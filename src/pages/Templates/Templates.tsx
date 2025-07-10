@@ -52,6 +52,7 @@ const Templates: React.FC = () => {
   const { templates, setTemplates, setCurrentPage, metaConfig, user } = useContext(AppContext);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
   
   const handleUseTemplate = (templateId: string) => {
     setCurrentPage('new-campaign', { templateId });
@@ -64,6 +65,7 @@ const Templates: React.FC = () => {
     }
     setIsLoading(true);
     setError(null);
+    setSyncMessage(null);
     try {
         const metaTemplates = await getMetaTemplates(metaConfig);
 
@@ -108,6 +110,8 @@ const Templates: React.FC = () => {
         if (refetchError) throw refetchError;
         
         setTemplates((dbTemplates as unknown as MessageTemplate[]) || []);
+        setSyncMessage("Sincronização concluída! Os status dos templates foram atualizados.");
+        setTimeout(() => setSyncMessage(null), 4000);
 
     } catch(err: any) {
         setError(err.message);
@@ -130,6 +134,7 @@ const Templates: React.FC = () => {
       </div>
 
       {error && <Card className="border-l-4 border-red-500"><p className="text-red-400">{error}</p></Card>}
+      {syncMessage && <Card className="border-l-4 border-green-500"><p className="text-green-400">{syncMessage}</p></Card>}
       
       {templates.length === 0 ? (
         <Card className="text-center py-12">

@@ -35,19 +35,41 @@ export const createMetaTemplate = async (
 
     // Adiciona valores de exemplo para cada componente que possuir variáveis
     const componentsWithExamples = template.components.map(component => {
-        if (component.text) {
-            const placeholders = component.text.match(/\{\{\d+\}\}/g);
+        let newComponent: MetaTemplateComponent = { ...component };
+
+        // Lógica para exemplos de HEADER e BODY
+        if ((newComponent.type === 'HEADER' || newComponent.type === 'BODY') && newComponent.text) {
+            const placeholders = newComponent.text.match(/\{\{\d+\}\}/g);
             if (placeholders && placeholders.length > 0) {
-                const exampleValues = placeholders.map((p, i) => `[Exemplo ${p.replace(/\{|\}/g, '')}]`);
-                if (component.type === 'BODY') {
-                    return { ...component, example: { body_text: [exampleValues] } };
-                }
-                if (component.type === 'HEADER') {
-                    return { ...component, example: { header_text: exampleValues } };
+                const exampleValues = placeholders.map(p => `[Exemplo ${p.replace(/\{|\}/g, '')}]`);
+                if (newComponent.type === 'BODY') {
+                    // O formato { body_text: [exampleValues] } cria corretamente a estrutura string[][]
+                    newComponent.example = { body_text: [exampleValues] };
+                } else { // HEADER
+                    newComponent.example = { header_text: exampleValues };
                 }
             }
         }
-        return component;
+
+        // Lógica para exemplos de botões de URL
+        if (newComponent.type === 'BUTTONS' && newComponent.buttons) {
+            const buttonUrlExamples: string[] = [];
+            newComponent.buttons.forEach(button => {
+                // A Meta espera um exemplo para cada botão de URL que contém uma variável.
+                if (button.type === 'URL' && button.url && /\{\{1\}\}/.test(button.url)) {
+                    // A API da Meta espera um exemplo de sufixo para a URL.
+                    // Ex: se a URL é https://a.b/{{1}}, um exemplo pode ser "produto/123"
+                    buttonUrlExamples.push("exemplo-de-link-dinamico");
+                }
+            });
+
+            if (buttonUrlExamples.length > 0) {
+                // Adiciona o array de exemplos ao componente BUTTONS
+                newComponent.example = buttonUrlExamples;
+            }
+        }
+        
+        return newComponent;
     });
 
     const payload: MetaTemplateCreationPayload = {

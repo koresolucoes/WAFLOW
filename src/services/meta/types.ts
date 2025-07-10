@@ -6,16 +6,16 @@ interface MetaBodyExample {
 interface MetaHeaderExample {
     header_text: string[];
 }
-interface MetaUrlButtonExample {
-    url_suffix_example: string;
-}
+// O tipo 'MetaUrlButtonExample' foi removido porque o exemplo para botões de URL
+// é um array de strings diretamente no componente, não um objeto.
 
 export interface MetaButton {
     type: 'QUICK_REPLY' | 'URL' | 'PHONE_NUMBER';
     text: string;
     url?: string;
     phone_number?: string;
-    url_suffix_example?: string;
+    // A propriedade 'url_suffix_example' foi removida.
+    // O exemplo é fornecido no nível do componente 'BUTTONS'.
 }
 
 export interface MetaTemplateComponent {
@@ -23,7 +23,9 @@ export interface MetaTemplateComponent {
     text?: string;
     format?: 'TEXT' | 'IMAGE' | 'DOCUMENT' | 'VIDEO';
     buttons?: MetaButton[];
-    example?: MetaBodyExample | MetaHeaderExample | MetaUrlButtonExample;
+    // O tipo de 'example' foi atualizado para incluir 'string[]'
+    // para os exemplos de botões de URL, conforme a documentação oficial da Meta.
+    example?: MetaBodyExample | MetaHeaderExample | string[];
 }
 
 export interface MetaApiErrorResponse {

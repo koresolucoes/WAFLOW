@@ -22,6 +22,7 @@ const TemplateEditor: React.FC = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const header = useMemo(() => template.components.find(c => c.type === 'HEADER'), [template.components]);
   const body = useMemo(() => template.components.find(c => c.type === 'BODY'), [template.components]);
@@ -35,6 +36,7 @@ const TemplateEditor: React.FC = () => {
     }
     setIsGenerating(true);
     setError(null);
+    setSuccessMessage(null);
 
     const companyProfileForAI = {
         name: profile.company_name,
@@ -70,6 +72,7 @@ const TemplateEditor: React.FC = () => {
 
     setIsSaving(true);
     setError(null);
+    setSuccessMessage(null);
     try {
         const result = await createMetaTemplate(metaConfig, {
             templateName: template.template_name,
@@ -77,8 +80,13 @@ const TemplateEditor: React.FC = () => {
             components: template.components
         });
         await addTemplate({ ...template, meta_id: result.id, status: 'PENDING' });
-        alert('Template enviado para a Meta com sucesso! Ele aparecerá como PENDENTE até ser aprovado.');
-        setCurrentPage('templates');
+        
+        setSuccessMessage('Template enviado para aprovação com sucesso! Ele aparecerá como "PENDING" na sua lista. Você será redirecionado em 3 segundos.');
+        
+        setTimeout(() => {
+            setCurrentPage('templates');
+        }, 3000);
+
     } catch (err: any) {
         setError(err.message || 'Ocorreu um erro inesperado ao salvar na Meta.');
     } finally {
@@ -167,6 +175,7 @@ const TemplateEditor: React.FC = () => {
       <h1 className="text-3xl font-bold text-white">Editor de Templates</h1>
 
       {error && <Card className="border-l-4 border-red-500"><p className="text-red-400">{error}</p></Card>}
+      {successMessage && <Card className="border-l-4 border-green-500"><p className="text-green-400">{successMessage}</p></Card>}
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
         {/* Coluna de Edição */}
@@ -177,7 +186,7 @@ const TemplateEditor: React.FC = () => {
                     <label htmlFor="campaignGoal" className="block text-sm font-medium text-slate-300">
                         Descreva o objetivo da sua campanha
                     </label>
-                    <textarea id="campaignGoal" value={campaignGoal} onChange={(e) => { setCampaignGoal(e.target.value); setError(null); }}
+                    <textarea id="campaignGoal" value={campaignGoal} onChange={(e) => { setCampaignGoal(e.target.value); setError(null); setSuccessMessage(null); }}
                         placeholder="Ex: Anunciar um desconto de 20% em novos produtos para a temporada de verão e levar o cliente para o site."
                         className="w-full bg-slate-700 border border-slate-600 rounded-md p-3 text-white placeholder-slate-400 focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
                         rows={3}
@@ -276,7 +285,7 @@ const TemplateEditor: React.FC = () => {
             <h2 className="text-xl font-semibold text-white mb-4">3. Pré-visualização</h2>
             <TemplatePreview components={template.components} recipientName="Ana Silva" />
              <div className="mt-6">
-                <Button onClick={handleSave} variant="primary" size="lg" className="w-full" isLoading={isSaving} disabled={!template.template_name || !body?.text}>
+                <Button onClick={handleSave} variant="primary" size="lg" className="w-full" isLoading={isSaving} disabled={isSaving || !!successMessage || !template.template_name || !body?.text}>
                     Salvar e Enviar para Aprovação
                 </Button>
             </div>
