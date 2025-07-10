@@ -41,7 +41,7 @@ export default async function handler(req: Request) {
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
         const prompt = `
-            Com base no perfil da empresa e no objetivo da campanha a seguir, gere um modelo de mensagem do WhatsApp que esteja em conformidade com as políticas da Meta.
+            Com base no perfil da empresa e no objetivo da campanha a seguir, gere um modelo de mensagem completo para o WhatsApp, em conformidade com as políticas da Meta.
 
             **Perfil da Empresa:**
             - Nome: ${profile.name}
@@ -53,13 +53,15 @@ export default async function handler(req: Request) {
             **Objetivo da Campanha:**
             ${campaignGoal}
 
-            **Instruções:**
-            1.  Gere uma estrutura de componentes JSON, incluindo um HEADER (com 'format': 'TEXT') e um BODY.
-            2.  A mensagem deve ser amigável, profissional e concisa, em português do Brasil.
-            3.  O HEADER deve ser um título curto e chamativo para a mensagem.
-            4.  O BODY deve conter o texto principal e incluir placeholders para personalização, como {{1}} para o nome do cliente.
-            5.  A categoria deve ser uma das seguintes: MARKETING, UTILITY, AUTHENTICATION.
-            6.  O nome do template deve estar em snake_case, usando apenas letras minúsculas, números e underscores.
+            **Instruções para Geração:**
+            1.  **Estrutura JSON:** Gere uma estrutura de componentes JSON completa.
+            2.  **Componentes:** O componente 'BODY' é obrigatório. Inclua opcionalmente 'HEADER', 'FOOTER' e 'BUTTONS' se forem relevantes para o objetivo.
+                *   **HEADER**: Um título curto e chamativo para a mensagem. Use o formato 'TEXT'.
+                *   **BODY**: O texto principal, conciso e em português do Brasil. Use placeholders como '{{1}}' para o nome do cliente.
+                *   **FOOTER**: Uma linha de texto curta no final, como um slogan ou um aviso.
+                *   **BUTTONS**: Se a campanha tiver uma chamada para ação clara, adicione até 3 botões. Tipos de botão podem ser 'URL' (para um link), 'PHONE_NUMBER' (para ligar), ou 'QUICK_REPLY' (para uma resposta rápida).
+            3.  **Nome do Template:** O nome do template ('template_name') deve ser em 'snake_case', com letras minúsculas, números e underscores.
+            4.  **Categoria:** A categoria ('category') deve ser uma das seguintes: 'MARKETING', 'UTILITY', 'AUTHENTICATION'. Escolha a mais apropriada.
         `;
 
         const schema = {
@@ -75,30 +77,56 @@ export default async function handler(req: Request) {
                 },
                 components: {
                     type: Type.ARRAY,
-                    description: "Uma matriz de componentes do template. Deve conter um objeto para HEADER e um para BODY.",
+                    description: "Uma matriz de componentes do template. Deve conter um objeto para BODY e pode conter opcionalmente para HEADER, FOOTER, e BUTTONS.",
                     items: {
                         type: Type.OBJECT,
                         properties: {
                             type: {
                                 type: Type.STRING,
-                                description: "O tipo de componente, 'HEADER' ou 'BODY'."
+                                description: "O tipo de componente: 'HEADER', 'BODY', 'FOOTER', ou 'BUTTONS'."
                             },
                             format: {
                                 type: Type.STRING,
-                                description: "O formato para o HEADER, deve ser 'TEXT'."
+                                description: "Opcional. Para HEADER, deve ser 'TEXT'."
                             },
                             text: {
                                 type: Type.STRING,
-                                description: "O conteúdo de texto para o componente. Use placeholders como {{1}} no BODY."
+                                description: "O conteúdo de texto para HEADER, BODY, ou FOOTER. Use placeholders como {{1}}."
+                            },
+                            buttons: {
+                                type: Type.ARRAY,
+                                description: "Obrigatório se o tipo for 'BUTTONS'. Uma matriz de objetos de botão.",
+                                items: {
+                                    type: Type.OBJECT,
+                                    properties: {
+                                        type: {
+                                            type: Type.STRING,
+                                            description: "Tipo de botão: 'QUICK_REPLY', 'URL', ou 'PHONE_NUMBER'."
+                                        },
+                                        text: {
+                                            type: Type.STRING,
+                                            description: "O texto exibido no botão (máx 20 caracteres)."
+                                        },
+                                        url: {
+                                            type: Type.STRING,
+                                            description: "Obrigatório se o tipo for 'URL'. A URL para abrir. Pode usar variáveis."
+                                        },
+                                        phone_number: {
+                                            type: Type.STRING,
+                                            description: "Obrigatório se o tipo for 'PHONE_NUMBER'. O número de telefone a ser discado."
+                                        }
+                                    },
+                                    required: ["type", "text"]
+                                }
                             }
                         },
-                        required: ["type", "text"]
+                        required: ["type"]
                     }
                 }
             },
             required: ["template_name", "category", "components"]
         };
-
+        
         const response = await ai.models.generateContent({
             model: "gemini-2.5-flash",
             contents: prompt,
@@ -108,7 +136,17 @@ export default async function handler(req: Request) {
             },
         });
 
-        return new Response(response.text, {
+        // Limpa a resposta da IA para garantir que é um JSON válido
+        let jsonText = response.text.trim();
+        // Remove ```json e ``` do início e fim, se presentes
+        if (jsonText.startsWith('```json')) {
+            jsonText = jsonText.substring(7);
+        }
+        if (jsonText.endsWith('```')) {
+            jsonText = jsonText.substring(0, jsonText.length - 3);
+        }
+
+        return new Response(jsonText, {
             status: 200,
             headers: { 'Content-Type': 'application/json' },
         });

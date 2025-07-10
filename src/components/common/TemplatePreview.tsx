@@ -28,6 +28,10 @@ const TemplatePreview: React.FC<TemplatePreviewProps> = ({
             processedText = processedText.replace(regex, value ? `[${value}]` : key);
         });
 
+        // Substitui quaisquer variáveis não preenchidas pelo seu placeholder para visualização
+        processedText = processedText.replace(/\{\{(\d+)\}\}/g, '[Variável $1]');
+
+
         return processedText;
     };
 
@@ -76,7 +80,7 @@ const TemplatePreview: React.FC<TemplatePreviewProps> = ({
 
                             {/* Footer */}
                             {footer && footer.text && (
-                                 <p className="text-xs text-slate-300 mt-2" style={{ whiteSpace: 'pre-wrap' }}>
+                                 <p className="text-xs text-slate-300/90 mt-2" style={{ whiteSpace: 'pre-wrap' }}>
                                     {applyVars(footer.text)}
                                 </p>
                             )}
@@ -94,8 +98,8 @@ const TemplatePreview: React.FC<TemplatePreviewProps> = ({
                         {buttons && buttons.length > 0 && (
                             <div className="mt-1 space-y-1">
                                 {buttons.map((button, index) => (
-                                    <div key={index} className="bg-slate-700 rounded-lg p-2.5 text-center text-sky-400 font-semibold text-sm cursor-pointer shadow-md">
-                                        {button.text}
+                                    <div key={index} className="bg-slate-700/80 rounded-lg p-2.5 text-center text-sky-300 font-semibold text-sm cursor-pointer shadow-md backdrop-blur-sm hover:bg-slate-600/80">
+                                        {button.text || "Texto do Botão"}
                                     </div>
                                 ))}
                             </div>
