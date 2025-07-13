@@ -12,6 +12,8 @@ import Contacts from './pages/Contacts/Contacts';
 import NewCampaign from './pages/NewCampaign/NewCampaign';
 import CampaignDetails from './pages/CampaignDetails/CampaignDetails';
 import MetaSettings from './pages/Settings/MetaSettings';
+import Automations from './pages/Automations/Automations';
+import AutomationEditor from './pages/AutomationEditor/AutomationEditor';
 
 const App: React.FC = () => {
   const { session, loading, currentPage } = useContext(AppContext);
@@ -30,6 +32,10 @@ const App: React.FC = () => {
         return <TemplateEditor />;
       case 'contacts':
         return <Contacts />;
+      case 'automations':
+        return <Automations />;
+      case 'automation-editor':
+        return <AutomationEditor />;
       case 'new-campaign':
         return <NewCampaign />;
       case 'profile':

@@ -1,8 +1,9 @@
+
 import { Session, User } from '@supabase/supabase-js';
 import { Database, Tables, TablesInsert, Json } from './database.types';
 import { MetaTemplateComponent } from '../services/meta/types';
 
-export type Page = 'dashboard' | 'campaigns' | 'templates' | 'template-editor' | 'contacts' | 'new-campaign' | 'profile' | 'settings' | 'auth' | 'campaign-details';
+export type Page = 'dashboard' | 'campaigns' | 'templates' | 'template-editor' | 'contacts' | 'new-campaign' | 'profile' | 'settings' | 'auth' | 'campaign-details' | 'automations' | 'automation-editor';
 
 // Derivando tipos diretamente do schema do banco de dados para consistência
 export type Profile = Tables<'profiles'>;
@@ -23,6 +24,9 @@ export type CampaignMessageInsert = TablesInsert<'campaign_messages'>;
 export type Segment = Tables<'segments'>;
 export type SegmentRule = Tables<'segment_rules'>;
 export type ReceivedMessage = Tables<'received_messages'>;
+export type Automation = Tables<'automations'>;
+export type AutomationInsert = TablesInsert<'automations'>;
+export type AutomationRun = Tables<'automation_runs'>;
 
 
 // Tipos para formulários e operações específicas

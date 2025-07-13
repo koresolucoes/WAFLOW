@@ -1,7 +1,8 @@
 
 // /api/webhook.ts
 import { createClient } from '@supabase/supabase-js';
-import { Database } from '../src/types/database.types';
+import { Database, Tables } from '../src/types/database.types';
+import { Automation, Contact, MessageTemplate, Profile } from '../src/types';
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -21,7 +22,7 @@ const supabase = createClient<Database>(supabaseUrl, supabaseServiceKey, {
 const findProfileByPhoneNumberId = async (phoneId: string) => {
     const { data, error } = await supabase
         .from('profiles')
-        .select('id')
+        .select('id, meta_access_token, meta_waba_id, meta_phone_number_id')
         .eq('meta_phone_number_id', phoneId)
         .single();
     if (error) {
@@ -35,7 +36,6 @@ const processStatuses = async (statuses: any[]) => {
     for (const status of statuses) {
         const updateData: { status: any; delivered_at?: string; read_at?: string } = { status: status.status };
         
-        // Meta sends timestamps as strings representing seconds since epoch.
         const timestamp = parseInt(status.timestamp, 10) * 1000;
         if (isNaN(timestamp)) continue;
 
@@ -48,7 +48,7 @@ const processStatuses = async (statuses: any[]) => {
         
         const { error } = await supabase
             .from('campaign_messages')
-            .update(updateData)
+            .update(updateData as any)
             .eq('meta_message_id', status.id);
 
         if (error) {
@@ -59,51 +59,108 @@ const processStatuses = async (statuses: any[]) => {
     }
 };
 
-const processIncomingMessages = async (messages: any[], userId: string) => {
-    for (const message of messages) {
-        // Por enquanto, processar apenas mensagens de texto para simplicidade.
-        if (message.type !== 'text') {
-            console.log(`Webhook: Ignorando mensagem não-texto do tipo ${message.type}.`);
-            continue;
+const executeAutomation = async (automation: Automation, contact: Contact, metaConfig: any) => {
+    try {
+        if (automation.action_type === 'send_template') {
+            const templateId = (automation.action_config as any)?.template_id;
+            if (!templateId) throw new Error("ID do template não encontrado na automação.");
+
+            const { data: template, error } = await supabase
+                .from('message_templates')
+                .select('template_name, status, components')
+                .eq('id', templateId)
+                .single();
+            if (error || !template) throw error || new Error("Template não encontrado.");
+            if ((template as MessageTemplate).status !== 'APPROVED') throw new Error(`Template '${(template as MessageTemplate).template_name}' não está APROVADO.`);
+            
+            await sendTemplatedMessage(metaConfig, contact.phone, (template as MessageTemplate).template_name, [{type: 'body', parameters: [{type: 'text', text: contact.name}]}]);
+
+        } else if (automation.action_type === 'add_tag') {
+            const tagToAdd = (automation.action_config as any)?.tag;
+            if (!tagToAdd) throw new Error("Tag não configurada na automação.");
+            const newTags = [...new Set([...(contact.tags || []), tagToAdd])];
+            const { error } = await supabase.from('contacts').update({ tags: newTags } as any).eq('id', contact.id);
+            if(error) throw error;
         }
 
-        const contactPhone = message.from;
+        await supabase.from('automation_runs').insert({ automation_id: automation.id, contact_id: contact.id, status: 'success' } as any);
+    } catch (err: any) {
+        console.error(`Webhook: Falha ao executar automação ${automation.id} para contato ${contact.id}:`, err.message);
+        await supabase.from('automation_runs').insert({ automation_id: automation.id, contact_id: contact.id, status: 'failed', details: err.message } as any);
+    }
+};
 
-        // Buscar contato correspondente. Assume-se que o número de telefone está armazenado sem formatação.
+const sendTemplatedMessage = async (config: any, to: string, templateName: string, components: any[]) => {
+    const API_VERSION = 'v23.0';
+    const url = `https://graph.facebook.com/${API_VERSION}/${config.meta_phone_number_id}/messages`;
+    const payload = {
+        messaging_product: 'whatsapp',
+        to: to.replace(/\D/g, ''),
+        type: 'template',
+        template: { name: templateName, language: { code: 'pt_BR' }, components }
+    };
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${config.meta_access_token}` },
+        body: JSON.stringify(payload)
+    });
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(`Meta API Error: ${error.error.message}`);
+    }
+    return response.json();
+};
+
+const processIncomingMessages = async (messages: any[], userId: string, metaConfig: any) => {
+    for (const message of messages) {
+        if (message.type !== 'text') continue;
+
+        const contactPhone = message.from;
         const { data: contact, error: contactError } = await supabase
             .from('contacts')
-            .select('id')
+            .select('*')
             .eq('user_id', userId)
             .eq('phone', contactPhone)
             .single();
 
         if (contactError || !contact) {
-            console.warn(`Webhook: Mensagem recebida de um contato desconhecido (${contactPhone}) para o usuário ${userId}.`, contactError?.message);
+            console.warn(`Webhook: Mensagem de contato desconhecido (${contactPhone}) para usuário ${userId}.`);
             continue;
         }
 
-        const timestamp = parseInt(message.timestamp, 10) * 1000;
-        if (isNaN(timestamp)) continue;
+        // Save received message
+        await supabase.from('received_messages').insert({
+            user_id: userId,
+            contact_id: (contact as Contact).id,
+            meta_message_id: message.id,
+            message_body: message.text?.body || '',
+            received_at: new Date(parseInt(message.timestamp, 10) * 1000).toISOString()
+        } as any);
 
-        const { error: insertError } = await supabase
-            .from('received_messages')
-            .insert({
-                user_id: userId,
-                contact_id: contact.id,
-                meta_message_id: message.id,
-                message_body: message.text?.body || '',
-                received_at: new Date(timestamp).toISOString()
-            });
+        // Check for keyword automations
+        const { data: automations, error: autoError } = await supabase
+            .from('automations')
+            .select('*')
+            .eq('user_id', userId)
+            .eq('status', 'active')
+            .eq('trigger_type', 'message_received_with_keyword');
+        
+        if (autoError) {
+            console.error('Webhook: Erro ao buscar automações por palavra-chave:', autoError.message);
+            continue;
+        }
 
-        if (insertError) {
-            console.error(`Webhook: Erro ao inserir mensagem recebida ${message.id}:`, insertError.message);
-        } else {
-            console.log(`Webhook: Nova mensagem ${message.id} de ${contactPhone} armazenada.`);
+        const messageText = (message.text?.body || '').toLowerCase().trim();
+        for (const auto of (automations as Automation[])) {
+            const keyword = (((auto.trigger_config as any)?.keyword) || '').toLowerCase().trim();
+            if (keyword && messageText.includes(keyword)) {
+                console.log(`Webhook: Gatilho de palavra-chave '${keyword}' encontrado. Executando automação '${auto.name}'.`);
+                await executeAutomation(auto, contact as Contact, metaConfig);
+            }
         }
     }
 };
 
-// Main handler
 const handleVerification = (req: Request): Response => {
     const url = new URL(req.url);
     const params = url.searchParams;
@@ -123,7 +180,6 @@ const handleVerification = (req: Request): Response => {
 const handlePost = async (req: Request): Promise<Response> => {
     try {
         const body = await req.json();
-        // console.log('Webhook: Corpo recebido:', JSON.stringify(body, null, 2));
 
         if (body.object !== 'whatsapp_business_account') {
             return new Response('Not a WhatsApp Business Account notification', { status: 200 });
@@ -142,11 +198,17 @@ const handlePost = async (req: Request): Promise<Response> => {
                         continue;
                     }
 
+                    const metaConfig = {
+                        accessToken: (profile as Profile).meta_access_token,
+                        wabaId: (profile as Profile).meta_waba_id,
+                        phoneNumberId: (profile as Profile).meta_phone_number_id
+                    };
+
                     if (value.statuses) {
                         await processStatuses(value.statuses);
                     }
                     if (value.messages) {
-                        await processIncomingMessages(value.messages, profile.id);
+                        await processIncomingMessages(value.messages, (profile as Profile).id, metaConfig);
                     }
                 }
             }

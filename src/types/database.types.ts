@@ -1,3 +1,4 @@
+
 /**
  * =================================================================================================
  * ZAPFLOW AI - SUPABASE DATABASE SCHEMA
@@ -20,6 +21,8 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA extensions;
 
 -- Remove tipos e tabelas existentes na ordem correta para evitar erros de dependência.
+DROP TABLE IF EXISTS public.automation_runs CASCADE;
+DROP TABLE IF EXISTS public.automations CASCADE;
 DROP TABLE IF EXISTS public.campaign_messages CASCADE;
 DROP TABLE IF EXISTS public.received_messages CASCADE;
 DROP TABLE IF EXISTS public.segment_rules CASCADE;
@@ -28,6 +31,11 @@ DROP TABLE IF EXISTS public.message_templates CASCADE;
 DROP TABLE IF EXISTS public.contacts CASCADE;
 DROP TABLE IF EXISTS public.segments CASCADE;
 DROP TABLE IF EXISTS public.profiles CASCADE;
+
+DROP TYPE IF EXISTS public.automation_run_status_enum;
+DROP TYPE IF EXISTS public.automation_action_type_enum;
+DROP TYPE IF EXISTS public.automation_trigger_type_enum;
+DROP TYPE IF EXISTS public.automation_status_enum;
 DROP TYPE IF EXISTS public.message_status_enum;
 DROP TYPE IF EXISTS public.campaign_status_enum;
 DROP TYPE IF EXISTS public.template_status_enum;
@@ -38,6 +46,11 @@ CREATE TYPE public.template_category_enum AS ENUM ('MARKETING', 'UTILITY', 'AUTH
 CREATE TYPE public.template_status_enum AS ENUM ('APPROVED', 'PENDING', 'REJECTED', 'PAUSED', 'LOCAL');
 CREATE TYPE public.campaign_status_enum AS ENUM ('Sent', 'Draft', 'Failed');
 CREATE TYPE public.message_status_enum AS ENUM ('sent', 'delivered', 'read', 'failed');
+CREATE TYPE public.automation_status_enum AS ENUM ('active', 'paused');
+CREATE TYPE public.automation_trigger_type_enum AS ENUM ('new_contact_with_tag', 'message_received_with_keyword');
+CREATE TYPE public.automation_action_type_enum AS ENUM ('send_template', 'add_tag');
+CREATE TYPE public.automation_run_status_enum AS ENUM ('success', 'failed');
+
 
 -- Tabela de perfis, ligada à autenticação do Supabase
 CREATE TABLE public.profiles (
@@ -143,6 +156,33 @@ CREATE TABLE public.received_messages (
 comment on table public.received_messages is 'Armazena mensagens recebidas de contatos via Webhook.';
 comment on column public.received_messages.sentiment is 'Análise de sentimento da mensagem (ex: positivo, negativo, neutro).';
 
+-- Tabela de Automações
+CREATE TABLE public.automations (
+    id uuid NOT NULL PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+    name text NOT NULL,
+    status public.automation_status_enum NOT NULL DEFAULT 'active',
+    trigger_type public.automation_trigger_type_enum NOT NULL,
+    trigger_config jsonb NOT NULL,
+    action_type public.automation_action_type_enum NOT NULL,
+    action_config jsonb NOT NULL,
+    created_at timestamp with time zone NOT NULL DEFAULT now()
+);
+comment on table public.automations is 'Armazena fluxos de trabalho de automação.';
+comment on column public.automations.trigger_config is 'Ex: {"tag": "vip"} ou {"keyword": "promo"}';
+comment on column public.automations.action_config is 'Ex: {"template_id": "uuid"} ou {"tag": "interessado"}';
+
+-- Tabela de logs de execução das automações
+CREATE TABLE public.automation_runs (
+    id uuid NOT NULL PRIMARY KEY DEFAULT uuid_generate_v4(),
+    automation_id uuid NOT NULL REFERENCES public.automations(id) ON DELETE CASCADE,
+    contact_id uuid NOT NULL REFERENCES public.contacts(id) ON DELETE CASCADE,
+    run_at timestamp with time zone NOT NULL DEFAULT now(),
+    status public.automation_run_status_enum NOT NULL,
+    details text
+);
+comment on table public.automation_runs is 'Registra a execução de cada automação.';
+
 -- Habilita a Segurança a Nível de Linha (RLS) para todas as tabelas
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.contacts ENABLE ROW LEVEL SECURITY;
@@ -152,6 +192,9 @@ ALTER TABLE public.segment_rules ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.campaigns ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.campaign_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.received_messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.automations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.automation_runs ENABLE ROW LEVEL SECURITY;
+
 
 -- Define as políticas de RLS para garantir que os usuários só possam acessar seus próprios dados
 CREATE POLICY "Users can manage their own profile." ON public.profiles FOR ALL USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
@@ -162,6 +205,9 @@ CREATE POLICY "Users can manage rules for their own segments." ON public.segment
 CREATE POLICY "Users can manage their own campaigns." ON public.campaigns FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users can manage messages from their own campaigns." ON public.campaign_messages FOR ALL USING (auth.uid() = (SELECT user_id FROM public.campaigns WHERE id = campaign_id)) WITH CHECK (auth.uid() = (SELECT user_id FROM public.campaigns WHERE id = campaign_id));
 CREATE POLICY "Users can manage their own received messages." ON public.received_messages FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can manage their own automations." ON public.automations FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can view their own automation runs." ON public.automation_runs FOR ALL USING (auth.uid() = (SELECT user_id FROM public.automations WHERE id = automation_id));
+
 
 -- Função para criar um perfil automaticamente quando um novo usuário se cadastra
 CREATE OR REPLACE FUNCTION public.handle_new_user()
@@ -195,6 +241,92 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      automation_runs: {
+        Row: {
+          automation_id: string
+          contact_id: string
+          details: string | null
+          id: string
+          run_at: string
+          status: Database["public"]["Enums"]["automation_run_status_enum"]
+        }
+        Insert: {
+          automation_id: string
+          contact_id: string
+          details?: string | null
+          id?: string
+          run_at?: string
+          status: Database["public"]["Enums"]["automation_run_status_enum"]
+        }
+        Update: {
+          automation_id?: string
+          contact_id?: string
+          details?: string | null
+          id?: string
+          run_at?: string
+          status?: Database["public"]["Enums"]["automation_run_status_enum"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automation_runs_automation_id_fkey"
+            columns: ["automation_id"]
+            isOneToOne: false
+            referencedRelation: "automations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_runs_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      automations: {
+        Row: {
+          action_config: Json
+          action_type: Database["public"]["Enums"]["automation_action_type_enum"]
+          created_at: string
+          id: string
+          name: string
+          status: Database["public"]["Enums"]["automation_status_enum"]
+          trigger_config: Json
+          trigger_type: Database["public"]["Enums"]["automation_trigger_type_enum"]
+          user_id: string
+        }
+        Insert: {
+          action_config: Json
+          action_type: Database["public"]["Enums"]["automation_action_type_enum"]
+          created_at?: string
+          id?: string
+          name: string
+          status?: Database["public"]["Enums"]["automation_status_enum"]
+          trigger_config: Json
+          trigger_type: Database["public"]["Enums"]["automation_trigger_type_enum"]
+          user_id: string
+        }
+        Update: {
+          action_config?: Json
+          action_type?: Database["public"]["Enums"]["automation_action_type_enum"]
+          created_at?: string
+          id?: string
+          name?: string
+          status?: Database["public"]["Enums"]["automation_status_enum"]
+          trigger_config?: Json
+          trigger_type?: Database["public"]["Enums"]["automation_trigger_type_enum"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automations_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       campaign_messages: {
         Row: {
           campaign_id: string
@@ -534,6 +666,12 @@ export type Database = {
       }
     }
     Enums: {
+      automation_action_type_enum: "send_template" | "add_tag"
+      automation_run_status_enum: "success" | "failed"
+      automation_status_enum: "active" | "paused"
+      automation_trigger_type_enum:
+        | "new_contact_with_tag"
+        | "message_received_with_keyword"
       campaign_status_enum: "Sent" | "Draft" | "Failed"
       message_status_enum: "sent" | "delivered" | "read" | "failed"
       template_category_enum: "MARKETING" | "UTILITY" | "AUTHENTICATION"

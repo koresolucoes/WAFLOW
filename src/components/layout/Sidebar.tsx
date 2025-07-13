@@ -1,7 +1,8 @@
+
 import React, { useContext } from 'react';
 import { AppContext } from '../../contexts/AppContext';
 import { Page } from '../../types';
-import { ZAPFLOW_AI_LOGO, DASHBOARD_ICON, CAMPAIGN_ICON, TEMPLATE_ICON, CONTACTS_ICON, PROFILE_ICON, SETTINGS_ICON } from '../icons';
+import { ZAPFLOW_AI_LOGO, DASHBOARD_ICON, CAMPAIGN_ICON, TEMPLATE_ICON, CONTACTS_ICON, PROFILE_ICON, SETTINGS_ICON, AUTOMATION_ICON } from '../icons';
 
 interface NavItemProps {
   icon: React.ReactNode;
@@ -37,6 +38,7 @@ const Sidebar: React.FC = () => {
     { icon: <CAMPAIGN_ICON className="w-5 h-5" />, label: 'Campanhas', page: 'campaigns' as Page },
     { icon: <TEMPLATE_ICON className="w-5 h-5" />, label: 'Templates', page: 'templates' as Page },
     { icon: <CONTACTS_ICON className="w-5 h-5" />, label: 'Contatos', page: 'contacts' as Page },
+    { icon: <AUTOMATION_ICON className="w-5 h-5" />, label: 'Automações', page: 'automations' as Page },
     { icon: <PROFILE_ICON className="w-5 h-5" />, label: 'Perfil da Empresa', page: 'profile' as Page },
   ];
   

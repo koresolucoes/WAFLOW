@@ -1,3 +1,4 @@
+
 import React, { useContext, useState, useMemo } from 'react';
 import { MessageTemplate } from '../../types';
 import { AppContext } from '../../contexts/AppContext';
@@ -77,7 +78,7 @@ const Templates: React.FC = () => {
 
         if (fetchError) throw fetchError;
         
-        const existingMetaIdMap = new Map(existingTemplates?.map(t => [t.meta_id, t.id]));
+        const existingMetaIdMap = new Map((existingTemplates as any[])?.map(t => [t.meta_id, t.id]));
 
         const templatesToUpsert = metaTemplates.map(mt => {
             const existingId = existingMetaIdMap.get(mt.id);
