@@ -1,6 +1,6 @@
 
 import React, { useContext, useState, useMemo } from 'react';
-import { MessageTemplate } from '../../types';
+import { MessageTemplate, TablesInsert } from '../../types';
 import { AppContext } from '../../contexts/AppContext';
 import { getMetaTemplates } from '../../services/meta/templates';
 import { supabase } from '../../lib/supabaseClient';
@@ -82,13 +82,13 @@ const Templates: React.FC = () => {
 
         const templatesToUpsert = metaTemplates.map(mt => {
             const existingId = existingMetaIdMap.get(mt.id);
-            const templateData = {
+            const templateData: Partial<TablesInsert<'message_templates'>> & { user_id: string } = {
                 meta_id: mt.id,
                 user_id: user.id,
                 template_name: mt.name,
                 status: mt.status,
                 category: mt.category,
-                components: mt.components,
+                components: mt.components as any,
             };
 
             if (existingId) {
@@ -98,7 +98,7 @@ const Templates: React.FC = () => {
         });
         
         if (templatesToUpsert.length > 0) {
-            const { error: upsertError } = await supabase.from('message_templates').upsert(templatesToUpsert as any);
+            const { error: upsertError } = await (supabase.from('message_templates') as any).upsert(templatesToUpsert);
             if (upsertError) throw upsertError;
         }
 

@@ -137,7 +137,7 @@ export default async function handler(req: Request) {
         });
 
         // Limpa a resposta da IA para garantir que é um JSON válido
-        let jsonText = response.text.trim();
+        let jsonText = (response.text || '').trim();
         // Remove ```json e ``` do início e fim, se presentes
         if (jsonText.startsWith('```json')) {
             jsonText = jsonText.substring(7);

@@ -1,8 +1,8 @@
 
 // /api/webhook.ts
 import { createClient } from '@supabase/supabase-js';
-import { Database, Tables, Json } from '../src/types/database.types';
-import { Automation, Contact, MessageTemplate, Profile } from '../src/types';
+import { Database, Tables } from '../src/types/database.types';
+import { Contact } from '../src/types';
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -74,18 +74,19 @@ const sendTemplatedMessage = async (config: any, to: string, templateName: strin
 
 // --- AUTOMATION EXECUTION LOGIC ---
 
-const executeContactAutomation = async (automation: Automation, contact: Contact, metaConfig: any) => {
+const executeContactAutomation = async (automation: Tables<'automations'>, contact: Contact, metaConfig: any) => {
     try {
         if (automation.action_type === 'send_template') {
             const templateId = (automation.action_config as any)?.template_id;
             if (!templateId) throw new Error("ID do template não encontrado na automação.");
 
-            const { data: template, error } = await supabase
+            const { data: templateData, error } = await supabase
                 .from('message_templates')
                 .select('template_name, status, components')
                 .eq('id', templateId)
                 .single();
-            if (error || !template) throw error || new Error("Template não encontrado.");
+            if (error || !templateData) throw error || new Error("Template não encontrado.");
+            const template = templateData as any;
             if (template.status !== 'APPROVED') throw new Error(`Template '${template.template_name}' não está APROVADO.`);
             
             await sendTemplatedMessage(metaConfig, contact.phone, template.template_name, [{type: 'body', parameters: [{type: 'text', text: contact.name}]}]);
@@ -94,18 +95,18 @@ const executeContactAutomation = async (automation: Automation, contact: Contact
             const tagToAdd = (automation.action_config as any)?.tag;
             if (!tagToAdd) throw new Error("Tag não configurada na automação.");
             const newTags = [...new Set([...(contact.tags || []), tagToAdd])];
-            const { error } = await supabase.from('contacts').update({ tags: newTags }).eq('id', contact.id);
+            const { error } = await supabase.from('contacts').update({ tags: newTags } as any).eq('id', contact.id);
             if(error) throw error;
         }
 
-        await supabase.from('automation_runs').insert({ automation_id: automation.id, contact_id: contact.id, status: 'success' });
+        await supabase.from('automation_runs').insert({ automation_id: automation.id, contact_id: contact.id, status: 'success' } as any);
     } catch (err: any) {
         console.error(`Webhook: Falha ao executar automação ${automation.id} para contato ${contact.id}:`, err.message);
-        await supabase.from('automation_runs').insert({ automation_id: automation.id, contact_id: contact.id, status: 'failed', details: err.message });
+        await supabase.from('automation_runs').insert({ automation_id: automation.id, contact_id: contact.id, status: 'failed', details: err.message } as any);
     }
 };
 
-const executeGenericAutomation = async (automation: Automation, triggerData: any) => {
+const executeGenericAutomation = async (automation: Tables<'automations'>, triggerData: any) => {
     const actionType = automation.action_type;
     const actionConfig = automation.action_config as any;
 
@@ -151,7 +152,7 @@ const executeGenericAutomation = async (automation: Automation, triggerData: any
             automation_id: automation.id,
             status: 'success',
             details: `Ação '${actionType}' executada com sucesso via webhook.`
-        });
+        } as any);
 
     } catch (executionError: any) {
         // Log de falha
@@ -160,7 +161,7 @@ const executeGenericAutomation = async (automation: Automation, triggerData: any
             automation_id: automation.id,
             status: 'failed',
             details: executionError.message,
-        });
+        } as any);
         // Lançar o erro novamente para que o manipulador saiba que falhou.
         throw executionError;
     }
@@ -184,13 +185,14 @@ const handleMetaPost = async (req: Request): Promise<Response> => {
                 
                 const profile = await findProfileByPhoneNumberId(metadata.phone_number_id);
                 if (!profile) continue;
-
-                const metaConfig = { accessToken: profile.meta_access_token, phoneNumberId: profile.meta_phone_number_id };
+                
+                const typedProfile = profile as any;
+                const metaConfig = { accessToken: typedProfile.meta_access_token, phoneNumberId: typedProfile.meta_phone_number_id };
 
                 // Processar status de mensagens de campanhas
                 if (value.statuses) {
                     for (const status of value.statuses) {
-                        const { error } = await supabase.from('campaign_messages').update({ status: status.status }).eq('meta_message_id', status.id);
+                        const { error } = await supabase.from('campaign_messages').update({ status: status.status } as any).eq('meta_message_id', status.id);
                         if (error) console.error(`Webhook: Erro ao atualizar status da mensagem ${status.id}:`, error.message);
                     }
                 }
@@ -200,18 +202,21 @@ const handleMetaPost = async (req: Request): Promise<Response> => {
                     for (const message of value.messages) {
                         if (message.type !== 'text') continue;
 
-                        const { data: contact } = await supabase.from('contacts').select('*').eq('user_id', profile.id).eq('phone', message.from).single();
-                        if (!contact) continue;
+                        const { data: contactData } = await supabase.from('contacts').select('*').eq('user_id', typedProfile.id).eq('phone', message.from).single();
+                        if (!contactData) continue;
+                        const contact = contactData as any;
 
-                        await supabase.from('received_messages').insert({ user_id: profile.id, contact_id: contact.id, meta_message_id: message.id, message_body: message.text?.body || '' });
+                        await supabase.from('received_messages').insert({ user_id: typedProfile.id, contact_id: contact.id, meta_message_id: message.id, message_body: message.text?.body || '' } as any);
 
-                        const { data: automations } = await supabase.from('automations').select('*').eq('user_id', profile.id).eq('status', 'active').eq('trigger_type', 'message_received_with_keyword');
-                        if (automations) {
+                        const { data: automationsData } = await supabase.from('automations').select('*').eq('user_id', typedProfile.id).eq('status', 'active').eq('trigger_type', 'message_received_with_keyword');
+                        const automations = (automationsData as any[] | null) || [];
+
+                        if (automations.length > 0) {
                             const messageText = (message.text?.body || '').toLowerCase().trim();
                             for (const auto of automations) {
                                 const keyword = (((auto.trigger_config as any)?.keyword) || '').toLowerCase().trim();
                                 if (keyword && messageText.includes(keyword)) {
-                                    await executeContactAutomation(auto as Automation, contact, metaConfig);
+                                    await executeContactAutomation(auto, contact, metaConfig);
                                 }
                             }
                         }
@@ -224,14 +229,15 @@ const handleMetaPost = async (req: Request): Promise<Response> => {
 };
 
 const handleAutomationTrigger = async (req: Request, automationId: string): Promise<Response> => {
-    const { data: automation, error: autoError } = await supabase
+    const { data: automationData, error: autoError } = await supabase
         .from('automations')
         .select('*')
         .eq('id', automationId)
         .eq('status', 'active')
         .eq('trigger_type', 'webhook_received')
         .single();
-
+    
+    const automation = automationData as any;
     if (autoError || !automation) {
         return new Response('Automation not found or not a valid webhook trigger.', { status: 404 });
     }
