@@ -1,3 +1,4 @@
+
 // /api/automations/trigger/[id].ts
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Database, Tables, Json, TablesInsert } from '../../../src/types/database.types';
@@ -8,6 +9,16 @@ const corsHeaders = {
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 };
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+const getValueFromPath = (obj: any, path: string) => {
+    if (!path) return undefined;
+    return path.split('.').reduce((o, k) => (o && o[k] !== undefined) ? o[k] : undefined, obj);
+}
+
 
 // ============================================================================
 // Flow Execution Engine (Copied from /api/webhook.ts for serverless isolation)
@@ -185,6 +196,73 @@ async function executeFlow(supabase: SupabaseClient<Database>, automation: Autom
     }
 }
 
+async function processWebhookPayload(
+    supabase: SupabaseClient<Database>,
+    payload: any,
+    triggerNode: AutomationNode,
+    user_id: string
+): Promise<Contact> {
+    const config = triggerNode.data.config as any || {};
+    const dataMapping: {source: string, destination: string, destination_key?: string}[] = config.data_mapping || [];
+
+    let phone = '';
+    let name = '';
+    const customFieldsToUpdate: any = {};
+    const tagsToAdd: string[] = [];
+
+    if (dataMapping.length > 0) {
+        const phoneMap = dataMapping.find(m => m.destination === 'phone');
+        if (phoneMap) phone = getValueFromPath(payload, phoneMap.source);
+
+        const nameMap = dataMapping.find(m => m.destination === 'name');
+        if (nameMap) name = getValueFromPath(payload, nameMap.source) || '';
+        
+        dataMapping.forEach(map => {
+            const value = getValueFromPath(payload, map.source);
+            if (value === undefined || value === null) return;
+
+            if (map.destination === 'custom_field' && map.destination_key) {
+                customFieldsToUpdate[map.destination_key] = value;
+            } else if (map.destination === 'tag') {
+                tagsToAdd.push(String(value));
+            }
+        });
+    } else {
+        phone = payload.phone;
+        name = payload.name || '';
+        Object.keys(payload)
+            .filter(key => key !== 'phone' && key !== 'name')
+            .forEach(key => customFieldsToUpdate[key] = payload[key]);
+    }
+    
+    if (!phone) throw new Error('Número de telefone não encontrado no payload ou no mapeamento. Configure o mapeamento do campo de telefone.');
+
+    const sanitizedPhone = String(phone).replace(/\D/g, '');
+    let { data: contact } = await supabase.from('contacts').select('*').eq('user_id', user_id).eq('phone', sanitizedPhone).single();
+
+    if (contact) {
+        const updatedContact = {
+            name: name || contact.name,
+            custom_fields: { ...(contact.custom_fields as object || {}), ...customFieldsToUpdate },
+            tags: [...new Set([...(contact.tags || []), ...tagsToAdd])]
+        };
+        const { data: updated, error } = await supabase.from('contacts').update(updatedContact).eq('id', contact.id).select().single();
+        if (error) throw error;
+        return updated as Contact;
+    } else {
+        const { data: newContact, error } = await supabase.from('contacts').insert({
+            user_id: user_id,
+            phone: sanitizedPhone,
+            name: name || sanitizedPhone,
+            custom_fields: customFieldsToUpdate,
+            tags: tagsToAdd
+        } as TablesInsert<'contacts'>).select().single();
+        if (error) throw error;
+        return newContact as Contact;
+    }
+}
+
+
 // ============================================================================
 // Main Handler
 // ============================================================================
@@ -230,17 +308,16 @@ export default async function handler(req: Request) {
         }
 
         let payload: any = {};
-        if (req.method === 'POST') {
+        if (req.method === 'POST' && req.headers.get('content-type')?.includes('application/json')) {
              try {
                 payload = await req.json();
             } catch {
-                payload = {};
+                return errorResponse('Corpo da requisição JSON inválido.', 400);
             }
         } else if (req.method === 'GET') {
             payload = Object.fromEntries(url.searchParams.entries());
         }
         
-        // "Capture Once" logic
         const needsCapture = !(triggerNode.data.config as any)?.last_captured_data;
         if (needsCapture) {
             const updatedNodes = automation.nodes.map(n => {
@@ -253,29 +330,7 @@ export default async function handler(req: Request) {
             return new Response(JSON.stringify({ message: 'Dados capturados com sucesso. O webhook agora está ativo e irá executar a automação nas próximas requisições.' }), { status: 200, headers: corsHeaders });
         }
 
-        // Live run logic
-        if (!payload.phone) return errorResponse('A requisição deve conter a propriedade "phone" para identificar o contato.', 400);
-
-        let { data: contact } = await supabase.from('contacts').select('*').eq('user_id', automation.user_id).eq('phone', payload.phone).single();
-        const customData = { ...payload };
-        delete customData.phone;
-        delete customData.name;
-
-        if (!contact) {
-            const { data: newContact, error: createError } = await supabase.from('contacts').insert({
-                user_id: automation.user_id,
-                phone: payload.phone,
-                name: payload.name || payload.phone,
-                custom_fields: customData
-            } as TablesInsert<'contacts'>).select().single();
-            if (createError) throw createError;
-            contact = newContact;
-        } else {
-             const newCustomFields = { ...(contact.custom_fields as object || {}), ...customData };
-             const { data: updatedContact, error: updateError } = await supabase.from('contacts').update({ custom_fields: newCustomFields }).eq('id', contact.id).select().single();
-             if (updateError) throw updateError;
-             contact = updatedContact;
-        }
+        const contact = await processWebhookPayload(supabase, payload, triggerNode, automation.user_id);
         
         const metaConfig = {
             meta_access_token: profile.meta_access_token,
@@ -287,6 +342,6 @@ export default async function handler(req: Request) {
 
     } catch (error: any) {
         console.error('Webhook Trigger: Erro Crítico:', error);
-        return errorResponse('Erro interno do servidor.', 500);
+        return errorResponse(error.message || 'Erro interno do servidor.', 500);
     }
 }

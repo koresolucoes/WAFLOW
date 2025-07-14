@@ -1,16 +1,39 @@
 
-
 import React, { useContext, useState, useEffect, useCallback, memo } from 'react';
 import { ReactFlow, ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, type Node, type Edge, type NodeProps } from '@xyflow/react';
 import { AppContext } from '../../contexts/AppContext';
 import { Automation, AutomationInsert, AutomationNode, NodeData, TriggerType, ActionType, LogicType, MessageTemplate, Profile } from '../../types';
 import Button from '../../components/common/Button';
 import Card from '../../components/common/Card';
-import { AUTOMATION_ICON, PLUS_ICON, TRASH_ICON, COPY_ICON } from '../../components/icons';
+import { AUTOMATION_ICON, PLUS_ICON, TRASH_ICON, COPY_ICON, INFO_ICON } from '../../components/icons';
 
 
 const initialNodes: AutomationNode[] = [];
 const initialEdges: Edge[] = [];
+
+// ====================================================================================
+// Helper Functions
+// ====================================================================================
+
+const flattenObject = (obj: any, parentKey = '', res: Record<string, any> = {}) => {
+  for (const key in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+      const propName = parentKey ? `${parentKey}.${key}` : key;
+      if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
+        flattenObject(obj[key], propName, res);
+      } else {
+        res[propName] = obj[key];
+      }
+    }
+  }
+  return res;
+};
+
+const getValueFromPath = (obj: any, path: string) => {
+    if (!path) return undefined;
+    return path.split('.').reduce((o, k) => (o && o[k] !== undefined ? o[k] : undefined), obj);
+}
+
 
 // ====================================================================================
 // Custom Node Components
@@ -30,7 +53,7 @@ const nodeStyles = {
     description: "text-xs text-slate-400"
 };
 
-const CustomNode = memo(({ data, type }: NodeProps<NodeData>) => {
+const CustomNode = memo(({ data }: NodeProps<NodeData>) => {
     const isTrigger = data.nodeType === 'trigger';
 
     const nodeTypeStyle = data.nodeType;
@@ -159,8 +182,17 @@ const NodeSidebar = ({ onDragStart }: { onDragStart: (event: React.DragEvent, no
     </Card>
 );
 
-const SettingsPanel = ({ node, setNodes, templates, profile, updateAutomation, automationId }: { node: AutomationNode, setNodes: React.Dispatch<React.SetStateAction<AutomationNode[]>>, templates: MessageTemplate[], profile: Profile | null, updateAutomation: (automation: Automation) => Promise<void>, automationId?: string }) => {
+const SettingsPanel = ({ node, setNodes, templates, profile, automationId }: { node: AutomationNode, setNodes: React.Dispatch<React.SetStateAction<AutomationNode[]>>, templates: MessageTemplate[], profile: Profile | null, automationId?: string }) => {
     const { data, id } = node;
+    const config = (data.config as any) || {};
+    const [isListening, setIsListening] = useState(false);
+
+    // Watch for incoming data to stop the listening state
+    useEffect(() => {
+        if (config.last_captured_data) {
+            setIsListening(false);
+        }
+    }, [config.last_captured_data]);
 
     const updateNodeConfig = (key: string, value: any) => {
         setNodes(nds => nds.map(n => {
@@ -172,32 +204,102 @@ const SettingsPanel = ({ node, setNodes, templates, profile, updateAutomation, a
         }));
     };
     
-    const handleListenWebhook = async () => {
+    const handleStartListening = () => {
         if (!automationId) {
             alert("Por favor, salve a automação primeiro para ativar o modo de escuta.");
             return;
         }
-        // Clear previous data and save
-        setNodes(nds => {
-            const newNodes = nds.map(n => {
-                if (n.id === id) {
-                    const oldConfig = (typeof n.data.config === 'object' && n.data.config && !Array.isArray(n.data.config)) ? n.data.config : {};
-                    return { ...n, data: { ...n.data, config: { ...oldConfig, last_captured_data: null } } };
-                }
-                return n;
-            });
-            // Find the current automation state to save it
-            const currentAutomation = (window as any).currentAutomationForSave;
-            if (currentAutomation) {
-                updateAutomation({ ...currentAutomation, nodes: newNodes });
-                alert("Dados anteriores limpos. Envie uma requisição de teste para a URL do webhook para capturar os novos dados.");
+        // This relies on an external save function to persist the state change
+        // We clear the data, and the parent component should save this change
+        updateNodeConfig('last_captured_data', null);
+        setIsListening(true);
+        // The parent onSave will be called after this state update, persisting the change
+        setTimeout(() => {
+             const saveButton = document.getElementById('automation-save-button') as HTMLButtonElement;
+             if (saveButton) {
+                saveButton.click();
+                alert("Modo de escuta ativado. Envie uma requisição de teste para a URL do webhook para capturar os dados.");
+             }
+        }, 100);
+    }
+    
+    const handleMappingChange = (source: string, destination: string, destination_key?: string) => {
+        let newMapping = [...(config.data_mapping || [])];
+        const existingIndex = newMapping.findIndex(m => m.source === source);
+
+        if (destination === 'ignore') {
+             newMapping = newMapping.filter(m => m.source !== source);
+        } else {
+             const newRule = { source, destination, destination_key };
+            // Ensure only one field is mapped to phone
+            if (destination === 'phone') {
+                newMapping = newMapping.filter(m => m.destination !== 'phone');
             }
-            return newNodes;
-        });
+             if (existingIndex > -1) {
+                newMapping[existingIndex] = newRule;
+            } else {
+                newMapping.push(newRule);
+            }
+        }
+        updateNodeConfig('data_mapping', newMapping);
+    };
+
+    const renderDataMapping = () => {
+        if (!config.last_captured_data) return null;
+        
+        const flattenedData = flattenObject(config.last_captured_data);
+        const capturedKeys = Object.keys(flattenedData);
+        const currentMapping = config.data_mapping || [];
+        const isPhoneMapped = currentMapping.some((m: any) => m.destination === 'phone');
+
+        return (
+            <div className="mt-4 border-t border-slate-700 pt-4">
+                <h4 className="text-md font-semibold text-white mb-2">Mapeamento de Dados</h4>
+                {!isPhoneMapped && (
+                     <div className="p-2 mb-3 text-xs text-amber-300 bg-amber-500/10 rounded-md flex items-start gap-2">
+                        <INFO_ICON className="w-6 h-6 flex-shrink-0"/>
+                        <span>**Atenção:** Mapeie um campo para "Telefone do Contato" para que o sistema saiba qual contato acionar.</span>
+                    </div>
+                )}
+                <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
+                {capturedKeys.map(key => {
+                    const value = flattenedData[key];
+                    const mappingRule = currentMapping.find((m: any) => m.source === key);
+                    const destination = mappingRule?.destination || 'ignore';
+                    
+                    return (
+                        <div key={key} className="p-2 bg-slate-700/50 rounded-lg">
+                            <p className="text-xs text-slate-400 font-mono truncate" title={key}>{key}</p>
+                            <p className="text-sm text-white font-semibold truncate my-1" title={String(value)}>{String(value)}</p>
+                             <select 
+                                value={destination} 
+                                onChange={(e) => handleMappingChange(key, e.target.value)}
+                                className="w-full bg-slate-800 border border-slate-600 rounded-md p-1.5 text-white text-sm"
+                            >
+                                <option value="ignore">Ignorar</option>
+                                <option value="phone">Telefone do Contato</option>
+                                <option value="name">Nome do Contato</option>
+                                <option value="tag">Adicionar como Tag</option>
+                                <option value="custom_field">Campo Personalizado</option>
+                            </select>
+                            {destination === 'custom_field' && (
+                                <input 
+                                    type="text" 
+                                    placeholder="Nome do campo (ex: id_pedido)"
+                                    value={mappingRule?.destination_key || ''}
+                                    onChange={(e) => handleMappingChange(key, 'custom_field', e.target.value)}
+                                    className="w-full mt-2 bg-slate-800 border border-slate-600 rounded-md p-1.5 text-white text-sm"
+                                />
+                            )}
+                        </div>
+                    )
+                })}
+                </div>
+            </div>
+        )
     }
 
     const renderConfig = () => {
-        const config = data.config as any || {};
         switch (data.type) {
             case 'new_contact_with_tag':
             case 'add_tag':
@@ -275,16 +377,16 @@ const SettingsPanel = ({ node, setNodes, templates, profile, updateAutomation, a
                  );
             case 'webhook_received':
                 const webhookPrefix = profile?.webhook_path_prefix || profile?.id;
-                const webhookUrl = automationId ? `${window.location.origin}/api/automations/trigger/${webhookPrefix}_${id}` : 'Salve para gerar a URL';
+                const webhookUrl = `${window.location.origin}/api/automations/trigger/${webhookPrefix}_${id}`;
                 return (
                      <div className="space-y-4">
                         <div>
                             <label className="block text-sm font-medium text-slate-300 mb-1">URL do Webhook</label>
                             <div className="flex items-center gap-2">
                                 <input type="text" readOnly value={webhookUrl} className="w-full bg-slate-900 border border-slate-700 rounded-md p-2 text-slate-400 font-mono text-xs" />
-                                <Button size="sm" variant="ghost" onClick={() => navigator.clipboard.writeText(webhookUrl)} disabled={!automationId}><COPY_ICON className="w-4 h-4"/></Button>
+                                <Button size="sm" variant="ghost" onClick={() => navigator.clipboard.writeText(webhookUrl)}><COPY_ICON className="w-4 h-4"/></Button>
                             </div>
-                            <p className="text-xs text-slate-400 mt-1">Envie uma requisição para esta URL para iniciar a automação. Para identificar o contato, o corpo da requisição deve conter a chave `phone`.</p>
+                             <p className="text-xs text-slate-400 mt-1">Salve a automação para que esta URL se torne ativa.</p>
                         </div>
                         <div>
                              <label className="block text-sm font-medium text-slate-300 mb-1">Método HTTP</label>
@@ -295,18 +397,21 @@ const SettingsPanel = ({ node, setNodes, templates, profile, updateAutomation, a
                         </div>
                         <div className="border-t border-slate-700 pt-4">
                             <label className="block text-sm font-medium text-slate-300 mb-2">Escuta de Webhook</label>
-                            <Button size="sm" variant="secondary" onClick={handleListenWebhook} disabled={!automationId}>Limpar e Escutar por Dados</Button>
-                            <p className="text-xs text-slate-400 mt-1">Clique, salve a automação e envie um teste. A primeira requisição será capturada abaixo.</p>
-
-                            {config.last_captured_data && (
-                                <div className="mt-2">
-                                    <p className="text-sm font-medium text-slate-300">Últimos dados capturados:</p>
-                                    <pre className="mt-1 p-2 bg-slate-900 rounded-md text-xs text-slate-300 max-h-48 overflow-auto">
-                                        {JSON.stringify(config.last_captured_data, null, 2)}
-                                    </pre>
+                             {isListening ? (
+                                <div className="text-center p-4 bg-slate-700/50 rounded-lg">
+                                    <svg className="animate-spin h-6 w-6 text-sky-400 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    <p className="text-sm text-sky-300 mt-2">Aguardando dados...</p>
+                                    <Button size="sm" variant="ghost" className="mt-2 text-xs" onClick={() => setIsListening(false)}>Cancelar</Button>
                                 </div>
+                            ) : (
+                                <Button size="sm" variant="secondary" onClick={handleStartListening} disabled={!automationId}>Limpar e Escutar por Dados</Button>
                             )}
+                             {!isListening && <p className="text-xs text-slate-400 mt-1">Clique, salve, e envie um teste. Os dados capturados aparecerão abaixo para mapeamento.</p>}
                         </div>
+                        {renderDataMapping()}
                     </div>
                 )
             case 'send_media':
@@ -331,7 +436,6 @@ const SettingsPanel = ({ node, setNodes, templates, profile, updateAutomation, a
                     </div>
                 )
             case 'send_interactive_message':
-                // complex state logic for buttons
                 const buttons = Array.isArray(config.buttons) ? config.buttons : [];
                 const handleButtonChange = (index: number, field: string, value: string) => {
                     const newButtons = buttons.map((b, i) => i === index ? {...b, [field]: value} : b);
@@ -445,17 +549,6 @@ const FlowCanvas = () => {
             }
         }
     }, [isEditing, pageParams.automationId, automations, setNodes, setEdges]);
-    
-    // Hack to pass current automation state to a callback
-    useEffect(() => {
-        (window as any).currentAutomationForSave = {
-            id: automationId,
-            name: automationName,
-            status: isEditing ? (automations.find(a => a.id === automationId)?.status || 'active') : 'active',
-            nodes,
-            edges,
-        };
-    }, [nodes, edges, automationName, automationId, isEditing, automations]);
 
     const onConnect = useCallback((params: any) => setEdges((eds) => addEdge(params, eds)), [setEdges]);
 
@@ -514,7 +607,9 @@ const FlowCanvas = () => {
             } else {
                 await addAutomation(automationData as unknown as Omit<AutomationInsert, 'id' | 'user_id' | 'created_at'>);
             }
-            setCurrentPage('automations');
+            if(!document.getElementById('automation-save-button')?.classList.contains('triggered-by-listener')){
+                setCurrentPage('automations');
+            }
         } catch (err: any) {
              setError(err.message || 'Ocorreu um erro ao salvar.');
         } finally {
@@ -543,7 +638,7 @@ const FlowCanvas = () => {
                  <div className="flex items-center gap-3">
                     {error && <p className="text-red-400 text-sm">{error}</p>}
                     <Button variant="secondary" onClick={() => setCurrentPage('automations')} disabled={isSaving}>Cancelar</Button>
-                    <Button variant="primary" onClick={onSave} isLoading={isSaving}>
+                    <Button id="automation-save-button" variant="primary" onClick={onSave} isLoading={isSaving}>
                         {isEditing ? 'Salvar Alterações' : 'Criar Automação'}
                     </Button>
                 </div>
@@ -571,7 +666,7 @@ const FlowCanvas = () => {
                 </div>
                 <aside className="absolute right-0 top-0 h-full bg-slate-800/50 p-4 border-l border-slate-700 backdrop-blur-sm z-10">
                    {selectedNode ? 
-                    <SettingsPanel node={selectedNode} setNodes={setNodes as any} templates={templates} profile={profile} updateAutomation={updateAutomation} automationId={automationId}/> 
+                    <SettingsPanel node={selectedNode} setNodes={setNodes as any} templates={templates} profile={profile} automationId={automationId}/> 
                     : <NodeSidebar onDragStart={handleDragStart} />}
                 </aside>
             </div>
