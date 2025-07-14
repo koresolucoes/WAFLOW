@@ -1,29 +1,163 @@
 
-import React, { useContext, useState, useEffect, useMemo } from 'react';
+import React, { useContext, useState, useEffect, useMemo, useCallback, memo } from 'react';
+import ReactFlow, { ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, Node, Edge } from 'reactflow';
 import { AppContext } from '../../contexts/AppContext';
-import Card from '../../components/common/Card';
+import { Automation, AutomationInsert, AutomationNode, NodeData, TriggerType, ActionType } from '../../types';
 import Button from '../../components/common/Button';
-import { Automation, AutomationInsert, Json } from '../../types';
-import InfoCard from '../../components/common/InfoCard';
-import { COPY_ICON } from '../../components/icons';
-import Switch from '../../components/common/Switch';
+import Card from '../../components/common/Card';
+import { AUTOMATION_ICON, PLUS_ICON, TRASH_ICON } from '../../components/icons';
 
-const AutomationEditor: React.FC = () => {
+const initialNodes: AutomationNode[] = [];
+const initialEdges: Edge[] = [];
+
+// ====================================================================================
+// Custom Node Components
+// ====================================================================================
+
+const nodeStyles = {
+    base: "bg-slate-800 border-2 rounded-lg shadow-xl text-white w-72",
+    body: "p-4",
+    header: "px-4 py-2 rounded-t-lg font-bold text-sm flex items-center gap-2",
+    trigger: "border-sky-500",
+    action: "border-pink-500",
+    triggerHeader: "bg-sky-500/20",
+    actionHeader: "bg-pink-500/20",
+    label: "text-lg font-semibold",
+    description: "text-xs text-slate-400 mt-1"
+};
+
+const CustomNode = memo(({ data, type }: { data: NodeData, type: 'trigger' | 'action' }) => {
+    const isTrigger = type === 'trigger';
+
+    return (
+        <div className={`${nodeStyles.base} ${isTrigger ? nodeStyles.trigger : nodeStyles.action}`}>
+            <div className={`${nodeStyles.header} ${isTrigger ? nodeStyles.triggerHeader : nodeStyles.actionHeader}`}>
+                <AUTOMATION_ICON className="w-4 h-4" />
+                {isTrigger ? 'Gatilho' : 'Ação'}
+            </div>
+            <div className={nodeStyles.body}>
+                <p className={nodeStyles.label}>{data.label}</p>
+                <p className={nodeStyles.description}>Tipo: {data.type}</p>
+            </div>
+            {!isTrigger && <Handle type="target" position={Position.Left} className="!bg-slate-400" />}
+            <Handle type="source" position={Position.Right} className="!bg-slate-400" />
+        </div>
+    );
+});
+
+const nodeTypes = {
+    trigger: (props: Node<NodeData>) => <CustomNode {...props} type="trigger" />,
+    action: (props: Node<NodeData>) => <CustomNode {...props} type="action" />,
+};
+
+// ====================================================================================
+// Sidebar & Settings Panel Components
+// ====================================================================================
+
+const DraggableNode = ({ type, label, onDragStart }: { type: 'trigger' | 'action', label: string, onDragStart: (event: React.DragEvent, nodeType: string, type: string) => void }) => (
+    <div
+        className="p-3 mb-2 border-2 border-dashed border-slate-600 rounded-lg text-center cursor-grab bg-slate-800 hover:bg-slate-700 hover:border-sky-500"
+        onDragStart={(event) => onDragStart(event, type, label)}
+        draggable
+    >
+        <p className="font-semibold">{label}</p>
+    </div>
+);
+
+const NodeSidebar = ({ onDragStart }: { onDragStart: (event: React.DragEvent, nodeType: string, typeName: string) => void }) => (
+    <Card className="w-80">
+        <h3 className="text-xl font-bold text-white mb-4">Blocos</h3>
+        <p className="text-sm text-slate-400 mb-4">Arraste os blocos para a área de trabalho para construir sua automação.</p>
+        <div>
+            <h4 className="font-semibold text-sky-300 mb-2">Gatilhos</h4>
+            <DraggableNode type="trigger" label="Contato com Tag" onDragStart={(e, type) => onDragStart(e, type, 'new_contact_with_tag')} />
+            <DraggableNode type="trigger" label="Mensagem com Palavra-chave" onDragStart={(e, type) => onDragStart(e, type, 'message_received_with_keyword')} />
+        </div>
+        <div className="mt-6">
+            <h4 className="font-semibold text-pink-300 mb-2">Ações</h4>
+            <DraggableNode type="action" label="Enviar Template" onDragStart={(e, type) => onDragStart(e, type, 'send_template')} />
+            <DraggableNode type="action" label="Adicionar Tag" onDragStart={(e, type) => onDragStart(e, type, 'add_tag')} />
+        </div>
+    </Card>
+);
+
+const SettingsPanel = ({ node, setNodes, templates }: { node: AutomationNode, setNodes: React.Dispatch<React.SetStateAction<AutomationNode[]>>, templates: any[] }) => {
+    const { data, id } = node;
+
+    const updateNodeConfig = (key: string, value: any) => {
+        setNodes(nds => nds.map(n => {
+            if (n.id === id) {
+                return { ...n, data: { ...n.data, config: { ...n.data.config, [key]: value } } };
+            }
+            return n;
+        }));
+    };
+
+    const renderConfig = () => {
+        const config = data.config || {};
+        switch (data.type) {
+            case 'new_contact_with_tag':
+            case 'add_tag':
+                return (
+                    <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-1">Nome da Tag</label>
+                        <input type="text" value={config.tag || ''} onChange={(e) => updateNodeConfig('tag', e.target.value)} placeholder="Ex: vip" className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white" />
+                    </div>
+                );
+            case 'message_received_with_keyword':
+                 return (
+                    <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-1">Palavra-chave</label>
+                        <input type="text" value={config.keyword || ''} onChange={(e) => updateNodeConfig('keyword', e.target.value)} placeholder="Ex: promoção" className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white" />
+                    </div>
+                );
+            case 'send_template':
+                 const approvedTemplates = templates.filter(t => t.status === 'APPROVED');
+                 return (
+                    <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-1">Selecione o Template</label>
+                        <select value={config.template_id || ''} onChange={(e) => updateNodeConfig('template_id', e.target.value)} className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white">
+                            <option value="">-- Selecione um template --</option>
+                            {approvedTemplates.map(t => <option key={t.id} value={t.id}>{t.template_name}</option>)}
+                        </select>
+                         {approvedTemplates.length === 0 && <p className="text-xs text-amber-400 mt-1">Nenhum template APROVADO encontrado.</p>}
+                    </div>
+                 );
+            default:
+                return <p className="text-slate-400">Nenhuma configuração necessária para este nó.</p>;
+        }
+    };
+
+    return (
+         <Card className="w-80">
+            <h3 className="text-xl font-bold text-white mb-4">Configurações</h3>
+            <div className="space-y-4">
+                <div>
+                    <p className="block text-sm font-medium text-slate-300">Nó Selecionado</p>
+                    <p className="font-semibold text-white">{data.label}</p>
+                </div>
+                <div className="border-t border-slate-700 pt-4">
+                     {renderConfig()}
+                </div>
+            </div>
+        </Card>
+    )
+};
+
+// ====================================================================================
+// Flow Canvas Component
+// ====================================================================================
+
+const FlowCanvas = () => {
     const { pageParams, automations, templates, addAutomation, updateAutomation, setCurrentPage } = useContext(AppContext);
-    
-    const getInitialState = (): Partial<AutomationInsert> => ({
-        name: '',
-        status: 'active',
-        trigger_type: 'new_contact_with_tag',
-        trigger_config: { tag: '' },
-        action_type: 'send_template',
-        action_config: { template_id: '' }
-    });
+    const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
+    const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+    const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+    const [selectedNode, setSelectedNode] = useState<AutomationNode | null>(null);
 
-    const [automation, setAutomation] = useState<Partial<AutomationInsert>>(getInitialState());
+    const [automationName, setAutomationName] = useState('');
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [copySuccess, setCopySuccess] = useState('');
 
     const isEditing = Boolean(pageParams.automationId);
 
@@ -31,331 +165,146 @@ const AutomationEditor: React.FC = () => {
         if (isEditing) {
             const existingAutomation = automations.find(a => a.id === pageParams.automationId);
             if (existingAutomation) {
-                setAutomation(existingAutomation);
+                setAutomationName(existingAutomation.name);
+                setNodes(existingAutomation.nodes || []);
+                setEdges(existingAutomation.edges || []);
             }
-        } else {
-            setAutomation(getInitialState());
         }
-    }, [isEditing, pageParams.automationId, automations]);
+    }, [isEditing, pageParams.automationId, automations, setNodes, setEdges]);
 
-    const webhookUrl = useMemo(() => {
-        if (isEditing && automation.trigger_type === 'webhook_received') {
-            return `${window.location.origin}/api/automations/trigger/${pageParams.automationId}`;
-        }
-        return null;
-    }, [isEditing, pageParams.automationId, automation.trigger_type]);
+    const onConnect = useCallback((params: any) => setEdges((eds) => addEdge(params, eds)), [setEdges]);
+
+    const onDragOver = useCallback((event: React.DragEvent) => {
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+    }, []);
+
+    const onDrop = useCallback((event: React.DragEvent) => {
+        event.preventDefault();
+        const type = event.dataTransfer.getData('application/reactflow-nodetype');
+        const label = event.dataTransfer.getData('application/reactflow-label');
+        const specificType = event.dataTransfer.getData('application/reactflow-specifictype');
+
+        if (typeof type === 'undefined' || !type || !reactFlowInstance) return;
+
+        const position = reactFlowInstance.screenToFlowPosition({ x: event.clientX, y: event.clientY });
+        const newNode: AutomationNode = {
+            id: `node_${Date.now()}`,
+            type,
+            position,
+            data: {
+                nodeType: type as 'trigger' | 'action',
+                type: specificType as TriggerType | ActionType,
+                label,
+                config: {},
+            },
+        };
+        setNodes((nds) => nds.concat(newNode));
+    }, [reactFlowInstance, setNodes]);
+
+    const onNodeClick = useCallback((_: any, node: AutomationNode) => {
+        setSelectedNode(node);
+    }, []);
     
-    const handleCopyUrl = () => {
-        if (!webhookUrl) return;
-        navigator.clipboard.writeText(webhookUrl).then(() => {
-            setCopySuccess('Copiado!');
-            setTimeout(() => setCopySuccess(''), 2000);
-        }, (err) => {
-            setCopySuccess('Falha');
-            console.error('Could not copy text: ', err);
-            setTimeout(() => setCopySuccess(''), 2000);
-        });
-    };
+    const onPaneClick = useCallback(() => {
+        setSelectedNode(null);
+    }, []);
 
-
-    const handleMainChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-        const { name, value } = e.target;
-        setAutomation(prev => ({ ...prev, [name]: value }));
-    };
-
-    const handleTriggerTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        const newTriggerType = e.target.value as Automation['trigger_type'];
-        let newTriggerConfig: Json = {};
-        let newActionType: Automation['action_type'] = 'send_template';
-        let newActionConfig: Json = { template_id: '' };
-
-        if (newTriggerType === 'new_contact_with_tag') {
-            newTriggerConfig = { tag: '' };
-        } else if (newTriggerType === 'message_received_with_keyword') {
-            newTriggerConfig = { keyword: '' };
-        } else if (newTriggerType === 'webhook_received') {
-            newTriggerConfig = { method: 'POST', verify_key: '', waitForResponse: false };
-            newActionType = 'http_request';
-            newActionConfig = { url: '', method: 'POST', headers: '{\n  "Content-Type": "application/json"\n}', body: '{\n  "data": "Hello from ZapFlow AI!"\n}' };
-        }
-        
-        setAutomation(prev => ({
-            ...prev,
-            trigger_type: newTriggerType,
-            trigger_config: newTriggerConfig,
-            action_type: newActionType,
-            action_config: newActionConfig
-        }));
-    };
-    
-    const handleActionTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        const newActionType = e.target.value as Automation['action_type'];
-        let newActionConfig: Json = {};
-        
-        if (newActionType === 'add_tag') {
-            newActionConfig = { tag: '' };
-        } else if (newActionType === 'send_template') {
-            newActionConfig = { template_id: '' };
-        } else if (newActionType === 'http_request') {
-             newActionConfig = { url: '', method: 'POST', headers: '{\n  "Content-Type": "application/json"\n}', body: '{\n  "data": "Hello from ZapFlow AI!"\n}' };
-        }
-        
-        setAutomation(prev => ({
-            ...prev,
-            action_type: newActionType,
-            action_config: newActionConfig
-        }));
-    };
-    
-    const handleConfigChange = (type: 'trigger' | 'action', key: string, value: any) => {
-        const configKey = type === 'trigger' ? 'trigger_config' : 'action_config';
-        setAutomation(prev => ({
-            ...prev,
-            [configKey]: { ...(prev[configKey] as object), [key]: value }
-        }));
-    };
-    
-    const handleJsonConfigChange = (type: 'action', key: 'headers' | 'body', value: string) => {
-        const configKey = 'action_config';
-         setAutomation(prev => ({
-            ...prev,
-            [configKey]: { ...(prev[configKey] as object), [key]: value }
-        }));
-    }
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const onSave = async () => {
         setError(null);
-
-        // Validation
-        if (!automation.name?.trim()) return setError("O nome da automação é obrigatório.");
-        if (automation.trigger_type === 'new_contact_with_tag' && !(automation.trigger_config as any).tag) return setError("A tag para o gatilho é obrigatória.");
-        if (automation.trigger_type === 'message_received_with_keyword' && !(automation.trigger_config as any).keyword) return setError("A palavra-chave para o gatilho é obrigatória.");
-        if (automation.action_type === 'add_tag' && !(automation.action_config as any).tag) return setError("A tag para a ação é obrigatória.");
-        if (automation.action_type === 'send_template' && !(automation.action_config as any).template_id) return setError("Por favor, selecione um template para a ação.");
-        if (automation.action_type === 'http_request' && !(automation.action_config as any).url) return setError("A URL para a requisição HTTP é obrigatória.");
-        if (automation.action_type === 'http_request') {
-            try {
-                JSON.parse((automation.action_config as any).headers);
-            } catch {
-                return setError("O formato dos Cabeçalhos (Headers) é um JSON inválido.");
-            }
-        }
-
+        if (!automationName.trim()) return setError("O nome da automação é obrigatório.");
+        const triggerNodes = nodes.filter(n => n.data.nodeType === 'trigger');
+        if (triggerNodes.length === 0) return setError("A automação precisa de pelo menos um gatilho.");
 
         setIsSaving(true);
+        const automationData = {
+            name: automationName,
+            status: 'active', // Default status
+            nodes,
+            edges,
+        };
         try {
             if (isEditing) {
-                await updateAutomation(automation as Automation);
+                await updateAutomation({ ...automationData, id: pageParams.automationId } as Automation);
             } else {
-                await addAutomation(automation as AutomationInsert);
+                await addAutomation(automationData as Omit<AutomationInsert, 'id' | 'user_id' | 'created_at'>);
             }
             setCurrentPage('automations');
         } catch (err: any) {
-            setError(err.message || 'Ocorreu um erro ao salvar.');
+             setError(err.message || 'Ocorreu um erro ao salvar.');
         } finally {
             setIsSaving(false);
         }
     };
-
-    const approvedTemplates = templates.filter(t => t.status === 'APPROVED');
-
-    const compatibleActions = useMemo(() => {
-        if (automation.trigger_type === 'webhook_received') {
-            return [{ value: 'http_request', label: 'Enviar Requisição HTTP' }];
-        }
-        return [
-            { value: 'send_template', label: 'Enviar template do WhatsApp' },
-            { value: 'add_tag', label: 'Adicionar tag ao contato' }
-        ];
-    }, [automation.trigger_type]);
     
+    const handleDragStart = (event: React.DragEvent, nodeType: string, specificType: string) => {
+        const nodeInfo = nodeTypes[nodeType as keyof typeof nodeTypes];
+        const label = event.currentTarget.textContent || 'Novo Nó';
+        event.dataTransfer.setData('application/reactflow-nodetype', nodeType);
+        event.dataTransfer.setData('application/reactflow-label', label);
+        event.dataTransfer.setData('application/reactflow-specifictype', specificType);
+        event.dataTransfer.effectAllowed = 'move';
+    };
+
 
     return (
-        <div className="max-w-3xl mx-auto space-y-8">
-            <h1 className="text-3xl font-bold text-white">
-                {isEditing ? 'Editar Automação' : 'Criar Nova Automação'}
-            </h1>
-
-            {error && <Card className="border-l-4 border-red-500"><p className="text-red-400">{error}</p></Card>}
-
-            <form onSubmit={handleSubmit} className="space-y-6">
-                <Card>
-                    <label htmlFor="name" className="block text-sm font-medium text-slate-300 mb-1">Nome da Automação</label>
-                    <input
-                        type="text"
-                        id="name"
-                        name="name"
-                        value={automation.name || ''}
-                        onChange={handleMainChange}
-                        placeholder="Ex: Boas-vindas cliente VIP"
-                        className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white"
-                    />
-                </Card>
-
-                <Card>
-                    <h2 className="text-xl font-semibold text-white mb-4">Se... (Gatilho)</h2>
-                    <div className="space-y-4">
-                        <div>
-                            <label htmlFor="trigger_type" className="block text-sm font-medium text-slate-300 mb-1">Quando isso acontecer...</label>
-                            <select name="trigger_type" id="trigger_type" value={automation.trigger_type} onChange={handleTriggerTypeChange} className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white">
-                                <option value="new_contact_with_tag">Novo contato com tag</option>
-                                <option value="message_received_with_keyword">Mensagem recebida com palavra-chave</option>
-                                <option value="webhook_received">Webhook recebido</option>
-                            </select>
-                        </div>
-                        {automation.trigger_type === 'new_contact_with_tag' && (
-                            <div>
-                                <label className="block text-sm font-medium text-slate-300 mb-1">Nome da Tag</label>
-                                <input type="text" value={(automation.trigger_config as any)?.tag || ''} onChange={(e) => handleConfigChange('trigger', 'tag', e.target.value)} placeholder="Ex: vip" className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white" />
-                                <p className="text-xs text-slate-400 mt-1">Dispara quando um contato é criado ou atualizado com esta tag.</p>
-                            </div>
-                        )}
-                         {automation.trigger_type === 'message_received_with_keyword' && (
-                            <div>
-                                <label className="block text-sm font-medium text-slate-300 mb-1">Palavra-chave</label>
-                                <input type="text" value={(automation.trigger_config as any)?.keyword || ''} onChange={(e) => handleConfigChange('trigger', 'keyword', e.target.value)} placeholder="Ex: promoção" className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white" />
-                                <p className="text-xs text-slate-400 mt-1">Dispara quando uma mensagem recebida contém esta palavra (não diferencia maiúsculas/minúsculas).</p>
-                            </div>
-                        )}
-                        {automation.trigger_type === 'webhook_received' && (
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-300 mb-1">URL do Webhook</label>
-                                    {webhookUrl ? (
-                                        <div className="flex items-center gap-2">
-                                            <input type="text" value={webhookUrl} readOnly className="flex-1 bg-slate-900 border border-slate-700 rounded-md p-2 text-white font-mono" />
-                                            <Button type="button" variant="secondary" onClick={handleCopyUrl} className="w-24">
-                                                {copySuccess ? copySuccess : <COPY_ICON className="w-4 h-4 mx-auto" />}
-                                            </Button>
-                                        </div>
-                                    ) : (
-                                        <InfoCard variant="warning">
-                                            <p>Salve a automação primeiro para gerar a URL do webhook.</p>
-                                        </InfoCard>
-                                    )}
-                                </div>
-                                <div>
-                                    <label htmlFor="trigger_method" className="block text-sm font-medium text-slate-300 mb-1">Método HTTP Aceito</label>
-                                    <select
-                                        id="trigger_method"
-                                        value={(automation.trigger_config as any)?.method || 'POST'}
-                                        onChange={(e) => handleConfigChange('trigger', 'method', e.target.value)}
-                                        className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white"
-                                    >
-                                        <option value="POST">POST</option>
-                                        <option value="GET">GET</option>
-                                        <option value="PUT">PUT</option>
-                                        <option value="ANY">ANY (Qualquer método)</option>
-                                    </select>
-                                    <InfoCard variant="info" className="mt-2">
-                                        <p>
-                                            Certifique-se de que o serviço externo que chama este webhook está configurado para usar o método <strong>{((automation.trigger_config as any)?.method || 'POST').toUpperCase()}</strong>.
-                                            <br/>Uma incompatibilidade de método resultará em um erro '405 Method Not Allowed'.
-                                        </p>
-                                    </InfoCard>
-                                </div>
-                                <div>
-                                    <label htmlFor="verify_key" className="block text-sm font-medium text-slate-300 mb-1">
-                                        Chave de Verificação (Opcional)
-                                    </label>
-                                    <input
-                                        type="text"
-                                        id="verify_key"
-                                        value={(automation.trigger_config as any)?.verify_key || ''}
-                                        onChange={(e) => handleConfigChange('trigger', 'verify_key', e.target.value)}
-                                        placeholder="Um token secreto para proteger seu webhook"
-                                        className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white"
-                                    />
-                                </div>
-                                 <div className="pt-2">
-                                    <Switch
-                                        checked={(automation.trigger_config as any)?.waitForResponse || false}
-                                        onChange={(checked) => handleConfigChange('trigger', 'waitForResponse', checked)}
-                                    />
-                                    <label className="text-sm font-medium text-slate-300 ml-3">Execução Síncrona</label>
-                                    <p className="text-xs text-slate-400 mt-1">
-                                        Se ativado, o webhook aguardará a conclusão da ação e retornará o resultado. Desative para uma resposta mais rápida (fire-and-forget).
-                                    </p>
-                                </div>
-                                <InfoCard>
-                                    <p>Se você preencher a Chave de Verificação, as chamadas para sua URL de webhook deverão incluir um dos seguintes cabeçalhos para autenticação:</p>
-                                    <ul className="list-disc list-inside mt-2 text-xs font-mono">
-                                        <li><code>Authorization: Bearer SUA_CHAVE</code></li>
-                                        <li><code>x-api-key: SUA_CHAVE</code></li>
-                                    </ul>
-                                </InfoCard>
-                            </div>
-                        )}
-                    </div>
-                </Card>
-
-                <Card>
-                    <h2 className="text-xl font-semibold text-white mb-4">Então... (Ação)</h2>
-                    <div className="space-y-4">
-                        <div>
-                            <label htmlFor="action_type" className="block text-sm font-medium text-slate-300 mb-1">Execute esta ação...</label>
-                            <select name="action_type" id="action_type" value={automation.action_type} onChange={handleActionTypeChange} className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white">
-                               {compatibleActions.map(action => (
-                                    <option key={action.value} value={action.value}>{action.label}</option>
-                               ))}
-                            </select>
-                        </div>
-                         {automation.action_type === 'send_template' && (
-                            <div>
-                                <label className="block text-sm font-medium text-slate-300 mb-1">Selecione o Template</label>
-                                <select value={(automation.action_config as any)?.template_id || ''} onChange={(e) => handleConfigChange('action', 'template_id', e.target.value)} className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white">
-                                    <option value="">-- Selecione um template --</option>
-                                    {approvedTemplates.map(t => (
-                                        <option key={t.id} value={t.id}>{t.template_name}</option>
-                                    ))}
-                                </select>
-                                {approvedTemplates.length === 0 && <p className="text-xs text-amber-400 mt-1">Nenhum template APROVADO encontrado. Sincronize ou crie um novo.</p>}
-                            </div>
-                        )}
-                         {automation.action_type === 'add_tag' && (
-                            <div>
-                                <label className="block text-sm font-medium text-slate-300 mb-1">Nome da Tag a Adicionar</label>
-                                <input type="text" value={(automation.action_config as any)?.tag || ''} onChange={(e) => handleConfigChange('action', 'tag', e.target.value)} placeholder="Ex: interessado" className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white" />
-                            </div>
-                        )}
-                         {automation.action_type === 'http_request' && (
-                             <div className="space-y-4">
-                                <InfoCard>
-                                    <p className="text-sm">Você pode usar variáveis do webhook na URL, cabeçalhos e corpo. Ex: <code>&#123;&#123;trigger.body.id&#125;&#125;</code>, <code>&#123;&#123;trigger.query.user&#125;&#125;</code></p>
-                                </InfoCard>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-300 mb-1">URL</label>
-                                    <input type="url" value={(automation.action_config as any)?.url || ''} onChange={(e) => handleConfigChange('action', 'url', e.target.value)} placeholder="https://api.example.com/data" className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white font-mono text-sm" />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-300 mb-1">Método</label>
-                                     <select value={(automation.action_config as any)?.method || 'POST'} onChange={(e) => handleConfigChange('action', 'method', e.target.value)} className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white">
-                                        <option>POST</option>
-                                        <option>GET</option>
-                                        <option>PUT</option>
-                                        <option>PATCH</option>
-                                        <option>DELETE</option>
-                                    </select>
-                                </div>
-                                 <div>
-                                    <label className="block text-sm font-medium text-slate-300 mb-1">Cabeçalhos (Headers) - Formato JSON</label>
-                                    <textarea value={(automation.action_config as any)?.headers || ''} onChange={(e) => handleJsonConfigChange('action', 'headers', e.target.value)} rows={4} placeholder='{ "Content-Type": "application/json" }' className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white font-mono text-sm"></textarea>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-300 mb-1">Corpo (Body) - Formato JSON</label>
-                                    <textarea value={(automation.action_config as any)?.body || ''} onChange={(e) => handleJsonConfigChange('action', 'body', e.target.value)} rows={6} placeholder='{ "message": "Dados do webhook: {{trigger.body.message}}" }' className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white font-mono text-sm"></textarea>
-                                </div>
-                             </div>
-                         )}
-                    </div>
-                </Card>
-
-                <div className="flex justify-end gap-3">
-                    <Button type="button" variant="secondary" onClick={() => setCurrentPage('automations')} disabled={isSaving}>Cancelar</Button>
-                    <Button type="submit" variant="primary" isLoading={isSaving} disabled={isSaving}>Salvar Automação</Button>
+        <div className="h-full flex flex-col">
+             <header className="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-900/80 backdrop-blur-sm">
+                <input
+                    type="text"
+                    value={automationName}
+                    onChange={(e) => setAutomationName(e.target.value)}
+                    placeholder="Nome da sua Automação"
+                    className="bg-transparent text-xl font-bold text-white focus:outline-none"
+                />
+                 <div className="flex items-center gap-3">
+                    {error && <p className="text-red-400 text-sm">{error}</p>}
+                    <Button variant="secondary" onClick={() => setCurrentPage('automations')} disabled={isSaving}>Cancelar</Button>
+                    <Button variant="primary" onClick={onSave} isLoading={isSaving}>
+                        {isEditing ? 'Salvar Alterações' : 'Criar Automação'}
+                    </Button>
                 </div>
-            </form>
+            </header>
+            <div className="flex-grow flex">
+                <div className="w-[calc(100%-320px)] h-full">
+                    <ReactFlow
+                        nodes={nodes}
+                        edges={edges}
+                        onNodesChange={onNodesChange}
+                        onEdgesChange={onEdgesChange}
+                        onConnect={onConnect}
+                        onInit={setReactFlowInstance}
+                        onDrop={onDrop}
+                        onDragOver={onDragOver}
+                        onNodeClick={onNodeClick}
+                        onPaneClick={onPaneClick}
+                        nodeTypes={nodeTypes}
+                        fitView
+                        className="bg-slate-900"
+                    >
+                        <Background color="#475569" gap={16} />
+                        <Controls />
+                    </ReactFlow>
+                </div>
+                <aside className="w-80 h-full bg-slate-800/50 p-4 border-l border-slate-700 overflow-y-auto">
+                   {selectedNode ? <SettingsPanel node={selectedNode} setNodes={setNodes} templates={templates} /> : <NodeSidebar onDragStart={handleDragStart} />}
+                </aside>
+            </div>
+        </div>
+    );
+};
+
+
+// ====================================================================================
+// Main Page Component
+// ====================================================================================
+
+const AutomationEditor: React.FC = () => {
+    return (
+        <div className="w-full h-full -m-8">
+            <ReactFlowProvider>
+                <FlowCanvas />
+            </ReactFlowProvider>
         </div>
     );
 };

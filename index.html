@@ -7,10 +7,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ZapFlow AI - WhatsApp Campaign Manager</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reactflow@11.13.0/dist/style.css" />
     <style>
       /* For Recharts custom tooltip */
       .recharts-tooltip-wrapper {
         outline: none !important;
+      }
+      .react-flow__panel {
+        display: none;
       }
     </style>
   <script type="importmap">
@@ -21,7 +25,10 @@
     "react-dom/": "https://esm.sh/react-dom@^19.1.0/",
     "@google/genai": "https://esm.sh/@google/genai@^1.8.0",
     "recharts": "https://esm.sh/recharts@^3.1.0",
-    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.45.0"
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.45.0",
+    "reactflow": "https://esm.sh/reactflow@11.13.0",
+    "zustand": "https://esm.sh/zustand@4.5.4",
+    "zustand/": "https://esm.sh/zustand@4.5.4/"
   }
 }
 </script>

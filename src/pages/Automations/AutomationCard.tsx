@@ -12,7 +12,7 @@ interface AutomationCardProps {
 }
 
 const AutomationCard: React.FC<AutomationCardProps> = ({ automation }) => {
-    const { updateAutomation, deleteAutomation, setCurrentPage, templates } = useContext(AppContext);
+    const { updateAutomation, deleteAutomation, setCurrentPage } = useContext(AppContext);
 
     const handleStatusChange = async (checked: boolean) => {
         await updateAutomation({ ...automation, status: checked ? 'active' : 'paused' });
@@ -29,37 +29,15 @@ const AutomationCard: React.FC<AutomationCardProps> = ({ automation }) => {
     };
 
     const description = useMemo(() => {
-        const triggerDesc = () => {
-            switch (automation.trigger_type) {
-                case 'new_contact_with_tag':
-                    return `Quando um contato recebe a tag "${(automation.trigger_config as any).tag}"`;
-                case 'message_received_with_keyword':
-                    return `Quando uma mensagem contém a palavra-chave "${(automation.trigger_config as any).keyword}"`;
-                case 'webhook_received':
-                    const method = (automation.trigger_config as any)?.method || 'POST';
-                    return `Quando um webhook (${method}) é recebido`;
-                default:
-                    return "Gatilho desconhecido";
-            }
-        };
+        const triggerNode = automation.nodes.find(n => n.data.nodeType === 'trigger');
+        const actionNodeCount = automation.nodes.filter(n => n.data.nodeType === 'action').length;
+        
+        if (!triggerNode) {
+            return "Automação inválida sem gatilho.";
+        }
 
-        const actionDesc = () => {
-            switch (automation.action_type) {
-                case 'add_tag':
-                    return `adicionar a tag "${(automation.action_config as any).tag}"`;
-                case 'send_template':
-                    const templateId = (automation.action_config as any).template_id;
-                    const template = templates.find(t => t.id === templateId);
-                    return `enviar o template "${template?.template_name || 'Desconhecido'}"`;
-                case 'http_request':
-                    return `fazer uma requisição HTTP para "${(automation.action_config as any).url}"`;
-                default:
-                    return "ação desconhecida";
-            }
-        };
-
-        return `${triggerDesc()}, então ${actionDesc()}.`;
-    }, [automation, templates]);
+        return `Inicia com "${triggerNode.data.label}" e contém ${actionNodeCount} ação(ões).`;
+    }, [automation]);
 
 
     return (

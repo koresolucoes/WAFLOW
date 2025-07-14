@@ -1,6 +1,6 @@
 import React, { createContext, useState, useCallback, ReactNode, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import { Page, Profile, MessageTemplate, Contact, Campaign, CampaignWithMetrics, EditableContact, Session, User, CampaignMessageInsert, CampaignWithDetails, CampaignMessageWithContact, Segment, MessageTemplateInsert, Automation, AutomationInsert, CampaignStatus, MessageStatus, TablesInsert } from '../types';
+import { Page, Profile, MessageTemplate, Contact, Campaign, CampaignWithMetrics, EditableContact, Session, User, CampaignMessageInsert, CampaignWithDetails, CampaignMessageWithContact, Segment, MessageTemplateInsert, Automation, AutomationInsert, AutomationNode, Edge } from '../types';
 import { sendTemplatedMessage } from '../services/meta/messages';
 
 interface AppContextType {
@@ -261,74 +261,33 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   
     // --- Automação ---
   const executeAutomation = async (automation: Automation, contact: Contact) => {
-    if(!user) return;
-    
-    try {
-      if (automation.action_type === 'send_template') {
-        const templateId = (automation.action_config as any)?.template_id;
-        if (!templateId) throw new Error("ID do template não encontrado na configuração da automação.");
-        
-        const template = templates.find(t => t.id === templateId);
-        if (!template) throw new Error(`Template com ID ${templateId} não encontrado.`);
-        if (template.status !== 'APPROVED') throw new Error(`Template '${template.template_name}' não está APROVADO.`);
-        
-        // Simples substituição de variável (só {{1}} por enquanto)
-        const components = template.components.map(c => {
-            if (c.type === 'BODY' && c.text?.includes("{{1}}")) {
-                return {
-                    type: 'body',
-                    parameters: [{ type: 'text', text: contact.name }]
-                };
-            }
-            return c;
-        });
-
-        await sendTemplatedMessage(metaConfig, contact.phone, template.template_name, components);
-
-      } else if (automation.action_type === 'add_tag') {
-        const tagToAdd = (automation.action_config as any)?.tag;
-        if (!tagToAdd) throw new Error("Tag a ser adicionada não encontrada na configuração.");
-        
-        const newTags = [...new Set([...(contact.tags || []), tagToAdd])];
-        await updateContact({ ...contact, tags: newTags });
-      }
-      
-      // Log de sucesso
-      await supabase.from('automation_runs').insert({
-          automation_id: automation.id,
-          contact_id: contact.id,
-          status: 'success',
-          details: `Ação '${automation.action_type}' executada.`
-      });
-
-    } catch (err: any) {
-        console.error(`Falha ao executar automação ${automation.name} para o contato ${contact.name}:`, err.message);
-        await supabase.from('automation_runs').insert({
-          automation_id: automation.id,
-          contact_id: contact.id,
-          status: 'failed',
-          details: err.message
-      });
-    }
+      // Esta função precisa de uma refatoração completa para o motor de fluxo.
+      // A lógica de execução agora está no webhook.
+      console.log(`Disparando automação ${automation.name} para ${contact.name}`);
   };
   
   const checkAndRunContactAutomations = useCallback(async (contact: Contact, previousContactState?: Contact) => {
-    const activeAutomations = automations.filter(a => a.status === 'active' && a.trigger_type === 'new_contact_with_tag');
+    // Esta função precisa ser repensada. O gatilho agora é verificado no webhook.
+    // Manterei uma lógica simples por enquanto.
+    const activeAutomations = automations.filter(a => a.status === 'active');
 
     for (const auto of activeAutomations) {
-        const triggerTag = (auto.trigger_config as any)?.tag;
+        const triggerNode = auto.nodes?.find(n => n.data.nodeType === 'trigger' && n.data.type === 'new_contact_with_tag');
+        if (!triggerNode) continue;
+        
+        const triggerTag = (triggerNode.data.config as any)?.tag;
         if (!triggerTag) continue;
 
         const hasTagNow = contact.tags?.includes(triggerTag);
         const hadTagBefore = previousContactState?.tags?.includes(triggerTag);
         
-        // Dispara apenas se a tag foi recém-adicionada
         if(hasTagNow && !hadTagBefore) {
-            console.log(`Disparando automação '${auto.name}' para o contato ${contact.name}`);
-            await executeAutomation(auto, contact);
+            console.log(`Gatilho 'new_contact_with_tag' para automação '${auto.name}' disparado para o contato ${contact.name}`);
+            // A execução real acontece no backend/webhook para consistência.
+            // Apenas logamos aqui.
         }
     }
-  }, [automations, templates, metaConfig]);
+  }, [automations]);
 
 
   const addContact = async (contact: EditableContact) => {
@@ -380,7 +339,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (!user) throw new Error("Usuário não autenticado.");
     
     const existingPhones = new Set(contacts.map(c => c.phone.replace(/\D/g, '')));
-    const contactsToInsert: TablesInsert<'contacts'>[] = [];
+    const contactsToInsert = [];
     let skippedCount = 0;
     
     newContacts.forEach(contact => {
@@ -399,7 +358,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         if(data) {
           const newContactsData = data;
           setContacts(prev => [...newContactsData, ...prev].sort((a,b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()));
-          // Dispara automações para contatos importados
           for(const contact of newContactsData) {
               await checkAndRunContactAutomations(contact);
           }
@@ -434,7 +392,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     
     const sentCount = messages.filter(m => m.status !== 'failed').length;
 
-    // Otimização: Atualizar o estado localmente em vez de refazer o fetch de tudo.
     const newCampaignWithMetrics: CampaignWithMetrics = {
         ...(typedNewCampaign as Campaign),
         metrics: {
@@ -462,7 +419,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     
     const { data, error } = await supabase
         .from('automations')
-        .update(automation)
+        .update({
+            name: automation.name,
+            status: automation.status,
+            nodes: automation.nodes,
+            edges: automation.edges
+        })
         .eq('id', automation.id)
         .eq('user_id', user.id)
         .select()

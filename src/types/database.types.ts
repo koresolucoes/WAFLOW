@@ -1,6 +1,6 @@
 /**
  * =================================================================================================
- * ZAPFLOW AI - SUPABASE DATABASE SCHEMA (v2)
+ * ZAPFLOW AI - SUPABASE DATABASE SCHEMA (v3 - Flow Editor)
  * =================================================================================================
  * 
  * INSTRUÇÕES IMPORTANTES:
@@ -11,7 +11,7 @@
  *
  * Este script irá (re)criar todas as tabelas, relações e políticas de segurança necessárias
  * para que a aplicação funcione corretamente. Ele foi atualizado para usar campos de TEXTO
- * em vez de ENUMs, o que torna o sistema mais flexível e evita erros de tipo.
+ * em vez de ENUMs, e a tabela de automações agora suporta um editor de fluxo (nodes/edges).
  * É seguro executá-lo múltiplas vezes.
  * CUIDADO: A execução deste script apagará dados existentes. FAÇA UM BACKUP PRIMEIRO.
  *
@@ -74,8 +74,6 @@ CREATE TABLE public.message_templates (
 );
 CREATE INDEX message_templates_meta_id_idx ON public.message_templates USING btree (meta_id);
 comment on table public.message_templates is 'Armazena templates de mensagem criados ou sincronizados pelo usuário.';
-comment on column public.message_templates.components is 'Armazena a estrutura completa de componentes do template (cabeçalho, corpo, botões) como um JSON.';
-
 
 -- Tabela de Segmentos de Contatos
 CREATE TABLE public.segments (
@@ -122,7 +120,6 @@ CREATE TABLE public.campaign_messages (
 );
 CREATE INDEX campaign_messages_meta_message_id_idx ON public.campaign_messages USING btree (meta_message_id);
 comment on table public.campaign_messages is 'Rastreia o status de cada mensagem individual em uma campanha.';
-comment on column public.campaign_messages.error_message is 'Armazena a mensagem de erro da Meta se o envio da mensagem falhar.';
 
 -- Tabela para armazenar mensagens recebidas dos contatos
 CREATE TABLE public.received_messages (
@@ -135,23 +132,18 @@ CREATE TABLE public.received_messages (
     received_at timestamp with time zone NOT NULL DEFAULT now()
 );
 comment on table public.received_messages is 'Armazena mensagens recebidas de contatos via Webhook.';
-comment on column public.received_messages.sentiment is 'Análise de sentimento da mensagem (ex: positivo, negativo, neutro).';
 
--- Tabela de Automações
+-- Tabela de Automações com suporte para editor de fluxo (nodes/edges)
 CREATE TABLE public.automations (
     id uuid NOT NULL PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
     name text NOT NULL,
     status text NOT NULL DEFAULT 'active',
-    trigger_type text NOT NULL,
-    trigger_config jsonb NOT NULL,
-    action_type text NOT NULL,
-    action_config jsonb NOT NULL,
+    nodes jsonb,
+    edges jsonb,
     created_at timestamp with time zone NOT NULL DEFAULT now()
 );
-comment on table public.automations is 'Armazena fluxos de trabalho de automação.';
-comment on column public.automations.trigger_config is 'Ex: {"tag": "vip"} ou {"keyword": "promo"}';
-comment on column public.automations.action_config is 'Ex: {"template_id": "uuid"} ou {"tag": "interessado"} ou {"url": "https://api...", "method": "POST", ...}';
+comment on table public.automations is 'Armazena fluxos de trabalho de automação baseados em nós e arestas.';
 
 -- Tabela de logs de execução das automações
 CREATE TABLE public.automation_runs (
@@ -163,8 +155,6 @@ CREATE TABLE public.automation_runs (
     details text
 );
 comment on table public.automation_runs is 'Registra a execução de cada automação.';
-comment on column public.automation_runs.contact_id is 'Nulo se a automação não estiver vinculada a um contato (ex: webhook genérico).';
-
 
 -- Habilita a Segurança a Nível de Linha (RLS) para todas as tabelas
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
@@ -178,8 +168,7 @@ ALTER TABLE public.received_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.automations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.automation_runs ENABLE ROW LEVEL SECURITY;
 
-
--- Define as políticas de RLS para garantir que os usuários só possam acessar seus próprios dados
+-- Define as políticas de RLS
 CREATE POLICY "Users can manage their own profile." ON public.profiles FOR ALL USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
 CREATE POLICY "Users can manage their own contacts." ON public.contacts FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users can manage their own templates." ON public.message_templates FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
@@ -191,7 +180,6 @@ CREATE POLICY "Users can manage their own received messages." ON public.received
 CREATE POLICY "Users can manage their own automations." ON public.automations FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users can view their own automation runs." ON public.automation_runs FOR ALL USING (auth.uid() = (SELECT user_id FROM public.automations WHERE id = automation_id));
 
-
 -- Função para criar um perfil automaticamente quando um novo usuário se cadastra
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
@@ -202,7 +190,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Gatilho (trigger) que executa a função acima após um novo usuário ser criado na tabela auth.users
+-- Gatilho (trigger) que executa a função acima após um novo usuário ser criado
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
@@ -268,36 +256,30 @@ export type Database = {
       }
       automations: {
         Row: {
-          action_config: Json
-          action_type: string
           created_at: string
+          edges: Json | null
           id: string
           name: string
+          nodes: Json | null
           status: string
-          trigger_config: Json
-          trigger_type: string
           user_id: string
         }
         Insert: {
-          action_config: Json
-          action_type: string
           created_at?: string
+          edges?: Json | null
           id?: string
           name: string
+          nodes?: Json | null
           status?: string
-          trigger_config: Json
-          trigger_type: string
           user_id: string
         }
         Update: {
-          action_config?: Json
-          action_type?: string
           created_at?: string
+          edges?: Json | null
           id?: string
           name?: string
+          nodes?: Json | null
           status?: string
-          trigger_config?: Json
-          trigger_type?: string
           user_id?: string
         }
         Relationships: [
