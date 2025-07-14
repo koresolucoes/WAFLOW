@@ -1,6 +1,6 @@
 /**
  * =================================================================================================
- * ZAPFLOW AI - SUPABASE DATABASE SCHEMA (v3 - Flow Editor)
+ * ZAPFLOW AI - SUPABASE DATABASE SCHEMA (v4 - Custom Fields & New Triggers)
  * =================================================================================================
  * 
  * INSTRUÇÕES IMPORTANTES:
@@ -10,8 +10,8 @@
  * 4. Cole o script e clique em "RUN".
  *
  * Este script irá (re)criar todas as tabelas, relações e políticas de segurança necessárias
- * para que a aplicação funcione corretamente. Ele foi atualizado para usar campos de TEXTO
- * em vez de ENUMs, e a tabela de automações agora suporta um editor de fluxo (nodes/edges).
+ * para que a aplicação funcione corretamente. Ele foi atualizado para adicionar um campo
+ * `custom_fields` na tabela de contatos.
  * É seguro executá-lo múltiplas vezes.
  * CUIDADO: A execução deste script apagará dados existentes. FAÇA UM BACKUP PRIMEIRO.
  *
@@ -56,6 +56,7 @@ CREATE TABLE public.contacts (
     name text NOT NULL,
     phone text NOT NULL,
     tags text[],
+    custom_fields jsonb,
     created_at timestamp with time zone NOT NULL DEFAULT now()
 );
 CREATE UNIQUE INDEX contacts_user_id_phone_idx ON public.contacts USING btree (user_id, phone);
@@ -391,6 +392,7 @@ export type Database = {
       contacts: {
         Row: {
           created_at: string
+          custom_fields: Json | null
           id: string
           name: string
           phone: string
@@ -399,6 +401,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          custom_fields?: Json | null
           id?: string
           name: string
           phone: string
@@ -407,6 +410,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          custom_fields?: Json | null
           id?: string
           name?: string
           phone?: string
@@ -504,7 +508,15 @@ export type Database = {
           meta_webhook_verify_token?: string | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_id_fkey"
+            columns: ["id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       received_messages: {
         Row: {

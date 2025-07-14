@@ -1,4 +1,5 @@
 
+
 import { Session, User } from '@supabase/supabase-js';
 import { Json, Tables, TablesInsert, TablesUpdate } from './database.types';
 import { MetaTemplateComponent } from '../services/meta/types';
@@ -15,15 +16,17 @@ export type AutomationStatus = 'active' | 'paused';
 export type AutomationRunStatus = 'success' | 'failed';
 
 // Tipos para os nós do editor de automação
-export type TriggerType = 'new_contact_with_tag' | 'message_received_with_keyword';
-export type ActionType = 'send_template' | 'add_tag';
+export type NodeType = 'trigger' | 'action' | 'logic';
 
-export type NodeType = 'trigger' | 'action';
+export type TriggerType = 'new_contact_with_tag' | 'message_received_with_keyword' | 'button_clicked' | 'new_contact' | 'webhook_received';
+export type ActionType = 'send_template' | 'add_tag' | 'remove_tag' | 'send_text_message' | 'send_media' | 'send_interactive_message' | 'set_custom_field' | 'send_webhook';
+export type LogicType = 'condition' | 'split_path';
+
 
 export interface NodeData {
   [key: string]: any; // To satisfy @xyflow/react's Node data constraint
   nodeType: NodeType;
-  type: TriggerType | ActionType;
+  type: TriggerType | ActionType | LogicType;
   label: string;
   config: Json;
 }
@@ -32,7 +35,9 @@ export type AutomationNode = Node<NodeData>;
 
 // --- DATABASE TABLE TYPES ---
 export type Profile = Tables<'profiles'>;
-export type Contact = Tables<'contacts'>;
+export type Contact = Omit<Tables<'contacts'>, 'custom_fields'> & {
+    custom_fields: Json | null;
+};
 export type Segment = Tables<'segments'>;
 export type SegmentRule = Tables<'segment_rules'>;
 export type ReceivedMessage = Tables<'received_messages'>;

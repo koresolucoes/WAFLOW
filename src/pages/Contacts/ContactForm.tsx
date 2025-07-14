@@ -14,6 +14,7 @@ const ContactForm: React.FC<ContactFormProps> = ({ contact, onSave, onCancel, is
     name: '',
     phone: '',
     tags: [],
+    custom_fields: null,
   });
   const [tagInput, setTagInput] = useState('');
 
@@ -24,7 +25,7 @@ const ContactForm: React.FC<ContactFormProps> = ({ contact, onSave, onCancel, is
         tags: contact.tags || []
       });
     } else {
-      setFormData({ name: '', phone: '', tags: [] });
+      setFormData({ name: '', phone: '', tags: [], custom_fields: null });
     }
   }, [contact]);
 

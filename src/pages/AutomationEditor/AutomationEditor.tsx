@@ -1,11 +1,14 @@
 
-import React, { useContext, useState, useEffect, useMemo, useCallback, memo } from 'react';
-import { ReactFlow, ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, type Node, type Edge, type NodeProps } from '@xyflow/react';
+
+import React, { useContext, useState, useEffect, useCallback, memo } from 'react';
+import { ReactFlow, ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, type Node, type Edge, type NodeProps, getConnectedEdges, getNodesBounds, getViewportForBounds } from '@xyflow/react';
 import { AppContext } from '../../contexts/AppContext';
-import { Automation, AutomationInsert, AutomationNode, NodeData, TriggerType, ActionType, MessageTemplate } from '../../types';
+import { Automation, AutomationInsert, AutomationNode, NodeData, TriggerType, ActionType, LogicType, MessageTemplate } from '../../types';
 import Button from '../../components/common/Button';
 import Card from '../../components/common/Card';
-import { AUTOMATION_ICON, PLUS_ICON, TRASH_ICON } from '../../components/icons';
+import { AUTOMATION_ICON, PLUS_ICON, TRASH_ICON, UPLOAD_ICON, WEBHOOK_ICON } from '../../components/icons';
+import { toPng } from 'html-to-image';
+
 
 const initialNodes: AutomationNode[] = [];
 const initialEdges: Edge[] = [];
@@ -16,24 +19,30 @@ const initialEdges: Edge[] = [];
 
 const nodeStyles = {
     base: "bg-slate-800 border-2 rounded-lg shadow-xl text-white w-72",
-    body: "p-4",
+    body: "p-4 space-y-1",
     header: "px-4 py-2 rounded-t-lg font-bold text-sm flex items-center gap-2",
     trigger: "border-sky-500",
     action: "border-pink-500",
+    logic: "border-purple-500",
     triggerHeader: "bg-sky-500/20",
     actionHeader: "bg-pink-500/20",
-    label: "text-lg font-semibold",
-    description: "text-xs text-slate-400 mt-1"
+    logicHeader: "bg-purple-500/20",
+    label: "text-base font-semibold",
+    description: "text-xs text-slate-400"
 };
 
-const CustomNode = memo(({ data }: NodeProps<NodeData>) => {
+const CustomNode = memo(({ data, type }: NodeProps<NodeData>) => {
     const isTrigger = data.nodeType === 'trigger';
 
+    const nodeTypeStyle = data.nodeType;
+    const headerStyle = `${nodeStyles.header} ${nodeStyles[`${nodeTypeStyle}Header`]}`;
+    const borderStyle = `${nodeStyles.base} ${nodeStyles[nodeTypeStyle]}`;
+
     return (
-        <div className={`${nodeStyles.base} ${isTrigger ? nodeStyles.trigger : nodeStyles.action}`}>
-            <div className={`${nodeStyles.header} ${isTrigger ? nodeStyles.triggerHeader : nodeStyles.actionHeader}`}>
+        <div className={borderStyle}>
+            <div className={headerStyle}>
                 <AUTOMATION_ICON className="w-4 h-4" />
-                {isTrigger ? 'Gatilho' : 'Ação'}
+                {data.nodeType.charAt(0).toUpperCase() + data.nodeType.slice(1)}
             </div>
             <div className={nodeStyles.body}>
                 <p className={nodeStyles.label}>{data.label}</p>
@@ -45,43 +54,113 @@ const CustomNode = memo(({ data }: NodeProps<NodeData>) => {
     );
 });
 
+const ConditionNode = memo(({ data }: NodeProps<NodeData>) => {
+    return (
+      <div className={`${nodeStyles.base} ${nodeStyles.logic}`}>
+        <div className={`${nodeStyles.header} ${nodeStyles.logicHeader}`}>
+            <AUTOMATION_ICON className="w-4 h-4" />
+            Lógica
+        </div>
+        <div className={nodeStyles.body}>
+            <p className={nodeStyles.label}>{data.label}</p>
+            <p className={nodeStyles.description}>
+                {`${(data.config as any)?.field || ''} ${(data.config as any)?.operator || ''} "${(data.config as any)?.value || ''}"`}
+            </p>
+        </div>
+        <Handle type="target" position={Position.Left} className="!bg-slate-400" />
+        
+        <Handle type="source" id="yes" position={Position.Right} style={{ top: '40%' }} className="!bg-green-500" />
+        <div className="absolute right-[-25px] top-[40%] -translate-y-1/2 text-xs text-green-400 font-bold">Sim</div>
+        
+        <Handle type="source" id="no" position={Position.Right} style={{ top: '70%' }} className="!bg-red-500" />
+        <div className="absolute right-[-25px] top-[70%] -translate-y-1/2 text-xs text-red-400 font-bold">Não</div>
+      </div>
+    );
+});
+
+const SplitPathNode = memo(({ data }: NodeProps<NodeData>) => {
+    return (
+      <div className={`${nodeStyles.base} ${nodeStyles.logic}`}>
+        <div className={`${nodeStyles.header} ${nodeStyles.logicHeader}`}>
+            <AUTOMATION_ICON className="w-4 h-4" />
+            Lógica
+        </div>
+        <div className={nodeStyles.body}>
+            <p className={nodeStyles.label}>{data.label}</p>
+            <p className={nodeStyles.description}>Divide o fluxo em 50/50 aleatoriamente.</p>
+        </div>
+        <Handle type="target" position={Position.Left} className="!bg-slate-400" />
+        
+        <Handle type="source" id="a" position={Position.Right} style={{ top: '40%' }} className="!bg-sky-500" />
+        <div className="absolute right-[-35px] top-[40%] -translate-y-1/2 text-xs text-sky-400 font-bold">Via A</div>
+        
+        <Handle type="source" id="b" position={Position.Right} style={{ top: '70%' }} className="!bg-amber-500" />
+        <div className="absolute right-[-35px] top-[70%] -translate-y-1/2 text-xs text-amber-400 font-bold">Via B</div>
+      </div>
+    );
+});
+
+
 const nodeTypes = {
     trigger: (props: NodeProps<NodeData>) => <CustomNode {...props} />,
     action: (props: NodeProps<NodeData>) => <CustomNode {...props} />,
+    logic: (props: NodeProps<NodeData>) => {
+        if (props.data.type === 'condition') {
+            return <ConditionNode {...props} />;
+        }
+        if (props.data.type === 'split_path') {
+            return <SplitPathNode {...props} />;
+        }
+        return <CustomNode {...props} />;
+    },
 };
 
 // ====================================================================================
 // Sidebar & Settings Panel Components
 // ====================================================================================
 
-const DraggableNode = ({ type, label, onDragStart }: { type: 'trigger' | 'action', label: string, onDragStart: (event: React.DragEvent, nodeType: string, type: string) => void }) => (
+const DraggableNode = ({ type, label, onDragStart, specificType }: { type: 'trigger' | 'action' | 'logic', label: string, onDragStart: (event: React.DragEvent, nodeType: string, type: string, label: string) => void, specificType: string }) => (
     <div
         className="p-3 mb-2 border-2 border-dashed border-slate-600 rounded-lg text-center cursor-grab bg-slate-800 hover:bg-slate-700 hover:border-sky-500"
-        onDragStart={(event) => onDragStart(event, type, label)}
+        onDragStart={(event) => onDragStart(event, type, specificType, label)}
         draggable
     >
-        <p className="font-semibold">{label}</p>
+        <p className="font-semibold text-sm">{label}</p>
     </div>
 );
 
-const NodeSidebar = ({ onDragStart }: { onDragStart: (event: React.DragEvent, nodeType: string, typeName: string) => void }) => (
-    <Card className="w-80">
+const NodeSidebar = ({ onDragStart }: { onDragStart: (event: React.DragEvent, nodeType: string, specificType: string, label: string) => void }) => (
+    <Card className="w-80 h-full overflow-y-auto">
         <h3 className="text-xl font-bold text-white mb-4">Blocos</h3>
         <p className="text-sm text-slate-400 mb-4">Arraste os blocos para a área de trabalho para construir sua automação.</p>
         <div>
-            <h4 className="font-semibold text-sky-300 mb-2">Gatilhos</h4>
-            <DraggableNode type="trigger" label="Contato com Tag" onDragStart={(e, type) => onDragStart(e, type, 'new_contact_with_tag')} />
-            <DraggableNode type="trigger" label="Mensagem com Palavra-chave" onDragStart={(e, type) => onDragStart(e, type, 'message_received_with_keyword')} />
+            <h4 className="font-semibold text-sky-300 mb-2">Gatilhos (Início)</h4>
+            <DraggableNode type="trigger" label="Novo Contato" specificType="new_contact" onDragStart={onDragStart} />
+            <DraggableNode type="trigger" label="Tag Adicionada" specificType="new_contact_with_tag" onDragStart={onDragStart} />
+            <DraggableNode type="trigger" label="Msg com Palavra-chave" specificType="message_received_with_keyword" onDragStart={onDragStart} />
+            <DraggableNode type="trigger" label="Botão Clicado" specificType="button_clicked" onDragStart={onDragStart} />
+            <DraggableNode type="trigger" label="Webhook Recebido" specificType="webhook_received" onDragStart={onDragStart} />
         </div>
         <div className="mt-6">
             <h4 className="font-semibold text-pink-300 mb-2">Ações</h4>
-            <DraggableNode type="action" label="Enviar Template" onDragStart={(e, type) => onDragStart(e, type, 'send_template')} />
-            <DraggableNode type="action" label="Adicionar Tag" onDragStart={(e, type) => onDragStart(e, type, 'add_tag')} />
+            <DraggableNode type="action" label="Enviar Template" specificType="send_template" onDragStart={onDragStart} />
+            <DraggableNode type="action" label="Enviar Texto Simples" specificType="send_text_message" onDragStart={onDragStart} />
+            <DraggableNode type="action" label="Enviar Mídia" specificType="send_media" onDragStart={onDragStart} />
+            <DraggableNode type="action" label="Enviar Msg com Botões" specificType="send_interactive_message" onDragStart={onDragStart} />
+            <DraggableNode type="action" label="Adicionar Tag" specificType="add_tag" onDragStart={onDragStart} />
+            <DraggableNode type="action" label="Remover Tag" specificType="remove_tag" onDragStart={onDragStart} />
+            <DraggableNode type="action" label="Definir Campo" specificType="set_custom_field" onDragStart={onDragStart} />
+            <DraggableNode type="action" label="Enviar Webhook" specificType="send_webhook" onDragStart={onDragStart} />
+        </div>
+         <div className="mt-6">
+            <h4 className="font-semibold text-purple-300 mb-2">Lógica</h4>
+            <DraggableNode type="logic" label="Condição (Se/Senão)" specificType="condition" onDragStart={onDragStart} />
+            <DraggableNode type="logic" label="Dividir Caminho (A/B)" specificType="split_path" onDragStart={onDragStart} />
         </div>
     </Card>
 );
 
-const SettingsPanel = ({ node, setNodes, templates }: { node: AutomationNode, setNodes: React.Dispatch<React.SetStateAction<AutomationNode[]>>, templates: MessageTemplate[] }) => {
+const SettingsPanel = ({ node, setNodes, templates, automationId }: { node: AutomationNode, setNodes: React.Dispatch<React.SetStateAction<AutomationNode[]>>, templates: MessageTemplate[], automationId?: string }) => {
     const { data, id } = node;
 
     const updateNodeConfig = (key: string, value: any) => {
@@ -99,6 +178,7 @@ const SettingsPanel = ({ node, setNodes, templates }: { node: AutomationNode, se
         switch (data.type) {
             case 'new_contact_with_tag':
             case 'add_tag':
+            case 'remove_tag':
                 return (
                     <div>
                         <label className="block text-sm font-medium text-slate-300 mb-1">Nome da Tag</label>
@@ -110,6 +190,14 @@ const SettingsPanel = ({ node, setNodes, templates }: { node: AutomationNode, se
                     <div>
                         <label className="block text-sm font-medium text-slate-300 mb-1">Palavra-chave</label>
                         <input type="text" value={config.keyword || ''} onChange={(e) => updateNodeConfig('keyword', e.target.value)} placeholder="Ex: promoção" className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white" />
+                         <p className="text-xs text-slate-400 mt-1">A automação iniciará se a mensagem do contato contiver esta palavra.</p>
+                    </div>
+                );
+            case 'button_clicked':
+                 return (
+                    <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-1">ID do Botão</label>
+                        <input type="text" value={config.button_payload || ''} onChange={(e) => updateNodeConfig('button_payload', e.target.value)} placeholder="O ID único do botão" className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white" />
                     </div>
                 );
             case 'send_template':
@@ -124,13 +212,141 @@ const SettingsPanel = ({ node, setNodes, templates }: { node: AutomationNode, se
                          {approvedTemplates.length === 0 && <p className="text-xs text-amber-400 mt-1">Nenhum template APROVADO encontrado.</p>}
                     </div>
                  );
+            case 'send_text_message':
+                return (
+                    <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-1">Texto da Mensagem</label>
+                        <textarea value={config.message_text || ''} onChange={(e) => updateNodeConfig('message_text', e.target.value)} placeholder="Digite sua mensagem. Use {{contact.name}} para o nome." rows={4} className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white" />
+                    </div>
+                );
+            case 'condition':
+                 return (
+                    <div className="space-y-3">
+                        <div>
+                            <label className="block text-xs font-medium text-slate-400 mb-1">Campo do Contato</label>
+                            <select value={config.field || 'tags'} onChange={(e) => updateNodeConfig('field', e.target.value)} className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white">
+                                <option value="tags">Tags</option>
+                                <option value="name">Nome</option>
+                                {/* Add custom fields here later */}
+                            </select>
+                        </div>
+                         <div>
+                            <label className="block text-xs font-medium text-slate-400 mb-1">Operador</label>
+                            <select value={config.operator || 'contains'} onChange={(e) => updateNodeConfig('operator', e.target.value)} className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white">
+                                <option value="contains">Contém</option>
+                                <option value="not_contains">Não contém</option>
+                                <option value="equals">É igual a</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-slate-400 mb-1">Valor</label>
+                            <input type="text" value={config.value || ''} onChange={(e) => updateNodeConfig('value', e.target.value)} placeholder="Valor a comparar" className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white" />
+                        </div>
+                    </div>
+                 );
+            case 'webhook_received':
+                const webhookUrl = automationId ? `${window.location.origin}/api/automations/trigger/${automationId}` : 'Salve a automação para gerar a URL';
+                return (
+                     <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-1">URL do Webhook</label>
+                        <input type="text" readOnly value={webhookUrl} className="w-full bg-slate-900 border border-slate-700 rounded-md p-2 text-slate-400" />
+                        <p className="text-xs text-slate-400 mt-1">Envie uma requisição POST para esta URL para iniciar a automação.</p>
+                    </div>
+                )
+            case 'send_media':
+                return (
+                    <div className="space-y-3">
+                         <div>
+                            <label className="block text-sm font-medium text-slate-300 mb-1">Tipo de Mídia</label>
+                            <select value={config.media_type || 'image'} onChange={(e) => updateNodeConfig('media_type', e.target.value)} className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white">
+                                <option value="image">Imagem</option>
+                                <option value="video">Vídeo</option>
+                                <option value="document">Documento</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-300 mb-1">URL da Mídia</label>
+                            <input type="url" value={config.media_url || ''} onChange={(e) => updateNodeConfig('media_url', e.target.value)} placeholder="https://..." className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white" />
+                        </div>
+                         <div>
+                            <label className="block text-sm font-medium text-slate-300 mb-1">Legenda (Opcional)</label>
+                            <textarea value={config.caption || ''} onChange={(e) => updateNodeConfig('caption', e.target.value)} rows={2} className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white" />
+                        </div>
+                    </div>
+                )
+            case 'send_interactive_message':
+                // complex state logic for buttons
+                const buttons = Array.isArray(config.buttons) ? config.buttons : [];
+                const handleButtonChange = (index: number, field: string, value: string) => {
+                    const newButtons = buttons.map((b, i) => i === index ? {...b, [field]: value} : b);
+                    updateNodeConfig('buttons', newButtons);
+                }
+                const addButton = () => {
+                    if (buttons.length < 3) {
+                        const newButtons = [...buttons, {id: `btn_${Date.now()}`, text: ''}];
+                        updateNodeConfig('buttons', newButtons);
+                    }
+                }
+                 const removeButton = (index: number) => {
+                    const newButtons = buttons.filter((_, i) => i !== index);
+                    updateNodeConfig('buttons', newButtons);
+                }
+
+                return (
+                    <div className="space-y-3">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-300 mb-1">Texto Principal</label>
+                            <textarea value={config.message_text || ''} onChange={(e) => updateNodeConfig('message_text', e.target.value)} rows={3} className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white" />
+                        </div>
+                        <div>
+                             <label className="block text-sm font-medium text-slate-300 mb-1">Botões (Quick Reply)</label>
+                             <div className="space-y-2">
+                                {buttons.map((btn: any, index: number) => (
+                                    <div key={index} className="flex items-center gap-2">
+                                        <input type="text" value={btn.text} onChange={e => handleButtonChange(index, 'text', e.target.value)} placeholder={`Botão ${index + 1}`} className="flex-grow bg-slate-800 border border-slate-600 rounded-md p-1.5 text-white text-sm" />
+                                        <button onClick={() => removeButton(index)} className="p-1 text-slate-400 hover:text-red-400"><TRASH_ICON className="w-4 h-4" /></button>
+                                    </div>
+                                ))}
+                             </div>
+                             {buttons.length < 3 && <Button size="sm" variant="ghost" className="mt-2" onClick={addButton}>+ Adicionar Botão</Button>}
+                        </div>
+                    </div>
+                )
+             case 'set_custom_field':
+                 return (
+                    <div className="space-y-3">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-300 mb-1">Nome do Campo</label>
+                            <input type="text" value={config.field_name || ''} onChange={(e) => updateNodeConfig('field_name', e.target.value)} placeholder="Ex: plano" className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-300 mb-1">Valor do Campo</label>
+                            <input type="text" value={config.field_value || ''} onChange={(e) => updateNodeConfig('field_value', e.target.value)} placeholder="Ex: premium" className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white" />
+                        </div>
+                    </div>
+                );
+            case 'send_webhook':
+                return (
+                     <div className="space-y-3">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-300 mb-1">URL do Webhook</label>
+                            <input type="url" value={config.url || ''} onChange={(e) => updateNodeConfig('url', e.target.value)} placeholder="https://..." className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white" />
+                        </div>
+                        <div>
+                             <label className="block text-sm font-medium text-slate-300 mb-1">Corpo da Requisição (JSON)</label>
+                             <textarea value={config.body || ''} onChange={(e) => updateNodeConfig('body', e.target.value)} rows={5} placeholder={`{ "name": "{{contact.name}}" }`} className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white font-mono text-xs" />
+                        </div>
+                    </div>
+                )
+            case 'split_path':
+                return <p className="text-slate-400">Este nó divide aleatoriamente os contatos em dois caminhos (A e B) com uma chance de 50% para cada.</p>
             default:
                 return <p className="text-slate-400">Nenhuma configuração necessária para este nó.</p>;
         }
     };
 
     return (
-         <Card className="w-80">
+         <Card className="w-80 h-full overflow-y-auto">
             <h3 className="text-xl font-bold text-white mb-4">Configurações</h3>
             <div className="space-y-4">
                 <div>
@@ -161,6 +377,7 @@ const FlowCanvas = () => {
     const [error, setError] = useState<string | null>(null);
 
     const isEditing = Boolean(pageParams.automationId);
+    const automationId = pageParams.automationId;
 
     useEffect(() => {
         if (isEditing) {
@@ -182,20 +399,20 @@ const FlowCanvas = () => {
 
     const onDrop = useCallback((event: React.DragEvent) => {
         event.preventDefault();
-        const type = event.dataTransfer.getData('application/reactflow-nodetype');
+        const nodeType = event.dataTransfer.getData('application/reactflow-nodetype') as 'trigger' | 'action' | 'logic';
+        const specificType = event.dataTransfer.getData('application/reactflow-specifictype') as TriggerType | ActionType | LogicType;
         const label = event.dataTransfer.getData('application/reactflow-label');
-        const specificType = event.dataTransfer.getData('application/reactflow-specifictype');
 
-        if (typeof type === 'undefined' || !type || !reactFlowInstance) return;
+        if (typeof nodeType === 'undefined' || !nodeType || !reactFlowInstance) return;
 
         const position = reactFlowInstance.screenToFlowPosition({ x: event.clientX, y: event.clientY });
         const newNode: AutomationNode = {
-            id: `node_${Date.now()}`,
-            type,
+            id: `${specificType}_${Date.now()}`,
+            type: nodeType,
             position,
             data: {
-                nodeType: type as 'trigger' | 'action',
-                type: specificType as TriggerType | ActionType,
+                nodeType: nodeType,
+                type: specificType,
                 label,
                 config: {},
             },
@@ -220,7 +437,7 @@ const FlowCanvas = () => {
         setIsSaving(true);
         const automationData = {
             name: automationName,
-            status: 'active', // Default status
+            status: isEditing ? (automations.find(a => a.id === pageParams.automationId)?.status || 'active') : 'active',
             nodes: nodes as AutomationNode[],
             edges,
         };
@@ -238,24 +455,23 @@ const FlowCanvas = () => {
         }
     };
     
-    const handleDragStart = (event: React.DragEvent, nodeType: string, specificType: string) => {
-        const label = event.currentTarget.textContent || 'Novo Nó';
+    const handleDragStart = (event: React.DragEvent, nodeType: string, specificType: string, label: string) => {
         event.dataTransfer.setData('application/reactflow-nodetype', nodeType);
-        event.dataTransfer.setData('application/reactflow-label', label);
         event.dataTransfer.setData('application/reactflow-specifictype', specificType);
+        event.dataTransfer.setData('application/reactflow-label', label);
         event.dataTransfer.effectAllowed = 'move';
     };
 
 
     return (
         <div className="h-full flex flex-col">
-             <header className="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-900/80 backdrop-blur-sm">
+             <header className="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-900/80 backdrop-blur-sm z-10">
                 <input
                     type="text"
                     value={automationName}
                     onChange={(e) => setAutomationName(e.target.value)}
                     placeholder="Nome da sua Automação"
-                    className="bg-transparent text-xl font-bold text-white focus:outline-none"
+                    className="bg-transparent text-xl font-bold text-white focus:outline-none w-1/2"
                 />
                  <div className="flex items-center gap-3">
                     {error && <p className="text-red-400 text-sm">{error}</p>}
@@ -265,8 +481,8 @@ const FlowCanvas = () => {
                     </Button>
                 </div>
             </header>
-            <div className="flex-grow flex">
-                <div className="w-[calc(100%-320px)] h-full">
+            <div className="flex-grow flex relative">
+                <div className="w-full h-full">
                     <ReactFlow
                         nodes={nodes}
                         edges={edges}
@@ -286,8 +502,10 @@ const FlowCanvas = () => {
                         <Controls />
                     </ReactFlow>
                 </div>
-                <aside className="w-80 h-full bg-slate-800/50 p-4 border-l border-slate-700 overflow-y-auto">
-                   {selectedNode ? <SettingsPanel node={selectedNode} setNodes={setNodes as any} templates={templates} /> : <NodeSidebar onDragStart={handleDragStart} />}
+                <aside className="absolute right-0 top-0 h-full bg-slate-800/50 p-4 border-l border-slate-700 backdrop-blur-sm z-10">
+                   {selectedNode ? 
+                    <SettingsPanel node={selectedNode} setNodes={setNodes as any} templates={templates} automationId={automationId} /> 
+                    : <NodeSidebar onDragStart={handleDragStart} />}
                 </aside>
             </div>
         </div>

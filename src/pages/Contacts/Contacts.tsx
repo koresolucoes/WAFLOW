@@ -1,4 +1,5 @@
 
+
 import React, { useContext, useState, useRef } from 'react';
 import { AppContext } from '../../contexts/AppContext';
 import Card from '../../components/common/Card';
@@ -101,7 +102,7 @@ const Contacts: React.FC = () => {
                 const [name, phone, tagsStr] = lines[i].split(',');
                 if (name && phone) {
                     const tags = tagsStr ? tagsStr.trim().split(';').map(t => t.trim()).filter(Boolean) : [];
-                    newContacts.push({ name: name.trim(), phone: phone.trim(), tags });
+                    newContacts.push({ name: name.trim(), phone: phone.trim(), tags, custom_fields: null });
                 }
             }
 

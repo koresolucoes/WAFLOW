@@ -1,4 +1,5 @@
 
+
 import React, { useContext, useMemo } from 'react';
 import { AppContext } from '../../contexts/AppContext';
 import { Automation } from '../../types';
@@ -29,17 +30,29 @@ const AutomationCard: React.FC<AutomationCardProps> = ({ automation }) => {
     };
 
     const description = useMemo(() => {
-        if (!Array.isArray(automation.nodes)) {
-            return "Automação sem nós definidos.";
+        if (!Array.isArray(automation.nodes) || automation.nodes.length === 0) {
+            return "Automação vazia.";
         }
         const triggerNode = automation.nodes.find(n => n.data.nodeType === 'trigger');
         const actionNodeCount = automation.nodes.filter(n => n.data.nodeType === 'action').length;
+        const logicNodeCount = automation.nodes.filter(n => n.data.nodeType === 'logic').length;
         
         if (!triggerNode) {
             return "Automação inválida sem gatilho.";
         }
 
-        return `Inicia com "${triggerNode.data.label}" e contém ${actionNodeCount} ação(ões).`;
+        let desc = `Inicia com "${triggerNode.data.label}"`;
+        const parts = [];
+        if (actionNodeCount > 0) parts.push(`${actionNodeCount} ação(ões)`);
+        if (logicNodeCount > 0) parts.push(`${logicNodeCount} lógica(s)`);
+        
+        if(parts.length > 0) {
+            desc += ` e contém ${parts.join(' e ')}.`;
+        } else {
+            desc += '.';
+        }
+
+        return desc;
     }, [automation]);
 
 
@@ -50,7 +63,7 @@ const AutomationCard: React.FC<AutomationCardProps> = ({ automation }) => {
                     <h3 className="text-lg font-semibold text-white break-words">{automation.name}</h3>
                     <Switch checked={automation.status === 'active'} onChange={handleStatusChange} />
                 </div>
-                 <p className="text-sm text-slate-400 mt-2">{description}</p>
+                 <p className="text-sm text-slate-400 mt-2 h-10">{description}</p>
             </div>
              <div className="mt-6 flex justify-end items-center gap-2">
                 <Button variant="secondary" size="sm" onClick={handleEdit}>

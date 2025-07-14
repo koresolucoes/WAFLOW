@@ -145,8 +145,12 @@ export default async function handler(req: Request) {
         if (jsonText.endsWith('```')) {
             jsonText = jsonText.substring(0, jsonText.length - 3);
         }
+        
+        const parsedData = JSON.parse(jsonText);
+        // Garante que o retorno é o objeto de template, não um objeto aninhado.
+        const templateData = parsedData.template || parsedData;
 
-        return new Response(jsonText, {
+        return new Response(JSON.stringify(templateData), {
             status: 200,
             headers: { 'Content-Type': 'application/json' },
         });
