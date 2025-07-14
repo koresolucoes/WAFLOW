@@ -2,7 +2,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from '../lib/supabaseAdmin';
 import { executeAutomation } from './_lib/engine';
-import { Automation, Contact } from '../types';
+import { Automation, Contact } from '../src/types';
 
 // Helper to find a contact by phone and create if not exists
 const findOrCreateContact = async (user_id: string, phone: string, name: string): Promise<Contact | null> => {
