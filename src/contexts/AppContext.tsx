@@ -1,4 +1,5 @@
 
+
 import React, { createContext, useState, useCallback, ReactNode, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { Page, Profile, MessageTemplate, Contact, Campaign, CampaignWithMetrics, EditableContact, Session, User, CampaignMessageInsert, CampaignWithDetails, CampaignMessageWithContact, Segment, MessageTemplateInsert, Automation, AutomationInsert, AutomationNode, Edge, TablesInsert, Json } from '../types';
@@ -16,7 +17,6 @@ interface AppContextType {
     accessToken: string;
     wabaId: string;
     phoneNumberId: string;
-    webhookVerifyToken?: string;
   };
   updateProfile: (profileData: Partial<Profile>) => Promise<void>;
 
@@ -242,7 +242,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     accessToken: profile?.meta_access_token || '',
     wabaId: profile?.meta_waba_id || '',
     phoneNumberId: profile?.meta_phone_number_id || '',
-    webhookVerifyToken: profile?.meta_webhook_verify_token || '',
   }), [profile]);
 
 

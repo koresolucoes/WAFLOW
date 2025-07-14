@@ -122,7 +122,6 @@ export interface MetaConfig {
   accessToken: string;
   phoneNumberId: string;
   wabaId: string;
-  webhookVerifyToken?: string;
 }
 
 // Tipos de Autenticação

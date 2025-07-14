@@ -1,6 +1,6 @@
 /**
  * =================================================================================================
- * ZAPFLOW AI - SUPABASE DATABASE SCHEMA (v5 - Webhook Path Prefix)
+ * ZAPFLOW AI - SUPABASE DATABASE SCHEMA (v6 - Simplified Webhook Verification)
  * =================================================================================================
  * 
  * INSTRUÇÕES IMPORTANTES:
@@ -9,9 +9,10 @@
  * 3. Navegue até o "SQL Editor".
  * 4. Cole o script e clique em "RUN".
  *
- * Este script irá (re)criar todas as tabelas, relações e políticas de segurança necessárias
- * para que a aplicação funcione corretamente. Ele foi atualizado para adicionar um campo
- * `webhook_path_prefix` na tabela de perfis para URLs de automação personalizadas.
+ * Este script irá (re)criar todas as tabelas, relações e políticas de segurança necessárias.
+ * Ele foi atualizado para remover o campo `meta_webhook_verify_token` da tabela de perfis,
+ * simplificando a configuração do webhook e eliminando confusão. A verificação agora depende
+ * exclusivamente de uma variável de ambiente no servidor.
  * É seguro executá-lo múltiplas vezes.
  * CUIDADO: A execução deste script apagará dados existentes. FAÇA UM BACKUP PRIMEIRO.
  *
@@ -48,7 +49,6 @@ CREATE TABLE public.profiles (
     meta_access_token text,
     meta_waba_id text,
     meta_phone_number_id text,
-    meta_webhook_verify_token text,
     webhook_path_prefix text UNIQUE
 );
 comment on table public.profiles is 'Armazena o perfil do usuário e os dados de configuração.';
@@ -189,11 +189,10 @@ CREATE POLICY "Users can view their own automation runs." ON public.automation_r
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO public.profiles (id, company_name, meta_webhook_verify_token, webhook_path_prefix)
+  INSERT INTO public.profiles (id, company_name, webhook_path_prefix)
   VALUES (
       new.id, 
       'Minha Nova Empresa', 
-      'troque_seu_token_aqui' || substr(new.id::text, 1, 8),
       'user-' || encode(public.gen_random_bytes(6), 'hex') -- Gera um prefixo aleatório e único
   );
   RETURN new;
@@ -488,7 +487,6 @@ export type Database = {
           meta_access_token: string | null
           meta_phone_number_id: string | null
           meta_waba_id: string | null
-          meta_webhook_verify_token: string | null
           updated_at: string | null
           webhook_path_prefix: string | null
         }
@@ -502,7 +500,6 @@ export type Database = {
           meta_access_token?: string | null
           meta_phone_number_id?: string | null
           meta_waba_id?: string | null
-          meta_webhook_verify_token?: string | null
           updated_at?: string | null
           webhook_path_prefix?: string | null
         }
@@ -516,7 +513,6 @@ export type Database = {
           meta_access_token?: string | null
           meta_phone_number_id?: string | null
           meta_waba_id?: string | null
-          meta_webhook_verify_token?: string | null
           updated_at?: string | null
           webhook_path_prefix?: string | null
         }
