@@ -95,4 +95,4 @@ export interface MetaConfig {
 }
 
 // Tipos de Autenticação
-export type { Session, User, Json };
+export type { Session, User, Json, TablesInsert };

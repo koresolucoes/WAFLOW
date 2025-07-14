@@ -78,7 +78,7 @@ const Templates: React.FC = () => {
 
         if (fetchError) throw fetchError;
         
-        const existingMetaIdMap = new Map((existingTemplates as any[])?.map(t => [t.meta_id, t.id]));
+        const existingMetaIdMap = new Map((existingTemplates as unknown as { meta_id: string, id: string }[])?.map(t => [t.meta_id, t.id]));
 
         const templatesToUpsert = metaTemplates.map(mt => {
             const existingId = existingMetaIdMap.get(mt.id);
@@ -98,7 +98,7 @@ const Templates: React.FC = () => {
         });
         
         if (templatesToUpsert.length > 0) {
-            const { error: upsertError } = await (supabase.from('message_templates') as any).upsert(templatesToUpsert);
+            const { error: upsertError } = await supabase.from('message_templates').upsert(templatesToUpsert as any);
             if (upsertError) throw upsertError;
         }
 

@@ -48,7 +48,7 @@ const findProfileByPhoneNumberId = async (phoneId: string) => {
         console.error(`Webhook: Erro ao buscar perfil pelo phone_number_id ${phoneId}:`, error.message);
         return null;
     }
-    return data;
+    return data as unknown as (Tables<'profiles'> | null);
 };
 
 const sendTemplatedMessage = async (config: any, to: string, templateName: string, components: any[]) => {
@@ -86,7 +86,7 @@ const executeContactAutomation = async (automation: Tables<'automations'>, conta
                 .eq('id', templateId)
                 .single();
             if (error || !templateData) throw error || new Error("Template não encontrado.");
-            const template = templateData as any;
+            const template = templateData as unknown as Tables<'message_templates'>;
             if (template.status !== 'APPROVED') throw new Error(`Template '${template.template_name}' não está APROVADO.`);
             
             await sendTemplatedMessage(metaConfig, contact.phone, template.template_name, [{type: 'body', parameters: [{type: 'text', text: contact.name}]}]);
@@ -167,49 +167,49 @@ const executeGenericAutomation = async (automation: Tables<'automations'>, trigg
     }
 };
 
+// --- BACKGROUND PROCESSING ---
 
-// --- WEBHOOK HANDLERS ---
-
-const handleMetaPost = async (req: Request): Promise<Response> => {
-    const body = await req.json();
-
+async function processMetaPayload(body: any) {
     if (body.object !== 'whatsapp_business_account') {
-        return new Response('Not a WhatsApp Business Account notification', { status: 200 });
+        return; // Not a notification we care about
     }
-    
+
     for (const entry of body.entry) {
         for (const change of entry.changes) {
             if (change.field === 'messages') {
                 const value = change.value;
                 const metadata = value.metadata;
-                
+
                 const profile = await findProfileByPhoneNumberId(metadata.phone_number_id);
                 if (!profile) continue;
-                
-                const typedProfile = profile as any;
-                const metaConfig = { accessToken: typedProfile.meta_access_token, phoneNumberId: typedProfile.meta_phone_number_id };
 
-                // Processar status de mensagens de campanhas
+                const typedProfile = profile as any;
+                const metaConfig = {
+                    meta_access_token: typedProfile.meta_access_token,
+                    meta_phone_number_id: typedProfile.meta_phone_number_id
+                };
+
+                // Process message statuses from campaigns
                 if (value.statuses) {
                     for (const status of value.statuses) {
                         const { error } = await supabase.from('campaign_messages').update({ status: status.status } as any).eq('meta_message_id', status.id);
                         if (error) console.error(`Webhook: Erro ao atualizar status da mensagem ${status.id}:`, error.message);
                     }
                 }
-                
-                // Processar mensagens recebidas e automações de palavra-chave
+
+                // Process incoming messages and keyword automations
                 if (value.messages) {
                     for (const message of value.messages) {
                         if (message.type !== 'text') continue;
 
                         const { data: contactData } = await supabase.from('contacts').select('*').eq('user_id', typedProfile.id).eq('phone', message.from).single();
                         if (!contactData) continue;
-                        const contact = contactData as any;
+                        const contact = contactData as unknown as Contact;
 
                         await supabase.from('received_messages').insert({ user_id: typedProfile.id, contact_id: contact.id, meta_message_id: message.id, message_body: message.text?.body || '' } as any);
 
                         const { data: automationsData } = await supabase.from('automations').select('*').eq('user_id', typedProfile.id).eq('status', 'active').eq('trigger_type', 'message_received_with_keyword');
-                        const automations = (automationsData as any[] | null) || [];
+                        const automations = (automationsData as unknown as Tables<'automations'>[]) || [];
 
                         if (automations.length > 0) {
                             const messageText = (message.text?.body || '').toLowerCase().trim();
@@ -225,6 +225,20 @@ const handleMetaPost = async (req: Request): Promise<Response> => {
             }
         }
     }
+}
+
+
+// --- WEBHOOK HANDLERS ---
+
+const handleMetaPost = async (req: Request): Promise<Response> => {
+    const body = await req.json();
+
+    // Fire-and-forget: Start processing but don't wait for it.
+    // This ensures a quick response to the Meta server to prevent timeouts.
+    processMetaPayload(body).catch(err => {
+        console.error("Webhook: Error during background processing of Meta event:", err.message);
+    });
+
     return new Response('EVENT_RECEIVED', { status: 200 });
 };
 
@@ -237,19 +251,38 @@ const handleAutomationTrigger = async (req: Request, automationId: string): Prom
         .eq('trigger_type', 'webhook_received')
         .single();
     
-    const automation = automationData as any;
+    const automation = automationData as unknown as Tables<'automations'>;
     if (autoError || !automation) {
         return new Response('Automation not found or not a valid webhook trigger.', { status: 404 });
     }
     
-    const allowedMethod = (automation.trigger_config as any)?.method || 'POST';
+    const triggerConfig = automation.trigger_config as any;
+    
+    // --- Webhook Verification Logic ---
+    const expectedKey = triggerConfig?.verify_key;
+    if (expectedKey) {
+        const authHeader = req.headers.get('Authorization');
+        const apiKeyHeader = req.headers.get('x-api-key');
+        let providedKey: string | null = null;
+
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+            providedKey = authHeader.substring(7);
+        } else if (apiKeyHeader) {
+            providedKey = apiKeyHeader;
+        }
+
+        if (providedKey !== expectedKey) {
+            return new Response('Unauthorized: Invalid verification key.', { status: 401 });
+        }
+    }
+    
+    const allowedMethod = triggerConfig?.method || 'POST';
     if (allowedMethod !== 'ANY' && req.method !== allowedMethod) {
         return new Response(`Method Not Allowed. This webhook only accepts ${allowedMethod} requests.`, {
             status: 405,
             headers: { 'Allow': allowedMethod }
         });
     }
-
 
     let body: any = {};
     try {
@@ -275,7 +308,7 @@ const handleAutomationTrigger = async (req: Request, automationId: string): Prom
         headers: Object.fromEntries(req.headers),
     };
 
-    // FIX: Fire-and-forget execution to prevent hanging requests.
+    // Fire-and-forget execution to prevent hanging requests.
     executeGenericAutomation(automation, triggerData).catch(err => {
         // Log errors from the async execution, but don't block the response.
         console.error(`Webhook Trigger: Async execution failed for automation ${automation.id}:`, err.message);

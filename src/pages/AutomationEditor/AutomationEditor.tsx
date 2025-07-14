@@ -73,7 +73,7 @@ const AutomationEditor: React.FC = () => {
         } else if (newTriggerType === 'message_received_with_keyword') {
             newTriggerConfig = { keyword: '' };
         } else if (newTriggerType === 'webhook_received') {
-            newTriggerConfig = { method: 'POST' };
+            newTriggerConfig = { method: 'POST', verify_key: '' };
             newActionType = 'http_request';
             newActionConfig = { url: '', method: 'POST', headers: '{\n  "Content-Type": "application/json"\n}', body: '{\n  "data": "Hello from ZapFlow AI!"\n}' };
         }
@@ -233,6 +233,26 @@ const AutomationEditor: React.FC = () => {
                                         <option value="ANY">ANY (Qualquer método)</option>
                                     </select>
                                 </div>
+                                <div>
+                                    <label htmlFor="verify_key" className="block text-sm font-medium text-slate-300 mb-1">
+                                        Chave de Verificação (Opcional)
+                                    </label>
+                                    <input
+                                        type="text"
+                                        id="verify_key"
+                                        value={(automation.trigger_config as any)?.verify_key || ''}
+                                        onChange={(e) => handleConfigChange('trigger', 'verify_key', e.target.value)}
+                                        placeholder="Um token secreto para proteger seu webhook"
+                                        className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white"
+                                    />
+                                </div>
+                                <InfoCard>
+                                    <p>Se você preencher a Chave de Verificação, as chamadas para sua URL de webhook deverão incluir um dos seguintes cabeçalhos para autenticação:</p>
+                                    <ul className="list-disc list-inside mt-2 text-xs font-mono">
+                                        <li><code>Authorization: Bearer SUA_CHAVE</code></li>
+                                        <li><code>x-api-key: SUA_CHAVE</code></li>
+                                    </ul>
+                                </InfoCard>
                                 <div>
                                     <label className="block text-sm font-medium text-slate-300 mb-1">URL do Webhook</label>
                                     {isEditing ? (
