@@ -1,4 +1,3 @@
-
 import React, { useContext, useMemo } from 'react';
 import { AppContext } from '../../contexts/AppContext';
 import { Automation } from '../../types';
@@ -35,6 +34,8 @@ const AutomationCard: React.FC<AutomationCardProps> = ({ automation }) => {
                     return `Quando um contato recebe a tag "${(automation.trigger_config as any).tag}"`;
                 case 'message_received_with_keyword':
                     return `Quando uma mensagem contém a palavra-chave "${(automation.trigger_config as any).keyword}"`;
+                case 'webhook_received':
+                    return `Quando um webhook é recebido`;
                 default:
                     return "Gatilho desconhecido";
             }
@@ -48,6 +49,8 @@ const AutomationCard: React.FC<AutomationCardProps> = ({ automation }) => {
                     const templateId = (automation.action_config as any).template_id;
                     const template = templates.find(t => t.id === templateId);
                     return `enviar o template "${template?.template_name || 'Desconhecido'}"`;
+                case 'http_request':
+                    return `fazer uma requisição HTTP para "${(automation.action_config as any).url}"`;
                 default:
                     return "ação desconhecida";
             }

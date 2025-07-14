@@ -1,7 +1,6 @@
-
 // /api/webhook.ts
 import { createClient } from '@supabase/supabase-js';
-import { Database, Tables } from '../src/types/database.types';
+import { Database, Tables, Json } from '../src/types/database.types';
 import { Automation, Contact, MessageTemplate, Profile } from '../src/types';
 
 const supabaseUrl = process.env.SUPABASE_URL;
@@ -18,7 +17,26 @@ const supabase = createClient<Database>(supabaseUrl, supabaseServiceKey, {
     }
 });
 
-// Helpers
+// --- HELPER FUNCTIONS ---
+
+const replacePlaceholders = (text: string, data: any): string => {
+    if (typeof text !== 'string') return text;
+    // Regex to find {{...}} placeholders
+    return text.replace(/\{\{(.*?)\}\}/g, (match, key) => {
+        const keys = key.trim().split('.');
+        let value = data;
+        for (const k of keys) {
+            if (value && typeof value === 'object' && k in value) {
+                value = value[k];
+            } else {
+                return match; // Return original placeholder if path is invalid
+            }
+        }
+        // If the resolved value is an object, stringify it. Otherwise, return as is.
+        return typeof value === 'object' && value !== null ? JSON.stringify(value) : value;
+    });
+};
+
 const findProfileByPhoneNumberId = async (phoneId: string) => {
     const { data, error } = await supabase
         .from('profiles')
@@ -32,34 +50,30 @@ const findProfileByPhoneNumberId = async (phoneId: string) => {
     return data;
 };
 
-const processStatuses = async (statuses: any[]) => {
-    for (const status of statuses) {
-        const updateData: { status: any; delivered_at?: string; read_at?: string } = { status: status.status };
-        
-        const timestamp = parseInt(status.timestamp, 10) * 1000;
-        if (isNaN(timestamp)) continue;
-
-        if (status.status === 'delivered') {
-            updateData.delivered_at = new Date(timestamp).toISOString();
-        }
-        if (status.status === 'read') {
-            updateData.read_at = new Date(timestamp).toISOString();
-        }
-        
-        const { error } = await supabase
-            .from('campaign_messages')
-            .update(updateData as any)
-            .eq('meta_message_id', status.id);
-
-        if (error) {
-            console.error(`Webhook: Erro ao atualizar status da mensagem ${status.id} para ${status.status}:`, error.message);
-        } else {
-            console.log(`Webhook: Status da mensagem ${status.id} atualizado para ${status.status}.`);
-        }
+const sendTemplatedMessage = async (config: any, to: string, templateName: string, components: any[]) => {
+    const API_VERSION = 'v23.0';
+    const url = `https://graph.facebook.com/${API_VERSION}/${config.meta_phone_number_id}/messages`;
+    const payload = {
+        messaging_product: 'whatsapp',
+        to: to.replace(/\D/g, ''),
+        type: 'template',
+        template: { name: templateName, language: { code: 'pt_BR' }, components }
+    };
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${config.meta_access_token}` },
+        body: JSON.stringify(payload)
+    });
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(`Meta API Error: ${error.error.message}`);
     }
+    return response.json();
 };
 
-const executeAutomation = async (automation: Automation, contact: Contact, metaConfig: any) => {
+// --- AUTOMATION EXECUTION LOGIC ---
+
+const executeContactAutomation = async (automation: Automation, contact: Contact, metaConfig: any) => {
     try {
         if (automation.action_type === 'send_template') {
             const templateId = (automation.action_config as any)?.template_id;
@@ -90,143 +104,201 @@ const executeAutomation = async (automation: Automation, contact: Contact, metaC
     }
 };
 
-const sendTemplatedMessage = async (config: any, to: string, templateName: string, components: any[]) => {
-    const API_VERSION = 'v23.0';
-    const url = `https://graph.facebook.com/${API_VERSION}/${config.meta_phone_number_id}/messages`;
-    const payload = {
-        messaging_product: 'whatsapp',
-        to: to.replace(/\D/g, ''),
-        type: 'template',
-        template: { name: templateName, language: { code: 'pt_BR' }, components }
-    };
-    const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${config.meta_access_token}` },
-        body: JSON.stringify(payload)
-    });
-    if (!response.ok) {
-        const error = await response.json();
-        throw new Error(`Meta API Error: ${error.error.message}`);
-    }
-    return response.json();
-};
+const executeGenericAutomation = async (automation: Automation, triggerData: any) => {
+    const actionType = automation.action_type;
+    const actionConfig = automation.action_config as any;
 
-const processIncomingMessages = async (messages: any[], userId: string, metaConfig: any) => {
-    for (const message of messages) {
-        if (message.type !== 'text') continue;
+    try {
+        if (actionType === 'http_request') {
+            const url = replacePlaceholders(actionConfig.url, { trigger: triggerData });
+            const method = actionConfig.method || 'POST';
+            let headers: Record<string, string> = {};
+            if (actionConfig.headers) {
+                try {
+                    // O header vem como uma string JSON, então precisa ser parseado.
+                    // A string também pode conter placeholders, então eles são substituídos primeiro.
+                    const replacedHeaderString = replacePlaceholders(actionConfig.headers, { trigger: triggerData });
+                    headers = JSON.parse(replacedHeaderString);
+                } catch (e) {
+                    throw new Error("Formato JSON inválido nos Cabeçalhos (Headers).");
+                }
+            }
+            
+            let requestBody: any = undefined;
+            if (method !== 'GET' && actionConfig.body) {
+                // O corpo também pode conter placeholders
+                requestBody = replacePlaceholders(actionConfig.body, { trigger: triggerData });
+            }
 
-        const contactPhone = message.from;
-        const { data: contact, error: contactError } = await supabase
-            .from('contacts')
-            .select('*')
-            .eq('user_id', userId)
-            .eq('phone', contactPhone)
-            .single();
+            const httpResponse = await fetch(url, {
+                method,
+                headers,
+                body: requestBody,
+            });
 
-        if (contactError || !contact) {
-            console.warn(`Webhook: Mensagem de contato desconhecido (${contactPhone}) para usuário ${userId}.`);
-            continue;
+            if (!httpResponse.ok) {
+                const responseBody = await httpResponse.text();
+                throw new Error(`Requisição HTTP falhou com status ${httpResponse.status}: ${responseBody}`);
+            }
+        } else {
+            // Outras ações genéricas que não dependem de um contato podem ser adicionadas aqui.
+            throw new Error(`Ação '${actionType}' não é compatível com gatilhos de webhook genéricos.`);
         }
-
-        // Save received message
-        await supabase.from('received_messages').insert({
-            user_id: userId,
-            contact_id: (contact as Contact).id,
-            meta_message_id: message.id,
-            message_body: message.text?.body || '',
-            received_at: new Date(parseInt(message.timestamp, 10) * 1000).toISOString()
+        
+        // Log de sucesso
+        await supabase.from('automation_runs').insert({
+            automation_id: automation.id,
+            status: 'success',
+            details: `Ação '${actionType}' executada com sucesso via webhook.`
         } as any);
 
-        // Check for keyword automations
-        const { data: automations, error: autoError } = await supabase
-            .from('automations')
-            .select('*')
-            .eq('user_id', userId)
-            .eq('status', 'active')
-            .eq('trigger_type', 'message_received_with_keyword');
-        
-        if (autoError) {
-            console.error('Webhook: Erro ao buscar automações por palavra-chave:', autoError.message);
-            continue;
-        }
-
-        const messageText = (message.text?.body || '').toLowerCase().trim();
-        for (const auto of (automations as Automation[])) {
-            const keyword = (((auto.trigger_config as any)?.keyword) || '').toLowerCase().trim();
-            if (keyword && messageText.includes(keyword)) {
-                console.log(`Webhook: Gatilho de palavra-chave '${keyword}' encontrado. Executando automação '${auto.name}'.`);
-                await executeAutomation(auto, contact as Contact, metaConfig);
-            }
-        }
+    } catch (executionError: any) {
+        // Log de falha
+        console.error(`Webhook Trigger: Falha ao executar ação para automação ${automation.id}:`, executionError.message);
+        await supabase.from('automation_runs').insert({
+            automation_id: automation.id,
+            status: 'failed',
+            details: executionError.message,
+        } as any);
+        // Lançar o erro novamente para que o manipulador principal saiba que falhou.
+        throw executionError;
     }
 };
 
-const handleVerification = (req: Request): Response => {
-    const url = new URL(req.url);
-    const params = url.searchParams;
-    const mode = params.get('hub.mode');
-    const token = params.get('hub.verify_token');
-    const challenge = params.get('hub.challenge');
 
-    if (mode === 'subscribe' && token === VERIFY_TOKEN) {
-        console.log('WEBHOOK_VERIFIED');
-        return new Response(challenge, { status: 200, headers: { 'Content-Type': 'text/plain' } });
-    } else {
-        console.error('Falha na verificação do Webhook. Tokens não correspondem.');
-        return new Response('Failed validation', { status: 403 });
+// --- WEBHOOK HANDLERS ---
+
+const handleMetaPost = async (req: Request): Promise<Response> => {
+    const body = await req.json();
+
+    if (body.object !== 'whatsapp_business_account') {
+        return new Response('Not a WhatsApp Business Account notification', { status: 200 });
     }
-};
+    
+    for (const entry of body.entry) {
+        for (const change of entry.changes) {
+            if (change.field === 'messages') {
+                const value = change.value;
+                const metadata = value.metadata;
+                
+                const profile = await findProfileByPhoneNumberId(metadata.phone_number_id);
+                if (!profile) continue;
 
-const handlePost = async (req: Request): Promise<Response> => {
-    try {
-        const body = await req.json();
+                const metaConfig = { accessToken: (profile as Profile).meta_access_token, phoneNumberId: (profile as Profile).meta_phone_number_id };
 
-        if (body.object !== 'whatsapp_business_account') {
-            return new Response('Not a WhatsApp Business Account notification', { status: 200 });
-        }
-        
-        for (const entry of body.entry) {
-            for (const change of entry.changes) {
-                if (change.field === 'messages') {
-                    const value = change.value;
-                    const metadata = value.metadata;
-                    
-                    const profile = await findProfileByPhoneNumberId(metadata.phone_number_id);
-
-                    if (!profile) {
-                        console.error(`Webhook: Nenhum perfil encontrado para phone_number_id ${metadata.phone_number_id}. Ignorando.`);
-                        continue;
+                // Processar status de mensagens de campanhas
+                if (value.statuses) {
+                    for (const status of value.statuses) {
+                        const { error } = await supabase.from('campaign_messages').update({ status: status.status } as any).eq('meta_message_id', status.id);
+                        if (error) console.error(`Webhook: Erro ao atualizar status da mensagem ${status.id}:`, error.message);
                     }
+                }
+                
+                // Processar mensagens recebidas e automações de palavra-chave
+                if (value.messages) {
+                    for (const message of value.messages) {
+                        if (message.type !== 'text') continue;
 
-                    const metaConfig = {
-                        accessToken: (profile as Profile).meta_access_token,
-                        wabaId: (profile as Profile).meta_waba_id,
-                        phoneNumberId: (profile as Profile).meta_phone_number_id
-                    };
+                        const { data: contact } = await supabase.from('contacts').select('*').eq('user_id', profile.id).eq('phone', message.from).single();
+                        if (!contact) continue;
 
-                    if (value.statuses) {
-                        await processStatuses(value.statuses);
-                    }
-                    if (value.messages) {
-                        await processIncomingMessages(value.messages, (profile as Profile).id, metaConfig);
+                        await supabase.from('received_messages').insert({ user_id: profile.id, contact_id: contact.id, meta_message_id: message.id, message_body: message.text?.body || '' } as any);
+
+                        const { data: automations } = await supabase.from('automations').select('*').eq('user_id', profile.id).eq('status', 'active').eq('trigger_type', 'message_received_with_keyword');
+                        if (automations) {
+                            const messageText = (message.text?.body || '').toLowerCase().trim();
+                            for (const auto of automations) {
+                                const keyword = (((auto.trigger_config as any)?.keyword) || '').toLowerCase().trim();
+                                if (keyword && messageText.includes(keyword)) {
+                                    await executeContactAutomation(auto, contact, metaConfig);
+                                }
+                            }
+                        }
                     }
                 }
             }
         }
+    }
+    return new Response('EVENT_RECEIVED', { status: 200 });
+};
 
-        return new Response('EVENT_RECEIVED', { status: 200 });
+const handleAutomationTrigger = async (req: Request, automationId: string): Promise<Response> => {
+    const { data: automation, error: autoError } = await supabase
+        .from('automations')
+        .select('*')
+        .eq('id', automationId)
+        .eq('status', 'active')
+        .eq('trigger_type', 'webhook_received')
+        .single();
+
+    if (autoError || !automation) {
+        return new Response('Automation not found or not a valid webhook trigger.', { status: 404 });
+    }
+
+    let body: any = {};
+    try {
+        const contentType = req.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+            body = await req.json();
+        } else {
+            body = await req.text();
+        }
+    } catch (e) {}
+
+    const triggerData = {
+        body,
+        query: Object.fromEntries(new URL(req.url).searchParams),
+        headers: Object.fromEntries(req.headers),
+    };
+
+    try {
+        await executeGenericAutomation(automation, triggerData);
+        // Mesmo se a execução da automação falhar, o webhook foi recebido com sucesso.
+        // A falha é registrada internamente na tabela automation_runs.
+        return new Response('Webhook processed.', { status: 200 });
     } catch (error: any) {
-        console.error('Webhook: Erro ao processar a requisição POST:', error);
-        return new Response('Internal Server Error', { status: 500 });
+        // Este erro é capturado se executeGenericAutomation falhar, mas o log já foi feito lá.
+        // Retornamos 200 para não fazer o serviço de origem tentar reenviar o webhook.
+        return new Response(`Webhook processed, but action failed: ${error.message}`, { status: 200 });
     }
 };
 
+const handleVerification = (req: Request): Response => {
+    const params = new URL(req.url).searchParams;
+    if (params.get('hub.mode') === 'subscribe' && params.get('hub.verify_token') === VERIFY_TOKEN) {
+        console.log('WEBHOOK_VERIFIED');
+        return new Response(params.get('hub.challenge'), { status: 200 });
+    }
+    return new Response('Failed validation', { status: 403 });
+};
+
+
+// --- MAIN HANDLER ---
 export default async function handler(req: Request) {
-    if (req.method === 'GET') {
-        return handleVerification(req);
-    } else if (req.method === 'POST') {
-        return handlePost(req);
-    } else {
+    try {
+        const url = new URL(req.url);
+        const triggerId = url.searchParams.get('trigger_id');
+
+        // Rota 1: Gatilho de Automação Genérico
+        if (triggerId) {
+            return await handleAutomationTrigger(req, triggerId);
+        }
+
+        // Rota 2: Verificação do Webhook da Meta
+        if (req.method === 'GET') {
+            return handleVerification(req);
+        }
+
+        // Rota 3: Notificações do Webhook da Meta
+        if (req.method === 'POST') {
+            return await handleMetaPost(req);
+        }
+
+        // Método não suportado
         return new Response('Method Not Allowed', { status: 405, headers: { 'Allow': 'GET, POST' } });
+
+    } catch (error: any) {
+        console.error('Webhook: Erro Crítico no Handler Principal:', error);
+        return new Response('Internal Server Error', { status: 500 });
     }
 }

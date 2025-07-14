@@ -1,4 +1,3 @@
-
 /**
  * =================================================================================================
  * ZAPFLOW AI - SUPABASE DATABASE SCHEMA
@@ -47,8 +46,8 @@ CREATE TYPE public.template_status_enum AS ENUM ('APPROVED', 'PENDING', 'REJECTE
 CREATE TYPE public.campaign_status_enum AS ENUM ('Sent', 'Draft', 'Failed');
 CREATE TYPE public.message_status_enum AS ENUM ('sent', 'delivered', 'read', 'failed');
 CREATE TYPE public.automation_status_enum AS ENUM ('active', 'paused');
-CREATE TYPE public.automation_trigger_type_enum AS ENUM ('new_contact_with_tag', 'message_received_with_keyword');
-CREATE TYPE public.automation_action_type_enum AS ENUM ('send_template', 'add_tag');
+CREATE TYPE public.automation_trigger_type_enum AS ENUM ('new_contact_with_tag', 'message_received_with_keyword', 'webhook_received');
+CREATE TYPE public.automation_action_type_enum AS ENUM ('send_template', 'add_tag', 'http_request');
 CREATE TYPE public.automation_run_status_enum AS ENUM ('success', 'failed');
 
 
@@ -170,18 +169,20 @@ CREATE TABLE public.automations (
 );
 comment on table public.automations is 'Armazena fluxos de trabalho de automação.';
 comment on column public.automations.trigger_config is 'Ex: {"tag": "vip"} ou {"keyword": "promo"}';
-comment on column public.automations.action_config is 'Ex: {"template_id": "uuid"} ou {"tag": "interessado"}';
+comment on column public.automations.action_config is 'Ex: {"template_id": "uuid"} ou {"tag": "interessado"} ou {"url": "https://api...", "method": "POST", ...}';
 
 -- Tabela de logs de execução das automações
 CREATE TABLE public.automation_runs (
     id uuid NOT NULL PRIMARY KEY DEFAULT uuid_generate_v4(),
     automation_id uuid NOT NULL REFERENCES public.automations(id) ON DELETE CASCADE,
-    contact_id uuid NOT NULL REFERENCES public.contacts(id) ON DELETE CASCADE,
+    contact_id uuid REFERENCES public.contacts(id) ON DELETE CASCADE,
     run_at timestamp with time zone NOT NULL DEFAULT now(),
     status public.automation_run_status_enum NOT NULL,
     details text
 );
 comment on table public.automation_runs is 'Registra a execução de cada automação.';
+comment on column public.automation_runs.contact_id is 'Nulo se a automação não estiver vinculada a um contato (ex: webhook genérico).';
+
 
 -- Habilita a Segurança a Nível de Linha (RLS) para todas as tabelas
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
@@ -244,7 +245,7 @@ export type Database = {
       automation_runs: {
         Row: {
           automation_id: string
-          contact_id: string
+          contact_id: string | null
           details: string | null
           id: string
           run_at: string
@@ -252,7 +253,7 @@ export type Database = {
         }
         Insert: {
           automation_id: string
-          contact_id: string
+          contact_id?: string | null
           details?: string | null
           id?: string
           run_at?: string
@@ -260,7 +261,7 @@ export type Database = {
         }
         Update: {
           automation_id?: string
-          contact_id?: string
+          contact_id?: string | null
           details?: string | null
           id?: string
           run_at?: string
@@ -666,12 +667,16 @@ export type Database = {
       }
     }
     Enums: {
-      automation_action_type_enum: "send_template" | "add_tag"
+      automation_action_type_enum:
+        | "send_template"
+        | "add_tag"
+        | "http_request"
       automation_run_status_enum: "success" | "failed"
       automation_status_enum: "active" | "paused"
       automation_trigger_type_enum:
         | "new_contact_with_tag"
         | "message_received_with_keyword"
+        | "webhook_received"
       campaign_status_enum: "Sent" | "Draft" | "Failed"
       message_status_enum: "sent" | "delivered" | "read" | "failed"
       template_category_enum: "MARKETING" | "UTILITY" | "AUTHENTICATION"
