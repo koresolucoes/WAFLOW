@@ -1,5 +1,5 @@
 
-import { supabaseAdmin } from '../../lib/supabaseAdmin';
+import { supabaseAdmin } from './supabaseAdmin';
 import { sendTemplatedMessage, sendTextMessage, sendMediaMessage, sendInteractiveMessage } from '../../src/services/meta/messages';
 import { Automation, Contact, Json, MetaConfig, NodeData, MessageTemplate } from '../../src/types';
 

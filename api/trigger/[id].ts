@@ -1,6 +1,6 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { supabaseAdmin } from '../../lib/supabaseAdmin';
+import { supabaseAdmin } from '../_lib/supabaseAdmin';
 import { executeAutomation } from '../_lib/engine';
 import { Contact, Automation } from '../../src/types';
 
