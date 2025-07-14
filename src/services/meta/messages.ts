@@ -1,3 +1,4 @@
+
 import { MetaConfig } from "../../types";
 import metaApiClient from "./apiClient";
 import { MetaMessagePayload } from "./types";
@@ -25,7 +26,6 @@ export const sendTemplatedMessage = async (
 ): Promise<SendMessageResponse> => {
     if (!config.phoneNumberId) throw new Error("ID do Número de Telefone não configurado.");
 
-    // Remove caracteres não numéricos do telefone
     const sanitizedPhone = to.replace(/\D/g, '');
 
     const payload: MetaMessagePayload = {
@@ -49,4 +49,58 @@ export const sendTemplatedMessage = async (
             body: JSON.stringify(payload)
         }
     );
+};
+
+/**
+ * Envia uma mensagem de texto simples.
+ */
+export const sendTextMessage = async (config: MetaConfig, to: string, text: string): Promise<SendMessageResponse> => {
+    if (!config.phoneNumberId) throw new Error("ID do Número de Telefone não configurado.");
+    const payload = {
+        messaging_product: 'whatsapp',
+        to: to.replace(/\D/g, ''),
+        type: 'text',
+        text: { preview_url: true, body: text },
+    };
+    return metaApiClient<SendMessageResponse>(config, `/${config.phoneNumberId}/messages`, { method: 'POST', body: JSON.stringify(payload) });
+};
+
+/**
+ * Envia uma mensagem de mídia (imagem, vídeo, documento) por URL.
+ */
+export const sendMediaMessage = async (config: MetaConfig, to: string, mediaType: 'image' | 'video' | 'document', url: string, caption?: string): Promise<SendMessageResponse> => {
+    if (!config.phoneNumberId) throw new Error("ID do Número de Telefone não configurado.");
+    const payload = {
+        messaging_product: 'whatsapp',
+        to: to.replace(/\D/g, ''),
+        type: mediaType,
+        [mediaType]: {
+            link: url,
+            ...(caption && { caption }),
+        },
+    };
+    return metaApiClient<SendMessageResponse>(config, `/${config.phoneNumberId}/messages`, { method: 'POST', body: JSON.stringify(payload) });
+};
+
+/**
+ * Envia uma mensagem interativa com botões de resposta rápida.
+ */
+export const sendInteractiveMessage = async (config: MetaConfig, to: string, bodyText: string, buttons: { id: string; text: string }[]): Promise<SendMessageResponse> => {
+    if (!config.phoneNumberId) throw new Error("ID do Número de Telefone não configurado.");
+    const payload = {
+        messaging_product: 'whatsapp',
+        to: to.replace(/\D/g, ''),
+        type: 'interactive',
+        interactive: {
+            type: 'button',
+            body: { text: bodyText },
+            action: {
+                buttons: buttons.slice(0, 3).map(btn => ({
+                    type: 'reply',
+                    reply: { id: btn.id, title: btn.text },
+                })),
+            },
+        },
+    };
+     return metaApiClient<SendMessageResponse>(config, `/${config.phoneNumberId}/messages`, { method: 'POST', body: JSON.stringify(payload) });
 };

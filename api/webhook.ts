@@ -1,126 +1,164 @@
 
+import type { VercelRequest, VercelResponse } from '@vercel/node';
+import crypto from 'crypto';
 import { supabaseAdmin } from '../../lib/supabaseAdmin';
 import { executeAutomation } from './_lib/engine';
+import { Automation, Contact } from '../../types';
 
-// Helper function to find a profile by their Meta Phone Number ID
-const findProfileByPhoneNumberId = async (phoneId: string) => {
-    const { data, error } = await supabaseAdmin
-        .from('profiles')
-        .select('*')
-        .eq('meta_phone_number_id', phoneId)
-        .single();
-    if (error) throw new Error(`Could not find profile for phone number ID ${phoneId}: ${error.message}`);
-    return data;
-};
-
-// Helper function to find an existing contact or create a new one
-const findOrCreateContact = async (userId: string, phone: string, name?: string) => {
-    const { data: existingContact, error } = await supabaseAdmin
+// Helper to find a contact by phone and create if not exists
+const findOrCreateContact = async (user_id: string, phone: string, name: string): Promise<Contact | null> => {
+    let { data: contact, error } = await supabaseAdmin
         .from('contacts')
         .select('*')
-        .eq('user_id', userId)
+        .eq('user_id', user_id)
         .eq('phone', phone)
         .single();
 
-    if (existingContact) return existingContact;
-    if (error && error.code !== 'PGRST116') throw error; // Throw if it's not a "not found" error
+    if (error && error.code === 'PGRST116') { // Not found
+        const { data: newContact, error: insertError } = await supabaseAdmin
+            .from('contacts')
+            .insert({ user_id, phone, name, tags: ['new-lead'] })
+            .select()
+            .single();
+        if (insertError) return null;
+        contact = newContact;
+    } else if (error) {
+        return null;
+    }
+    return contact as Contact;
+};
 
-    const { data: newContact, error: insertError } = await supabaseAdmin
-        .from('contacts')
-        .insert({ user_id: userId, phone, name: name || phone })
-        .select()
-        .single();
-    
-    if (insertError) throw new Error(`Could not create contact for phone ${phone}: ${insertError.message}`);
-    return newContact;
+// Helper to find automations to trigger based on message content
+const findAutomationsToTrigger = async (user_id: string, messageBody: string, buttonPayload?: string): Promise<{automation: Automation, startNodeId: string}[]> => {
+    const { data: automations, error } = await supabaseAdmin
+        .from('automations')
+        .select('*')
+        .eq('user_id', user_id)
+        .eq('status', 'active');
+
+    if (error || !automations) return [];
+
+    const triggers: {automation: Automation, startNodeId: string}[] = [];
+
+    for (const auto of (automations as unknown as Automation[])) {
+        if (!auto.nodes) continue;
+        for (const node of auto.nodes) {
+            const config = (node.data.config || {}) as any;
+            if (buttonPayload && node.data.type === 'button_clicked' && config.button_payload === buttonPayload) {
+                triggers.push({ automation: auto, startNodeId: node.id });
+            }
+            if (messageBody && node.data.type === 'message_received_with_keyword' && messageBody.toLowerCase().includes(config.keyword?.toLowerCase())) {
+                 triggers.push({ automation: auto, startNodeId: node.id });
+            }
+        }
+    }
+    return triggers;
 };
 
 
-// Main Vercel serverless function handler
-export default async function handler(req: Request) {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+    // 1. Handle Verification Request from Meta
     if (req.method === 'GET') {
-        // Handle Meta's webhook verification
-        const url = new URL(req.url);
-        const mode = url.searchParams.get('hub.mode');
-        const token = url.searchParams.get('hub.verify_token');
-        const challenge = url.searchParams.get('hub.challenge');
+        const verifyToken = process.env.META_VERIFY_TOKEN;
+        const mode = req.query['hub.mode'];
+        const token = req.query['hub.verify_token'];
+        const challenge = req.query['hub.challenge'];
 
-        if (mode === 'subscribe' && token === process.env.META_VERIFY_TOKEN) {
-            return new Response(challenge, { status: 200 });
+        if (mode === 'subscribe' && token === verifyToken) {
+            console.log('Webhook verified successfully!');
+            return res.status(200).send(challenge);
         } else {
-            return new Response('Forbidden', { status: 403 });
+            console.error('Failed webhook verification. Make sure META_VERIFY_TOKEN is set.');
+            return res.status(403).send('Forbidden');
         }
     }
 
+    // 2. Handle Event Notifications from Meta
     if (req.method === 'POST') {
-        const body = await req.json();
+        // 2a. Verify Signature
+        const signature = req.headers['x-hub-signature-256'] as string;
+        const appSecret = process.env.META_APP_SECRET;
 
-        // Process incoming notifications
-        try {
-            if (body.object === 'whatsapp_business_account') {
-                for (const entry of body.entry) {
-                    for (const change of entry.changes) {
-                        const value = change.value;
+        if (!appSecret) {
+            console.error("META_APP_SECRET is not set. Cannot verify webhook signature.");
+            return res.status(500).send('Server configuration error.');
+        }
+
+        const hmac = crypto.createHmac('sha256', appSecret);
+        hmac.update(JSON.stringify(req.body));
+        const expectedSignature = `sha256=${hmac.digest('hex')}`;
+
+        if (signature !== expectedSignature) {
+            console.warn('Invalid webhook signature.');
+            return res.status(403).send('Invalid signature.');
+        }
+
+        // 2b. Process Webhook Body
+        const { entry } = req.body;
+        if (!entry || !Array.isArray(entry)) {
+            return res.status(400).send('Invalid payload');
+        }
+
+        for (const item of entry) {
+            for (const change of item.changes) {
+                const { field, value } = change;
+
+                if (field !== 'messages') continue;
+                
+                // ---- STATUS UPDATES ----
+                if (value.statuses) {
+                    for (const status of value.statuses) {
+                        const { message_id, status: newStatus, timestamp } = status;
+                        const updateData: any = { status: newStatus };
+                        if (newStatus === 'delivered') updateData.delivered_at = new Date(timestamp * 1000).toISOString();
+                        if (newStatus === 'read') updateData.read_at = new Date(timestamp * 1000).toISOString();
                         
-                        // Handle message status updates (e.g., delivered, read)
-                        if (value.statuses) {
-                            for (const status of value.statuses) {
-                                await supabaseAdmin
-                                    .from('campaign_messages')
-                                    .update({
-                                        status: status.status,
-                                        delivered_at: status.status === 'delivered' ? new Date(status.timestamp * 1000).toISOString() : null,
-                                        read_at: status.status === 'read' ? new Date(status.timestamp * 1000).toISOString() : null,
-                                    })
-                                    .eq('meta_message_id', status.id);
-                            }
+                        await supabaseAdmin
+                            .from('campaign_messages')
+                            .update(updateData)
+                            .eq('meta_message_id', message_id);
+                    }
+                }
+
+                // ---- INCOMING MESSAGES ----
+                if (value.messages) {
+                    for (const message of value.messages) {
+                        const wabaId = value.metadata.phone_number_id;
+                        const { data: profile } = await supabaseAdmin.from('profiles').select('id').eq('meta_phone_number_id', wabaId).single();
+
+                        if (!profile) continue;
+
+                        const contact = await findOrCreateContact(profile.id, message.from, value.contacts[0].profile.name);
+                        if (!contact) continue;
+
+                        let messageBody = '';
+                        let buttonPayload: string | undefined = undefined;
+
+                        if (message.type === 'text') messageBody = message.text.body;
+                        if (message.type === 'interactive' && message.interactive.type === 'button_reply') {
+                            messageBody = message.interactive.button_reply.title;
+                            buttonPayload = message.interactive.button_reply.id;
                         }
 
-                        // Handle incoming messages from users
-                        if (value.messages) {
-                            const profile = await findProfileByPhoneNumberId(value.metadata.phone_number_id);
-                            const message = value.messages[0];
-                            const contact = await findOrCreateContact(profile.id, message.from, value.contacts[0]?.profile.name);
-                            
-                            // Log the received message
-                            await supabaseAdmin.from('received_messages').insert({
-                                user_id: profile.id,
-                                contact_id: contact.id,
-                                meta_message_id: message.id,
-                                message_body: message.text?.body || message.interactive?.button_reply?.title || 'Unsupported message type'
-                            });
-                            
-                            // Find and trigger relevant automations
-                            const { data: automations } = await supabaseAdmin.from('automations').select('*').eq('user_id', profile.id).eq('status', 'active');
-                            if (automations) {
-                                for(const auto of automations) {
-                                    const triggerNode = auto.nodes?.find((n:any) => {
-                                        const config = n.data.config as any;
-                                        if (message.text?.body && n.data.type === 'message_received_with_keyword') {
-                                            return message.text.body.toLowerCase().includes(config.keyword?.toLowerCase());
-                                        }
-                                        if (message.interactive?.button_reply && n.data.type === 'button_clicked') {
-                                            return message.interactive.button_reply.id === config.button_payload;
-                                        }
-                                        return false;
-                                    });
-
-                                    if(triggerNode) {
-                                        await executeAutomation(auto as any, contact, triggerNode.id, message);
-                                    }
-                                }
-                            }
+                        // Store received message
+                        await supabaseAdmin.from('received_messages').insert({
+                           user_id: profile.id,
+                           contact_id: contact.id,
+                           meta_message_id: message.id,
+                           message_body: messageBody
+                        });
+                        
+                        // Find and run automations
+                        const automationsToRun = await findAutomationsToTrigger(profile.id, messageBody, buttonPayload);
+                        for(const { automation, startNodeId } of automationsToRun) {
+                            await executeAutomation(automation, contact, startNodeId, { message });
                         }
                     }
                 }
             }
-        } catch (error: any) {
-            console.error("Error processing webhook:", error.message);
-            // Still return 200 to Meta, but log the error for debugging
         }
-        
-        return new Response('EVENT_RECEIVED', { status: 200 });
+        return res.status(200).send('EVENT_RECEIVED');
     }
 
-    return new Response('Method Not Allowed', { status: 405 });
+    return res.status(405).send('Method Not Allowed');
 }

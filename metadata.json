@@ -1,6 +1,6 @@
 {
   "name": "ZapFlow AI",
-  "description": "CRM edicao e envio de templates, com automacoes, http request, webhooks, e implementacao com meta bussines",
+  "description": "CRM edicao e envio de templates, com automacoes, http request, webhooks externos de diferentes origem para inicio de automacao, e implementacao com meta bussines",
   "requestFramePermissions": [],
   "prompt": ""
 }
