@@ -379,7 +379,7 @@ const SettingsPanel = ({ node, setNodes, templates, profile, automationId }: { n
                  );
             case 'webhook_received':
                 const webhookPrefix = profile?.webhook_path_prefix || profile?.id;
-                const webhookUrl = `${window.location.origin}/api/automation-trigger/${webhookPrefix}_${id}`;
+                const webhookUrl = `${window.location.origin}/api/trigger/${webhookPrefix}_${id}`;
                 return (
                      <div className="space-y-4">
                         <div>
