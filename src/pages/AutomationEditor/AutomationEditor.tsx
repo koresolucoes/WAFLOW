@@ -248,6 +248,12 @@ const AutomationEditor: React.FC = () => {
                                         <option value="PUT">PUT</option>
                                         <option value="ANY">ANY (Qualquer método)</option>
                                     </select>
+                                    <InfoCard variant="info" className="mt-2">
+                                        <p>
+                                            Certifique-se de que o serviço externo que chama este webhook está configurado para usar o método <strong>{((automation.trigger_config as any)?.method || 'POST').toUpperCase()}</strong>.
+                                            <br/>Uma incompatibilidade de método resultará em um erro '405 Method Not Allowed'.
+                                        </p>
+                                    </InfoCard>
                                 </div>
                                 <div>
                                     <label htmlFor="verify_key" className="block text-sm font-medium text-slate-300 mb-1">
