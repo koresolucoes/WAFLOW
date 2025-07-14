@@ -1,5 +1,6 @@
 
 
+
 import React, { useContext, useState, useEffect, useCallback, memo } from 'react';
 import { ReactFlow, ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, type Node, type Edge, type NodeProps } from '@xyflow/react';
 import { AppContext } from '../../contexts/AppContext';
@@ -378,7 +379,7 @@ const SettingsPanel = ({ node, setNodes, templates, profile, automationId }: { n
                  );
             case 'webhook_received':
                 const webhookPrefix = profile?.webhook_path_prefix || profile?.id;
-                const webhookUrl = `${window.location.origin}/api/automations/trigger/${webhookPrefix}_${id}`;
+                const webhookUrl = `${window.location.origin}/api/automation-trigger/${webhookPrefix}_${id}`;
                 return (
                      <div className="space-y-4">
                         <div>
