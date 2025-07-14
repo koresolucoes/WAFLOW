@@ -1,7 +1,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { supabaseAdmin } from './_lib/supabaseAdmin';
-import { executeAutomation } from './_lib/engine';
+import { supabaseAdmin } from './_lib/supabaseAdmin.js';
+import { executeAutomation } from './_lib/engine.js';
 import { Automation, Contact } from '../src/types';
 
 // Helper to find a contact by phone and create if not exists
