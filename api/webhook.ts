@@ -2,7 +2,7 @@
 // /api/webhook.ts
 import { createClient } from '@supabase/supabase-js';
 import { Database } from '../src/types/database.types';
-import { Contact, Profile, Automation, MessageTemplate } from '../src/types';
+import { Contact, Profile, Automation, MessageTemplate, MessageStatus } from '../src/types';
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -18,6 +18,13 @@ const supabase = createClient<Database>(supabaseUrl, supabaseServiceKey, {
     }
 });
 
+// Headers for CORS
+const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type',
+};
+
+
 // --- HELPER FUNCTIONS FOR META ---
 
 const findProfileByPhoneNumberId = async (phoneId: string): Promise<Profile | null> => {
@@ -30,7 +37,7 @@ const findProfileByPhoneNumberId = async (phoneId: string): Promise<Profile | nu
         console.error(`Webhook: Erro ao buscar perfil pelo phone_number_id ${phoneId}:`, error.message);
         return null;
     }
-    return data as Profile | null;
+    return data as unknown as Profile | null;
 };
 
 const sendTemplatedMessage = async (config: any, to: string, templateName: string, components: any[]) => {
@@ -66,7 +73,7 @@ const executeContactAutomation = async (automation: Automation, contact: Contact
                 .eq('id', templateId)
                 .single();
             if (error || !templateData) throw error || new Error("Template não encontrado.");
-            const template = templateData as MessageTemplate;
+            const template = templateData as unknown as MessageTemplate;
             if (template.status !== 'APPROVED') throw new Error(`Template '${template.template_name}' não está APROVADO.`);
             
             await sendTemplatedMessage(metaConfig, contact.phone, template.template_name, [{type: 'body', parameters: [{type: 'text', text: contact.name}]}]);
@@ -79,10 +86,10 @@ const executeContactAutomation = async (automation: Automation, contact: Contact
             if(error) throw error;
         }
 
-        await supabase.from('automation_runs').insert({ automation_id: automation.id, contact_id: contact.id, status: 'success' });
+        await supabase.from('automation_runs').insert([{ automation_id: automation.id, contact_id: contact.id, status: 'success' }]);
     } catch (err: any) {
         console.error(`Webhook: Falha ao executar automação ${automation.id} para contato ${contact.id}:`, err.message);
-        await supabase.from('automation_runs').insert({ automation_id: automation.id, contact_id: contact.id, status: 'failed', details: err.message });
+        await supabase.from('automation_runs').insert([{ automation_id: automation.id, contact_id: contact.id, status: 'failed', details: err.message }]);
     }
 };
 
@@ -110,7 +117,7 @@ async function processMetaPayload(body: any) {
 
                 if (value.statuses) {
                     for (const status of value.statuses) {
-                        const { error } = await supabase.from('campaign_messages').update({ status: status.status }).eq('meta_message_id', status.id);
+                        const { error } = await supabase.from('campaign_messages').update({ status: status.status as MessageStatus }).eq('meta_message_id', status.id);
                         if (error) console.error(`Webhook: Erro ao atualizar status da mensagem ${status.id}:`, error.message);
                     }
                 }
@@ -121,12 +128,12 @@ async function processMetaPayload(body: any) {
 
                         const { data: contactData } = await supabase.from('contacts').select('*').eq('user_id', typedProfile.id).eq('phone', message.from).single();
                         if (!contactData) continue;
-                        const contact = contactData as Contact;
+                        const contact = contactData as unknown as Contact;
 
-                        await supabase.from('received_messages').insert({ user_id: typedProfile.id, contact_id: contact.id, meta_message_id: message.id, message_body: message.text?.body || '' });
+                        await supabase.from('received_messages').insert([{ user_id: typedProfile.id, contact_id: contact.id, meta_message_id: message.id, message_body: message.text?.body || '' }]);
 
                         const { data: automationsData } = await supabase.from('automations').select('*').eq('user_id', typedProfile.id).eq('status', 'active').eq('trigger_type', 'message_received_with_keyword');
-                        const automations = (automationsData as Automation[]) || [];
+                        const automations = (automationsData as unknown as Automation[]) || [];
 
                         if (automations.length > 0) {
                             const messageText = (message.text?.body || '').toLowerCase().trim();
@@ -152,7 +159,7 @@ const handleMetaPost = async (req: Request): Promise<Response> => {
     processMetaPayload(body).catch(err => {
         console.error("Webhook: Error during background processing of Meta event:", err.message);
     });
-    return new Response('EVENT_RECEIVED', { status: 200 });
+    return new Response('EVENT_RECEIVED', { status: 200, headers: corsHeaders });
 };
 
 const handleVerification = (req: Request): Response => {
@@ -167,6 +174,17 @@ const handleVerification = (req: Request): Response => {
 
 // --- MAIN HANDLER ---
 export default async function handler(req: Request) {
+    // Handle CORS preflight requests
+    if (req.method === 'OPTIONS') {
+        return new Response(null, {
+            status: 204,
+            headers: {
+                ...corsHeaders,
+                'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+            }
+        });
+    }
+
     try {
         if (req.method === 'GET') {
             return handleVerification(req);
@@ -176,10 +194,10 @@ export default async function handler(req: Request) {
             return await handleMetaPost(req);
         }
 
-        return new Response('Method Not Allowed', { status: 405, headers: { 'Allow': 'GET, POST' } });
+        return new Response('Method Not Allowed', { status: 405, headers: { ...corsHeaders, 'Allow': 'GET, POST' } });
 
     } catch (error: any) {
         console.error('Webhook: Erro Crítico no Handler Principal:', error);
-        return new Response('Internal Server Error', { status: 500 });
+        return new Response('Internal Server Error', { status: 500, headers: corsHeaders });
     }
 }
