@@ -1,9 +1,11 @@
+
 import React, { useContext, useState, useEffect, useMemo } from 'react';
 import { AppContext } from '../../contexts/AppContext';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
-import { Automation, AutomationInsert } from '../../types';
+import { Automation, AutomationInsert, Json } from '../../types';
 import InfoCard from '../../components/common/InfoCard';
+import { COPY_ICON } from '../../components/icons';
 
 const AutomationEditor: React.FC = () => {
     const { pageParams, automations, templates, addAutomation, updateAutomation, setCurrentPage } = useContext(AppContext);
@@ -20,6 +22,7 @@ const AutomationEditor: React.FC = () => {
     const [automation, setAutomation] = useState<Partial<AutomationInsert>>(getInitialState());
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [copySuccess, setCopySuccess] = useState('');
 
     const isEditing = Boolean(pageParams.automationId);
 
@@ -35,11 +38,24 @@ const AutomationEditor: React.FC = () => {
     }, [isEditing, pageParams.automationId, automations]);
 
     const webhookUrl = useMemo(() => {
-        if (isEditing && automation.trigger_type === 'webhook_received') {
+        if (isEditing) {
             return `${window.location.origin}/api/webhook?trigger_id=${pageParams.automationId}`;
         }
         return null;
-    }, [isEditing, pageParams.automationId, automation.trigger_type]);
+    }, [isEditing, pageParams.automationId]);
+    
+    const handleCopyUrl = () => {
+        if (!webhookUrl) return;
+        navigator.clipboard.writeText(webhookUrl).then(() => {
+            setCopySuccess('Copiado!');
+            setTimeout(() => setCopySuccess(''), 2000);
+        }, (err) => {
+            setCopySuccess('Falha');
+            console.error('Could not copy text: ', err);
+            setTimeout(() => setCopySuccess(''), 2000);
+        });
+    };
+
 
     const handleMainChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
@@ -57,7 +73,7 @@ const AutomationEditor: React.FC = () => {
         } else if (newTriggerType === 'message_received_with_keyword') {
             newTriggerConfig = { keyword: '' };
         } else if (newTriggerType === 'webhook_received') {
-            newTriggerConfig = {};
+            newTriggerConfig = { method: 'POST' };
             newActionType = 'http_request';
             newActionConfig = { url: '', method: 'POST', headers: '{\n  "Content-Type": "application/json"\n}', body: '{\n  "data": "Hello from ZapFlow AI!"\n}' };
         }
@@ -202,18 +218,36 @@ const AutomationEditor: React.FC = () => {
                             </div>
                         )}
                         {automation.trigger_type === 'webhook_received' && (
-                             <div>
-                                <label className="block text-sm font-medium text-slate-300 mb-1">URL do Webhook</label>
-                                {webhookUrl ? (
-                                    <>
-                                        <input type="text" value={webhookUrl} readOnly className="w-full bg-slate-900 border border-slate-700 rounded-md p-2 text-white font-mono" />
-                                        <p className="text-xs text-slate-400 mt-1">Use esta URL no serviço externo para enviar dados para esta automação.</p>
-                                    </>
-                                ) : (
-                                    <InfoCard variant="warning">
-                                        <p>Salve a automação primeiro para gerar a URL do webhook.</p>
-                                    </InfoCard>
-                                )}
+                            <div className="space-y-4">
+                                <div>
+                                    <label htmlFor="trigger_method" className="block text-sm font-medium text-slate-300 mb-1">Método HTTP Aceito</label>
+                                    <select
+                                        id="trigger_method"
+                                        value={(automation.trigger_config as any)?.method || 'POST'}
+                                        onChange={(e) => handleConfigChange('trigger', 'method', e.target.value)}
+                                        className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white"
+                                    >
+                                        <option value="POST">POST</option>
+                                        <option value="GET">GET</option>
+                                        <option value="PUT">PUT</option>
+                                        <option value="ANY">ANY (Qualquer método)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-300 mb-1">URL do Webhook</label>
+                                    {isEditing ? (
+                                        <div className="flex items-center gap-2">
+                                            <input type="text" value={webhookUrl || ''} readOnly className="flex-1 bg-slate-900 border border-slate-700 rounded-md p-2 text-white font-mono" />
+                                            <Button type="button" variant="secondary" onClick={handleCopyUrl} className="w-24">
+                                                {copySuccess ? copySuccess : <COPY_ICON className="w-4 h-4 mx-auto" />}
+                                            </Button>
+                                        </div>
+                                    ) : (
+                                        <InfoCard variant="warning">
+                                            <p>Salve a automação primeiro para gerar a URL do webhook.</p>
+                                        </InfoCard>
+                                    )}
+                                </div>
                             </div>
                         )}
                     </div>

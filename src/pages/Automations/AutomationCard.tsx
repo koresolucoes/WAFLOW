@@ -1,3 +1,4 @@
+
 import React, { useContext, useMemo } from 'react';
 import { AppContext } from '../../contexts/AppContext';
 import { Automation } from '../../types';
@@ -35,7 +36,8 @@ const AutomationCard: React.FC<AutomationCardProps> = ({ automation }) => {
                 case 'message_received_with_keyword':
                     return `Quando uma mensagem contém a palavra-chave "${(automation.trigger_config as any).keyword}"`;
                 case 'webhook_received':
-                    return `Quando um webhook é recebido`;
+                    const method = (automation.trigger_config as any)?.method || 'POST';
+                    return `Quando um webhook (${method}) é recebido`;
                 default:
                     return "Gatilho desconhecido";
             }

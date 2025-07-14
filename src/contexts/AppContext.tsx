@@ -95,7 +95,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         console.warn("Profile not found for user, creating a default one.");
         const { data: newProfile, error: insertError } = await supabase
           .from('profiles')
-          .insert({ id: user.id, company_name: 'Minha Nova Empresa' } as any)
+          .insert({ id: user.id, company_name: 'Minha Nova Empresa' })
           .select()
           .single();
         
@@ -110,7 +110,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }
 
       if (profileData) {
-        setProfile(profileData as Profile);
+        setProfile(profileData);
       } else {
         console.error("Could not load or create a user profile. App may not function correctly.");
         setLoading(false);
@@ -128,7 +128,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       if (templatesRes.data) setTemplates(templatesRes.data as unknown as MessageTemplate[]);
       else if (templatesRes.error) console.error("Error fetching templates:", templatesRes.error);
 
-      if (contactsRes.data) setContacts(contactsRes.data as Contact[]);
+      if (contactsRes.data) setContacts(contactsRes.data);
       else if (contactsRes.error) console.error("Error fetching contacts:", contactsRes.error);
 
       if (campaignsRes.data) {
@@ -137,7 +137,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           console.error("Error fetching campaigns:", campaignsRes.error);
       }
       
-      if (segmentsRes.data) setSegments(segmentsRes.data as Segment[]);
+      if (segmentsRes.data) setSegments(segmentsRes.data);
       else if (segmentsRes.error) console.error("Error fetching segments:", segmentsRes.error);
       
       if (automationsRes.data) setAutomations(automationsRes.data as Automation[]);
@@ -232,9 +232,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const updateProfile = async (profileData: Partial<Profile>) => {
     if (!user) throw new Error("Usuário não autenticado.");
-    const { data, error } = await supabase.from('profiles').update(profileData as any).eq('id', user.id).select().single();
+    const { data, error } = await supabase.from('profiles').update(profileData).eq('id', user.id).select().single();
     if(error) throw error;
-    setProfile(data as Profile);
+    if (data) setProfile(data);
   };
   
   const metaConfig = useMemo(() => ({
@@ -249,7 +249,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (!user) throw new Error("Usuário não autenticado.");
     const { data, error } = await supabase
       .from('message_templates')
-      .insert({ ...template, user_id: user.id, status: template.status || 'LOCAL', components: template.components as any } as any)
+      .insert({ ...template, user_id: user.id, status: template.status || 'LOCAL', components: template.components })
       .select()
       .single();
     if (error) throw error;
@@ -298,7 +298,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           contact_id: contact.id,
           status: 'success',
           details: `Ação '${automation.action_type}' executada.`
-      } as any);
+      });
 
     } catch (err: any) {
         console.error(`Falha ao executar automação ${automation.name} para o contato ${contact.name}:`, err.message);
@@ -307,7 +307,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           contact_id: contact.id,
           status: 'failed',
           details: err.message
-      } as any);
+      });
     }
   };
   
@@ -334,12 +334,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (!user) throw new Error("Usuário não autenticado.");
     const { data, error } = await supabase
       .from('contacts')
-      .insert({ ...contact, user_id: user.id } as any)
+      .insert({ ...contact, user_id: user.id })
       .select()
       .single();
     if (error) throw error;
-    setContacts(prev => [data as Contact, ...prev]);
-    await checkAndRunContactAutomations(data as Contact);
+    if(data) {
+      setContacts(prev => [data, ...prev]);
+      await checkAndRunContactAutomations(data);
+    }
   };
   
   const updateContact = async (updatedContact: Contact) => {
@@ -347,14 +349,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
      const oldContact = contacts.find(c => c.id === updatedContact.id);
      const { data, error } = await supabase
         .from('contacts')
-        .update(updatedContact as any)
+        .update(updatedContact)
         .eq('id', updatedContact.id)
         .eq('user_id', user.id)
         .select()
         .single();
     if (error) throw error;
-    setContacts(prev => prev.map(c => c.id === (data as Contact).id ? data as Contact : c));
-    await checkAndRunContactAutomations(data as Contact, oldContact);
+    if(data) {
+      setContacts(prev => prev.map(c => c.id === data.id ? data : c));
+      await checkAndRunContactAutomations(data, oldContact);
+    }
   };
 
   const deleteContact = async (contactId: string) => {
@@ -387,12 +391,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     if (contactsToInsert.length > 0) {
         const contactsWithUser = contactsToInsert.map(c => ({...c, user_id: user.id}));
-        const { data, error } = await supabase.from('contacts').insert(contactsWithUser as any).select();
+        const { data, error } = await supabase.from('contacts').insert(contactsWithUser).select();
         if (error) throw error;
-        setContacts(prev => [...(data as Contact[]), ...prev].sort((a,b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()));
-        // Dispara automações para contatos importados
-        for(const contact of (data as Contact[])) {
-            await checkAndRunContactAutomations(contact);
+        if(data) {
+          setContacts(prev => [...data, ...prev].sort((a,b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()));
+          // Dispara automações para contatos importados
+          for(const contact of data) {
+              await checkAndRunContactAutomations(contact);
+          }
         }
     }
 
@@ -405,17 +411,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const sent_at = new Date().toISOString();
     const { data: newCampaign, error: campaignError } = await supabase
         .from('campaigns')
-        .insert({ ...campaign, user_id: user.id, sent_at } as any)
+        .insert({ ...campaign, user_id: user.id, sent_at })
         .select()
         .single();
 
     if (campaignError) throw campaignError;
+    if (!newCampaign) throw new Error("Failed to create campaign.");
 
-    const messagesToInsert = messages.map(msg => ({ ...msg, campaign_id: (newCampaign as Campaign).id }));
-    const { error: messagesError } = await supabase.from('campaign_messages').insert(messagesToInsert as any);
+
+    const messagesToInsert = messages.map(msg => ({ ...msg, campaign_id: newCampaign.id }));
+    const { error: messagesError } = await supabase.from('campaign_messages').insert(messagesToInsert);
 
     if (messagesError) {
-        await supabase.from('campaigns').delete().eq('id', (newCampaign as Campaign).id);
+        await supabase.from('campaigns').delete().eq('id', newCampaign.id);
         throw messagesError;
     }
     
@@ -423,7 +431,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     // Otimização: Atualizar o estado localmente em vez de refazer o fetch de tudo.
     const newCampaignWithMetrics: CampaignWithMetrics = {
-        ...(newCampaign as Campaign),
+        ...newCampaign,
         metrics: {
             sent: sentCount,
             delivered: 0,
@@ -437,24 +445,24 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (!user) throw new Error("Usuário não autenticado.");
     const { data, error } = await supabase
         .from('automations')
-        .insert({ ...automation, user_id: user.id } as any)
+        .insert({ ...automation, user_id: user.id })
         .select()
         .single();
     if (error) throw error;
-    setAutomations(prev => [data as Automation, ...prev]);
+    if(data) setAutomations(prev => [data as Automation, ...prev]);
   };
 
   const updateAutomation = async (automation: Automation) => {
     if (!user) throw new Error("Usuário não autenticado.");
     const { data, error } = await supabase
         .from('automations')
-        .update(automation as any)
+        .update(automation)
         .eq('id', automation.id)
         .eq('user_id', user.id)
         .select()
         .single();
     if(error) throw error;
-    setAutomations(prev => prev.map(a => a.id === (data as Automation).id ? data as Automation : a));
+    if(data) setAutomations(prev => prev.map(a => a.id === data.id ? data as Automation : a));
   };
   
   const deleteAutomation = async (automationId: string) => {
