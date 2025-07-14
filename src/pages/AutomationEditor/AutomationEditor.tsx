@@ -1,6 +1,6 @@
 
 import React, { useContext, useState, useEffect, useMemo, useCallback, memo } from 'react';
-import ReactFlow, { ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, Node, Edge, NodeProps } from '@xyflow/react';
+import { ReactFlow, ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, type Node, type Edge, type NodeProps } from '@xyflow/react';
 import { AppContext } from '../../contexts/AppContext';
 import { Automation, AutomationInsert, AutomationNode, NodeData, TriggerType, ActionType, MessageTemplate } from '../../types';
 import Button from '../../components/common/Button';
@@ -203,7 +203,7 @@ const FlowCanvas = () => {
         setNodes((nds) => nds.concat(newNode));
     }, [reactFlowInstance, setNodes]);
 
-    const onNodeClick = useCallback((_: any, node: AutomationNode) => {
+    const onNodeClick = useCallback((_: any, node: Node<NodeData>) => {
         setSelectedNode(node);
     }, []);
     

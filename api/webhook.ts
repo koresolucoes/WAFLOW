@@ -1,7 +1,7 @@
 
 // /api/webhook.ts
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { Database, Tables, Json } from '../src/types/database.types';
+import { Database, Tables, Json, TablesInsert } from '../src/types/database.types';
 import { Automation, Contact, AutomationNode, MessageTemplate } from '../src/types';
 
 const corsHeaders = {
@@ -65,7 +65,7 @@ async function executeActionNode(supabase: SupabaseClient<Database>, node: Autom
         } else if (actionType === 'add_tag') {
             if (!actionConfig.tag) throw new Error("Tag não configurada na ação.");
             const newTags = [...new Set([...(contact.tags || []), actionConfig.tag])];
-            const { error } = await supabase.from('contacts').update({ tags: newTags } as any).eq('id', contact.id);
+            const { error } = await supabase.from('contacts').update({ tags: newTags }).eq('id', contact.id);
             if (error) throw error;
         }
 
@@ -87,7 +87,7 @@ async function executeFlow(supabase: SupabaseClient<Database>, automation: Autom
                 contact_id: contact.id,
                 status: result.success ? 'success' : 'failed',
                 details: result.details,
-            } as any);
+            } as TablesInsert<'automation_runs'>);
         }
     }
 }
@@ -106,7 +106,7 @@ async function findProfileByPhoneNumberId(supabase: SupabaseClient<Database>, ph
         console.error(`Webhook: Erro ao buscar perfil pelo phone_number_id ${phoneId}:`, error.message);
         return null;
     }
-    return data as Tables<'profiles'> | null;
+    return data as unknown as Tables<'profiles'> | null;
 };
 
 
@@ -129,7 +129,7 @@ async function processMetaPayload(supabase: SupabaseClient<Database>, body: any)
             // Process status updates
             if (value.statuses) {
                 for (const status of value.statuses) {
-                    await supabase.from('campaign_messages').update({ status: status.status } as any).eq('meta_message_id', status.id);
+                    await supabase.from('campaign_messages').update({ status: status.status }).eq('meta_message_id', status.id);
                 }
             }
 
@@ -144,9 +144,9 @@ async function processMetaPayload(supabase: SupabaseClient<Database>, body: any)
 
                     const { data: contactData } = await supabase.from('contacts').select('*').eq('user_id', profile.id).eq('phone', message.from).single();
                     if (!contactData) continue;
-                    const contact = contactData as Contact;
+                    const contact = contactData as unknown as Contact;
 
-                    await supabase.from('received_messages').insert({ user_id: profile.id, contact_id: contact.id, meta_message_id: message.id, message_body: message.text.body } as any);
+                    await supabase.from('received_messages').insert({ user_id: profile.id, contact_id: contact.id, meta_message_id: message.id, message_body: message.text.body } as TablesInsert<'received_messages'>);
                     
                     const messageText = message.text.body.toLowerCase().trim();
 

@@ -88,7 +88,7 @@ const Templates: React.FC = () => {
                 template_name: mt.name,
                 status: mt.status,
                 category: mt.category,
-                components: mt.components as Json,
+                components: mt.components as unknown as Json,
             };
 
             return templateData;
