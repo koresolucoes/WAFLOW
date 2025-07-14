@@ -6,6 +6,7 @@ import Button from '../../components/common/Button';
 import { Automation, AutomationInsert, Json } from '../../types';
 import InfoCard from '../../components/common/InfoCard';
 import { COPY_ICON } from '../../components/icons';
+import Switch from '../../components/common/Switch';
 
 const AutomationEditor: React.FC = () => {
     const { pageParams, automations, templates, addAutomation, updateAutomation, setCurrentPage } = useContext(AppContext);
@@ -73,7 +74,7 @@ const AutomationEditor: React.FC = () => {
         } else if (newTriggerType === 'message_received_with_keyword') {
             newTriggerConfig = { keyword: '' };
         } else if (newTriggerType === 'webhook_received') {
-            newTriggerConfig = { method: 'POST', verify_key: '' };
+            newTriggerConfig = { method: 'POST', verify_key: '', waitForResponse: false };
             newActionType = 'http_request';
             newActionConfig = { url: '', method: 'POST', headers: '{\n  "Content-Type": "application/json"\n}', body: '{\n  "data": "Hello from ZapFlow AI!"\n}' };
         }
@@ -106,7 +107,7 @@ const AutomationEditor: React.FC = () => {
         }));
     };
     
-    const handleConfigChange = (type: 'trigger' | 'action', key: string, value: string) => {
+    const handleConfigChange = (type: 'trigger' | 'action', key: string, value: any) => {
         const configKey = type === 'trigger' ? 'trigger_config' : 'action_config';
         setAutomation(prev => ({
             ...prev,
@@ -245,6 +246,16 @@ const AutomationEditor: React.FC = () => {
                                         placeholder="Um token secreto para proteger seu webhook"
                                         className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white"
                                     />
+                                </div>
+                                 <div className="pt-2">
+                                    <Switch
+                                        checked={(automation.trigger_config as any)?.waitForResponse || false}
+                                        onChange={(checked) => handleConfigChange('trigger', 'waitForResponse', checked)}
+                                    />
+                                    <label className="text-sm font-medium text-slate-300 ml-3">Execução Síncrona</label>
+                                    <p className="text-xs text-slate-400 mt-1">
+                                        Se ativado, o webhook aguardará a conclusão da ação e retornará o resultado. Desative para uma resposta mais rápida (fire-and-forget).
+                                    </p>
                                 </div>
                                 <InfoCard>
                                     <p>Se você preencher a Chave de Verificação, as chamadas para sua URL de webhook deverão incluir um dos seguintes cabeçalhos para autenticação:</p>

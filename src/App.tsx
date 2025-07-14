@@ -1,19 +1,35 @@
 
-import React, { useContext } from 'react';
+import React, { useContext, Suspense, lazy } from 'react';
 import { AppContext } from './contexts/AppContext';
 import MainLayout from './components/layout/MainLayout';
-import Auth from './pages/Auth/Auth';
-import Dashboard from './pages/Dashboard/Dashboard';
-import Campaigns from './pages/Campaigns/Campaigns';
-import Templates from './pages/Templates/Templates';
-import TemplateEditor from './pages/TemplateEditor/TemplateEditor';
-import CompanyProfile from './pages/Profile/CompanyProfile';
-import Contacts from './pages/Contacts/Contacts';
-import NewCampaign from './pages/NewCampaign/NewCampaign';
-import CampaignDetails from './pages/CampaignDetails/CampaignDetails';
-import MetaSettings from './pages/Settings/MetaSettings';
-import Automations from './pages/Automations/Automations';
-import AutomationEditor from './pages/AutomationEditor/AutomationEditor';
+
+const Auth = lazy(() => import('./pages/Auth/Auth'));
+const Dashboard = lazy(() => import('./pages/Dashboard/Dashboard'));
+const Campaigns = lazy(() => import('./pages/Campaigns/Campaigns'));
+const CampaignDetails = lazy(() => import('./pages/CampaignDetails/CampaignDetails'));
+const Templates = lazy(() => import('./pages/Templates/Templates'));
+const TemplateEditor = lazy(() => import('./pages/TemplateEditor/TemplateEditor'));
+const Contacts = lazy(() => import('./pages/Contacts/Contacts'));
+const NewCampaign = lazy(() => import('./pages/NewCampaign/NewCampaign'));
+const CompanyProfile = lazy(() => import('./pages/Profile/CompanyProfile'));
+const MetaSettings = lazy(() => import('./pages/Settings/MetaSettings'));
+const Automations = lazy(() => import('./pages/Automations/Automations'));
+const AutomationEditor = lazy(() => import('./pages/AutomationEditor/AutomationEditor'));
+
+const PageSuspenseFallback = () => (
+    <div className="flex items-center justify-center w-full h-full p-10">
+        <svg className="animate-spin h-8 w-8 text-sky-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+    </div>
+);
+
+const FullPageSuspenseFallback = () => (
+    <div className="flex items-center justify-center h-screen bg-slate-900">
+        <PageSuspenseFallback />
+    </div>
+);
 
 const App: React.FC = () => {
   const { session, loading, currentPage } = useContext(AppContext);
@@ -56,12 +72,18 @@ const App: React.FC = () => {
   }
 
   if (!session) {
-    return <Auth />;
+    return (
+      <Suspense fallback={<FullPageSuspenseFallback />}>
+        <Auth />
+      </Suspense>
+    );
   }
 
   return (
     <MainLayout>
-      {renderPage()}
+      <Suspense fallback={<PageSuspenseFallback />}>
+        {renderPage()}
+      </Suspense>
     </MainLayout>
   );
 };

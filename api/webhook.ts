@@ -117,8 +117,6 @@ const executeGenericAutomation = async (automation: Tables<'automations'>, trigg
             let headers: Record<string, string> = {};
             if (actionConfig.headers) {
                 try {
-                    // O header vem como uma string JSON, então precisa ser parseado.
-                    // A string também pode conter placeholders, então eles são substituídos primeiro.
                     const replacedHeaderString = replacePlaceholders(actionConfig.headers, { trigger: triggerData });
                     headers = JSON.parse(replacedHeaderString);
                 } catch (e) {
@@ -128,41 +126,34 @@ const executeGenericAutomation = async (automation: Tables<'automations'>, trigg
             
             let requestBody: any = undefined;
             if (method !== 'GET' && actionConfig.body) {
-                // O corpo também pode conter placeholders
                 requestBody = replacePlaceholders(actionConfig.body, { trigger: triggerData });
             }
 
-            const httpResponse = await fetch(url, {
-                method,
-                headers,
-                body: requestBody,
-            });
+            const httpResponse = await fetch(url, { method, headers, body: requestBody });
+            const responseBodyText = await httpResponse.text();
 
             if (!httpResponse.ok) {
-                const responseBody = await httpResponse.text();
-                throw new Error(`Requisição HTTP falhou com status ${httpResponse.status}: ${responseBody}`);
+                throw new Error(`Requisição HTTP falhou com status ${httpResponse.status}: ${responseBodyText}`);
             }
+            
+            await supabase.from('automation_runs').insert({
+                automation_id: automation.id,
+                status: 'success',
+                details: `Ação '${actionType}' executada com sucesso via webhook. Status: ${httpResponse.status}`
+            } as any);
+
+            return { status: httpResponse.status, body: responseBodyText, headers: httpResponse.headers };
         } else {
-            // Outras ações genéricas que não dependem de um contato podem ser adicionadas aqui.
             throw new Error(`Ação '${actionType}' não é compatível com gatilhos de webhook genéricos.`);
         }
-        
-        // Log de sucesso
-        await supabase.from('automation_runs').insert({
-            automation_id: automation.id,
-            status: 'success',
-            details: `Ação '${actionType}' executada com sucesso via webhook.`
-        } as any);
 
     } catch (executionError: any) {
-        // Log de falha
         console.error(`Webhook Trigger: Falha ao executar ação para automação ${automation.id}:`, executionError.message);
         await supabase.from('automation_runs').insert({
             automation_id: automation.id,
             status: 'failed',
             details: executionError.message,
         } as any);
-        // Lançar o erro novamente para que o manipulador saiba que falhou.
         throw executionError;
     }
 };
@@ -171,7 +162,7 @@ const executeGenericAutomation = async (automation: Tables<'automations'>, trigg
 
 async function processMetaPayload(body: any) {
     if (body.object !== 'whatsapp_business_account') {
-        return; // Not a notification we care about
+        return;
     }
 
     for (const entry of body.entry) {
@@ -189,7 +180,6 @@ async function processMetaPayload(body: any) {
                     meta_phone_number_id: typedProfile.meta_phone_number_id
                 };
 
-                // Process message statuses from campaigns
                 if (value.statuses) {
                     for (const status of value.statuses) {
                         const { error } = await supabase.from('campaign_messages').update({ status: status.status } as any).eq('meta_message_id', status.id);
@@ -197,7 +187,6 @@ async function processMetaPayload(body: any) {
                     }
                 }
 
-                // Process incoming messages and keyword automations
                 if (value.messages) {
                     for (const message of value.messages) {
                         if (message.type !== 'text') continue;
@@ -232,13 +221,9 @@ async function processMetaPayload(body: any) {
 
 const handleMetaPost = async (req: Request): Promise<Response> => {
     const body = await req.json();
-
-    // Fire-and-forget: Start processing but don't wait for it.
-    // This ensures a quick response to the Meta server to prevent timeouts.
     processMetaPayload(body).catch(err => {
         console.error("Webhook: Error during background processing of Meta event:", err.message);
     });
-
     return new Response('EVENT_RECEIVED', { status: 200 });
 };
 
@@ -258,7 +243,6 @@ const handleAutomationTrigger = async (req: Request, automationId: string): Prom
     
     const triggerConfig = automation.trigger_config as any;
     
-    // --- Webhook Verification Logic ---
     const expectedKey = triggerConfig?.verify_key;
     if (expectedKey) {
         const authHeader = req.headers.get('Authorization');
@@ -289,14 +273,10 @@ const handleAutomationTrigger = async (req: Request, automationId: string): Prom
         const contentType = req.headers.get('content-type');
         if (contentType && contentType.includes('application/json')) {
             const textBody = await req.text();
-            if (textBody) {
-                body = JSON.parse(textBody);
-            }
+            if (textBody) body = JSON.parse(textBody);
         } else {
             const textBody = await req.text();
-            if(textBody) {
-                body = textBody;
-            }
+            if(textBody) body = textBody;
         }
     } catch (e) {
          console.warn(`Webhook: Could not parse body for automation ${automationId}.`, e);
@@ -308,14 +288,25 @@ const handleAutomationTrigger = async (req: Request, automationId: string): Prom
         headers: Object.fromEntries(req.headers),
     };
 
-    // Fire-and-forget execution to prevent hanging requests.
-    executeGenericAutomation(automation, triggerData).catch(err => {
-        // Log errors from the async execution, but don't block the response.
-        console.error(`Webhook Trigger: Async execution failed for automation ${automation.id}:`, err.message);
-    });
+    const waitForResponse = triggerConfig?.waitForResponse || false;
 
-    // Immediately return a 202 Accepted response.
-    return new Response('Webhook received and is being processed.', { status: 202 });
+    if (waitForResponse) {
+        try {
+            const result = await executeGenericAutomation(automation, triggerData);
+            const contentType = result.headers.get('content-type') || 'application/json';
+            return new Response(result.body, { status: result.status, headers: { 'Content-Type': contentType } });
+        } catch (executionError: any) {
+            return new Response(JSON.stringify({ error: executionError.message }), { 
+                status: 500,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
+    } else {
+        executeGenericAutomation(automation, triggerData).catch(err => {
+            console.error(`Webhook Trigger: Async execution failed for automation ${automation.id}:`, err.message);
+        });
+        return new Response('Webhook received and is being processed.', { status: 202 });
+    }
 };
 
 const handleVerification = (req: Request): Response => {
@@ -334,22 +325,18 @@ export default async function handler(req: Request) {
         const url = new URL(req.url);
         const triggerId = url.searchParams.get('trigger_id');
 
-        // Rota 1: Gatilho de Automação Genérico
         if (triggerId) {
             return await handleAutomationTrigger(req, triggerId);
         }
 
-        // Rota 2: Verificação do Webhook da Meta
         if (req.method === 'GET') {
             return handleVerification(req);
         }
 
-        // Rota 3: Notificações do Webhook da Meta
         if (req.method === 'POST') {
             return await handleMetaPost(req);
         }
 
-        // Método não suportado
         return new Response('Method Not Allowed', { status: 405, headers: { 'Allow': 'GET, POST' } });
 
     } catch (error: any) {
