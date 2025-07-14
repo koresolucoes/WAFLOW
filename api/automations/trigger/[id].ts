@@ -112,10 +112,10 @@ async function executeActionNode(supabase: SupabaseClient<Database>, node: Autom
         switch(actionType) {
             case 'send_template':
                 if (!actionConfig.template_id) throw new Error("ID do template não configurado.");
-                const { data: tpl } = await supabase.from('message_templates').select('*').eq('id', actionConfig.template_id).single();
-                if (!tpl) throw new Error("Template não encontrado.");
-                if ((tpl as MessageTemplate).status !== 'APPROVED') throw new Error(`Template não APROVADO.`);
-                await sendWhatsAppTemplate(metaConfig, contact.phone, tpl as MessageTemplate, contact);
+                const { data: tpl, error: tplError } = await supabase.from('message_templates').select('*').eq('id', actionConfig.template_id).single();
+                if (tplError || !tpl) throw tplError || new Error("Template não encontrado.");
+                if ((tpl as unknown as MessageTemplate).status !== 'APPROVED') throw new Error(`Template não APROVADO.`);
+                await sendWhatsAppTemplate(metaConfig, contact.phone, tpl as unknown as MessageTemplate, contact);
                 break;
             case 'add_tag':
                 if (!actionConfig.tag) throw new Error("Tag não configurada.");
@@ -237,7 +237,11 @@ async function processWebhookPayload(
     if (!phone) throw new Error('Número de telefone não encontrado no payload ou no mapeamento. Configure o mapeamento do campo de telefone.');
 
     const sanitizedPhone = String(phone).replace(/\D/g, '');
-    let { data: contact } = await supabase.from('contacts').select('*').eq('user_id', user_id).eq('phone', sanitizedPhone).single();
+    let { data: contact, error: contactError } = await supabase.from('contacts').select('*').eq('user_id', user_id).eq('phone', sanitizedPhone).single();
+
+    if (contactError && contactError.code !== 'PGRST116') {
+        throw contactError;
+    }
 
     if (contact) {
         const updatedContact = {
@@ -247,7 +251,7 @@ async function processWebhookPayload(
         };
         const { data: updated, error } = await supabase.from('contacts').update(updatedContact).eq('id', contact.id).select().single();
         if (error) throw error;
-        return updated as Contact;
+        return updated as unknown as Contact;
     } else {
         const { data: newContact, error } = await supabase.from('contacts').insert({
             user_id: user_id,
@@ -255,9 +259,9 @@ async function processWebhookPayload(
             name: name || sanitizedPhone,
             custom_fields: customFieldsToUpdate,
             tags: tagsToAdd
-        } as TablesInsert<'contacts'>).select().single();
+        }).select().single();
         if (error) throw error;
-        return newContact as Contact;
+        return newContact as unknown as Contact;
     }
 }
 
@@ -279,10 +283,32 @@ export default async function handler(req: Request) {
     try {
         const url = new URL(req.url);
         const compositeId = url.pathname.split('/').pop();
-        if (!compositeId || !compositeId.includes('_')) return errorResponse('ID do gatilho de webhook inválido ou malformado.', 400);
+        if (!compositeId) return errorResponse('ID do gatilho de webhook não encontrado na URL.', 400);
 
-        const [prefix, nodeId] = compositeId.split(/_(.*)/s);
-        if (!prefix || !nodeId) return errorResponse('ID do gatilho de webhook inválido.', 400);
+        // Define possible trigger types to build a robust parser.
+        const triggerNodeTypes = [
+            'new_contact_with_tag', 
+            'message_received_with_keyword', 
+            'button_clicked', 
+            'new_contact', 
+            'webhook_received'
+        ];
+        const triggerTypesRegexPart = triggerNodeTypes.join('|');
+        // Regex to correctly separate a prefix (that can contain '_') from a node ID (which is type_timestamp).
+        const parsingRegex = new RegExp(`^(.*)_(${triggerTypesRegexPart}_\\d+)$`);
+        const match = compositeId.match(parsingRegex);
+
+        if (!match) {
+            console.error(`Webhook trigger parsing failed for compositeId: ${compositeId}`);
+            return errorResponse(`ID do gatilho de webhook malformado. O formato esperado é {prefixo}_${triggerTypesRegexPart}_{timestamp}.`, 400);
+        }
+
+        const prefix = match[1];
+        const nodeId = match[2];
+
+        if (!prefix || !nodeId) { // Should not happen if regex matches, but good for safety.
+            return errorResponse('Falha crítica ao extrair prefixo e ID do nó.', 400);
+        }
 
         const { data: profile, error: profileError } = await supabase.from('profiles').select('*').eq('webhook_path_prefix', prefix).single();
         if (profileError || !profile) return errorResponse('Prefixo de webhook não encontrado ou inválido.', 404);

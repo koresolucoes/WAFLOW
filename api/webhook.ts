@@ -1,7 +1,7 @@
 // /api/webhook.ts
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Database, Tables, Json, TablesInsert } from '../src/types/database.types';
-import { Automation, Contact, AutomationNode, MessageTemplate } from '../src/types';
+import { Automation, Contact, AutomationNode, MessageTemplate, MessageStatus } from '../src/types';
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -233,7 +233,7 @@ async function processMetaPayload(supabase: SupabaseClient<Database>, body: any)
             // Process status updates
             if (value.statuses) {
                 for (const status of value.statuses) {
-                    await supabase.from('campaign_messages').update({ status: status.status, delivered_at: status.status === 'delivered' ? new Date().toISOString() : null, read_at: status.status === 'read' ? new Date().toISOString() : null }).eq('meta_message_id', status.id);
+                    await supabase.from('campaign_messages').update({ status: status.status as MessageStatus, delivered_at: status.status === 'delivered' ? new Date().toISOString() : null, read_at: status.status === 'read' ? new Date().toISOString() : null }).eq('meta_message_id', status.id);
                 }
             }
 
@@ -244,7 +244,13 @@ async function processMetaPayload(supabase: SupabaseClient<Database>, body: any)
                 if (automations.length === 0) continue;
 
                 for (const message of value.messages) {
-                    let { data: contactData } = await supabase.from('contacts').select('*').eq('user_id', profile.id).eq('phone', message.from).single();
+                    let { data: contactData, error: contactError } = await supabase.from('contacts').select('*').eq('user_id', profile.id).eq('phone', message.from).single();
+                    
+                    if(contactError && contactError.code !== 'PGRST116') {
+                        console.error(`Webhook: Erro ao buscar contato ${message.from}:`, contactError.message);
+                        continue; // Pula para a próxima mensagem
+                    }
+                    
                     let isNewContact = false;
                     
                     if (!contactData) {
@@ -255,7 +261,7 @@ async function processMetaPayload(supabase: SupabaseClient<Database>, body: any)
                                 phone: message.from,
                                 name: value.contacts?.[0]?.profile?.name || message.from,
                                 tags: ['lead'],
-                            } as TablesInsert<'contacts'>)
+                            })
                             .select()
                             .single();
                         
@@ -278,7 +284,7 @@ async function processMetaPayload(supabase: SupabaseClient<Database>, body: any)
 
                     // Gatilho de Palavra-chave
                     if (message.type === 'text' && message.text?.body) {
-                        await supabase.from('received_messages').insert({ user_id: profile.id, contact_id: contact.id, meta_message_id: message.id, message_body: message.text.body } as TablesInsert<'received_messages'>);
+                        await supabase.from('received_messages').insert({ user_id: profile.id, contact_id: contact.id, meta_message_id: message.id, message_body: message.text.body });
                         const messageText = message.text.body.toLowerCase().trim();
                         for (const auto of automations) {
                             const triggerNode = auto.nodes.find(n => n.data.nodeType === 'trigger' && n.data.type === 'message_received_with_keyword' && messageText.includes(((n.data.config as any)?.keyword || 'NON_EXISTENT_KEYWORD').toLowerCase().trim()));

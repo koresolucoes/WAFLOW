@@ -139,7 +139,7 @@ const MetaSettings: React.FC = () => {
                             onChange={handleChange}
                             className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white placeholder-slate-400 focus:ring-2 focus:ring-sky-500"
                         />
-                         <p className="text-xs text-slate-400 mt-1">Um prefixo único para as URLs de webhook das suas automações. Use apenas letras, números e hífens.</p>
+                         <p className="text-xs text-slate-400 mt-1">Um prefixo único para suas URLs de automação. Use letras, números e hífens. Evite underscores (_) para garantir a compatibilidade.</p>
                     </div>
 
                      <div>
@@ -177,7 +177,7 @@ const MetaSettings: React.FC = () => {
                     </InfoCard>
 
                     <div className="flex justify-end items-center gap-4 pt-4 border-t border-slate-700/50">
-                        <Button type="submit" variant="primary" isLoading={isSaving}>Salvar Configurações de Webhook</Button>
+                        <Button type="submit" variant="primary" isLoading={isSaving} onClick={handleSave}>Salvar Configurações de Webhook</Button>
                     </div>
                 </div>
             </Card>

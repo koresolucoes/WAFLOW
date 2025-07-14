@@ -729,7 +729,7 @@ export type Enums<
     | keyof PublicSchema["Enums"]
     | { schema: keyof Database },
   EnumName extends PublicEnumNameOrOptions extends { schema: keyof Database }
-    ? keyof Database[PublicTableNameOrOptions["schema"]]["Enums"]
+    ? keyof Database[PublicEnumNameOrOptions["schema"]]["Enums"]
     : never = never,
 > = PublicEnumNameOrOptions extends { schema: keyof Database }
   ? Database[PublicEnumNameOrOptions["schema"]]["Enums"][EnumName]

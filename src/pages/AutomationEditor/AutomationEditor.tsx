@@ -1,4 +1,5 @@
 
+
 import React, { useContext, useState, useEffect, useCallback, memo } from 'react';
 import { ReactFlow, ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, type Node, type Edge, type NodeProps } from '@xyflow/react';
 import { AppContext } from '../../contexts/AppContext';
@@ -53,7 +54,7 @@ const nodeStyles = {
     description: "text-xs text-slate-400"
 };
 
-const CustomNode = memo(({ data }: NodeProps<NodeData>) => {
+const CustomNode = ({ data }: NodeProps<NodeData>) => {
     const isTrigger = data.nodeType === 'trigger';
 
     const nodeTypeStyle = data.nodeType;
@@ -74,9 +75,9 @@ const CustomNode = memo(({ data }: NodeProps<NodeData>) => {
             <Handle type="source" position={Position.Right} className="!bg-slate-400" />
         </div>
     );
-});
+};
 
-const ConditionNode = memo(({ data }: NodeProps<NodeData>) => {
+const ConditionNode = ({ data }: NodeProps<NodeData>) => {
     return (
       <div className={`${nodeStyles.base} ${nodeStyles.logic}`}>
         <div className={`${nodeStyles.header} ${nodeStyles.logicHeader}`}>
@@ -98,9 +99,9 @@ const ConditionNode = memo(({ data }: NodeProps<NodeData>) => {
         <div className="absolute right-[-25px] top-[70%] -translate-y-1/2 text-xs text-red-400 font-bold">Não</div>
       </div>
     );
-});
+};
 
-const SplitPathNode = memo(({ data }: NodeProps<NodeData>) => {
+const SplitPathNode = ({ data }: NodeProps<NodeData>) => {
     return (
       <div className={`${nodeStyles.base} ${nodeStyles.logic}`}>
         <div className={`${nodeStyles.header} ${nodeStyles.logicHeader}`}>
@@ -120,7 +121,7 @@ const SplitPathNode = memo(({ data }: NodeProps<NodeData>) => {
         <div className="absolute right-[-35px] top-[70%] -translate-y-1/2 text-xs text-amber-400 font-bold">Via B</div>
       </div>
     );
-});
+};
 
 
 const nodeTypes = {
