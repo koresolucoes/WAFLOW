@@ -1,6 +1,6 @@
 /**
  * =================================================================================================
- * ZAPFLOW AI - SUPABASE DATABASE SCHEMA
+ * ZAPFLOW AI - SUPABASE DATABASE SCHEMA (v2)
  * =================================================================================================
  * 
  * INSTRUÇÕES IMPORTANTES:
@@ -10,7 +10,9 @@
  * 4. Cole o script e clique em "RUN".
  *
  * Este script irá (re)criar todas as tabelas, relações e políticas de segurança necessárias
- * para que a aplicação funcione corretamente. É seguro executá-lo múltiplas vezes.
+ * para que a aplicação funcione corretamente. Ele foi atualizado para usar campos de TEXTO
+ * em vez de ENUMs, o que torna o sistema mais flexível e evita erros de tipo.
+ * É seguro executá-lo múltiplas vezes.
  * CUIDADO: A execução deste script apagará dados existentes. FAÇA UM BACKUP PRIMEIRO.
  *
  *
@@ -19,7 +21,7 @@
 -- Garante que a extensão uuid-ossp está habilitada
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA extensions;
 
--- Remove tipos e tabelas existentes na ordem correta para evitar erros de dependência.
+-- Remove tabelas existentes na ordem correta para evitar erros de dependência.
 DROP TABLE IF EXISTS public.automation_runs CASCADE;
 DROP TABLE IF EXISTS public.automations CASCADE;
 DROP TABLE IF EXISTS public.campaign_messages CASCADE;
@@ -30,26 +32,6 @@ DROP TABLE IF EXISTS public.message_templates CASCADE;
 DROP TABLE IF EXISTS public.contacts CASCADE;
 DROP TABLE IF EXISTS public.segments CASCADE;
 DROP TABLE IF EXISTS public.profiles CASCADE;
-
-DROP TYPE IF EXISTS public.automation_run_status_enum;
-DROP TYPE IF EXISTS public.automation_action_type_enum;
-DROP TYPE IF EXISTS public.automation_trigger_type_enum;
-DROP TYPE IF EXISTS public.automation_status_enum;
-DROP TYPE IF EXISTS public.message_status_enum;
-DROP TYPE IF EXISTS public.campaign_status_enum;
-DROP TYPE IF EXISTS public.template_status_enum;
-DROP TYPE IF EXISTS public.template_category_enum;
-
--- Cria os tipos (ENUMs) para padronização de valores
-CREATE TYPE public.template_category_enum AS ENUM ('MARKETING', 'UTILITY', 'AUTHENTICATION');
-CREATE TYPE public.template_status_enum AS ENUM ('APPROVED', 'PENDING', 'REJECTED', 'PAUSED', 'LOCAL');
-CREATE TYPE public.campaign_status_enum AS ENUM ('Sent', 'Draft', 'Failed');
-CREATE TYPE public.message_status_enum AS ENUM ('sent', 'delivered', 'read', 'failed');
-CREATE TYPE public.automation_status_enum AS ENUM ('active', 'paused');
-CREATE TYPE public.automation_trigger_type_enum AS ENUM ('new_contact_with_tag', 'message_received_with_keyword', 'webhook_received');
-CREATE TYPE public.automation_action_type_enum AS ENUM ('send_template', 'add_tag', 'http_request');
-CREATE TYPE public.automation_run_status_enum AS ENUM ('success', 'failed');
-
 
 -- Tabela de perfis, ligada à autenticação do Supabase
 CREATE TABLE public.profiles (
@@ -85,9 +67,9 @@ CREATE TABLE public.message_templates (
     user_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
     meta_id text,
     template_name text NOT NULL,
-    category public.template_category_enum NOT NULL,
+    category text NOT NULL,
     components jsonb NOT NULL,
-    status public.template_status_enum NOT NULL DEFAULT 'LOCAL'::public.template_status_enum,
+    status text NOT NULL DEFAULT 'LOCAL',
     created_at timestamp with time zone NOT NULL DEFAULT now()
 );
 CREATE INDEX message_templates_meta_id_idx ON public.message_templates USING btree (meta_id);
@@ -120,7 +102,7 @@ CREATE TABLE public.campaigns (
     user_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
     name text NOT NULL,
     template_id uuid NOT NULL REFERENCES public.message_templates(id),
-    status public.campaign_status_enum NOT NULL,
+    status text NOT NULL,
     sent_at timestamp with time zone NOT NULL DEFAULT now(),
     recipient_count integer NOT NULL DEFAULT 0
 );
@@ -132,7 +114,7 @@ CREATE TABLE public.campaign_messages (
     campaign_id uuid NOT NULL REFERENCES public.campaigns(id) ON DELETE CASCADE,
     contact_id uuid NOT NULL REFERENCES public.contacts(id) ON DELETE CASCADE,
     meta_message_id text,
-    status public.message_status_enum NOT NULL,
+    status text NOT NULL,
     delivered_at timestamp with time zone,
     read_at timestamp with time zone,
     error_message text,
@@ -160,10 +142,10 @@ CREATE TABLE public.automations (
     id uuid NOT NULL PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
     name text NOT NULL,
-    status public.automation_status_enum NOT NULL DEFAULT 'active',
-    trigger_type public.automation_trigger_type_enum NOT NULL,
+    status text NOT NULL DEFAULT 'active',
+    trigger_type text NOT NULL,
     trigger_config jsonb NOT NULL,
-    action_type public.automation_action_type_enum NOT NULL,
+    action_type text NOT NULL,
     action_config jsonb NOT NULL,
     created_at timestamp with time zone NOT NULL DEFAULT now()
 );
@@ -177,7 +159,7 @@ CREATE TABLE public.automation_runs (
     automation_id uuid NOT NULL REFERENCES public.automations(id) ON DELETE CASCADE,
     contact_id uuid REFERENCES public.contacts(id) ON DELETE CASCADE,
     run_at timestamp with time zone NOT NULL DEFAULT now(),
-    status public.automation_run_status_enum NOT NULL,
+    status text NOT NULL,
     details text
 );
 comment on table public.automation_runs is 'Registra a execução de cada automação.';
@@ -249,7 +231,7 @@ export type Database = {
           details: string | null
           id: string
           run_at: string
-          status: Database["public"]["Enums"]["automation_run_status_enum"]
+          status: string
         }
         Insert: {
           automation_id: string
@@ -257,7 +239,7 @@ export type Database = {
           details?: string | null
           id?: string
           run_at?: string
-          status: Database["public"]["Enums"]["automation_run_status_enum"]
+          status: string
         }
         Update: {
           automation_id?: string
@@ -265,7 +247,7 @@ export type Database = {
           details?: string | null
           id?: string
           run_at?: string
-          status?: Database["public"]["Enums"]["automation_run_status_enum"]
+          status?: string
         }
         Relationships: [
           {
@@ -287,35 +269,35 @@ export type Database = {
       automations: {
         Row: {
           action_config: Json
-          action_type: Database["public"]["Enums"]["automation_action_type_enum"]
+          action_type: string
           created_at: string
           id: string
           name: string
-          status: Database["public"]["Enums"]["automation_status_enum"]
+          status: string
           trigger_config: Json
-          trigger_type: Database["public"]["Enums"]["automation_trigger_type_enum"]
+          trigger_type: string
           user_id: string
         }
         Insert: {
           action_config: Json
-          action_type: Database["public"]["Enums"]["automation_action_type_enum"]
+          action_type: string
           created_at?: string
           id?: string
           name: string
-          status?: Database["public"]["Enums"]["automation_status_enum"]
+          status?: string
           trigger_config: Json
-          trigger_type: Database["public"]["Enums"]["automation_trigger_type_enum"]
+          trigger_type: string
           user_id: string
         }
         Update: {
           action_config?: Json
-          action_type?: Database["public"]["Enums"]["automation_action_type_enum"]
+          action_type?: string
           created_at?: string
           id?: string
           name?: string
-          status?: Database["public"]["Enums"]["automation_status_enum"]
+          status?: string
           trigger_config?: Json
-          trigger_type?: Database["public"]["Enums"]["automation_trigger_type_enum"]
+          trigger_type?: string
           user_id?: string
         }
         Relationships: [
@@ -338,7 +320,7 @@ export type Database = {
           id: string
           meta_message_id: string | null
           read_at: string | null
-          status: Database["public"]["Enums"]["message_status_enum"]
+          status: string
         }
         Insert: {
           campaign_id: string
@@ -349,7 +331,7 @@ export type Database = {
           id?: string
           meta_message_id?: string | null
           read_at?: string | null
-          status: Database["public"]["Enums"]["message_status_enum"]
+          status: string
         }
         Update: {
           campaign_id?: string
@@ -360,7 +342,7 @@ export type Database = {
           id?: string
           meta_message_id?: string | null
           read_at?: string | null
-          status?: Database["public"]["Enums"]["message_status_enum"]
+          status?: string
         }
         Relationships: [
           {
@@ -385,7 +367,7 @@ export type Database = {
           name: string
           recipient_count: number
           sent_at: string
-          status: Database["public"]["Enums"]["campaign_status_enum"]
+          status: string
           template_id: string
           user_id: string
         }
@@ -394,7 +376,7 @@ export type Database = {
           name: string
           recipient_count?: number
           sent_at?: string
-          status: Database["public"]["Enums"]["campaign_status_enum"]
+          status: string
           template_id: string
           user_id: string
         }
@@ -403,7 +385,7 @@ export type Database = {
           name?: string
           recipient_count?: number
           sent_at?: string
-          status?: Database["public"]["Enums"]["campaign_status_enum"]
+          status?: string
           template_id?: string
           user_id?: string
         }
@@ -461,32 +443,32 @@ export type Database = {
       }
       message_templates: {
         Row: {
-          category: Database["public"]["Enums"]["template_category_enum"]
+          category: string
           components: Json
           created_at: string
           id: string
           meta_id: string | null
-          status: Database["public"]["Enums"]["template_status_enum"]
+          status: string
           template_name: string
           user_id: string
         }
         Insert: {
-          category: Database["public"]["Enums"]["template_category_enum"]
+          category: string
           components: Json
           created_at?: string
           id?: string
           meta_id?: string | null
-          status?: Database["public"]["Enums"]["template_status_enum"]
+          status?: string
           template_name: string
           user_id: string
         }
         Update: {
-          category?: Database["public"]["Enums"]["template_category_enum"]
+          category?: string
           components?: Json
           created_at?: string
           id?: string
           meta_id?: string | null
-          status?: Database["public"]["Enums"]["template_status_enum"]
+          status?: string
           template_name?: string
           user_id?: string
         }
@@ -667,25 +649,7 @@ export type Database = {
       }
     }
     Enums: {
-      automation_action_type_enum:
-        | "send_template"
-        | "add_tag"
-        | "http_request"
-      automation_run_status_enum: "success" | "failed"
-      automation_status_enum: "active" | "paused"
-      automation_trigger_type_enum:
-        | "new_contact_with_tag"
-        | "message_received_with_keyword"
-        | "webhook_received"
-      campaign_status_enum: "Sent" | "Draft" | "Failed"
-      message_status_enum: "sent" | "delivered" | "read" | "failed"
-      template_category_enum: "MARKETING" | "UTILITY" | "AUTHENTICATION"
-      template_status_enum:
-        | "APPROVED"
-        | "PENDING"
-        | "REJECTED"
-        | "PAUSED"
-        | "LOCAL"
+      [_ in never]: never
     }
     CompositeTypes: {
       [_ in never]: never

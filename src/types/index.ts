@@ -1,32 +1,60 @@
-
 import { Session, User } from '@supabase/supabase-js';
 import { Database, Tables, TablesInsert, Json } from './database.types';
 import { MetaTemplateComponent } from '../services/meta/types';
 
 export type Page = 'dashboard' | 'campaigns' | 'templates' | 'template-editor' | 'contacts' | 'new-campaign' | 'profile' | 'settings' | 'auth' | 'campaign-details' | 'automations' | 'automation-editor';
 
-// Derivando tipos diretamente do schema do banco de dados para consistência
+// String literal unions to replace DB enums for type safety in the app
+export type TemplateCategory = 'MARKETING' | 'UTILITY' | 'AUTHENTICATION';
+export type TemplateStatus = 'APPROVED' | 'PENDING' | 'REJECTED' | 'PAUSED' | 'LOCAL';
+export type CampaignStatus = 'Sent' | 'Draft' | 'Failed';
+export type MessageStatus = 'sent' | 'delivered' | 'read' | 'failed';
+export type AutomationStatus = 'active' | 'paused';
+export type AutomationTriggerType = 'new_contact_with_tag' | 'message_received_with_keyword' | 'webhook_received';
+export type AutomationActionType = 'send_template' | 'add_tag' | 'http_request';
+export type AutomationRunStatus = 'success' | 'failed';
+
+
+// Base table types
 export type Profile = Tables<'profiles'>;
 export type Contact = Tables<'contacts'>;
-
-// Tipo personalizado para MessageTemplate para garantir que 'components' seja fortemente tipado
-export type MessageTemplate = Omit<Tables<'message_templates'>, 'components'> & {
-  components: MetaTemplateComponent[];
-};
-export type MessageTemplateInsert = Omit<TablesInsert<'message_templates'>, 'components'> & {
-  components: MetaTemplateComponent[];
-};
-
-
-export type Campaign = Tables<'campaigns'>;
-export type CampaignMessage = Tables<'campaign_messages'>;
-export type CampaignMessageInsert = TablesInsert<'campaign_messages'>;
 export type Segment = Tables<'segments'>;
 export type SegmentRule = Tables<'segment_rules'>;
 export type ReceivedMessage = Tables<'received_messages'>;
-export type Automation = Tables<'automations'>;
-export type AutomationInsert = TablesInsert<'automations'>;
 export type AutomationRun = Tables<'automation_runs'>;
+
+
+// Custom types with stricter enum-like properties
+export type MessageTemplate = Omit<Tables<'message_templates'>, 'components' | 'category' | 'status'> & {
+  components: MetaTemplateComponent[];
+  category: TemplateCategory;
+  status: TemplateStatus;
+};
+export type MessageTemplateInsert = Omit<TablesInsert<'message_templates'>, 'components' | 'category' | 'status'> & {
+  components: MetaTemplateComponent[];
+  category: TemplateCategory;
+  status: TemplateStatus;
+};
+
+export type Campaign = Omit<Tables<'campaigns'>, 'status'> & {
+    status: CampaignStatus;
+};
+export type CampaignMessage = Omit<Tables<'campaign_messages'>, 'status'> & {
+    status: MessageStatus;
+};
+export type CampaignMessageInsert = Omit<TablesInsert<'campaign_messages'>, 'status'> & {
+    status: MessageStatus;
+};
+export type Automation = Omit<Tables<'automations'>, 'status' | 'trigger_type' | 'action_type'> & {
+    status: AutomationStatus;
+    trigger_type: AutomationTriggerType;
+    action_type: AutomationActionType;
+};
+export type AutomationInsert = Omit<TablesInsert<'automations'>, 'status' | 'trigger_type' | 'action_type'> & {
+    status: AutomationStatus;
+    trigger_type: AutomationTriggerType;
+    action_type: AutomationActionType;
+};
 
 
 // Tipos para formulários e operações específicas
