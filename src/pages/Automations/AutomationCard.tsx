@@ -29,6 +29,9 @@ const AutomationCard: React.FC<AutomationCardProps> = ({ automation }) => {
     };
 
     const description = useMemo(() => {
+        if (!Array.isArray(automation.nodes)) {
+            return "Automação sem nós definidos.";
+        }
         const triggerNode = automation.nodes.find(n => n.data.nodeType === 'trigger');
         const actionNodeCount = automation.nodes.filter(n => n.data.nodeType === 'action').length;
         
