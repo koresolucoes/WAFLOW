@@ -2,7 +2,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from '../../../lib/supabaseAdmin';
 import { executeAutomation } from '../../_lib/engine';
-import { Contact, Automation, AutomationNode } from '../../../types';
+import { Contact, Automation, AutomationNode } from '../../../src/types';
 
 const getValueFromPath = (obj: any, path: string): any => {
     if (!path || !obj) return undefined;
@@ -23,7 +23,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // 1. Find Profile and Automation
     const { data: profile } = await supabaseAdmin
         .from('profiles')
-        .select('id, user_id:id')
+        .select('id')
         .eq('webhook_path_prefix', webhookPrefix)
         .single();
 
@@ -124,7 +124,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // 5. Trigger the automation engine
-    await executeAutomation(automation, contact as Contact, nodeId, payload);
+    executeAutomation(automation, contact as Contact, nodeId, payload);
     
     // Trigger "New Contact" automations if applicable
     if (isNewContact) {
@@ -133,7 +133,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             for (const auto of (newContactAutomations as unknown as Automation[])) {
                 const trigger = auto.nodes?.find(n => n.data.type === 'new_contact');
                 if (trigger) {
-                    await executeAutomation(auto, contact as Contact, trigger.id, null);
+                    executeAutomation(auto, contact as Contact, trigger.id, null);
                 }
             }
          }

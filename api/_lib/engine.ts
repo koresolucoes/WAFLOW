@@ -1,8 +1,7 @@
 
 import { supabaseAdmin } from '../../lib/supabaseAdmin';
-import { sendTemplatedMessage, sendTextMessage, sendMediaMessage, sendInteractiveMessage } from '../../services/meta/messages';
-import { Automation, Contact, Json, MetaConfig, NodeData, MessageTemplate } from '../../types';
-import { TablesUpdate } from '../../types/database.types';
+import { sendTemplatedMessage, sendTextMessage, sendMediaMessage, sendInteractiveMessage } from '../../src/services/meta/messages';
+import { Automation, Contact, Json, MetaConfig, NodeData, MessageTemplate } from '../../src/types';
 
 // Helper to resolve nested values from an object path (e.g., 'contact.custom_fields.order_id')
 const getValueFromPath = (obj: any, path: string): any => {
@@ -70,7 +69,6 @@ export const executeAutomation = async (
         
         processedNodes.add(nodeId); // Mark as processed for this run
 
-        let nextNodeId: string | null = null;
         let nextNodeHandle: string | undefined = undefined;
 
         try {
@@ -80,15 +78,21 @@ export const executeAutomation = async (
                 case 'send_template':
                     const { data: template } = await supabaseAdmin.from('message_templates').select('*').eq('id', config.template_id).single();
                     if (template) {
-                         const placeholders = (template.components as Json[])?.flatMap(c => (c as any).text?.match(/\{\{\d+\}\}/g) || []).filter(Boolean) || [];
+                         const templateTyped = template as unknown as MessageTemplate;
+                         const placeholders = (templateTyped.components as any[])?.flatMap(c => c.text?.match(/\{\{\d+\}\}/g) || []).filter(Boolean) || [];
                          const uniquePlaceholders = [...new Set(placeholders)];
+                         
+                         const bodyParameters = uniquePlaceholders.map(p => {
+                            const varNumber = p.replace(/\{|\}/g, '');
+                            const textValue = p === '{{1}}' ? currentContactState.name : resolveVariables(`{{trigger.body[${parseInt(varNumber, 10) - 2}]}}`, context); // Example mapping
+                            return { type: 'text', text: textValue || '' };
+                         });
+
                          const components = [{
                             type: 'body',
-                            parameters: uniquePlaceholders.map(p => ({
-                                type: 'text',
-                                text: p === '{{1}}' ? currentContactState.name : resolveVariables(`{{trigger.variable_${p.replace(/\{|\}/g, '')}}}`, context) // Assumes variables passed in trigger data
-                            }))
+                            parameters: bodyParameters
                          }];
+
                         await sendTemplatedMessage(metaConfig, currentContactState.phone, template.template_name, components);
                     }
                     break;
@@ -105,7 +109,7 @@ export const executeAutomation = async (
                     }
                     break;
                 case 'send_interactive_message':
-                    if(config.message_text && config.buttons){
+                    if(config.message_text && Array.isArray(config.buttons)){
                          const message = resolveVariables(config.message_text, context);
                          const buttons = config.buttons.map((b: any) => ({...b, text: resolveVariables(b.text, context)}));
                          await sendInteractiveMessage(metaConfig, currentContactState.phone, message, buttons);
@@ -128,9 +132,9 @@ export const executeAutomation = async (
                     }
                     break;
                 case 'set_custom_field':
-                    if(config.field_name && config.field_value){
+                    if(config.field_name){
                         const fieldName = resolveVariables(config.field_name, context);
-                        const fieldValue = resolveVariables(config.field_value, context);
+                        const fieldValue = resolveVariables(config.field_value || '', context);
                         const newCustomFields = { ...(currentContactState.custom_fields as object || {}), [fieldName]: fieldValue };
                         const { data } = await supabaseAdmin.from('contacts').update({ custom_fields: newCustomFields }).eq('id', currentContactState.id).select().single();
                         if (data) currentContactState = data as Contact;
@@ -148,9 +152,20 @@ export const executeAutomation = async (
                     }
 
                     let conditionMet = false;
-                    if (operator === 'contains') conditionMet = Array.isArray(sourceValue) ? sourceValue.includes(value) : String(sourceValue).includes(value);
-                    if (operator === 'not_contains') conditionMet = Array.isArray(sourceValue) ? !sourceValue.includes(value) : !String(sourceValue).includes(value);
-                    if (operator === 'equals') conditionMet = String(sourceValue) === String(value);
+                    const lowerCaseValue = String(value).toLowerCase();
+                    const lowerCaseSourceValue = String(sourceValue).toLowerCase();
+
+                    if (operator === 'contains') {
+                        conditionMet = Array.isArray(sourceValue) 
+                            ? sourceValue.map(v => String(v).toLowerCase()).includes(lowerCaseValue)
+                            : lowerCaseSourceValue.includes(lowerCaseValue);
+                    } else if (operator === 'not_contains') {
+                         conditionMet = Array.isArray(sourceValue) 
+                            ? !sourceValue.map(v => String(v).toLowerCase()).includes(lowerCaseValue)
+                            : !lowerCaseSourceValue.includes(lowerCaseValue);
+                    } else if (operator === 'equals') {
+                        conditionMet = lowerCaseSourceValue === lowerCaseValue;
+                    }
                     
                     nextNodeHandle = conditionMet ? 'yes' : 'no';
                     break;
@@ -172,7 +187,7 @@ export const executeAutomation = async (
             }
 
             // Find next node(s) in the flow
-            const outgoingEdges = automation.edges.filter(e => e.source === nodeId && (!nextNodeHandle || e.sourceHandle === nextNodeHandle));
+            const outgoingEdges = automation.edges.filter(e => e.source === nodeId && (!nextNodeHandle || e.sourceHandle === nextNodeHandle || !e.sourceHandle));
             for (const edge of outgoingEdges) {
                 nodeQueue.push({ nodeId: edge.target });
             }
