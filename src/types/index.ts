@@ -1,7 +1,8 @@
+
 import { Session, User } from '@supabase/supabase-js';
 import { Json, Tables, TablesInsert, TablesUpdate } from './database.types';
 import { MetaTemplateComponent } from '../services/meta/types';
-import type { Node, Edge } from 'reactflow';
+import type { Node, Edge } from '@xyflow/react';
 
 export type Page = 'dashboard' | 'campaigns' | 'templates' | 'template-editor' | 'contacts' | 'new-campaign' | 'profile' | 'settings' | 'auth' | 'campaign-details' | 'automations' | 'automation-editor';
 
@@ -20,6 +21,7 @@ export type ActionType = 'send_template' | 'add_tag';
 export type NodeType = 'trigger' | 'action';
 
 export interface NodeData {
+  [key: string]: any; // To satisfy @xyflow/react's Node data constraint
   nodeType: NodeType;
   type: TriggerType | ActionType;
   label: string;

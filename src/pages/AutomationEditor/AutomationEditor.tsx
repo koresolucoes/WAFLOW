@@ -1,8 +1,8 @@
 
 import React, { useContext, useState, useEffect, useMemo, useCallback, memo } from 'react';
-import ReactFlow, { ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, Node, Edge } from 'reactflow';
+import ReactFlow, { ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, Node, Edge, NodeProps } from '@xyflow/react';
 import { AppContext } from '../../contexts/AppContext';
-import { Automation, AutomationInsert, AutomationNode, NodeData, TriggerType, ActionType } from '../../types';
+import { Automation, AutomationInsert, AutomationNode, NodeData, TriggerType, ActionType, MessageTemplate } from '../../types';
 import Button from '../../components/common/Button';
 import Card from '../../components/common/Card';
 import { AUTOMATION_ICON, PLUS_ICON, TRASH_ICON } from '../../components/icons';
@@ -26,8 +26,8 @@ const nodeStyles = {
     description: "text-xs text-slate-400 mt-1"
 };
 
-const CustomNode = memo(({ data, type }: { data: NodeData, type: 'trigger' | 'action' }) => {
-    const isTrigger = type === 'trigger';
+const CustomNode = memo(({ data }: NodeProps<NodeData>) => {
+    const isTrigger = data.nodeType === 'trigger';
 
     return (
         <div className={`${nodeStyles.base} ${isTrigger ? nodeStyles.trigger : nodeStyles.action}`}>
@@ -46,8 +46,8 @@ const CustomNode = memo(({ data, type }: { data: NodeData, type: 'trigger' | 'ac
 });
 
 const nodeTypes = {
-    trigger: (props: Node<NodeData>) => <CustomNode {...props} type="trigger" />,
-    action: (props: Node<NodeData>) => <CustomNode {...props} type="action" />,
+    trigger: (props: NodeProps<NodeData>) => <CustomNode {...props} />,
+    action: (props: NodeProps<NodeData>) => <CustomNode {...props} />,
 };
 
 // ====================================================================================
@@ -81,20 +81,21 @@ const NodeSidebar = ({ onDragStart }: { onDragStart: (event: React.DragEvent, no
     </Card>
 );
 
-const SettingsPanel = ({ node, setNodes, templates }: { node: AutomationNode, setNodes: React.Dispatch<React.SetStateAction<AutomationNode[]>>, templates: any[] }) => {
+const SettingsPanel = ({ node, setNodes, templates }: { node: AutomationNode, setNodes: React.Dispatch<React.SetStateAction<AutomationNode[]>>, templates: MessageTemplate[] }) => {
     const { data, id } = node;
 
     const updateNodeConfig = (key: string, value: any) => {
         setNodes(nds => nds.map(n => {
             if (n.id === id) {
-                return { ...n, data: { ...n.data, config: { ...n.data.config, [key]: value } } };
+                const oldConfig = (typeof n.data.config === 'object' && n.data.config && !Array.isArray(n.data.config)) ? n.data.config : {};
+                return { ...n, data: { ...n.data, config: { ...oldConfig, [key]: value } } };
             }
             return n;
         }));
     };
 
     const renderConfig = () => {
-        const config = data.config || {};
+        const config = data.config as any || {};
         switch (data.type) {
             case 'new_contact_with_tag':
             case 'add_tag':
@@ -220,14 +221,14 @@ const FlowCanvas = () => {
         const automationData = {
             name: automationName,
             status: 'active', // Default status
-            nodes,
+            nodes: nodes as AutomationNode[],
             edges,
         };
         try {
             if (isEditing) {
-                await updateAutomation({ ...automationData, id: pageParams.automationId } as Automation);
+                await updateAutomation({ ...automationData, id: pageParams.automationId } as unknown as Automation);
             } else {
-                await addAutomation(automationData as Omit<AutomationInsert, 'id' | 'user_id' | 'created_at'>);
+                await addAutomation(automationData as unknown as Omit<AutomationInsert, 'id' | 'user_id' | 'created_at'>);
             }
             setCurrentPage('automations');
         } catch (err: any) {
@@ -238,7 +239,6 @@ const FlowCanvas = () => {
     };
     
     const handleDragStart = (event: React.DragEvent, nodeType: string, specificType: string) => {
-        const nodeInfo = nodeTypes[nodeType as keyof typeof nodeTypes];
         const label = event.currentTarget.textContent || 'Novo Nó';
         event.dataTransfer.setData('application/reactflow-nodetype', nodeType);
         event.dataTransfer.setData('application/reactflow-label', label);
@@ -280,14 +280,14 @@ const FlowCanvas = () => {
                         onPaneClick={onPaneClick}
                         nodeTypes={nodeTypes}
                         fitView
-                        className="bg-slate-900"
+                        className="bg-slate-900 xyflow-react"
                     >
                         <Background color="#475569" gap={16} />
                         <Controls />
                     </ReactFlow>
                 </div>
                 <aside className="w-80 h-full bg-slate-800/50 p-4 border-l border-slate-700 overflow-y-auto">
-                   {selectedNode ? <SettingsPanel node={selectedNode} setNodes={setNodes} templates={templates} /> : <NodeSidebar onDragStart={handleDragStart} />}
+                   {selectedNode ? <SettingsPanel node={selectedNode} setNodes={setNodes as any} templates={templates} /> : <NodeSidebar onDragStart={handleDragStart} />}
                 </aside>
             </div>
         </div>

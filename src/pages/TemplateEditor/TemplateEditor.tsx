@@ -1,3 +1,4 @@
+
 import React, { useState, useContext, useMemo } from 'react';
 import { generateTemplateWithAI } from '../../services/geminiService';
 import { createMetaTemplate } from '../../services/meta/templates';
@@ -12,7 +13,7 @@ import TemplatePreview from '../../components/common/TemplatePreview';
 type EditableTemplate = Omit<MessageTemplateInsert, 'id' | 'user_id' | 'created_at' | 'status' | 'meta_id'>;
 
 const TemplateEditor: React.FC = () => {
-  const { profile, addTemplate, setCurrentPage, metaConfig } = useContext(AppContext);
+  const { profile, addTemplate, setCurrentPage, metaConfig, user } = useContext(AppContext);
   const [campaignGoal, setCampaignGoal] = useState('');
   const [template, setTemplate] = useState<EditableTemplate>({
     template_name: '',
@@ -69,6 +70,10 @@ const TemplateEditor: React.FC = () => {
         setError("Credenciais da Meta não configuradas. Por favor, vá para Configurações.");
         return;
     }
+    if (!user) {
+        setError("Usuário não autenticado. Por favor, recarregue a página.");
+        return;
+    }
 
     setIsSaving(true);
     setError(null);
@@ -79,7 +84,7 @@ const TemplateEditor: React.FC = () => {
             category: template.category,
             components: template.components
         });
-        await addTemplate({ ...template, meta_id: result.id, status: 'PENDING' });
+        await addTemplate({ ...template, user_id: user.id, meta_id: result.id, status: 'PENDING' });
         
         setSuccessMessage('Template enviado para aprovação com sucesso! Ele aparecerá como "PENDING" na sua lista. Você será redirecionado em 3 segundos.');
         
