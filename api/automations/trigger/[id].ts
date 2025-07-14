@@ -3,17 +3,14 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Database, Tables, Json, TablesInsert } from '../../../src/types/database.types';
 import { Automation, Contact, AutomationNode, MessageTemplate } from '../../../src/types';
 
-// This is a minimal version of the types needed for the serverless function
-// to avoid complex path resolution issues in Vercel.
-
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 };
 
 // ============================================================================
-// Flow Execution Engine (Duplicated from /api/webhook.ts for serverless isolation)
+// Flow Execution Engine (Copied from /api/webhook.ts for serverless isolation)
 // ============================================================================
 const API_VERSION = 'v23.0';
 const BASE_META_URL = `https://graph.facebook.com/${API_VERSION}`;
@@ -72,17 +69,30 @@ async function sendWhatsAppInteractiveMessage(metaConfig: any, to: string, confi
 async function evaluateCondition(node: AutomationNode, contact: Contact): Promise<boolean> {
     const config = node.data.config as any;
     if (!config.field || !config.operator) return false;
-    let contactValue;
-    if (config.field === 'tags') contactValue = contact.tags || [];
-    else if (config.field === 'name') contactValue = contact.name || '';
-    else contactValue = (contact.custom_fields as any)?.[config.field] ?? '';
+
+    let contactValue: any;
+    if (config.field === 'tags') {
+        contactValue = contact.tags || [];
+    } else if (config.field === 'name') {
+        contactValue = contact.name || '';
+    } else if (config.field === 'custom_fields') {
+        contactValue = (contact.custom_fields as any)?.[config.custom_field_name] ?? '';
+    } else {
+        contactValue = (contact.custom_fields as any)?.[config.field] ?? '';
+    }
+
     switch (config.operator) {
-        case 'contains': return Array.isArray(contactValue) ? contactValue.includes(config.value) : String(contactValue).includes(config.value);
-        case 'not_contains': return Array.isArray(contactValue) ? !contactValue.includes(config.value) : !String(contactValue).includes(config.value);
-        case 'equals': return String(contactValue) === config.value;
-        default: return false;
+        case 'contains':
+            return Array.isArray(contactValue) ? contactValue.includes(config.value) : String(contactValue).includes(config.value);
+        case 'not_contains':
+            return Array.isArray(contactValue) ? !contactValue.includes(config.value) : !String(contactValue).includes(config.value);
+        case 'equals':
+            return String(contactValue) === config.value;
+        default:
+            return false;
     }
 }
+
 
 async function executeActionNode(supabase: SupabaseClient<Database>, node: AutomationNode, contact: Contact, metaConfig: any) {
     const actionType = node.data.type;
@@ -182,10 +192,7 @@ export default async function handler(req: Request) {
     if (req.method === 'OPTIONS') {
         return new Response(null, { status: 204, headers: corsHeaders });
     }
-     if (req.method !== 'POST') {
-        return new Response('Method Not Allowed', { status: 405, headers: { ...corsHeaders, 'Allow': 'POST' } });
-    }
-
+    
     const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } = process.env;
     const errorResponse = (msg: string, status: number = 500) => new Response(JSON.stringify({ message: msg }), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
@@ -194,50 +201,92 @@ export default async function handler(req: Request) {
 
     try {
         const url = new URL(req.url);
-        const automationId = url.pathname.split('/').pop();
-        if (!automationId) return errorResponse('ID da automação não fornecido.', 400);
+        const compositeId = url.pathname.split('/').pop();
+        if (!compositeId || !compositeId.includes('_')) return errorResponse('ID do gatilho de webhook inválido ou malformado.', 400);
 
-        const { data: automationData, error: autoError } = await supabase.from('automations').select('*, nodes:nodes, edges:edges').eq('id', automationId).eq('status', 'active').single();
-        if (autoError || !automationData) return errorResponse('Automação não encontrada ou inativa.', 404);
-        
+        const [prefix, nodeId] = compositeId.split(/_(.*)/s);
+        if (!prefix || !nodeId) return errorResponse('ID do gatilho de webhook inválido.', 400);
+
+        const { data: profile, error: profileError } = await supabase.from('profiles').select('*').eq('webhook_path_prefix', prefix).single();
+        if (profileError || !profile) return errorResponse('Prefixo de webhook não encontrado ou inválido.', 404);
+
+        const { data: automationData, error: autoError } = await supabase
+            .from('automations')
+            .select('*, nodes:nodes, edges:edges')
+            .eq('user_id', profile.id)
+            .eq('status', 'active')
+            .filter('nodes', 'cs', `[{"id":"${nodeId}"}]`)
+            .single();
+
+        if (autoError || !automationData) return errorResponse('Automação não encontrada, inativa ou não contém o nó de webhook especificado.', 404);
+
         const automation = automationData as unknown as Automation;
-        const triggerNode = automation.nodes.find(n => n.data.nodeType === 'trigger' && n.data.type === 'webhook_received');
-        if (!triggerNode) return errorResponse('Esta automação não está configurada para receber webhooks.', 400);
+        const triggerNode = automation.nodes.find(n => n.id === nodeId && n.data.type === 'webhook_received');
+        if (!triggerNode) return errorResponse('Nó de gatilho de webhook não encontrado na automação.', 404);
 
-        const { data: profile, error: profileError } = await supabase.from('profiles').select('*').eq('id', automation.user_id).single();
-        if (profileError || !profile) return errorResponse('Perfil do usuário não encontrado.', 500);
+        const configuredMethod = (triggerNode.data.config as any)?.method || 'POST';
+        if (req.method !== configuredMethod) {
+            return new Response(`Método ${req.method} não permitido. Use ${configuredMethod}.`, { status: 405, headers: { ...corsHeaders, 'Allow': configuredMethod } });
+        }
 
-        const metaConfig = {
-            meta_access_token: profile.meta_access_token,
-            meta_phone_number_id: profile.meta_phone_number_id,
-        };
+        let payload: any = {};
+        if (req.method === 'POST') {
+             try {
+                payload = await req.json();
+            } catch {
+                payload = {};
+            }
+        } else if (req.method === 'GET') {
+            payload = Object.fromEntries(url.searchParams.entries());
+        }
+        
+        // "Capture Once" logic
+        const needsCapture = !(triggerNode.data.config as any)?.last_captured_data;
+        if (needsCapture) {
+            const updatedNodes = automation.nodes.map(n => {
+                if (n.id === nodeId) {
+                    return { ...n, data: { ...n.data, config: { ...(n.data.config as any), last_captured_data: payload } } };
+                }
+                return n;
+            });
+            await supabase.from('automations').update({ nodes: updatedNodes as unknown as Json }).eq('id', automation.id);
+            return new Response(JSON.stringify({ message: 'Dados capturados com sucesso. O webhook agora está ativo e irá executar a automação nas próximas requisições.' }), { status: 200, headers: corsHeaders });
+        }
 
-        const body = await req.json();
-        if (!body.phone) return errorResponse('O corpo da requisição deve conter a propriedade "phone".', 400);
+        // Live run logic
+        if (!payload.phone) return errorResponse('A requisição deve conter a propriedade "phone" para identificar o contato.', 400);
 
-        let { data: contact } = await supabase.from('contacts').select('*').eq('user_id', automation.user_id).eq('phone', body.phone).single();
+        let { data: contact } = await supabase.from('contacts').select('*').eq('user_id', automation.user_id).eq('phone', payload.phone).single();
+        const customData = { ...payload };
+        delete customData.phone;
+        delete customData.name;
+
         if (!contact) {
             const { data: newContact, error: createError } = await supabase.from('contacts').insert({
                 user_id: automation.user_id,
-                phone: body.phone,
-                name: body.name || body.phone,
-                custom_fields: body.data || {}
+                phone: payload.phone,
+                name: payload.name || payload.phone,
+                custom_fields: customData
             } as TablesInsert<'contacts'>).select().single();
             if (createError) throw createError;
             contact = newContact;
         } else {
-             const newCustomFields = { ...(contact.custom_fields as object || {}), ...(body.data || {}) };
+             const newCustomFields = { ...(contact.custom_fields as object || {}), ...customData };
              const { data: updatedContact, error: updateError } = await supabase.from('contacts').update({ custom_fields: newCustomFields }).eq('id', contact.id).select().single();
              if (updateError) throw updateError;
              contact = updatedContact;
         }
-
-        executeFlow(supabase, automation, triggerNode.id, contact as Contact, metaConfig).catch(err => console.error(`External Webhook Trigger: Erro durante execução do fluxo ${automation.id}:`, err.message));
+        
+        const metaConfig = {
+            meta_access_token: profile.meta_access_token,
+            meta_phone_number_id: profile.meta_phone_number_id,
+        };
+        executeFlow(supabase, automation, triggerNode.id, contact as Contact, metaConfig).catch(err => console.error(`Webhook Trigger: Erro durante execução do fluxo ${automation.id}:`, err.message));
 
         return new Response(JSON.stringify({ message: 'Webhook recebido e automação iniciada.' }), { status: 202, headers: corsHeaders });
 
     } catch (error: any) {
-        console.error('External Webhook Trigger: Erro Crítico:', error);
+        console.error('Webhook Trigger: Erro Crítico:', error);
         return errorResponse('Erro interno do servidor.', 500);
     }
 }

@@ -1,6 +1,6 @@
 /**
  * =================================================================================================
- * ZAPFLOW AI - SUPABASE DATABASE SCHEMA (v4 - Custom Fields & New Triggers)
+ * ZAPFLOW AI - SUPABASE DATABASE SCHEMA (v5 - Webhook Path Prefix)
  * =================================================================================================
  * 
  * INSTRUÇÕES IMPORTANTES:
@@ -11,7 +11,7 @@
  *
  * Este script irá (re)criar todas as tabelas, relações e políticas de segurança necessárias
  * para que a aplicação funcione corretamente. Ele foi atualizado para adicionar um campo
- * `custom_fields` na tabela de contatos.
+ * `webhook_path_prefix` na tabela de perfis para URLs de automação personalizadas.
  * É seguro executá-lo múltiplas vezes.
  * CUIDADO: A execução deste script apagará dados existentes. FAÇA UM BACKUP PRIMEIRO.
  *
@@ -20,6 +20,9 @@
  *
 -- Garante que a extensão uuid-ossp está habilitada
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA extensions;
+-- Garante que a extensão pgcrypto está habilitada para gerar strings aleatórias
+CREATE EXTENSION IF NOT EXISTS "pgcrypto" WITH SCHEMA extensions;
+
 
 -- Remove tabelas existentes na ordem correta para evitar erros de dependência.
 DROP TABLE IF EXISTS public.automation_runs CASCADE;
@@ -45,7 +48,8 @@ CREATE TABLE public.profiles (
     meta_access_token text,
     meta_waba_id text,
     meta_phone_number_id text,
-    meta_webhook_verify_token text
+    meta_webhook_verify_token text,
+    webhook_path_prefix text UNIQUE
 );
 comment on table public.profiles is 'Armazena o perfil do usuário e os dados de configuração.';
 
@@ -185,8 +189,13 @@ CREATE POLICY "Users can view their own automation runs." ON public.automation_r
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO public.profiles (id, company_name, meta_webhook_verify_token)
-  VALUES (new.id, 'Minha Nova Empresa', 'troque_seu_token_aqui' || substr(new.id::text, 1, 8));
+  INSERT INTO public.profiles (id, company_name, meta_webhook_verify_token, webhook_path_prefix)
+  VALUES (
+      new.id, 
+      'Minha Nova Empresa', 
+      'troque_seu_token_aqui' || substr(new.id::text, 1, 8),
+      'user-' || encode(public.gen_random_bytes(6), 'hex') -- Gera um prefixo aleatório e único
+  );
   RETURN new;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -481,6 +490,7 @@ export type Database = {
           meta_waba_id: string | null
           meta_webhook_verify_token: string | null
           updated_at: string | null
+          webhook_path_prefix: string | null
         }
         Insert: {
           company_audience?: string | null
@@ -494,6 +504,7 @@ export type Database = {
           meta_waba_id?: string | null
           meta_webhook_verify_token?: string | null
           updated_at?: string | null
+          webhook_path_prefix?: string | null
         }
         Update: {
           company_audience?: string | null
@@ -507,6 +518,7 @@ export type Database = {
           meta_waba_id?: string | null
           meta_webhook_verify_token?: string | null
           updated_at?: string | null
+          webhook_path_prefix?: string | null
         }
         Relationships: [
           {
@@ -717,7 +729,7 @@ export type Enums<
     | keyof PublicSchema["Enums"]
     | { schema: keyof Database },
   EnumName extends PublicEnumNameOrOptions extends { schema: keyof Database }
-    ? keyof Database[PublicEnumNameOrOptions["schema"]]["Enums"]
+    ? keyof Database[PublicTableNameOrOptions["schema"]]["Enums"]
     : never = never,
 > = PublicEnumNameOrOptions extends { schema: keyof Database }
   ? Database[PublicEnumNameOrOptions["schema"]]["Enums"][EnumName]

@@ -1,13 +1,12 @@
 
 
 import React, { useContext, useState, useEffect, useCallback, memo } from 'react';
-import { ReactFlow, ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, type Node, type Edge, type NodeProps, getConnectedEdges, getNodesBounds, getViewportForBounds } from '@xyflow/react';
+import { ReactFlow, ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, type Node, type Edge, type NodeProps } from '@xyflow/react';
 import { AppContext } from '../../contexts/AppContext';
-import { Automation, AutomationInsert, AutomationNode, NodeData, TriggerType, ActionType, LogicType, MessageTemplate } from '../../types';
+import { Automation, AutomationInsert, AutomationNode, NodeData, TriggerType, ActionType, LogicType, MessageTemplate, Profile } from '../../types';
 import Button from '../../components/common/Button';
 import Card from '../../components/common/Card';
-import { AUTOMATION_ICON, PLUS_ICON, TRASH_ICON, UPLOAD_ICON, WEBHOOK_ICON } from '../../components/icons';
-import { toPng } from 'html-to-image';
+import { AUTOMATION_ICON, PLUS_ICON, TRASH_ICON, COPY_ICON } from '../../components/icons';
 
 
 const initialNodes: AutomationNode[] = [];
@@ -160,7 +159,7 @@ const NodeSidebar = ({ onDragStart }: { onDragStart: (event: React.DragEvent, no
     </Card>
 );
 
-const SettingsPanel = ({ node, setNodes, templates, automationId }: { node: AutomationNode, setNodes: React.Dispatch<React.SetStateAction<AutomationNode[]>>, templates: MessageTemplate[], automationId?: string }) => {
+const SettingsPanel = ({ node, setNodes, templates, profile, updateAutomation, automationId }: { node: AutomationNode, setNodes: React.Dispatch<React.SetStateAction<AutomationNode[]>>, templates: MessageTemplate[], profile: Profile | null, updateAutomation: (automation: Automation) => Promise<void>, automationId?: string }) => {
     const { data, id } = node;
 
     const updateNodeConfig = (key: string, value: any) => {
@@ -172,6 +171,30 @@ const SettingsPanel = ({ node, setNodes, templates, automationId }: { node: Auto
             return n;
         }));
     };
+    
+    const handleListenWebhook = async () => {
+        if (!automationId) {
+            alert("Por favor, salve a automação primeiro para ativar o modo de escuta.");
+            return;
+        }
+        // Clear previous data and save
+        setNodes(nds => {
+            const newNodes = nds.map(n => {
+                if (n.id === id) {
+                    const oldConfig = (typeof n.data.config === 'object' && n.data.config && !Array.isArray(n.data.config)) ? n.data.config : {};
+                    return { ...n, data: { ...n.data, config: { ...oldConfig, last_captured_data: null } } };
+                }
+                return n;
+            });
+            // Find the current automation state to save it
+            const currentAutomation = (window as any).currentAutomationForSave;
+            if (currentAutomation) {
+                updateAutomation({ ...currentAutomation, nodes: newNodes });
+                alert("Dados anteriores limpos. Envie uma requisição de teste para a URL do webhook para capturar os novos dados.");
+            }
+            return newNodes;
+        });
+    }
 
     const renderConfig = () => {
         const config = data.config as any || {};
@@ -227,9 +250,15 @@ const SettingsPanel = ({ node, setNodes, templates, automationId }: { node: Auto
                             <select value={config.field || 'tags'} onChange={(e) => updateNodeConfig('field', e.target.value)} className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white">
                                 <option value="tags">Tags</option>
                                 <option value="name">Nome</option>
-                                {/* Add custom fields here later */}
+                                <option value="custom_fields">Campo Personalizado</option>
                             </select>
                         </div>
+                        {config.field === 'custom_fields' && (
+                             <div>
+                                <label className="block text-xs font-medium text-slate-400 mb-1">Nome do Campo Personalizado</label>
+                                <input type="text" value={config.custom_field_name || ''} onChange={(e) => updateNodeConfig('custom_field_name', e.target.value)} placeholder="Ex: id_pedido" className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white" />
+                            </div>
+                        )}
                          <div>
                             <label className="block text-xs font-medium text-slate-400 mb-1">Operador</label>
                             <select value={config.operator || 'contains'} onChange={(e) => updateNodeConfig('operator', e.target.value)} className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white">
@@ -245,12 +274,39 @@ const SettingsPanel = ({ node, setNodes, templates, automationId }: { node: Auto
                     </div>
                  );
             case 'webhook_received':
-                const webhookUrl = automationId ? `${window.location.origin}/api/automations/trigger/${automationId}` : 'Salve a automação para gerar a URL';
+                const webhookPrefix = profile?.webhook_path_prefix || profile?.id;
+                const webhookUrl = automationId ? `${window.location.origin}/api/automations/trigger/${webhookPrefix}_${id}` : 'Salve para gerar a URL';
                 return (
-                     <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-1">URL do Webhook</label>
-                        <input type="text" readOnly value={webhookUrl} className="w-full bg-slate-900 border border-slate-700 rounded-md p-2 text-slate-400" />
-                        <p className="text-xs text-slate-400 mt-1">Envie uma requisição POST para esta URL para iniciar a automação.</p>
+                     <div className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-300 mb-1">URL do Webhook</label>
+                            <div className="flex items-center gap-2">
+                                <input type="text" readOnly value={webhookUrl} className="w-full bg-slate-900 border border-slate-700 rounded-md p-2 text-slate-400 font-mono text-xs" />
+                                <Button size="sm" variant="ghost" onClick={() => navigator.clipboard.writeText(webhookUrl)} disabled={!automationId}><COPY_ICON className="w-4 h-4"/></Button>
+                            </div>
+                            <p className="text-xs text-slate-400 mt-1">Envie uma requisição para esta URL para iniciar a automação. Para identificar o contato, o corpo da requisição deve conter a chave `phone`.</p>
+                        </div>
+                        <div>
+                             <label className="block text-sm font-medium text-slate-300 mb-1">Método HTTP</label>
+                             <select value={config.method || 'POST'} onChange={(e) => updateNodeConfig('method', e.target.value)} className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white">
+                                <option value="POST">POST</option>
+                                <option value="GET">GET</option>
+                            </select>
+                        </div>
+                        <div className="border-t border-slate-700 pt-4">
+                            <label className="block text-sm font-medium text-slate-300 mb-2">Escuta de Webhook</label>
+                            <Button size="sm" variant="secondary" onClick={handleListenWebhook} disabled={!automationId}>Limpar e Escutar por Dados</Button>
+                            <p className="text-xs text-slate-400 mt-1">Clique, salve a automação e envie um teste. A primeira requisição será capturada abaixo.</p>
+
+                            {config.last_captured_data && (
+                                <div className="mt-2">
+                                    <p className="text-sm font-medium text-slate-300">Últimos dados capturados:</p>
+                                    <pre className="mt-1 p-2 bg-slate-900 rounded-md text-xs text-slate-300 max-h-48 overflow-auto">
+                                        {JSON.stringify(config.last_captured_data, null, 2)}
+                                    </pre>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 )
             case 'send_media':
@@ -366,7 +422,7 @@ const SettingsPanel = ({ node, setNodes, templates, automationId }: { node: Auto
 // ====================================================================================
 
 const FlowCanvas = () => {
-    const { pageParams, automations, templates, addAutomation, updateAutomation, setCurrentPage } = useContext(AppContext);
+    const { pageParams, automations, templates, addAutomation, updateAutomation, setCurrentPage, profile } = useContext(AppContext);
     const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
     const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
     const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -389,6 +445,17 @@ const FlowCanvas = () => {
             }
         }
     }, [isEditing, pageParams.automationId, automations, setNodes, setEdges]);
+    
+    // Hack to pass current automation state to a callback
+    useEffect(() => {
+        (window as any).currentAutomationForSave = {
+            id: automationId,
+            name: automationName,
+            status: isEditing ? (automations.find(a => a.id === automationId)?.status || 'active') : 'active',
+            nodes,
+            edges,
+        };
+    }, [nodes, edges, automationName, automationId, isEditing, automations]);
 
     const onConnect = useCallback((params: any) => setEdges((eds) => addEdge(params, eds)), [setEdges]);
 
@@ -504,7 +571,7 @@ const FlowCanvas = () => {
                 </div>
                 <aside className="absolute right-0 top-0 h-full bg-slate-800/50 p-4 border-l border-slate-700 backdrop-blur-sm z-10">
                    {selectedNode ? 
-                    <SettingsPanel node={selectedNode} setNodes={setNodes as any} templates={templates} automationId={automationId} /> 
+                    <SettingsPanel node={selectedNode} setNodes={setNodes as any} templates={templates} profile={profile} updateAutomation={updateAutomation} automationId={automationId}/> 
                     : <NodeSidebar onDragStart={handleDragStart} />}
                 </aside>
             </div>
