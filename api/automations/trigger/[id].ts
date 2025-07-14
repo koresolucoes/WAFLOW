@@ -1,24 +1,12 @@
 // /api/automations/trigger/[id].ts
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Database, Tables } from '../../../src/types/database.types';
-
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-if (!supabaseUrl || !supabaseServiceKey) {
-    throw new Error("Variáveis de ambiente do servidor não configuradas: SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY são necessárias.");
-}
-
-const supabase = createClient<Database>(supabaseUrl, supabaseServiceKey, {
-    auth: {
-        persistSession: false
-    }
-});
 
 // Headers for CORS
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-api-key',
+    'Access-Control-Allow-Methods': 'POST, GET, PUT, OPTIONS',
 };
 
 // --- HELPER FUNCTIONS ---
@@ -41,7 +29,7 @@ const replacePlaceholders = (text: string, data: any): string => {
     });
 };
 
-const executeGenericAutomation = async (automation: Tables<'automations'>, triggerData: any) => {
+const executeGenericAutomation = async (supabase: SupabaseClient<Database>, automation: Tables<'automations'>, triggerData: any) => {
     const actionType = automation.action_type;
     const actionConfig = automation.action_config as any;
 
@@ -99,19 +87,33 @@ export default async function handler(req: Request) {
     if (req.method === 'OPTIONS') {
         return new Response(null, {
             status: 204,
-            headers: {
-                ...corsHeaders,
-                'Access-Control-Allow-Methods': 'POST, GET, PUT', // List allowed methods
-            },
+            headers: corsHeaders,
         });
     }
+
+    const {
+        SUPABASE_URL: supabaseUrl,
+        SUPABASE_SERVICE_ROLE_KEY: supabaseServiceKey,
+    } = process.env;
+
+    const errorResponse = (message: string, status = 500) => new Response(JSON.stringify({ message }), {
+        status,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+
+    if (!supabaseUrl) return errorResponse('Erro de configuração do servidor: SUPABASE_URL não foi encontrada.');
+    if (!supabaseServiceKey) return errorResponse('Erro de configuração do servidor: SUPABASE_SERVICE_ROLE_KEY não foi encontrada.');
+    
+    const supabase = createClient<Database>(supabaseUrl, supabaseServiceKey, {
+        auth: { persistSession: false }
+    });
 
     const url = new URL(req.url);
     const pathSegments = url.pathname.split('/');
     const automationId = pathSegments[pathSegments.length - 1];
 
     if (!automationId) {
-        return new Response('Automation ID is missing.', { status: 400, headers: corsHeaders });
+        return errorResponse('ID da automação ausente na URL.', 400);
     }
 
     try {
@@ -125,7 +127,7 @@ export default async function handler(req: Request) {
         
         const automation = automationData as unknown as Tables<'automations'>;
         if (autoError || !automation) {
-            return new Response('Automation not found, not active, or not a webhook trigger.', { status: 404, headers: corsHeaders });
+            return errorResponse('Automação não encontrada, inativa ou não é do tipo webhook.', 404);
         }
         
         const triggerConfig = automation.trigger_config as any;
@@ -143,13 +145,13 @@ export default async function handler(req: Request) {
             }
 
             if (providedKey !== expectedKey) {
-                return new Response('Unauthorized: Invalid verification key.', { status: 401, headers: corsHeaders });
+                return errorResponse('Não autorizado: chave de verificação inválida.', 401);
             }
         }
         
         const allowedMethod = triggerConfig?.method || 'POST';
         if (allowedMethod !== 'ANY' && req.method !== allowedMethod) {
-            return new Response(`Method Not Allowed. This webhook only accepts ${allowedMethod} requests.`, {
+            return new Response(`Método não permitido. Este webhook aceita apenas requisições ${allowedMethod}.`, {
                 status: 405,
                 headers: { ...corsHeaders, 'Allow': allowedMethod }
             });
@@ -168,7 +170,7 @@ export default async function handler(req: Request) {
                 }
             }
         } catch (e) {
-            console.warn(`Webhook: Could not parse body for automation ${automationId}.`, e);
+            console.warn(`Webhook: Não foi possível parsear o corpo da requisição para a automação ${automationId}.`, e);
         }
 
         const triggerData = {
@@ -181,26 +183,23 @@ export default async function handler(req: Request) {
 
         if (waitForResponse) {
             try {
-                const result = await executeGenericAutomation(automation, triggerData);
+                const result = await executeGenericAutomation(supabase, automation, triggerData);
                 const contentType = result.headers.get('content-type') || 'application/json';
                 return new Response(result.body, { status: result.status, headers: { ...corsHeaders, 'Content-Type': contentType } });
             } catch (executionError: any) {
-                return new Response(JSON.stringify({ error: executionError.message }), { 
-                    status: 500,
-                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-                });
+                return errorResponse(executionError.message);
             }
         } else {
-            executeGenericAutomation(automation, triggerData).catch(err => {
-                console.error(`Webhook Trigger: Async execution failed for automation ${automation.id}:`, err.message);
+            executeGenericAutomation(supabase, automation, triggerData).catch(err => {
+                console.error(`Webhook Trigger: Execução assíncrona falhou para a automação ${automation.id}:`, err.message);
             });
-            return new Response(JSON.stringify({ message: 'Webhook received and is being processed.' }), { 
+            return new Response(JSON.stringify({ message: 'Webhook recebido e está sendo processado.' }), { 
                 status: 202,
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' }
              });
         }
     } catch (error: any) {
-        console.error(`Webhook Trigger: Critical error for automation ${automationId}:`, error);
-        return new Response('Internal Server Error', { status: 500, headers: corsHeaders });
+        console.error(`Webhook Trigger: Erro crítico para automação ${automationId}:`, error);
+        return errorResponse('Erro Interno do Servidor');
     }
 }

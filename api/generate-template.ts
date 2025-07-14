@@ -19,16 +19,16 @@ export default async function handler(req: Request) {
         });
     }
 
-    // Verifica a presença da chave de API no servidor
-    if (!process.env.API_KEY) {
-        console.error("A variável de ambiente API_KEY não está definida.");
-        return new Response(JSON.stringify({ message: 'Erro de configuração do servidor.' }), {
-            status: 500,
-            headers: { 'Content-Type': 'application/json' },
-        });
-    }
-
     try {
+        // Verifica a presença da chave de API no servidor
+        if (!process.env.API_KEY) {
+            console.error("A variável de ambiente API_KEY não está definida.");
+            return new Response(JSON.stringify({ message: 'Erro de configuração do servidor: a variável de ambiente API_KEY não foi encontrada.' }), {
+                status: 500,
+                headers: { 'Content-Type': 'application/json' },
+            });
+        }
+
         const { profile, campaignGoal } = (await req.json()) as { profile: CompanyProfileData, campaignGoal: string };
 
         if (!profile || !campaignGoal) {

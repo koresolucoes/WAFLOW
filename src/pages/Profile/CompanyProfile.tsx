@@ -1,11 +1,8 @@
-
 import React, { useState, useContext, useEffect } from 'react';
-import { Profile } from '../../types';
+import { EditableProfile } from '../../types';
 import { AppContext } from '../../contexts/AppContext';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
-
-type EditableProfile = Omit<Profile, 'id' | 'updated_at'>;
 
 const ProfileInput: React.FC<{
     label: string;
@@ -95,11 +92,11 @@ const CompanyProfile: React.FC = () => {
       <Card>
         <form onSubmit={handleSave} className="space-y-6">
           <p className="text-slate-400 text-sm">Esta informação será usada pela IA para gerar conteúdo personalizado para suas campanhas.</p>
-          <ProfileInput label="Nome da Empresa" id="company_name" value={localProfile.company_name} onChange={handleChange} />
-          <ProfileTextarea label="Descrição da Empresa" id="company_description" value={localProfile.company_description} onChange={handleChange} />
-          <ProfileTextarea label="Produtos / Serviços" id="company_products" value={localProfile.company_products} onChange={handleChange} />
-          <ProfileTextarea label="Público-alvo" id="company_audience" value={localProfile.company_audience} onChange={handleChange} />
-          <ProfileInput label="Tom de Voz da Marca" id="company_tone" value={localProfile.company_tone} onChange={handleChange} />
+          <ProfileInput label="Nome da Empresa" id="company_name" value={localProfile.company_name || ''} onChange={handleChange} />
+          <ProfileTextarea label="Descrição da Empresa" id="company_description" value={localProfile.company_description || ''} onChange={handleChange} />
+          <ProfileTextarea label="Produtos / Serviços" id="company_products" value={localProfile.company_products || ''} onChange={handleChange} />
+          <ProfileTextarea label="Público-alvo" id="company_audience" value={localProfile.company_audience || ''} onChange={handleChange} />
+          <ProfileInput label="Tom de Voz da Marca" id="company_tone" value={localProfile.company_tone || ''} onChange={handleChange} />
           
           <div className="flex justify-end items-center gap-4">
               {isSaved && <p className="text-green-400 text-sm">Perfil salvo com sucesso!</p>}

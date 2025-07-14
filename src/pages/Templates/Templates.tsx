@@ -1,5 +1,3 @@
-
-
 import React, { useContext, useState, useMemo } from 'react';
 import { MessageTemplate, TablesInsert } from '../../types';
 import { AppContext } from '../../contexts/AppContext';
@@ -79,27 +77,24 @@ const Templates: React.FC = () => {
 
         if (fetchError) throw fetchError;
         
-        const existingMetaIdMap = new Map((existingTemplates as unknown as { meta_id: string, id: string }[])?.map(t => [t.meta_id, t.id]));
+        const existingMetaIdMap = new Map((existingTemplates as { meta_id: string, id: string }[])?.map(t => [t.meta_id, t.id]));
 
-        const templatesToUpsert = metaTemplates.map(mt => {
-            const existingId = existingMetaIdMap.get(mt.id);
-            const templateData: Partial<TablesInsert<'message_templates'>> & { user_id: string } = {
+        const templatesToUpsert: TablesInsert<'message_templates'>[] = metaTemplates.map(mt => {
+            const templateData: TablesInsert<'message_templates'> = {
+                id: existingMetaIdMap.get(mt.id), // a chave primária para o upsert
                 meta_id: mt.id,
                 user_id: user.id,
                 template_name: mt.name,
                 status: mt.status,
                 category: mt.category,
-                components: mt.components as any,
+                components: mt.components,
             };
 
-            if (existingId) {
-                return { ...templateData, id: existingId };
-            }
             return templateData;
         });
         
         if (templatesToUpsert.length > 0) {
-            const { error: upsertError } = await supabase.from('message_templates').upsert(templatesToUpsert as any);
+            const { error: upsertError } = await supabase.from('message_templates').upsert(templatesToUpsert);
             if (upsertError) throw upsertError;
         }
 
@@ -111,7 +106,7 @@ const Templates: React.FC = () => {
 
         if (refetchError) throw refetchError;
         
-        setTemplates((dbTemplates as unknown as MessageTemplate[]) || []);
+        setTemplates((dbTemplates as MessageTemplate[]) || []);
         setSyncMessage("Sincronização concluída! Os status dos templates foram atualizados.");
         setTimeout(() => setSyncMessage(null), 4000);
 
