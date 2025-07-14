@@ -1,7 +1,7 @@
 
-import { supabaseAdmin } from './supabaseAdmin.js';
-import { sendTemplatedMessage, sendTextMessage, sendMediaMessage, sendInteractiveMessage } from '../../src/services/meta/messages';
-import { Automation, Contact, Json, MetaConfig, NodeData, MessageTemplate } from '../../src/types';
+import { supabaseAdmin } from './supabaseAdmin';
+import { sendTemplatedMessage, sendTextMessage, sendMediaMessage, sendInteractiveMessage } from './meta/messages';
+import { Automation, Contact, Json, MetaConfig, NodeData, MessageTemplate } from './types';
 
 // Helper to resolve nested values from an object path (e.g., 'contact.custom_fields.order_id')
 const getValueFromPath = (obj: any, path: string): any => {
