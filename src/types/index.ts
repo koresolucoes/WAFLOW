@@ -1,5 +1,5 @@
 import { Session, User } from '@supabase/supabase-js';
-import { Database, Tables, TablesInsert, Json } from './database.types';
+import { Json, TablesInsert } from './database.types';
 import { MetaTemplateComponent } from '../services/meta/types';
 
 export type Page = 'dashboard' | 'campaigns' | 'templates' | 'template-editor' | 'contacts' | 'new-campaign' | 'profile' | 'settings' | 'auth' | 'campaign-details' | 'automations' | 'automation-editor';
@@ -15,45 +15,145 @@ export type AutomationActionType = 'send_template' | 'add_tag' | 'http_request';
 export type AutomationRunStatus = 'success' | 'failed';
 
 
-// Base table types
-export type Profile = Tables<'profiles'>;
-export type Contact = Tables<'contacts'>;
-export type Segment = Tables<'segments'>;
-export type SegmentRule = Tables<'segment_rules'>;
-export type ReceivedMessage = Tables<'received_messages'>;
-export type AutomationRun = Tables<'automation_runs'>;
+// Base table types defined explicitly to avoid deep type instantiation errors
+export type Profile = {
+  id: string;
+  updated_at: string | null;
+  company_name: string | null;
+  company_description: string | null;
+  company_products: string | null;
+  company_audience: string | null;
+  company_tone: string | null;
+  meta_access_token: string | null;
+  meta_waba_id: string | null;
+  meta_phone_number_id: string | null;
+  meta_webhook_verify_token: string | null;
+};
+
+export type Contact = {
+  id: string;
+  user_id: string;
+  name: string;
+  phone: string;
+  tags: string[] | null;
+  created_at: string;
+};
+
+export type Segment = {
+  id: string;
+  user_id: string;
+  name: string;
+  created_at: string;
+};
+
+export type SegmentRule = {
+  id: string;
+  segment_id: string;
+  field: string;
+  operator: string;
+  value: string;
+};
+
+export type ReceivedMessage = {
+  id: string;
+  user_id: string;
+  contact_id: string;
+  meta_message_id: string;
+  message_body: string | null;
+  sentiment: string | null;
+  received_at: string;
+};
+
+export type AutomationRun = {
+  id: string;
+  automation_id: string;
+  contact_id: string | null;
+  run_at: string;
+  status: string;
+  details: string | null;
+};
 
 
 // Custom types with stricter enum-like properties
-export type MessageTemplate = Omit<Tables<'message_templates'>, 'components' | 'category' | 'status'> & {
-  components: MetaTemplateComponent[];
+export type MessageTemplate = {
+  id: string;
+  user_id: string;
+  meta_id: string | null;
+  template_name: string;
   category: TemplateCategory;
-  status: TemplateStatus;
-};
-export type MessageTemplateInsert = Omit<TablesInsert<'message_templates'>, 'components' | 'category' | 'status'> & {
   components: MetaTemplateComponent[];
-  category: TemplateCategory;
   status: TemplateStatus;
+  created_at: string;
 };
 
-export type Campaign = Omit<Tables<'campaigns'>, 'status'> & {
-    status: CampaignStatus;
+export type MessageTemplateInsert = {
+  user_id: string;
+  meta_id?: string | null;
+  template_name: string;
+  category: TemplateCategory;
+  components: MetaTemplateComponent[];
+  status: TemplateStatus;
+  created_at?: string;
+  id?: string;
 };
-export type CampaignMessage = Omit<Tables<'campaign_messages'>, 'status'> & {
-    status: MessageStatus;
+
+
+export type Campaign = {
+  id: string;
+  user_id: string;
+  name: string;
+  template_id: string;
+  status: CampaignStatus;
+  sent_at: string;
+  recipient_count: number;
 };
-export type CampaignMessageInsert = Omit<TablesInsert<'campaign_messages'>, 'status'> & {
-    status: MessageStatus;
+
+export type CampaignMessage = {
+  id: string;
+  campaign_id: string;
+  contact_id: string;
+  meta_message_id: string | null;
+  status: MessageStatus;
+  delivered_at: string | null;
+  read_at: string | null;
+  error_message: string | null;
+  created_at: string;
 };
-export type Automation = Omit<Tables<'automations'>, 'status' | 'trigger_type' | 'action_type'> & {
-    status: AutomationStatus;
-    trigger_type: AutomationTriggerType;
-    action_type: AutomationActionType;
+
+export type CampaignMessageInsert = {
+  campaign_id: string;
+  contact_id: string;
+  status: MessageStatus;
+  meta_message_id?: string | null;
+  delivered_at?: string | null;
+  read_at?: string | null;
+  error_message?: string | null;
+  created_at?: string;
+  id?: string;
 };
-export type AutomationInsert = Omit<TablesInsert<'automations'>, 'status' | 'trigger_type' | 'action_type'> & {
-    status: AutomationStatus;
-    trigger_type: AutomationTriggerType;
-    action_type: AutomationActionType;
+
+export type Automation = {
+  id: string;
+  user_id: string;
+  name: string;
+  status: AutomationStatus;
+  trigger_type: AutomationTriggerType;
+  trigger_config: Json;
+  action_type: AutomationActionType;
+  action_config: Json;
+  created_at: string;
+};
+
+export type AutomationInsert = {
+  user_id: string;
+  name: string;
+  status: AutomationStatus;
+  trigger_type: AutomationTriggerType;
+  trigger_config: Json;
+  action_type: AutomationActionType;
+  action_config: Json;
+  created_at?: string;
+  id?: string;
 };
 
 

@@ -95,7 +95,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         console.warn("Profile not found for user, creating a default one.");
         const { data: newProfile, error: insertError } = await supabase
           .from('profiles')
-          .insert({ id: user.id, company_name: 'Minha Nova Empresa' } as any)
+          .insert({ id: user.id, company_name: 'Minha Nova Empresa' })
           .select()
           .single();
         
@@ -110,7 +110,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }
 
       if (profileData) {
-        setProfile(profileData as unknown as Profile);
+        setProfile(profileData as Profile);
       } else {
         console.error("Could not load or create a user profile. App may not function correctly.");
         setLoading(false);
@@ -125,22 +125,22 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           supabase.from('automations').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
       ]);
 
-      if (templatesRes.data) setTemplates(templatesRes.data as unknown as MessageTemplate[]);
+      if (templatesRes.data) setTemplates(templatesRes.data as MessageTemplate[]);
       else if (templatesRes.error) console.error("Error fetching templates:", templatesRes.error);
 
-      if (contactsRes.data) setContacts(contactsRes.data as unknown as Contact[]);
+      if (contactsRes.data) setContacts(contactsRes.data as Contact[]);
       else if (contactsRes.error) console.error("Error fetching contacts:", contactsRes.error);
 
       if (campaignsRes.data) {
-          await fetchCampaignsWithMetrics(campaignsRes.data as unknown as Campaign[]);
+          await fetchCampaignsWithMetrics(campaignsRes.data as Campaign[]);
       } else if (campaignsRes.error) {
           console.error("Error fetching campaigns:", campaignsRes.error);
       }
       
-      if (segmentsRes.data) setSegments(segmentsRes.data as unknown as Segment[]);
+      if (segmentsRes.data) setSegments(segmentsRes.data as Segment[]);
       else if (segmentsRes.error) console.error("Error fetching segments:", segmentsRes.error);
       
-      if (automationsRes.data) setAutomations(automationsRes.data as unknown as Automation[]);
+      if (automationsRes.data) setAutomations(automationsRes.data as Automation[]);
       else if (automationsRes.error) console.error("Error fetching automations:", automationsRes.error);
 
 
@@ -166,7 +166,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 return { ...campaign, metrics: { sent: campaign.recipient_count || 0, delivered: 0, read: 0 } };
             }
             
-            const typedData = (data as unknown as { status: string }[] | null) || [];
+            const typedData = (data as { status: string }[] | null) || [];
             const delivered = typedData.filter(d => d.status === 'delivered' || d.status === 'read').length || 0;
             const read = typedData.filter(d => d.status === 'read').length || 0;
 
@@ -195,7 +195,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         throw campaignError || new Error("Campanha não encontrada ou acesso negado.");
       }
       
-      const typedCampaignData = campaignData as unknown as (Campaign & { message_templates: MessageTemplate | null });
+      const typedCampaignData = campaignData as (Campaign & { message_templates: MessageTemplate | null });
 
       const { data: messagesData, error: messagesError } = await supabase
         .from('campaign_messages')
@@ -205,7 +205,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         
       if (messagesError) throw messagesError;
 
-      const typedMessagesData = (messagesData as unknown as CampaignMessageWithContact[]) || [];
+      const typedMessagesData = (messagesData as CampaignMessageWithContact[]) || [];
       const delivered = typedMessagesData.filter(d => d.status === 'delivered' || d.status === 'read').length || 0;
       const read = typedMessagesData.filter(d => d.status === 'read').length || 0;
 
@@ -234,9 +234,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const updateProfile = async (profileData: Partial<Profile>) => {
     if (!user) throw new Error("Usuário não autenticado.");
-    const { data, error } = await supabase.from('profiles').update(profileData as any).eq('id', user.id).select().single();
+    const { data, error } = await supabase.from('profiles').update(profileData).eq('id', user.id).select().single();
     if(error) throw error;
-    if (data) setProfile(data as unknown as Profile);
+    if (data) setProfile(data as Profile);
   };
   
   const metaConfig = useMemo(() => ({
@@ -251,12 +251,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (!user) throw new Error("Usuário não autenticado.");
     const { data, error } = await supabase
       .from('message_templates')
-      .insert({ ...template, user_id: user.id, status: template.status || 'LOCAL', components: template.components } as any)
+      .insert({ ...template, user_id: user.id, status: template.status || 'LOCAL', components: template.components })
       .select()
       .single();
     if (error) throw error;
     if (data) {
-        setTemplates(prev => [data as unknown as MessageTemplate, ...prev]);
+        setTemplates(prev => [data as MessageTemplate, ...prev]);
     }
   };
   
@@ -300,7 +300,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           contact_id: contact.id,
           status: 'success',
           details: `Ação '${automation.action_type}' executada.`
-      } as any);
+      });
 
     } catch (err: any) {
         console.error(`Falha ao executar automação ${automation.name} para o contato ${contact.name}:`, err.message);
@@ -309,7 +309,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           contact_id: contact.id,
           status: 'failed',
           details: err.message
-      } as any);
+      });
     }
   };
   
@@ -336,29 +336,33 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (!user) throw new Error("Usuário não autenticado.");
     const { data, error } = await supabase
       .from('contacts')
-      .insert({ ...contact, user_id: user.id } as any)
+      .insert({ ...contact, user_id: user.id })
       .select()
       .single();
     if (error) throw error;
     if(data) {
-      setContacts(prev => [data as unknown as Contact, ...prev]);
-      await checkAndRunContactAutomations(data as unknown as Contact);
+      setContacts(prev => [data as Contact, ...prev]);
+      await checkAndRunContactAutomations(data as Contact);
     }
   };
   
   const updateContact = async (updatedContact: Contact) => {
      if (!user) throw new Error("Usuário não autenticado.");
      const oldContact = contacts.find(c => c.id === updatedContact.id);
+     
+     // The 'id' field cannot be part of the update payload.
+     const { id, ...updatePayload } = updatedContact;
+
      const { data, error } = await supabase
         .from('contacts')
-        .update(updatedContact as any)
-        .eq('id', updatedContact.id)
+        .update(updatePayload)
+        .eq('id', id)
         .eq('user_id', user.id)
         .select()
         .single();
     if (error) throw error;
     if(data) {
-      const newContact = data as unknown as Contact;
+      const newContact = data as Contact;
       setContacts(prev => prev.map(c => c.id === newContact.id ? newContact : c));
       await checkAndRunContactAutomations(newContact, oldContact);
     }
@@ -394,10 +398,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     if (contactsToInsert.length > 0) {
         const contactsWithUser = contactsToInsert.map(c => ({...c, user_id: user.id}));
-        const { data, error } = await supabase.from('contacts').insert(contactsWithUser as any).select();
+        const { data, error } = await supabase.from('contacts').insert(contactsWithUser).select();
         if (error) throw error;
         if(data) {
-          const newContactsData = data as unknown as Contact[];
+          const newContactsData = data as Contact[];
           setContacts(prev => [...newContactsData, ...prev].sort((a,b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()));
           // Dispara automações para contatos importados
           for(const contact of newContactsData) {
@@ -415,17 +419,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const sent_at = new Date().toISOString();
     const { data: newCampaign, error: campaignError } = await supabase
         .from('campaigns')
-        .insert({ ...campaign, user_id: user.id, sent_at } as any)
+        .insert({ ...campaign, user_id: user.id, sent_at })
         .select()
         .single();
 
     if (campaignError) throw campaignError;
     if (!newCampaign) throw new Error("Failed to create campaign.");
 
-    const typedNewCampaign = newCampaign as unknown as Campaign;
+    const typedNewCampaign = newCampaign as Campaign;
 
     const messagesToInsert = messages.map(msg => ({ ...msg, campaign_id: typedNewCampaign.id }));
-    const { error: messagesError } = await supabase.from('campaign_messages').insert(messagesToInsert as any);
+    const { error: messagesError } = await supabase.from('campaign_messages').insert(messagesToInsert);
 
     if (messagesError) {
         await supabase.from('campaigns').delete().eq('id', typedNewCampaign.id);
@@ -450,24 +454,28 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (!user) throw new Error("Usuário não autenticado.");
     const { data, error } = await supabase
         .from('automations')
-        .insert({ ...automation, user_id: user.id } as any)
+        .insert({ ...automation, user_id: user.id })
         .select()
         .single();
     if (error) throw error;
-    if(data) setAutomations(prev => [data as unknown as Automation, ...prev]);
+    if(data) setAutomations(prev => [data as Automation, ...prev]);
   };
 
   const updateAutomation = async (automation: Automation) => {
     if (!user) throw new Error("Usuário não autenticado.");
+    
+    // The 'id' field cannot be part of the update payload.
+    const { id, ...updatePayload } = automation;
+
     const { data, error } = await supabase
         .from('automations')
-        .update(automation as any)
-        .eq('id', automation.id)
+        .update(updatePayload)
+        .eq('id', id)
         .eq('user_id', user.id)
         .select()
         .single();
     if(error) throw error;
-    if(data) setAutomations(prev => prev.map(a => a.id === (data as unknown as Automation).id ? data as unknown as Automation : a));
+    if(data) setAutomations(prev => prev.map(a => a.id === (data as Automation).id ? data as Automation : a));
   };
   
   const deleteAutomation = async (automationId: string) => {

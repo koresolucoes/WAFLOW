@@ -39,11 +39,11 @@ const AutomationEditor: React.FC = () => {
     }, [isEditing, pageParams.automationId, automations]);
 
     const webhookUrl = useMemo(() => {
-        if (isEditing) {
-            return `${window.location.origin}/api/webhook?trigger_id=${pageParams.automationId}`;
+        if (isEditing && automation.trigger_type === 'webhook_received') {
+            return `${window.location.origin}/api/automations/trigger/${pageParams.automationId}`;
         }
         return null;
-    }, [isEditing, pageParams.automationId]);
+    }, [isEditing, pageParams.automationId, automation.trigger_type]);
     
     const handleCopyUrl = () => {
         if (!webhookUrl) return;
@@ -221,6 +221,21 @@ const AutomationEditor: React.FC = () => {
                         {automation.trigger_type === 'webhook_received' && (
                             <div className="space-y-4">
                                 <div>
+                                    <label className="block text-sm font-medium text-slate-300 mb-1">URL do Webhook</label>
+                                    {webhookUrl ? (
+                                        <div className="flex items-center gap-2">
+                                            <input type="text" value={webhookUrl} readOnly className="flex-1 bg-slate-900 border border-slate-700 rounded-md p-2 text-white font-mono" />
+                                            <Button type="button" variant="secondary" onClick={handleCopyUrl} className="w-24">
+                                                {copySuccess ? copySuccess : <COPY_ICON className="w-4 h-4 mx-auto" />}
+                                            </Button>
+                                        </div>
+                                    ) : (
+                                        <InfoCard variant="warning">
+                                            <p>Salve a automação primeiro para gerar a URL do webhook.</p>
+                                        </InfoCard>
+                                    )}
+                                </div>
+                                <div>
                                     <label htmlFor="trigger_method" className="block text-sm font-medium text-slate-300 mb-1">Método HTTP Aceito</label>
                                     <select
                                         id="trigger_method"
@@ -264,21 +279,6 @@ const AutomationEditor: React.FC = () => {
                                         <li><code>x-api-key: SUA_CHAVE</code></li>
                                     </ul>
                                 </InfoCard>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-300 mb-1">URL do Webhook</label>
-                                    {isEditing ? (
-                                        <div className="flex items-center gap-2">
-                                            <input type="text" value={webhookUrl || ''} readOnly className="flex-1 bg-slate-900 border border-slate-700 rounded-md p-2 text-white font-mono" />
-                                            <Button type="button" variant="secondary" onClick={handleCopyUrl} className="w-24">
-                                                {copySuccess ? copySuccess : <COPY_ICON className="w-4 h-4 mx-auto" />}
-                                            </Button>
-                                        </div>
-                                    ) : (
-                                        <InfoCard variant="warning">
-                                            <p>Salve a automação primeiro para gerar a URL do webhook.</p>
-                                        </InfoCard>
-                                    )}
-                                </div>
                             </div>
                         )}
                     </div>
