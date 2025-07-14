@@ -16,19 +16,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ error: 'Invalid trigger ID format.' });
     }
 
-    const lastUnderscoreIndex = rawId.lastIndexOf('_');
-    const webhookPrefix = rawId.substring(0, lastUnderscoreIndex);
-    const nodeId = rawId.substring(lastUnderscoreIndex + 1);
+    // Corrected Parsing Logic: Split by the first underscore, as the prefix is guaranteed not to contain them.
+    const firstUnderscoreIndex = rawId.indexOf('_');
+    if (firstUnderscoreIndex === -1) {
+        return res.status(400).json({ error: 'Invalid trigger ID format: separator not found.' });
+    }
+    const webhookPrefix = rawId.substring(0, firstUnderscoreIndex);
+    const nodeId = rawId.substring(firstUnderscoreIndex + 1);
 
     // 1. Find Profile and Automation
+    // Corrected Profile Lookup: Check both webhook_path_prefix and the user's ID as a fallback.
     const { data: profile } = await supabaseAdmin
         .from('profiles')
         .select('id')
-        .eq('webhook_path_prefix', webhookPrefix)
+        .or(`webhook_path_prefix.eq.${webhookPrefix},id.eq.${webhookPrefix}`)
+        .limit(1)
         .single();
 
     if (!profile) {
-        return res.status(404).json({ error: 'Profile not found for this webhook prefix.' });
+        return res.status(404).json({ error: 'Profile not found for this webhook prefix or ID.' });
     }
 
     const { data: automations } = await supabaseAdmin
