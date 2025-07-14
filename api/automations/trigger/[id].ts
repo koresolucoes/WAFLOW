@@ -1,4 +1,3 @@
-
 // /api/automations/trigger/[id].ts
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Database, Tables, Json, TablesInsert } from '../../../src/types/database.types';
@@ -336,7 +335,11 @@ export default async function handler(req: Request) {
             meta_access_token: profile.meta_access_token,
             meta_phone_number_id: profile.meta_phone_number_id,
         };
-        executeFlow(supabase, automation, triggerNode.id, contact as Contact, metaConfig).catch(err => console.error(`Webhook Trigger: Erro durante execução do fluxo ${automation.id}:`, err.message));
+        
+        Promise.resolve().then(() => {
+            executeFlow(supabase, automation, triggerNode.id, contact as Contact, metaConfig)
+                .catch(err => console.error(`Webhook Trigger: Erro durante execução do fluxo ${automation.id}:`, err.message));
+        });
 
         return new Response(JSON.stringify({ message: 'Webhook recebido e automação iniciada.' }), { status: 202, headers: corsHeaders });
 

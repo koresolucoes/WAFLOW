@@ -332,7 +332,9 @@ export default async function handler(req: Request) {
         if (req.method === 'POST') {
             const body = await req.json();
             // Process in background to immediately return 200 OK to Meta
-            processMetaPayload(supabase, body).catch(err => console.error("Webhook: Erro durante o processamento de evento da Meta:", err.message));
+            Promise.resolve().then(() => {
+                processMetaPayload(supabase, body).catch(err => console.error("Webhook: Erro durante o processamento de evento da Meta:", err.message));
+            });
             return new Response('EVENT_RECEIVED', { status: 200, headers: corsHeaders });
         }
 
