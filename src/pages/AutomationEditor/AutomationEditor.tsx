@@ -1,35 +1,16 @@
 
-import React, { useContext, useState, useEffect, useCallback, memo, useRef } from 'react';
+import React, { useContext, useState, useEffect, useCallback, memo } from 'react';
 import { ReactFlow, ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, type Node, type Edge, type NodeProps, useReactFlow } from '@xyflow/react';
 import { AppContext } from '../../contexts/AppContext';
-import { Automation, AutomationInsert, AutomationNode, NodeData, TriggerType, ActionType, LogicType, MessageTemplate, Profile } from '../../types';
+import { Automation, AutomationInsert, AutomationNode, NodeData, TriggerType, ActionType, LogicType } from '../../types';
 import Button from '../../components/common/Button';
 import Card from '../../components/common/Card';
 import { supabase } from '../../lib/supabaseClient';
-import { AUTOMATION_ICON, PLUS_ICON, TRASH_ICON, COPY_ICON, INFO_ICON } from '../../components/icons';
-
+import { AUTOMATION_ICON } from '../../components/icons';
+import NodeSettingsModal from './NodeSettingsModal';
 
 const initialNodes: AutomationNode[] = [];
 const initialEdges: Edge[] = [];
-
-// ====================================================================================
-// Helper Functions
-// ====================================================================================
-
-const flattenObject = (obj: any, parentKey = '', res: Record<string, any> = {}) => {
-  if (typeof obj !== 'object' || obj === null) return res;
-  for (const key in obj) {
-    if (Object.prototype.hasOwnProperty.call(obj, key)) {
-      const propName = parentKey ? `${parentKey}.${key}` : key;
-      if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
-        flattenObject(obj[key], propName, res);
-      } else {
-        res[propName] = obj[key];
-      }
-    }
-  }
-  return res;
-};
 
 // ====================================================================================
 // Custom Node Components
@@ -131,9 +112,6 @@ const nodeTypes = {
     },
 };
 
-// ====================================================================================
-// Sidebar, Settings & Drag-n-Drop Components
-// ====================================================================================
 
 const DraggableNode = ({ type, label, onDragStart, specificType }: { type: 'trigger' | 'action' | 'logic', label: string, onDragStart: (event: React.DragEvent, nodeType: string, type: string, label: string) => void, specificType: string }) => (
     <div
@@ -145,8 +123,8 @@ const DraggableNode = ({ type, label, onDragStart, specificType }: { type: 'trig
     </div>
 );
 
-const NodeSidebar = ({ onDragStart }: { onDragStart: (event: React.DragEvent, nodeType: string, specificType: string, label: string) => void }) => (
-    <Card className="w-80 h-full overflow-y-auto">
+const NodeSidebar = memo(({ onDragStart }: { onDragStart: (event: React.DragEvent, nodeType: string, specificType: string, label: string) => void }) => (
+    <Card className="w-full h-full overflow-y-auto !p-4 bg-transparent shadow-none">
         <h3 className="text-xl font-bold text-white mb-4">Blocos</h3>
         <p className="text-sm text-slate-400 mb-4">Arraste os blocos para a área de trabalho para construir sua automação.</p>
         <div>
@@ -165,306 +143,7 @@ const NodeSidebar = ({ onDragStart }: { onDragStart: (event: React.DragEvent, no
             <DraggableNode type="logic" label="Dividir Caminho (A/B)" specificType="split_path" onDragStart={onDragStart} />
         </div>
     </Card>
-);
-
-const VariablePill = memo(({ path, value }: { path: string; value: string }) => {
-    const handleDragStart = (e: React.DragEvent) => {
-        e.dataTransfer.setData('application/variable-path', `{{trigger.${path}}}`);
-        e.dataTransfer.effectAllowed = 'copy';
-    };
-    return (
-        <div draggable onDragStart={handleDragStart} className="flex justify-between items-center bg-slate-800 p-1.5 rounded-md cursor-grab hover:bg-sky-500/20 group">
-            <span className="text-xs font-mono text-sky-300 group-hover:text-sky-200" title={path}>{path}</span>
-            <span className="text-xs text-slate-400 truncate ml-2" title={String(value)}>{String(value)}</span>
-        </div>
-    );
-});
-
-const VariablesPanel = memo(({ nodes }: { nodes: AutomationNode[] }) => {
-    const triggerNode = nodes.find(n => n.data.nodeType === 'trigger' && n.data.type === 'webhook_received');
-    const capturedData = triggerNode?.data.config?.last_captured_data;
-
-    if (!capturedData) {
-        return <p className="text-xs text-slate-400 p-2 bg-slate-700/50 rounded-md">Para usar variáveis, primeiro configure e escute o gatilho "Webhook Recebido".</p>;
-    }
-    
-    const flattened = flattenObject(capturedData);
-
-    return (
-        <div>
-            <h4 className="text-md font-semibold text-white mb-2">Variáveis Disponíveis</h4>
-            <p className="text-xs text-slate-400 mb-2">Arraste uma variável para um campo de texto abaixo.</p>
-            <div className="space-y-1 max-h-48 overflow-y-auto pr-2 bg-slate-900/50 p-2 rounded-md">
-                {Object.entries(flattened).map(([key, value]) => (
-                    <VariablePill key={key} path={key} value={value} />
-                ))}
-            </div>
-        </div>
-    );
-});
-
-const DroppableInput = (props: React.InputHTMLAttributes<HTMLInputElement> & { onValueChange: (value: string) => void }) => {
-    const { onValueChange, ...rest } = props;
-    const [isDragOver, setIsDragOver] = useState(false);
-    const ref = useRef<HTMLInputElement>(null);
-
-    const onDrop = (e: React.DragEvent) => {
-        e.preventDefault();
-        setIsDragOver(false);
-        const path = e.dataTransfer.getData('application/variable-path');
-        if (path && ref.current) {
-            const { selectionStart, selectionEnd } = ref.current;
-            const currentValue = ref.current.value;
-            const newValue = `${currentValue.substring(0, selectionStart)}${path}${currentValue.substring(selectionEnd as number)}`;
-            onValueChange(newValue);
-        }
-    };
-    
-    return <input ref={ref} {...rest} onDrop={onDrop} onDragOver={e => { e.preventDefault(); setIsDragOver(true); }} onDragLeave={() => setIsDragOver(false)} className={`${props.className} ${isDragOver ? 'ring-2 ring-sky-500' : ''}`} />;
-};
-
-const DroppableTextarea = (props: React.TextareaHTMLAttributes<HTMLTextAreaElement> & { onValueChange: (value: string) => void }) => {
-    const { onValueChange, ...rest } = props;
-    const [isDragOver, setIsDragOver] = useState(false);
-    const ref = useRef<HTMLTextAreaElement>(null);
-
-     const onDrop = (e: React.DragEvent) => {
-        e.preventDefault();
-        setIsDragOver(false);
-        const path = e.dataTransfer.getData('application/variable-path');
-        if (path && ref.current) {
-            const { selectionStart, selectionEnd } = ref.current;
-            const currentValue = ref.current.value;
-            const newValue = `${currentValue.substring(0, selectionStart)}${path}${currentValue.substring(selectionEnd as number)}`;
-            onValueChange(newValue);
-        }
-    };
-
-    return <textarea ref={ref} {...rest} onDrop={onDrop} onDragOver={e => { e.preventDefault(); setIsDragOver(true); }} onDragLeave={() => setIsDragOver(false)} className={`${props.className} ${isDragOver ? 'ring-2 ring-sky-500' : ''}`} />;
-};
-
-
-const SettingsPanel = ({ node, nodes, setNodes, templates, profile, automationId, updateAutomation }: { node: AutomationNode; nodes: AutomationNode[]; setNodes: React.Dispatch<React.SetStateAction<AutomationNode[]>>; templates: MessageTemplate[]; profile: Profile | null; automationId?: string; updateAutomation: (automation: Automation) => Promise<void>}) => {
-    const { data, id } = node;
-    const config = (data.config as any) || {};
-
-    const [isListening, setIsListening] = useState(false);
-
-    const updateNodeConfig = (key: string, value: any) => {
-        setNodes(nds => nds.map(n => {
-            if (n.id === id) {
-                const oldConfig = (typeof n.data.config === 'object' && n.data.config && !Array.isArray(n.data.config)) ? n.data.config : {};
-                return { ...n, data: { ...n.data, config: { ...oldConfig, [key]: value } } };
-            }
-            return n;
-        }));
-    };
-    
-    const handleStartListening = async () => {
-        if (!automationId) {
-            alert("Por favor, salve a automação primeiro para ativar o modo de escuta.");
-            return;
-        }
-        setIsListening(true);
-        const newNodes = nodes.map(n => {
-            if (n.id === id) {
-                return { ...n, data: { ...n.data, config: { ...config, last_captured_data: null } } };
-            }
-            return n;
-        });
-
-        const currentAutomation = { id: automationId, nodes: newNodes } as Automation;
-        await updateAutomation(currentAutomation);
-    };
-
-    useEffect(() => {
-        // Stop listening if data arrives
-        if (config.last_captured_data) {
-            setIsListening(false);
-        }
-    }, [config.last_captured_data]);
-    
-    const handleMappingChange = (source: string, destination: string, destination_key?: string) => {
-        let newMapping = [...(config.data_mapping || [])];
-        const existingIndex = newMapping.findIndex(m => m.source === source);
-
-        if (destination === 'ignore') {
-             newMapping = newMapping.filter(m => m.source !== source);
-        } else {
-             const newRule = { source, destination, destination_key };
-            if (destination === 'phone') newMapping = newMapping.filter(m => m.destination !== 'phone');
-            if (existingIndex > -1) newMapping[existingIndex] = newRule;
-            else newMapping.push(newRule);
-        }
-        updateNodeConfig('data_mapping', newMapping);
-    };
-
-    const renderDataMapping = () => {
-        if (!config.last_captured_data) return null;
-        
-        const flattenedData = flattenObject(config.last_captured_data);
-        const capturedKeys = Object.keys(flattenedData);
-        const currentMapping = config.data_mapping || [];
-        const isPhoneMapped = currentMapping.some((m: any) => m.destination === 'phone');
-
-        return (
-            <div className="mt-4 border-t border-slate-700 pt-4">
-                <h4 className="text-md font-semibold text-white mb-2">Mapeamento de Dados</h4>
-                {!isPhoneMapped && (
-                     <div className="p-2 mb-3 text-xs text-amber-300 bg-amber-500/10 rounded-md flex items-start gap-2">
-                        <INFO_ICON className="w-6 h-6 flex-shrink-0"/>
-                        <span>**Atenção:** Mapeie um campo para "Telefone do Contato" para que o sistema saiba qual contato acionar.</span>
-                    </div>
-                )}
-                <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
-                {capturedKeys.map(key => {
-                    const value = flattenedData[key];
-                    const mappingRule = currentMapping.find((m: any) => m.source === key);
-                    const destination = mappingRule?.destination || 'ignore';
-                    
-                    return (
-                        <div key={key} className="p-2 bg-slate-700/50 rounded-lg">
-                            <p className="text-xs text-slate-400 font-mono truncate" title={key}>{key}</p>
-                            <p className="text-sm text-white font-semibold truncate my-1" title={String(value)}>{String(value)}</p>
-                             <select 
-                                value={destination} 
-                                onChange={(e) => handleMappingChange(key, e.target.value)}
-                                className="w-full bg-slate-800 border border-slate-600 rounded-md p-1.5 text-white text-sm"
-                            >
-                                <option value="ignore">Ignorar</option>
-                                <option value="phone">Telefone do Contato</option>
-                                <option value="name">Nome do Contato</option>
-                                <option value="tag">Adicionar como Tag</option>
-                                <option value="custom_field">Campo Personalizado</option>
-                            </select>
-                            {destination === 'custom_field' && (
-                                <input 
-                                    type="text" 
-                                    placeholder="Nome do campo (ex: id_pedido)"
-                                    value={mappingRule?.destination_key || ''}
-                                    onChange={(e) => handleMappingChange(key, 'custom_field', e.target.value)}
-                                    className="w-full mt-2 bg-slate-800 border border-slate-600 rounded-md p-1.5 text-white text-sm"
-                                />
-                            )}
-                        </div>
-                    )
-                })}
-                </div>
-            </div>
-        )
-    }
-
-    const renderConfig = () => {
-        const baseInputClass = "w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white";
-
-        switch (data.type) {
-            case 'add_tag':
-                return (
-                    <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-1">Nome da Tag</label>
-                        <DroppableInput type="text" value={config.tag || ''} onValueChange={val => updateNodeConfig('tag', val)} placeholder="Ex: vip" className={baseInputClass} />
-                    </div>
-                );
-            case 'send_template':
-                 const approvedTemplates = templates.filter(t => t.status === 'APPROVED');
-                 return (
-                    <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-1">Selecione o Template</label>
-                        <select value={config.template_id || ''} onChange={(e) => updateNodeConfig('template_id', e.target.value)} className={baseInputClass}>
-                            <option value="">-- Selecione um template --</option>
-                            {approvedTemplates.map(t => <option key={t.id} value={t.id}>{t.template_name}</option>)}
-                        </select>
-                         {approvedTemplates.length === 0 && <p className="text-xs text-amber-400 mt-1">Nenhum template APROVADO encontrado.</p>}
-                    </div>
-                 );
-            case 'send_text_message':
-                return (
-                    <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-1">Texto da Mensagem</label>
-                        <DroppableTextarea value={config.message_text || ''} onValueChange={val => updateNodeConfig('message_text', val)} placeholder="Digite sua mensagem..." rows={4} className={baseInputClass} />
-                    </div>
-                );
-            case 'condition':
-                 return (
-                    <div className="space-y-3">
-                        <div>
-                            <label className="block text-xs font-medium text-slate-400 mb-1">Campo</label>
-                             <DroppableInput type="text" value={config.field || ''} onValueChange={val => updateNodeConfig('field', val)} placeholder={'tags ou {{trigger.body.id}}'} className={baseInputClass} />
-                             <p className="text-xs text-slate-400 mt-1">Para contato: 'tags', 'name'. Para gatilho: arraste a variável.</p>
-                        </div>
-                         <div>
-                            <label className="block text-xs font-medium text-slate-400 mb-1">Operador</label>
-                            <select value={config.operator || 'contains'} onChange={(e) => updateNodeConfig('operator', e.target.value)} className={baseInputClass}>
-                                <option value="contains">Contém</option>
-                                <option value="not_contains">Não contém</option>
-                                <option value="equals">É igual a</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-xs font-medium text-slate-400 mb-1">Valor</label>
-                            <DroppableInput type="text" value={config.value || ''} onValueChange={val => updateNodeConfig('value', val)} placeholder="Valor a comparar" className={baseInputClass} />
-                        </div>
-                    </div>
-                 );
-            case 'webhook_received':
-                const webhookPrefix = profile?.webhook_path_prefix || profile?.id;
-                const webhookUrl = `${window.location.origin}/api/trigger/${webhookPrefix}_${id}`;
-                return (
-                     <div className="space-y-4">
-                        <div>
-                            <label className="block text-sm font-medium text-slate-300 mb-1">URL do Webhook</label>
-                            <div className="flex items-center gap-2">
-                                <input type="text" readOnly value={webhookUrl} className="w-full bg-slate-900 border border-slate-700 rounded-md p-2 text-slate-400 font-mono text-xs" />
-                                <Button size="sm" variant="ghost" onClick={() => navigator.clipboard.writeText(webhookUrl)}><COPY_ICON className="w-4 h-4"/></Button>
-                            </div>
-                             <p className="text-xs text-slate-400 mt-1">Salve a automação para que esta URL se torne ativa.</p>
-                        </div>
-                        <div className="border-t border-slate-700 pt-4">
-                            <label className="block text-sm font-medium text-slate-300 mb-2">Escuta de Webhook</label>
-                             {isListening ? (
-                                <div className="text-center p-4 bg-slate-700/50 rounded-lg">
-                                    <svg className="animate-spin h-6 w-6 text-sky-400 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                    </svg>
-                                    <p className="text-sm text-sky-300 mt-2">Aguardando dados...</p>
-                                    <p className="text-xs text-slate-400 mt-1">Envie uma requisição de teste para a URL.</p>
-                                </div>
-                            ) : (
-                                <Button size="sm" variant="secondary" onClick={handleStartListening} disabled={!automationId}>Limpar e Escutar por Novos Dados</Button>
-                            )}
-                        </div>
-                        {renderDataMapping()}
-                    </div>
-                )
-            case 'split_path':
-                return <p className="text-slate-400">Este nó divide aleatoriamente os contatos em dois caminhos (A e B) com uma chance de 50% para cada.</p>
-            default:
-                return <p className="text-slate-400">Nenhuma configuração necessária para este nó.</p>;
-        }
-    };
-
-    return (
-         <Card className="w-80 h-full overflow-y-auto">
-            <div className="space-y-4">
-                <div>
-                    <p className="block text-sm font-medium text-slate-300">Configurações do nó</p>
-                    <p className="font-semibold text-white text-lg">{data.label}</p>
-                </div>
-                
-                { data.nodeType === 'action' && <VariablesPanel nodes={nodes} /> }
-
-                <div className="border-t border-slate-700 pt-4">
-                     {renderConfig()}
-                </div>
-            </div>
-        </Card>
-    )
-};
-
-// ====================================================================================
-// Flow Canvas Component
-// ====================================================================================
+));
 
 const FlowCanvas = () => {
     const { pageParams, automations, templates, addAutomation, updateAutomation, setCurrentPage, profile } = useContext(AppContext);
@@ -509,9 +188,7 @@ const FlowCanvas = () => {
                 const updatedAutomation = payload.new as unknown as Automation;
                 if (updatedAutomation && updatedAutomation.nodes) {
                     setNodes(nds => {
-                       // Only update if there's a meaningful change to avoid loops
                        if (JSON.stringify(nds) !== JSON.stringify(updatedAutomation.nodes)) {
-                           // When data is captured, update the selected node's data
                            if (selectedNode) {
                                const updatedSelectedNode = updatedAutomation.nodes.find(n => n.id === selectedNode.id);
                                if(updatedSelectedNode) setSelectedNode(updatedSelectedNode);
@@ -560,6 +237,7 @@ const FlowCanvas = () => {
 
     const onNodeClick = useCallback((_: any, node: Node<NodeData>) => setSelectedNode(node), []);
     const onPaneClick = useCallback(() => setSelectedNode(null), []);
+    const onNodesDelete = useCallback(() => setSelectedNode(null), []);
 
     const handleUpdateAutomation = async (automationData: Automation) => {
         const payload = {
@@ -605,10 +283,9 @@ const FlowCanvas = () => {
         event.dataTransfer.effectAllowed = 'move';
     };
 
-
     return (
-        <div className="h-full flex flex-col">
-             <header className="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-900/80 backdrop-blur-sm z-10">
+        <div className="h-full flex flex-col bg-slate-900">
+             <header className="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-900/80 backdrop-blur-sm z-10 shrink-0">
                 <input
                     type="text"
                     value={automationName}
@@ -625,7 +302,11 @@ const FlowCanvas = () => {
                 </div>
             </header>
             <div className="flex-grow flex relative">
-                <div className="w-full h-full">
+                 <aside className="w-80 h-full p-4 border-r border-slate-700 bg-slate-800/50 backdrop-blur-sm z-10">
+                   <NodeSidebar onDragStart={handleDragStart} />
+                </aside>
+
+                <div className="flex-grow h-full">
                     <ReactFlow
                         nodes={nodes}
                         edges={edges}
@@ -636,7 +317,7 @@ const FlowCanvas = () => {
                         onDragOver={onDragOver}
                         onNodeClick={onNodeClick}
                         onPaneClick={onPaneClick}
-                        onNodesDelete={() => setSelectedNode(null)}
+                        onNodesDelete={onNodesDelete}
                         nodeTypes={nodeTypes}
                         fitView
                         className="bg-slate-900 xyflow-react"
@@ -645,20 +326,21 @@ const FlowCanvas = () => {
                         <Controls />
                     </ReactFlow>
                 </div>
-                <aside className="absolute right-0 top-0 h-full bg-slate-800/50 p-4 border-l border-slate-700 backdrop-blur-sm z-10">
-                   {selectedNode ? 
-                    <SettingsPanel node={selectedNode} nodes={nodes} setNodes={setNodes as any} templates={templates} profile={profile} automationId={automationId} updateAutomation={handleUpdateAutomation}/> 
-                    : <NodeSidebar onDragStart={handleDragStart} />}
-                </aside>
             </div>
+             <NodeSettingsModal
+                node={selectedNode}
+                isOpen={!!selectedNode}
+                onClose={() => setSelectedNode(null)}
+                nodes={nodes}
+                setNodes={setNodes as any}
+                templates={templates}
+                profile={profile}
+                automationId={automationId}
+                updateAutomation={handleUpdateAutomation}
+            />
         </div>
     );
 };
-
-
-// ====================================================================================
-// Main Page Component
-// ====================================================================================
 
 const AutomationEditor: React.FC = () => {
     return (
