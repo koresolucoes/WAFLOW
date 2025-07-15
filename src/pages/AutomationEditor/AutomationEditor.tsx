@@ -159,6 +159,8 @@ const FlowCanvas = () => {
 
     const automationId = pageParams.automationId;
 
+    // Effect to load data from context when automations list or ID changes.
+    // It does NOT close the modal.
     useEffect(() => {
         if (automationId) {
             const existingAutomation = automations.find(a => a.id === automationId);
@@ -168,9 +170,14 @@ const FlowCanvas = () => {
                 setEdges(existingAutomation.edges || []);
             }
         }
-        setSelectedNode(null);
     }, [automationId, automations, setNodes, setEdges]);
     
+    // Effect to reset the modal (close it) ONLY when navigating to a new automation.
+    useEffect(() => {
+        setSelectedNode(null);
+    }, [automationId]);
+    
+    // Effect for real-time updates from Supabase.
     useEffect(() => {
         if (!automationId) return;
 
@@ -183,15 +190,12 @@ const FlowCanvas = () => {
             }, (payload) => {
                 const updatedAutomation = payload.new as unknown as Automation;
                 if (updatedAutomation && updatedAutomation.nodes) {
-                    setNodes(nds => {
-                       if (JSON.stringify(nds) !== JSON.stringify(updatedAutomation.nodes)) {
-                           if (selectedNode) {
-                               const updatedSelectedNode = updatedAutomation.nodes.find(n => n.id === selectedNode.id);
-                               if(updatedSelectedNode) setSelectedNode(updatedSelectedNode);
-                           }
-                           return updatedAutomation.nodes;
-                       }
-                       return nds;
+                    setNodes(updatedAutomation.nodes);
+                    // Functional update to avoid stale state for selectedNode
+                    setSelectedNode(currentNode => {
+                        if (!currentNode) return null;
+                        const updatedSelectedNode = updatedAutomation.nodes.find(n => n.id === currentNode.id);
+                        return updatedSelectedNode || currentNode;
                     });
                 }
             })
@@ -200,7 +204,7 @@ const FlowCanvas = () => {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [automationId, setNodes, selectedNode]);
+    }, [automationId, setNodes]);
 
     const onConnect = useCallback((params: any) => setEdges((eds) => addEdge(params, eds)), [setEdges]);
 

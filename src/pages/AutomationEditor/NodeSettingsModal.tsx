@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, memo, useRef, useCallback } from 'react';
 import { Automation, AutomationNode, NodeData, MessageTemplate, Profile } from '../../types';
 import Button from '../../components/common/Button';
@@ -115,6 +116,7 @@ const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({ node, isOpen, onC
     const [isListening, setIsListening] = useState(false);
     
     useEffect(() => {
+        // Automatically turn off listening indicator when data arrives
         if (node?.data.config?.last_captured_data) {
             setIsListening(false);
         }
@@ -132,15 +134,12 @@ const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({ node, isOpen, onC
     }, [node, setNodes]);
 
     const handleStartListening = async () => {
-        if (!automationId || !node) {
-            alert("Por favor, salve a automação primeiro para ativar o modo de escuta.");
-            return;
-        }
         setIsListening(true);
-        const newConfig = { ...(node.data.config as object || {}), last_captured_data: null };
-        const updatedNode = { ...node, data: { ...node.data, config: newConfig } };
-        const newNodes = nodes.map(n => n.id === node.id ? updatedNode : n);
-        const currentAutomation = { id: automationId, nodes: newNodes } as Automation;
+        // This function assumes `node` and `automationId` are valid because the button is disabled otherwise.
+        const newConfig = { ...(node!.data.config as object || {}), last_captured_data: null };
+        const updatedNode = { ...node!, data: { ...node!.data, config: newConfig } };
+        const newNodes = nodes.map(n => n.id === node!.id ? updatedNode : n);
+        const currentAutomation = { id: automationId!, nodes: newNodes } as Automation;
         await updateAutomation(currentAutomation);
     };
 
@@ -284,7 +283,7 @@ const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({ node, isOpen, onC
                                 <input type="text" readOnly value={webhookUrl} className="w-full bg-slate-900 border border-slate-700 rounded-md p-2 text-slate-400 font-mono text-xs" />
                                 <Button size="sm" variant="ghost" onClick={() => navigator.clipboard.writeText(webhookUrl)}><COPY_ICON className="w-4 h-4"/></Button>
                             </div>
-                             <p className="text-xs text-slate-400 mt-1">Salve a automação para que esta URL se torne ativa.</p>
+                             <p className="text-xs text-slate-400 mt-1">Esta URL é única para este nó e já está ativa.</p>
                         </div>
                         <div className="border-t border-slate-700 pt-4">
                             <label className="block text-sm font-medium text-slate-300 mb-2">Escuta de Webhook</label>
