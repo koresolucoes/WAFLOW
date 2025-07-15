@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, memo, useRef, useCallback, useMemo } from 'react';
 import { AutomationNode, MessageTemplate, Profile } from '../../types';
 import Button from '../../components/common/Button';
@@ -19,6 +20,7 @@ const getContextVariables = (nodes: AutomationNode[]) => {
                 { path: 'contact.name', label: 'Nome do Contato' },
                 { path: 'contact.phone', label: 'Telefone do Contato' },
                 { path: 'contact.tags', label: 'Tags do Contato' },
+                 { path: 'contact.id', label: 'ID do Contato' },
             ],
         }
     ];
@@ -188,14 +190,24 @@ interface NodeSettingsModalProps {
 
 const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({ node, isOpen, onClose, nodes, templates, profile, onUpdateNodes }) => {
     const [isListening, setIsListening] = useState(false);
-    
-    const availableVariables = useMemo(() => getContextVariables(nodes), [nodes]);
+    const [isTesting, setIsTesting] = useState(false);
+    const [testResponse, setTestResponse] = useState<any>(null);
 
     useEffect(() => {
         const config = (node?.data.config as any) || {};
         const hasData = config.last_captured_data && Object.keys(config.last_captured_data).length > 0;
         if (hasData) setIsListening(false);
     }, [node?.data.config]);
+
+     useEffect(() => {
+        // Reset test state when node changes
+        if (node) {
+            setIsTesting(false);
+            setTestResponse(null);
+        }
+    }, [node?.id]);
+    
+    const availableVariables = useMemo(() => getContextVariables(nodes), [nodes]);
     
     const updateNodeConfig = useCallback((updatedConfig: any) => {
         if (!node) return;
@@ -230,6 +242,50 @@ const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({ node, isOpen, onC
         }
         handleConfigChange('data_mapping', newMapping);
     }, [node, handleConfigChange]);
+
+    const handleTestWebhook = async () => {
+        if (!node || node.data.type !== 'send_webhook') return;
+
+        setIsTesting(true);
+        setTestResponse(null);
+
+        const triggerNode = nodes.find(n => n.data.nodeType === 'trigger');
+        const contextData = (triggerNode?.data.config as any)?.last_captured_data || { body: {}, query: {}, headers: {} };
+
+        try {
+            const res = await fetch('/api/test-webhook', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    webhookConfig: node.data.config,
+                    context: {
+                        trigger: contextData,
+                        contact: {
+                            id: 'contact_test_id',
+                            name: 'Contato de Teste',
+                            phone: '5511999998888',
+                            tags: ['teste', 'webhook'],
+                            custom_fields: { sample: 'data' }
+                        }
+                    }
+                }),
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                const errorMessage = data.details || data.error || 'Falha no teste';
+                throw new Error(errorMessage);
+            }
+            setTestResponse(data);
+        } catch (err: any) {
+            setTestResponse({
+                status: 'Erro',
+                body: err.message,
+            });
+        } finally {
+            setIsTesting(false);
+        }
+    };
+
 
     if (!isOpen || !node) return null;
 
@@ -474,9 +530,41 @@ const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({ node, isOpen, onC
                          {showBody && (
                             <div>
                                 <label className="block text-sm font-medium text-slate-300 mb-1">Corpo (JSON)</label>
-                                <TextareaWithVariables onValueChange={val => handleConfigChange('body', val)} value={config.body || ''} placeholder={`{ "id": "{{contact.id}}", "event": "new_tag" }`} rows={5} className={`${baseInputClass} font-mono`} variables={availableVariables} />
+                                <TextareaWithVariables 
+                                    onValueChange={val => handleConfigChange('body', val)} 
+                                    value={config.body || ''} 
+                                    placeholder={`{ "id": {{contact.id}}, "event": "new_tag" }`} 
+                                    rows={5} 
+                                    className={`${baseInputClass} font-mono`} 
+                                    variables={availableVariables} 
+                                />
+                                <p className="text-xs text-slate-400 mt-1">Dica: Insira placeholders (ex: `{{contact.name}}`) sem aspas ao redor.</p>
                             </div>
                         )}
+                        <div className="mt-4 pt-4 border-t border-slate-700 space-y-3">
+                            <Button variant="secondary" onClick={handleTestWebhook} isLoading={isTesting} disabled={!config.url}>
+                                Testar Requisição
+                            </Button>
+                            {testResponse && (
+                                <div>
+                                    <h5 className="text-md font-semibold text-white mt-2 mb-2">Resposta do Teste</h5>
+                                    <div className="p-3 bg-slate-900/50 rounded-lg space-y-2 font-mono text-xs">
+                                        <p>
+                                            <span className="font-bold text-slate-300">Status: </span>
+                                            <span className={testResponse.status >= 400 || testResponse.status === 'Erro' ? 'text-red-400' : 'text-green-400'}>
+                                                {testResponse.status}
+                                            </span>
+                                        </p>
+                                        <div>
+                                            <p className="font-bold text-slate-300">Corpo:</p>
+                                            <pre className="mt-1 p-2 bg-slate-800 rounded-md whitespace-pre-wrap max-h-48 overflow-y-auto text-slate-400">
+                                                {typeof testResponse.body === 'object' ? JSON.stringify(testResponse.body, null, 2) : String(testResponse.body)}
+                                            </pre>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 );
             case 'condition':
@@ -509,10 +597,21 @@ const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({ node, isOpen, onC
     };
     
     const renderVariablesPanel = () => {
+        const capturedData = (nodes.find(n => n.data.nodeType === 'trigger')?.data.config as any)?.last_captured_data;
+       
        return (
            <div>
                <h4 className="text-lg font-semibold text-white">Variáveis Disponíveis</h4>
-               <p className="text-sm text-slate-400 mb-3">Clique em um campo de texto à esquerda e use o seletor para inserir uma variável.</p>
+               <p className="text-sm text-slate-400 mb-3">
+                   {data.type === 'send_webhook' ? 'Clique em um campo de texto à esquerda e use o seletor para inserir uma variável.' : 'Arraste uma variável para um campo de texto à esquerda.'}
+                </p>
+
+                {data.type === 'webhook_received' && !capturedData && (
+                     <p className="text-slate-400 text-sm p-3 bg-slate-700/40 rounded-lg">
+                        Execute uma "Escuta de Webhook" na aba de Configurações para ver as variáveis do seu gatilho aqui.
+                    </p>
+                )}
+
                <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-2">
                    {availableVariables.length > 0 ? availableVariables.map(group => (
                         <div key={group.group}>

@@ -1,5 +1,6 @@
 
-import React, { useContext, useState, useEffect, useCallback, memo } from 'react';
+
+import React, { useContext, useState, useEffect, useCallback, memo, FC } from 'react';
 import { ReactFlow, ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, type Node, type Edge, type NodeProps, useReactFlow, NodeTypes } from '@xyflow/react';
 import { AppContext } from '../../contexts/AppContext';
 import { Automation, AutomationNode, NodeData, TriggerType, ActionType, LogicType } from '../../types';
@@ -30,7 +31,8 @@ const nodeStyles = {
     description: "text-xs text-slate-400"
 };
 
-const CustomNode = ({ data }: NodeProps<NodeData>) => {
+const CustomNode: FC<NodeProps> = (props) => {
+    const data = props.data as NodeData;
     const isTrigger = data.nodeType === 'trigger';
 
     const nodeTypeStyle = data.nodeType;
@@ -53,7 +55,8 @@ const CustomNode = ({ data }: NodeProps<NodeData>) => {
     );
 };
 
-const ConditionNode = ({ data }: NodeProps<NodeData>) => {
+const ConditionNode: FC<NodeProps> = (props) => {
+    const data = props.data as NodeData;
     const config = (data.config as any) || {};
     const conditionText = `${config.field || ''} ${config.operator || ''} "${config.value || ''}"`;
     return (
@@ -79,7 +82,8 @@ const ConditionNode = ({ data }: NodeProps<NodeData>) => {
     );
 };
 
-const SplitPathNode = ({ data }: NodeProps<NodeData>) => {
+const SplitPathNode: FC<NodeProps> = (props) => {
+    const data = props.data as NodeData;
     return (
       <div className={`${nodeStyles.base} ${nodeStyles.logic}`}>
         <div className={`${nodeStyles.header} ${nodeStyles.logicHeader}`}>
@@ -101,15 +105,17 @@ const SplitPathNode = ({ data }: NodeProps<NodeData>) => {
     );
 };
 
+const LogicNodeResolver: FC<NodeProps> = (props) => {
+    const data = props.data as NodeData;
+    if (data.type === 'condition') return <ConditionNode {...props} />;
+    if (data.type === 'split_path') return <SplitPathNode {...props} />;
+    return <CustomNode {...props} />;
+};
 
 const nodeTypes: NodeTypes = {
     trigger: CustomNode,
     action: CustomNode,
-    logic: (props: NodeProps<NodeData>) => {
-        if (props.data.type === 'condition') return <ConditionNode {...props} />;
-        if (props.data.type === 'split_path') return <SplitPathNode {...props} />;
-        return <CustomNode {...props} />;
-    },
+    logic: LogicNodeResolver,
 };
 
 

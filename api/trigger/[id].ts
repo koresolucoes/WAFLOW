@@ -1,9 +1,11 @@
 
 
+
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
 import { executeAutomation } from '../_lib/engine.js';
-import { Contact, Automation, TablesInsert, TablesUpdate } from '../_lib/types.js';
+import { Contact, Automation, TablesInsert, TablesUpdate, Json } from '../_lib/types.js';
 
 const getValueFromPath = (obj: any, path: string): any => {
     if (!path || !obj) return undefined;
@@ -44,7 +46,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if(automationsError || !data) {
          return res.status(500).json({ error: 'Failed to retrieve automations.' });
     }
-    const automations = data as Automation[] | null;
+    const automations = data as unknown as Automation[] | null;
         
     const automation = automations?.find(a => a.nodes?.some(n => n.id === nodeId));
 
@@ -112,7 +114,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             .eq('phone', phone)
             .single();
         
-        let contact: Contact | null = contactData as Contact | null;
+        let contact: Contact | null = contactData as unknown as Contact | null;
         let isNewContact = false;
         
         if (contactError && contactError.code === 'PGRST116') { // not found
@@ -124,7 +126,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 console.error('Failed to create new contact for webhook trigger.', insertError);
                 continue;
             }
-            contact = newContact as Contact;
+            contact = newContact as unknown as Contact;
         } else if (contactError) {
             console.error('Failed to query contact.', contactError);
             continue;
@@ -155,7 +157,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             if(updateContactError) {
                 console.error("Failed to update contact with webhook data", updateContactError);
             } else if(updatedContact) {
-                 contact = updatedContact as Contact;
+                 contact = updatedContact as unknown as Contact;
             }
         }
         
@@ -167,7 +169,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (isNewContact) {
              const { data: newContactAutomationsData, error: newContactAutomationsError } = await supabaseAdmin.from('automations').select('*').eq('user_id', profile.id).eq('status', 'active');
              if (newContactAutomationsData && !newContactAutomationsError) {
-                const newContactAutomations = newContactAutomationsData as Automation[] | null;
+                const newContactAutomations = newContactAutomationsData as unknown as Automation[] | null;
                  if (newContactAutomations) {
                     for (const auto of newContactAutomations) {
                         const trigger = auto.nodes?.find(n => n.data.type === 'new_contact');

@@ -1,5 +1,6 @@
 
 
+
 import { Session, User } from '@supabase/supabase-js';
 import { Json, Tables, TablesInsert, TablesUpdate } from './database.types';
 import { MetaTemplateComponent } from '../services/meta/types';
@@ -25,6 +26,7 @@ export type LogicType = 'condition' | 'split_path';
 
 
 export interface NodeData {
+  [key: string]: any;
   nodeType: NodeType;
   type: TriggerType | ActionType | LogicType;
   label: string;
@@ -125,4 +127,4 @@ export interface MetaConfig {
 }
 
 // Tipos de Autenticação
-export type { Session, User, Json, TablesInsert, TablesUpdate, Edge };
+export type { Session, User, Json, Tables, TablesInsert, TablesUpdate, Edge };

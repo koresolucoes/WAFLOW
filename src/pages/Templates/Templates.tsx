@@ -80,10 +80,10 @@ const Templates: React.FC = () => {
 
         if (fetchError) throw fetchError;
         
-        const existingMetaIdMap = new Map((existingTemplates as { meta_id: string; id: string }[] | null)?.map(t => [t.meta_id, t.id]));
+        const existingMetaIdMap = new Map((existingTemplates as unknown as { meta_id: string; id: string }[] | null)?.map(t => [t.meta_id, t.id]));
 
         const templatesToUpsert: Tables<"message_templates">[] = metaTemplates.map(mt => {
-            const templateData = {
+            const templateData: Partial<Tables<"message_templates">> = {
                 id: existingMetaIdMap.get(mt.id)!, // a chave primária para o upsert
                 meta_id: mt.id,
                 user_id: user.id,
@@ -103,7 +103,7 @@ const Templates: React.FC = () => {
         });
         
         if (templatesToUpsert.length > 0) {
-            const { error: upsertError } = await supabase.from('message_templates').upsert(templatesToUpsert, { onConflict: 'meta_id, user_id' });
+            const { error: upsertError } = await supabase.from('message_templates').upsert(templatesToUpsert as any, { onConflict: 'meta_id, user_id' });
             if (upsertError) throw upsertError;
         }
 
@@ -115,7 +115,7 @@ const Templates: React.FC = () => {
 
         if (refetchError) throw refetchError;
         
-        setTemplates((dbTemplates as MessageTemplate[]) || []);
+        setTemplates((dbTemplates as unknown as MessageTemplate[]) || []);
         setSyncMessage("Sincronização concluída! Os status dos templates foram atualizados.");
         setTimeout(() => setSyncMessage(null), 4000);
 

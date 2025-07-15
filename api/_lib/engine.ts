@@ -19,6 +19,38 @@ const resolveVariables = (text: string, context: { contact: Contact, trigger: an
     });
 };
 
+// Replaces placeholders in a JSON string template with their actual values,
+// ensuring the output is a valid JSON value representation.
+const resolveJsonPlaceholders = (jsonString: string, context: any): string => {
+    if (typeof jsonString !== 'string') {
+        return JSON.stringify(jsonString);
+    }
+    
+    // Pre-process to handle placeholders inside quotes like "{{var}}" -> {{var}}
+    // This allows users to be less precise with their JSON syntax.
+    let processedJsonString = jsonString.replace(/"\{\{([^}]+)\}\}"/g, '{{$1}}');
+
+    return processedJsonString.replace(/\{\{([^}]+)\}\}/g, (match, path) => {
+        const value = getValueFromPath(context, path.trim());
+
+        if (value === undefined) {
+            return 'null'; // Replace unresolved variables with JSON null for safety
+        }
+        
+        if (value === null) {
+            return 'null';
+        }
+
+        // For numbers and booleans, their direct string representation is a valid JSON value.
+        if (typeof value === 'number' || typeof value === 'boolean') {
+            return String(value);
+        }
+
+        // For strings, objects, and arrays, JSON.stringify will handle correct quoting.
+        return JSON.stringify(value);
+    });
+};
+
 
 // Main function to execute an automation flow
 export const executeAutomation = async (
@@ -83,7 +115,7 @@ export const executeAutomation = async (
                     const { data: template, error: templateError } = await supabaseAdmin.from('message_templates').select('*').eq('id', config.template_id).single();
                     if (templateError) throw templateError;
                     if (template) {
-                         const templateTyped = template as MessageTemplate;
+                         const templateTyped = template as unknown as MessageTemplate;
                          
                          let allText = '';
                          templateTyped.components.forEach(c => {
@@ -138,7 +170,7 @@ export const executeAutomation = async (
                         const updatePayload: TablesUpdate<'contacts'> = { tags: newTags };
                         const { data, error } = await supabaseAdmin.from('contacts').update(updatePayload).eq('id', currentContactState.id).select().single();
                         if (error) throw error;
-                        if (data) currentContactState = data as Contact;
+                        if (data) currentContactState = data as unknown as Contact;
                     }
                     break;
                 case 'remove_tag':
@@ -148,7 +180,7 @@ export const executeAutomation = async (
                         const updatePayload: TablesUpdate<'contacts'> = { tags: newTags };
                         const { data, error } = await supabaseAdmin.from('contacts').update(updatePayload).eq('id', currentContactState.id).select().single();
                         if (error) throw error;
-                        if (data) currentContactState = data as Contact;
+                        if (data) currentContactState = data as unknown as Contact;
                     }
                     break;
                 case 'set_custom_field':
@@ -159,7 +191,7 @@ export const executeAutomation = async (
                         const updatePayload: TablesUpdate<'contacts'> = { custom_fields: newCustomFields };
                         const { data, error } = await supabaseAdmin.from('contacts').update(updatePayload).eq('id', currentContactState.id).select().single();
                         if (error) throw error;
-                        if (data) currentContactState = data as Contact;
+                        if (data) currentContactState = data as unknown as Contact;
                     }
                     break;
                 case 'condition':
@@ -194,20 +226,22 @@ export const executeAutomation = async (
                     break;
 
                 case 'send_webhook':
-                    if(config.url){
+                    if (config.url) {
                         const url = resolveVariables(config.url, context);
                         const method = config.method || 'POST';
                         const headers = { 'Content-Type': 'application/json' };
                         const requestOptions: RequestInit = { method, headers };
 
-                        if (method !== 'GET' && method !== 'DELETE' && config.body) {
-                             try {
-                                const body = JSON.parse(resolveVariables(config.body, context));
-                                requestOptions.body = JSON.stringify(body);
-                             } catch (e) {
-                                console.error("Webhook Body Error: Invalid JSON.", e);
-                                throw new Error("O corpo do Webhook não é um JSON válido.");
-                             }
+                        if ((method === 'POST' || method === 'PUT' || method === 'PATCH') && config.body) {
+                            const jsonBodyString = resolveJsonPlaceholders(config.body, context);
+                            try {
+                                // We parse only to validate. The string itself is sent as the body.
+                                JSON.parse(jsonBodyString);
+                                requestOptions.body = jsonBodyString;
+                            } catch (e) {
+                               console.error("Webhook Body Error: Final JSON is invalid after resolving variables.", { body: jsonBodyString, error: e });
+                               throw new Error("O corpo do Webhook resultou em um JSON inválido. Verifique a sintaxe e se os placeholders (ex: {{contact.name}}) estão sem aspas ao redor.");
+                            }
                         }
                         
                         await fetch(url, requestOptions);

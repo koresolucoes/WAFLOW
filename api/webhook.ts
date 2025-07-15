@@ -29,7 +29,7 @@ const findOrCreateContact = async (user_id: string, phone: string, name: string)
          console.error("Error finding contact:", error);
         return null;
     }
-    return contactData as Contact;
+    return contactData as unknown as Contact;
 };
 
 // Helper to find automations to trigger based on message content
@@ -44,7 +44,7 @@ const findAutomationsToTrigger = async (user_id: string, messageBody: string, bu
         console.error("Error fetching automations:", error);
         return [];
     }
-    const automations = data as Automation[] | null;
+    const automations = data as unknown as Automation[] | null;
     if (!automations) return [];
 
     const triggers: {automation: Automation, startNodeId: string}[] = [];
