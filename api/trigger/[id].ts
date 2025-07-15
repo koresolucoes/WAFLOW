@@ -16,7 +16,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ error: 'Invalid trigger ID format.' });
     }
 
-    // Corrected Parsing Logic: Split by the first underscore, as the prefix is guaranteed not to contain them.
     const firstUnderscoreIndex = rawId.indexOf('_');
     if (firstUnderscoreIndex === -1) {
         return res.status(400).json({ error: 'Invalid trigger ID format: separator not found.' });
@@ -24,8 +23,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const webhookPrefix = rawId.substring(0, firstUnderscoreIndex);
     const nodeId = rawId.substring(firstUnderscoreIndex + 1);
 
-    // 1. Find Profile and Automation
-    // Corrected Profile Lookup: Check both webhook_path_prefix and the user's ID as a fallback.
     const { data: profile } = await supabaseAdmin
         .from('profiles')
         .select('id')
@@ -53,9 +50,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ error: 'Invalid trigger node.' });
     }
 
-    // 2. Extract payload
-    const payload = req.method === 'POST' ? req.body : req.query;
-    
+    // --- Robust Payload Parsing ---
+    let rawPayload: any;
+    if (req.method === 'POST') {
+        if (typeof req.body === 'string') {
+            try {
+                rawPayload = JSON.parse(req.body);
+            } catch (e) {
+                return res.status(400).json({ error: 'Invalid JSON in POST body.' });
+            }
+        } else {
+            rawPayload = req.body;
+        }
+    } else { // GET
+        rawPayload = req.query;
+    }
+
     // 3. Handle "Listening Mode" for UI setup
     const config = (triggerNode.data.config || {}) as any;
     if (config.last_captured_data === null) {
@@ -63,7 +73,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             .from('automations')
             .update({
                 nodes: automation.nodes.map(n => 
-                    n.id === nodeId ? { ...n, data: { ...n.data, config: { ...config, last_captured_data: payload } } } : n
+                    n.id === nodeId ? { ...n, data: { ...n.data, config: { ...config, last_captured_data: rawPayload } } } : n
                 )
             })
             .eq('id', automation.id);
@@ -74,77 +84,79 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json({ message: 'Webhook data captured successfully. You can now configure mapping in the editor.' });
     }
 
-    // 4. Execute Automation: Map data and find/create contact
+    // 4. Execute Automation (handles single or batch payloads)
+    const events = Array.isArray(rawPayload) ? rawPayload : [rawPayload];
     const mappingRules = config.data_mapping || [];
     const phoneRule = mappingRules.find((m: any) => m.destination === 'phone');
+
     if (!phoneRule) {
         return res.status(400).json({ error: 'Data mapping for contact phone number is not configured.' });
     }
-    
-    const phone = String(getValueFromPath(payload, phoneRule.source)).replace(/\D/g, '');
-    if (!phone) {
-        return res.status(400).json({ error: 'Could not extract phone number from payload using mapping rules.' });
-    }
 
-    // Find or create contact
-    let { data: contact } = await supabaseAdmin
-        .from('contacts')
-        .select('*')
-        .eq('user_id', profile.id)
-        .eq('phone', phone)
-        .single();
-    
-    let isNewContact = false;
-    if (!contact) {
-        isNewContact = true;
-        const nameRule = mappingRules.find((m: any) => m.destination === 'name');
-        const name = nameRule ? getValueFromPath(payload, nameRule.source) : 'New Webhook Lead';
-        const { data: newContact, error } = await supabaseAdmin.from('contacts').insert({ user_id: profile.id, name, phone }).select().single();
-        if (error || !newContact) {
-            return res.status(500).json({ error: 'Failed to create new contact.' });
+    for (const payload of events) {
+        const phone = String(getValueFromPath(payload, phoneRule.source)).replace(/\D/g, '');
+        if (!phone) {
+            console.warn('Could not extract phone number from event, skipping:', payload);
+            continue;
         }
-        contact = newContact;
-    }
 
-    // Apply other mapping rules (tags, custom fields)
-    const newTags = new Set(contact.tags || []);
-    const newCustomFields = { ...(contact.custom_fields as object || {}) };
-    let needsUpdate = false;
-
-    mappingRules.forEach((rule: any) => {
-        const value = getValueFromPath(payload, rule.source);
-        if (value === undefined) return;
-
-        if (rule.destination === 'tag') {
-            newTags.add(String(value));
-            needsUpdate = true;
-        } else if (rule.destination === 'custom_field' && rule.destination_key) {
-            (newCustomFields as any)[rule.destination_key] = value;
-            needsUpdate = true;
-        }
-    });
-
-    if (needsUpdate) {
-        const { data: updatedContact } = await supabaseAdmin.from('contacts').update({ tags: Array.from(newTags), custom_fields: newCustomFields }).eq('id', contact.id).select().single();
-        if(updatedContact) contact = updatedContact;
-    }
-
-    // 5. Trigger the automation engine
-    executeAutomation(automation, contact as Contact, nodeId, payload);
-    
-    // Trigger "New Contact" automations if applicable
-    if (isNewContact) {
-         const { data: newContactAutomations } = await supabaseAdmin.from('automations').select('*').eq('user_id', profile.id).eq('status', 'active');
-         if (newContactAutomations) {
-            for (const auto of (newContactAutomations as unknown as Automation[])) {
-                const trigger = auto.nodes?.find(n => n.data.type === 'new_contact');
-                if (trigger) {
-                    executeAutomation(auto, contact as Contact, trigger.id, null);
-                }
+        let { data: contact } = await supabaseAdmin
+            .from('contacts')
+            .select('*')
+            .eq('user_id', profile.id)
+            .eq('phone', phone)
+            .single();
+        
+        let isNewContact = false;
+        if (!contact) {
+            isNewContact = true;
+            const nameRule = mappingRules.find((m: any) => m.destination === 'name');
+            const name = nameRule ? getValueFromPath(payload, nameRule.source) : 'New Webhook Lead';
+            const { data: newContact, error } = await supabaseAdmin.from('contacts').insert({ user_id: profile.id, name, phone }).select().single();
+            if (error || !newContact) {
+                console.error('Failed to create new contact for webhook trigger.', error);
+                continue;
             }
-         }
-    }
+            contact = newContact;
+        }
 
+        const newTags = new Set(contact.tags || []);
+        const newCustomFields = { ...(contact.custom_fields as object || {}) };
+        let needsUpdate = false;
+
+        mappingRules.forEach((rule: any) => {
+            const value = getValueFromPath(payload, rule.source);
+            if (value === undefined) return;
+
+            if (rule.destination === 'tag') {
+                newTags.add(String(value));
+                needsUpdate = true;
+            } else if (rule.destination === 'custom_field' && rule.destination_key) {
+                (newCustomFields as any)[rule.destination_key] = value;
+                needsUpdate = true;
+            }
+        });
+
+        if (needsUpdate) {
+            const { data: updatedContact } = await supabaseAdmin.from('contacts').update({ tags: Array.from(newTags), custom_fields: newCustomFields }).eq('id', contact.id).select().single();
+            if(updatedContact) contact = updatedContact;
+        }
+
+        // Non-blocking call to the engine
+        executeAutomation(automation, contact as Contact, nodeId, payload);
+        
+        if (isNewContact) {
+             const { data: newContactAutomations } = await supabaseAdmin.from('automations').select('*').eq('user_id', profile.id).eq('status', 'active');
+             if (newContactAutomations) {
+                for (const auto of (newContactAutomations as unknown as Automation[])) {
+                    const trigger = auto.nodes?.find(n => n.data.type === 'new_contact');
+                    if (trigger) {
+                        executeAutomation(auto, contact as Contact, trigger.id, null);
+                    }
+                }
+             }
+        }
+    }
 
     return res.status(202).json({ message: 'Automation triggered.' });
 }
