@@ -168,10 +168,10 @@ const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({ node, isOpen, onC
     const config = (data.config as any) || {};
 
     const renderDataMapping = () => {
-        if (!config.last_captured_data || Object.keys(config.last_captured_data).length === 0) return null;
+        const capturedData = config.last_captured_data;
+        if (!capturedData || !capturedData.body || Object.keys(capturedData.body).length === 0) return null;
         
-        const flattenedData = flattenObject(config.last_captured_data);
-        const capturedKeys = Object.keys(flattenedData);
+        const capturedKeys = Object.keys(capturedData.body);
         const currentMapping = config.data_mapping || [];
         const isPhoneMapped = currentMapping.some((m: any) => m.destination === 'phone');
 
@@ -186,8 +186,9 @@ const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({ node, isOpen, onC
                 )}
                 <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
                 {capturedKeys.map(key => {
-                    const value = flattenedData[key] ?? '';
-                    const mappingRule = currentMapping.find((m: any) => m.source === key);
+                    const value = capturedData.body[key] ?? '';
+                    const sourcePath = `body.${key}`;
+                    const mappingRule = currentMapping.find((m: any) => m.source === sourcePath);
                     const destination = mappingRule?.destination || 'ignore';
                     
                     return (
@@ -196,7 +197,7 @@ const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({ node, isOpen, onC
                             <p className="text-sm text-white font-semibold truncate my-1" title={String(value)}>{String(value)}</p>
                              <select 
                                 value={destination} 
-                                onChange={(e) => handleMappingChange(key, e.target.value)}
+                                onChange={(e) => handleMappingChange(sourcePath, e.target.value)}
                                 className="w-full bg-slate-800 border border-slate-600 rounded-md p-1.5 text-white text-sm"
                             >
                                 <option value="ignore">Ignorar</option>
@@ -210,7 +211,7 @@ const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({ node, isOpen, onC
                                     type="text" 
                                     placeholder="Nome do campo (ex: id_pedido)"
                                     value={mappingRule?.destination_key || ''}
-                                    onChange={(e) => handleMappingChange(key, 'custom_field', e.target.value)}
+                                    onChange={(e) => handleMappingChange(sourcePath, 'custom_field', e.target.value)}
                                     className="w-full mt-2 bg-slate-800 border border-slate-600 rounded-md p-1.5 text-white text-sm"
                                 />
                             )}

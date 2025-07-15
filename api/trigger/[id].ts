@@ -1,6 +1,7 @@
 
 
 
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
 import { executeAutomation } from '../_lib/engine.js';
@@ -56,21 +57,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ error: 'Invalid trigger node.' });
     }
 
-    // --- Robust Payload Parsing ---
-    let rawPayload: any;
-    if (req.method === 'POST') {
-        if (typeof req.body === 'string') {
-            try {
-                rawPayload = JSON.parse(req.body);
-            } catch (e) {
-                return res.status(400).json({ error: 'Invalid JSON in POST body.' });
-            }
-        } else {
-            rawPayload = req.body;
-        }
-    } else { // GET
-        rawPayload = req.query;
-    }
+    // --- Structured Payload Parsing ---
+    const structuredPayload = {
+        body: req.body || {},
+        query: req.query || {},
+        headers: req.headers || {},
+    };
 
     // 3. Handle "Listening Mode" for UI setup
     const config = (triggerNode.data.config || {}) as any;
@@ -79,7 +71,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             .from('automations')
             .update({
                 nodes: automation.nodes.map(n => 
-                    n.id === nodeId ? { ...n, data: { ...n.data, config: { ...config, last_captured_data: rawPayload } } } : n
+                    n.id === nodeId ? { ...n, data: { ...n.data, config: { ...config, last_captured_data: structuredPayload } } } : n
                 )
             } as any)
             .eq('id', automation.id);
@@ -91,7 +83,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // 4. Execute Automation (handles single or batch payloads)
-    const events = Array.isArray(rawPayload) ? rawPayload : [rawPayload];
+    const events = Array.isArray(structuredPayload.body) ? structuredPayload.body : [structuredPayload.body];
     const mappingRules = config.data_mapping || [];
     const phoneRule = mappingRules.find((m: any) => m.destination === 'phone');
 
@@ -99,10 +91,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ error: 'Data mapping for contact phone number is not configured.' });
     }
 
-    for (const payload of events) {
-        const phone = String(getValueFromPath(payload, phoneRule.source)).replace(/\D/g, '');
+    for (const eventBody of events) {
+        // We create a full payload for each event in a batch
+        const fullPayloadForEvent = {
+            ...structuredPayload,
+            body: eventBody
+        };
+
+        const phone = String(getValueFromPath(fullPayloadForEvent, phoneRule.source)).replace(/\D/g, '');
         if (!phone) {
-            console.warn('Could not extract phone number from event, skipping:', payload);
+            console.warn('Could not extract phone number from event, skipping:', fullPayloadForEvent);
             continue;
         }
 
@@ -119,7 +117,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (contactError && contactError.code === 'PGRST116') { // not found
             isNewContact = true;
             const nameRule = mappingRules.find((m: any) => m.destination === 'name');
-            const name = nameRule ? getValueFromPath(payload, nameRule.source) : 'New Webhook Lead';
+            const name = nameRule ? getValueFromPath(fullPayloadForEvent, nameRule.source) : 'New Webhook Lead';
             const { data: newContact, error: insertError } = await supabaseAdmin.from('contacts').insert({ user_id: profile.id, name, phone } as any).select().single();
             if (insertError || !newContact) {
                 console.error('Failed to create new contact for webhook trigger.', insertError);
@@ -136,7 +134,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         let needsUpdate = false;
 
         mappingRules.forEach((rule: any) => {
-            const value = getValueFromPath(payload, rule.source);
+            const value = getValueFromPath(fullPayloadForEvent, rule.source);
             if (value === undefined) return;
 
             if (rule.destination === 'tag') {
@@ -158,7 +156,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         // Non-blocking call to the engine
-        executeAutomation(automation, contact as Contact, nodeId, payload);
+        executeAutomation(automation, contact as Contact, nodeId, fullPayloadForEvent);
         
         if (isNewContact) {
              const { data: newContactAutomations } = await supabaseAdmin.from('automations').select('*').eq('user_id', profile.id).eq('status', 'active');
