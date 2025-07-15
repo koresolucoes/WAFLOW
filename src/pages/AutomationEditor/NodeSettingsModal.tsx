@@ -2,147 +2,219 @@
 
 
 
-import React, { useState, useEffect, memo, useRef, useCallback } from 'react';
-import { AutomationNode, NodeData, MessageTemplate, Profile } from '../../types';
+import React, { useState, useEffect, memo, useRef, useCallback, useMemo } from 'react';
+import { AutomationNode, MessageTemplate, Profile } from '../../types';
 import Button from '../../components/common/Button';
-import { COPY_ICON, INFO_ICON } from '../../components/icons';
+import { COPY_ICON, INFO_ICON, PLUS_ICON, TRASH_ICON } from '../../components/icons';
 
 // ====================================================================================
-// Helper Components
+// Helper Functions
 // ====================================================================================
 
-const flattenObject = (obj: any, parentKey = '', res: Record<string, any> = {}) => {
-  if (typeof obj !== 'object' || obj === null) return res;
-  for (const key in obj) {
-    if (Object.prototype.hasOwnProperty.call(obj, key)) {
-      const propName = parentKey ? `${parentKey}.${key}` : key;
-      if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
-        flattenObject(obj[key], propName, res);
-      } else {
-        res[propName] = obj[key];
-      }
-    }
-  }
-  return res;
-};
-
-const VariablePill = memo(({ path, value }: { path: string; value: string }) => {
-    const handleDragStart = (e: React.DragEvent) => {
-        e.dataTransfer.setData('application/variable-path', `{{trigger.${path}}}`);
-        e.dataTransfer.effectAllowed = 'copy';
-    };
-    return (
-        <div draggable onDragStart={handleDragStart} className="flex justify-between items-center bg-slate-800 p-1.5 rounded-md cursor-grab hover:bg-sky-500/20 group">
-            <span className="text-xs font-mono text-sky-300 group-hover:text-sky-200" title={path}>{path}</span>
-            <span className="text-xs text-slate-400 truncate ml-2" title={String(value)}>{String(value)}</span>
-        </div>
-    );
-});
-
-const VariablesPanel = memo(({ nodes }: { nodes: AutomationNode[] }) => {
+const getContextVariables = (nodes: AutomationNode[]) => {
     const triggerNode = nodes.find(n => n.data.nodeType === 'trigger' && n.data.type === 'webhook_received');
     const capturedData = (triggerNode?.data.config as any)?.last_captured_data;
 
-    if (!capturedData || Object.keys(capturedData).length === 0) {
-        return <p className="text-xs text-slate-400 p-2 bg-slate-700/50 rounded-md">Para usar variáveis, clique em "Limpar e Escutar" e envie uma requisição de teste para a URL do webhook.</p>;
-    }
-    
-    const flattened = flattenObject(capturedData);
+    const variables = [
+        {
+            group: 'Contato',
+            vars: [
+                { path: 'contact.name', label: 'Nome do Contato' },
+                { path: 'contact.phone', label: 'Telefone do Contato' },
+                { path: 'contact.tags', label: 'Tags do Contato' },
+            ],
+        }
+    ];
 
+    if (capturedData) {
+        const flattenObject = (obj: any, parentKey = '', res: { path: string, label: string }[] = []) => {
+            if (typeof obj !== 'object' || obj === null) return res;
+            for (const key in obj) {
+                if (Object.prototype.hasOwnProperty.call(obj, key)) {
+                    const propName = parentKey ? `${parentKey}.${key}` : key;
+                    if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
+                        flattenObject(obj[key], propName, res);
+                    } else {
+                        res.push({ path: `trigger.${propName}`, label: propName });
+                    }
+                }
+            }
+            return res;
+        };
+        const triggerVars = flattenObject(capturedData);
+        if (triggerVars.length > 0) {
+            variables.push({ group: 'Gatilho (Webhook)', vars: triggerVars });
+        }
+    }
+    return variables;
+};
+
+const getTemplatePlaceholders = (template: MessageTemplate | undefined) => {
+    if (!template?.components) return [];
+    let allText = '';
+    template.components.forEach(c => {
+        if (c.text) {
+            allText += c.text + ' ';
+        }
+        if (c.type === 'BUTTONS' && c.buttons) {
+            c.buttons.forEach(b => {
+                if (b.type === 'URL' && b.url) {
+                    allText += b.url + ' ';
+                }
+            });
+        }
+    });
+    const matches = allText.match(/\{\{\d+\}\}/g) || [];
+    return [...new Set(matches)].filter(p => p !== '{{1}}').sort((a, b) => {
+        const numA = parseInt(a.match(/\d+/)?.[0] || '0', 10);
+        const numB = parseInt(b.match(/\d+/)?.[0] || '0', 10);
+        return numA - numB;
+    });
+};
+
+// ====================================================================================
+// Variable Selector Component
+// ====================================================================================
+interface VariableSelectorProps {
+    variables: ReturnType<typeof getContextVariables>;
+    onSelect: (variablePath: string) => void;
+}
+const VariableSelector: React.FC<VariableSelectorProps> = memo(({ variables, onSelect }) => {
     return (
-        <div>
-            <h4 className="text-md font-semibold text-white mb-2">Variáveis Disponíveis</h4>
-            <p className="text-xs text-slate-400 mb-2">Arraste uma variável para um campo de texto à esquerda.</p>
-            <div className="space-y-1 max-h-96 overflow-y-auto pr-2 bg-slate-900/50 p-2 rounded-md">
-                {Object.entries(flattened).map(([key, value]) => (
-                    <VariablePill key={key} path={key} value={value} />
+        <div className="absolute z-10 mt-1 w-full rounded-md bg-slate-700 shadow-lg p-2 border border-slate-600">
+            <div className="max-h-48 overflow-y-auto">
+                {variables.map(group => (
+                    <div key={group.group}>
+                        <h5 className="text-xs font-bold text-slate-400 px-2 pt-2">{group.group}</h5>
+                        <ul>
+                            {group.vars.map(v => (
+                                <li key={v.path}>
+                                    <button
+                                        type="button"
+                                        className="w-full text-left px-2 py-1.5 text-sm text-slate-300 hover:bg-sky-500/20 rounded-md"
+                                        onClick={() => onSelect(`{{${v.path}}}`)}
+                                        title={`Inserir {{${v.path}}}`}
+                                    >
+                                        {v.label}
+                                    </button>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
                 ))}
             </div>
         </div>
     );
 });
 
-const DroppableInput = (props: React.InputHTMLAttributes<HTMLInputElement> & { onValueChange: (value: string) => void }) => {
-    const { onValueChange, ...rest } = props;
-    const [isDragOver, setIsDragOver] = useState(false);
-    const ref = useRef<HTMLInputElement>(null);
 
-    const onDrop = (e: React.DragEvent) => {
-        e.preventDefault();
-        setIsDragOver(false);
-        const path = e.dataTransfer.getData('application/variable-path');
-        if (path && ref.current) {
-            const { selectionStart, selectionEnd } = ref.current;
-            const currentValue = ref.current.value || '';
-            const newValue = `${currentValue.substring(0, selectionStart as number)}${path}${currentValue.substring(selectionEnd as number)}`;
-            onValueChange(newValue);
-        }
+// ====================================================================================
+// Input with Variable Selector
+// ====================================================================================
+interface InputWithVariablesProps extends React.InputHTMLAttributes<HTMLInputElement> {
+    onValueChange: (value: string) => void;
+    variables: ReturnType<typeof getContextVariables>;
+}
+const InputWithVariables: React.FC<InputWithVariablesProps> = ({ onValueChange, value, variables, ...props }) => {
+    const [isFocused, setIsFocused] = useState(false);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    const handleSelectVariable = (variablePath: string) => {
+        if (!inputRef.current) return;
+        const { selectionStart, selectionEnd } = inputRef.current;
+        const currentValue = value || '';
+        const newValue = `${currentValue.substring(0, selectionStart as number)}${variablePath}${currentValue.substring(selectionEnd as number)}`;
+        onValueChange(newValue);
+        inputRef.current.focus();
+    };
+
+    return (
+        <div className="relative">
+            <input
+                ref={inputRef}
+                value={value}
+                onChange={e => onValueChange(e.target.value)}
+                onFocus={() => setIsFocused(true)}
+                onBlur={() => setTimeout(() => setIsFocused(false), 150)} // Delay to allow click on selector
+                {...props}
+            />
+            {isFocused && <VariableSelector variables={variables} onSelect={handleSelectVariable} />}
+        </div>
+    );
+};
+
+interface TextareaWithVariablesProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
+    onValueChange: (value: string) => void;
+    variables: ReturnType<typeof getContextVariables>;
+}
+const TextareaWithVariables: React.FC<TextareaWithVariablesProps> = ({ onValueChange, value, variables, ...props }) => {
+    const [isFocused, setIsFocused] = useState(false);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+    const handleSelectVariable = (variablePath: string) => {
+        if (!textareaRef.current) return;
+        const { selectionStart, selectionEnd } = textareaRef.current;
+        const currentValue = value || '';
+        const newValue = `${currentValue.substring(0, selectionStart as number)}${variablePath}${currentValue.substring(selectionEnd as number)}`;
+        onValueChange(newValue);
+        textareaRef.current.focus();
     };
     
-    return <input ref={ref} {...rest} onDrop={onDrop} onDragOver={e => { e.preventDefault(); setIsDragOver(true); }} onDragLeave={() => setIsDragOver(false)} className={`${props.className} transition-all ${isDragOver ? 'ring-2 ring-sky-500' : 'ring-0 ring-transparent'}`} />;
+    return (
+        <div className="relative">
+            <textarea
+                ref={textareaRef}
+                value={value}
+                onChange={e => onValueChange(e.target.value)}
+                onFocus={() => setIsFocused(true)}
+                onBlur={() => setTimeout(() => setIsFocused(false), 150)}
+                {...props}
+            />
+            {isFocused && <VariableSelector variables={variables} onSelect={handleSelectVariable} />}
+        </div>
+    );
 };
 
-const DroppableTextarea = (props: React.TextareaHTMLAttributes<HTMLTextAreaElement> & { onValueChange: (value: string) => void }) => {
-    const { onValueChange, ...rest } = props;
-    const [isDragOver, setIsDragOver] = useState(false);
-    const ref = useRef<HTMLTextAreaElement>(null);
 
-     const onDrop = (e: React.DragEvent) => {
-        e.preventDefault();
-        setIsDragOver(false);
-        const path = e.dataTransfer.getData('application/variable-path');
-        if (path && ref.current) {
-            const { selectionStart, selectionEnd } = ref.current;
-            const currentValue = ref.current.value || '';
-            const newValue = `${currentValue.substring(0, selectionStart as number)}${path}${currentValue.substring(selectionEnd as number)}`;
-            onValueChange(newValue);
-        }
-    };
-
-    return <textarea ref={ref} {...rest} onDrop={onDrop} onDragOver={e => { e.preventDefault(); setIsDragOver(true); }} onDragLeave={() => setIsDragOver(false)} className={`${props.className} transition-all ${isDragOver ? 'ring-2 ring-sky-500' : 'ring-0 ring-transparent'}`} />;
-};
-
+// ====================================================================================
+// Main Modal Component
+// ====================================================================================
 interface NodeSettingsModalProps {
     node: AutomationNode | null;
     isOpen: boolean;
     onClose: () => void;
     nodes: AutomationNode[];
-    setNodes: React.Dispatch<React.SetStateAction<AutomationNode[]>>;
     templates: MessageTemplate[];
     profile: Profile | null;
     onUpdateNodes: (nodes: AutomationNode[]) => Promise<void>;
 }
 
-const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({ node, isOpen, onClose, nodes, setNodes, templates, profile, onUpdateNodes }) => {
+const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({ node, isOpen, onClose, nodes, templates, profile, onUpdateNodes }) => {
     const [isListening, setIsListening] = useState(false);
     
+    const availableVariables = useMemo(() => getContextVariables(nodes), [nodes]);
+
     useEffect(() => {
-        // Automatically turn off listening indicator when data arrives
         const config = (node?.data.config as any) || {};
         const hasData = config.last_captured_data && Object.keys(config.last_captured_data).length > 0;
-        if (hasData) {
-            setIsListening(false);
-        }
+        if (hasData) setIsListening(false);
     }, [node?.data.config]);
     
-    const updateNodeConfig = useCallback((key: string, value: any) => {
+    const updateNodeConfig = useCallback((updatedConfig: any) => {
         if (!node) return;
-        const updatedNodes = nodes.map(n => {
-            if (n.id === node.id) {
-                const oldConfig = (typeof n.data.config === 'object' && n.data.config && !Array.isArray(n.data.config)) ? n.data.config : {};
-                return { ...n, data: { ...n.data, config: { ...oldConfig, [key]: value } } };
-            }
-            return n;
-        });
-        setNodes(updatedNodes);
-        onUpdateNodes(updatedNodes); // Persist change
-    }, [node, nodes, setNodes, onUpdateNodes]);
+        const updatedNodes = nodes.map(n => n.id === node.id ? { ...n, data: { ...n.data, config: updatedConfig } } : n);
+        onUpdateNodes(updatedNodes);
+    }, [node, nodes, onUpdateNodes]);
+
+    const handleConfigChange = (key: string, value: any) => {
+        if (!node) return;
+        const currentConfig = (typeof node.data.config === 'object' && node.data.config && !Array.isArray(node.data.config)) ? node.data.config : {};
+        updateNodeConfig({ ...currentConfig, [key]: value });
+    };
 
     const handleStartListening = async () => {
-        if (!node) return;
         setIsListening(true);
-        // We only need to update the config on the specific node
-        updateNodeConfig('last_captured_data', null);
+        handleConfigChange('last_captured_data', null);
     };
 
     const handleMappingChange = useCallback((source: string, destination: string, destination_key?: string) => {
@@ -159,8 +231,8 @@ const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({ node, isOpen, onC
             if (existingIndex > -1) newMapping[existingIndex] = newRule;
             else newMapping.push(newRule);
         }
-        updateNodeConfig('data_mapping', newMapping);
-    }, [node, updateNodeConfig]);
+        handleConfigChange('data_mapping', newMapping);
+    }, [node, handleConfigChange]);
 
     if (!isOpen || !node) return null;
 
@@ -222,59 +294,11 @@ const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({ node, isOpen, onC
             </div>
         )
     };
+    
+    const baseInputClass = "w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white placeholder-slate-400 focus:ring-2 focus:ring-sky-500 focus:border-sky-500";
 
     const renderConfig = () => {
-        const baseInputClass = "w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white";
-
         switch (data.type) {
-            case 'add_tag':
-                return (
-                    <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-1">Nome da Tag</label>
-                        <DroppableInput type="text" value={config.tag || ''} onValueChange={val => updateNodeConfig('tag', val)} placeholder="Ex: vip" className={baseInputClass} />
-                    </div>
-                );
-            case 'send_template':
-                 const approvedTemplates = templates.filter(t => t.status === 'APPROVED');
-                 return (
-                    <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-1">Selecione o Template</label>
-                        <select value={config.template_id || ''} onChange={(e) => updateNodeConfig('template_id', e.target.value)} className={baseInputClass}>
-                            <option value="">-- Selecione um template --</option>
-                            {approvedTemplates.map(t => <option key={t.id} value={t.id}>{t.template_name}</option>)}
-                        </select>
-                         {approvedTemplates.length === 0 && <p className="text-xs text-amber-400 mt-1">Nenhum template APROVADO encontrado.</p>}
-                    </div>
-                 );
-            case 'send_text_message':
-                return (
-                    <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-1">Texto da Mensagem</label>
-                        <DroppableTextarea value={config.message_text || ''} onValueChange={val => updateNodeConfig('message_text', val)} placeholder="Digite sua mensagem..." rows={4} className={baseInputClass} />
-                    </div>
-                );
-            case 'condition':
-                 return (
-                    <div className="space-y-3">
-                        <div>
-                            <label className="block text-xs font-medium text-slate-400 mb-1">Campo</label>
-                             <DroppableInput type="text" value={config.field || ''} onValueChange={val => updateNodeConfig('field', val)} placeholder={'tags ou {{trigger.body.id}}'} className={baseInputClass} />
-                             <p className="text-xs text-slate-400 mt-1">Para contato: 'tags', 'name'. Para gatilho: arraste a variável.</p>
-                        </div>
-                         <div>
-                            <label className="block text-xs font-medium text-slate-400 mb-1">Operador</label>
-                            <select value={config.operator || 'contains'} onChange={(e) => updateNodeConfig('operator', e.target.value)} className={baseInputClass}>
-                                <option value="contains">Contém</option>
-                                <option value="not_contains">Não contém</option>
-                                <option value="equals">É igual a</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-xs font-medium text-slate-400 mb-1">Valor</label>
-                            <DroppableInput type="text" value={config.value || ''} onValueChange={val => updateNodeConfig('value', val)} placeholder="Valor a comparar" className={baseInputClass} />
-                        </div>
-                    </div>
-                 );
             case 'webhook_received':
                 const webhookPrefix = profile?.webhook_path_prefix || profile?.id;
                 const webhookUrl = `${window.location.origin}/api/trigger/${webhookPrefix}_${id}`;
@@ -306,12 +330,201 @@ const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({ node, isOpen, onC
                         {renderDataMapping()}
                     </div>
                 )
+            case 'send_template': {
+                 const approvedTemplates = templates.filter(t => t.status === 'APPROVED');
+                 const selectedTemplate = templates.find(t => t.id === config.template_id);
+                 const placeholders = selectedTemplate ? getTemplatePlaceholders(selectedTemplate) : [];
+
+                 return (
+                    <div className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-300 mb-1">Selecione o Template</label>
+                            <select value={config.template_id || ''} onChange={(e) => handleConfigChange('template_id', e.target.value)} className={baseInputClass}>
+                                <option value="">-- Selecione um template --</option>
+                                {approvedTemplates.map(t => <option key={t.id} value={t.id}>{t.template_name}</option>)}
+                            </select>
+                            {approvedTemplates.length === 0 && <p className="text-xs text-amber-400 mt-1">Nenhum template APROVADO encontrado.</p>}
+                        </div>
+
+                        {placeholders.length > 0 && (
+                            <div className="border-t border-slate-700 pt-4 space-y-3">
+                                <h5 className="text-md font-semibold text-white">Preencher Variáveis</h5>
+                                {placeholders.map(p => (
+                                    <div key={p}>
+                                        <label className="block text-sm font-medium text-slate-300 mb-1">
+                                            Variável {p}
+                                        </label>
+                                        <InputWithVariables
+                                            onValueChange={val => handleConfigChange(p, val)}
+                                            value={config[p] || ''}
+                                            type="text"
+                                            placeholder={`Valor para ${p}`}
+                                            className={baseInputClass}
+                                            variables={availableVariables}
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                 );
+            }
+            case 'send_text_message':
+                return (
+                    <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-1">Texto da Mensagem</label>
+                        <TextareaWithVariables onValueChange={val => handleConfigChange('message_text', val)} value={config.message_text || ''} placeholder="Digite sua mensagem..." rows={4} className={baseInputClass} variables={availableVariables} />
+                    </div>
+                );
+             case 'add_tag':
+                return (
+                    <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-1">Nome da Tag</label>
+                        <InputWithVariables onValueChange={val => handleConfigChange('tag', val)} value={config.tag || ''} type="text" placeholder="Ex: vip" className={baseInputClass} variables={availableVariables} />
+                    </div>
+                );
+            case 'remove_tag':
+                return (
+                    <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-1">Nome da Tag a Remover</label>
+                         <InputWithVariables onValueChange={val => handleConfigChange('tag', val)} value={config.tag || ''} type="text" placeholder="Ex: lead-antigo" className={baseInputClass} variables={availableVariables} />
+                    </div>
+                );
+            case 'set_custom_field':
+                 return (
+                    <div className="space-y-3">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-300 mb-1">Nome do Campo</label>
+                            <InputWithVariables onValueChange={val => handleConfigChange('field_name', val)} value={config.field_name || ''} type="text" placeholder="Ex: id_pedido" className={baseInputClass} variables={availableVariables} />
+                        </div>
+                         <div>
+                            <label className="block text-sm font-medium text-slate-300 mb-1">Valor do Campo</label>
+                            <InputWithVariables onValueChange={val => handleConfigChange('field_value', val)} value={config.field_value || ''} type="text" placeholder="Ex: 12345 ou {{trigger.body.id}}" className={baseInputClass} variables={availableVariables} />
+                        </div>
+                    </div>
+                 );
+            case 'send_media':
+                return (
+                    <div className="space-y-3">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-300 mb-1">Tipo de Mídia</label>
+                            <select value={config.media_type || 'image'} onChange={(e) => handleConfigChange('media_type', e.target.value)} className={baseInputClass}>
+                                <option value="image">Imagem</option>
+                                <option value="video">Vídeo</option>
+                                <option value="document">Documento</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-300 mb-1">URL da Mídia</label>
+                            <InputWithVariables onValueChange={val => handleConfigChange('media_url', val)} value={config.media_url || ''} type="text" placeholder="https://..." className={baseInputClass} variables={availableVariables} />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-300 mb-1">Legenda (Opcional)</label>
+                            <TextareaWithVariables onValueChange={val => handleConfigChange('caption', val)} value={config.caption || ''} placeholder="Digite uma legenda..." rows={2} className={baseInputClass} variables={availableVariables} />
+                        </div>
+                    </div>
+                )
+            case 'send_interactive_message':
+                const buttons = Array.isArray(config.buttons) ? config.buttons : [];
+                const handleButtonChange = (index: number, text: string) => {
+                    const newButtons = [...buttons];
+                    newButtons[index] = { ...newButtons[index], text };
+                    handleConfigChange('buttons', newButtons);
+                }
+                const addButton = () => {
+                     const newButtons = [...buttons, { id: `btn_${Date.now()}`, text: ''}];
+                     handleConfigChange('buttons', newButtons);
+                }
+                 const removeButton = (index: number) => {
+                    const newButtons = buttons.filter((_, i) => i !== index);
+                    handleConfigChange('buttons', newButtons);
+                }
+                return (
+                    <div className="space-y-4">
+                         <div>
+                            <label className="block text-sm font-medium text-slate-300 mb-1">Texto Principal</label>
+                            <TextareaWithVariables onValueChange={val => handleConfigChange('message_text', val)} value={config.message_text || ''} placeholder="Digite a pergunta ou texto..." rows={3} className={baseInputClass} variables={availableVariables} />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-300 mb-1">Botões (até 3)</label>
+                            <div className="space-y-2">
+                            {buttons.map((btn, index) => (
+                                <div key={btn.id} className="flex items-center gap-2">
+                                    <InputWithVariables onValueChange={val => handleButtonChange(index, val)} value={btn.text} type="text" placeholder={`Texto do botão ${index + 1}`} className={baseInputClass} variables={availableVariables} />
+                                    <Button size="sm" variant="ghost" className="text-red-400" onClick={() => removeButton(index)}><TRASH_ICON className="w-4 h-4"/></Button>
+                                </div>
+                            ))}
+                            </div>
+                            {buttons.length < 3 && <Button size="sm" variant="secondary" className="mt-2" onClick={addButton}><PLUS_ICON className="w-4 h-4 mr-1"/> Adicionar Botão</Button>}
+                        </div>
+                    </div>
+                )
+            case 'send_webhook':
+                return (
+                     <div className="space-y-3">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-300 mb-1">URL para Envio (POST)</label>
+                            <InputWithVariables onValueChange={val => handleConfigChange('url', val)} value={config.url || ''} type="text" placeholder="https://..." className={baseInputClass} variables={availableVariables} />
+                        </div>
+                         <div>
+                            <label className="block text-sm font-medium text-slate-300 mb-1">Corpo (JSON)</label>
+                            <TextareaWithVariables onValueChange={val => handleConfigChange('body', val)} value={config.body || ''} placeholder={`{ "id": "{{contact.id}}", "event": "new_tag" }`} rows={5} className={`${baseInputClass} font-mono`} variables={availableVariables} />
+                        </div>
+                    </div>
+                )
+            case 'condition':
+                 return (
+                    <div className="space-y-3">
+                        <div>
+                            <label className="block text-xs font-medium text-slate-400 mb-1">Campo</label>
+                             <InputWithVariables onValueChange={val => handleConfigChange('field', val)} value={config.field || ''} type="text" placeholder={'tags ou {{trigger.body.id}}'} className={baseInputClass} variables={availableVariables} />
+                             <p className="text-xs text-slate-400 mt-1">Para contato: 'tags', 'name'. Para gatilho: use o seletor.</p>
+                        </div>
+                         <div>
+                            <label className="block text-xs font-medium text-slate-400 mb-1">Operador</label>
+                            <select value={config.operator || 'contains'} onChange={(e) => handleConfigChange('operator', e.target.value)} className={baseInputClass}>
+                                <option value="contains">Contém</option>
+                                <option value="not_contains">Não contém</option>
+                                <option value="equals">É igual a</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-slate-400 mb-1">Valor</label>
+                            <InputWithVariables onValueChange={val => handleConfigChange('value', val)} value={config.value || ''} type="text" placeholder="Valor a comparar" className={baseInputClass} variables={availableVariables} />
+                        </div>
+                    </div>
+                 );
             case 'split_path':
                 return <p className="text-slate-400">Este nó divide aleatoriamente os contatos em dois caminhos (A e B) com uma chance de 50% para cada.</p>
             default:
                 return <p className="text-slate-400">Nenhuma configuração necessária para este nó.</p>;
         }
     };
+    
+    const renderVariablesPanel = () => {
+       if (data.type === 'webhook_received') return null;
+
+       return (
+           <div>
+               <h4 className="text-lg font-semibold text-white">Variáveis Disponíveis</h4>
+               <p className="text-sm text-slate-400 mb-3">Clique em um campo de texto à esquerda e use o seletor para inserir uma variável.</p>
+               <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-2">
+                   {availableVariables.map(group => (
+                        <div key={group.group}>
+                            <h5 className="text-sm font-bold text-slate-300 px-2 pt-2">{group.group}</h5>
+                            <ul className="pl-2">
+                                {group.vars.map(v => (
+                                    <li key={v.path} className="text-sm text-slate-400 font-mono py-0.5" title={v.path}>
+                                        {`{{${v.path}}}`}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                   ))}
+               </div>
+           </div>
+       )
+    }
 
     return (
         <div 
@@ -338,7 +551,7 @@ const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({ node, isOpen, onC
                     </div>
                     
                     <div className="space-y-4">
-                        {(data.nodeType === 'action' || data.type === 'condition' || data.type === 'webhook_received') && <VariablesPanel nodes={nodes} />}
+                       {renderVariablesPanel()}
                     </div>
                 </main>
 

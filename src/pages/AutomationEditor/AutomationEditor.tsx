@@ -137,7 +137,12 @@ const NodeSidebar = memo(({ onDragStart }: { onDragStart: (event: React.DragEven
             <h4 className="font-semibold text-pink-300 mb-2">Ações</h4>
             <DraggableNode type="action" label="Enviar Template" specificType="send_template" onDragStart={onDragStart} />
             <DraggableNode type="action" label="Enviar Texto Simples" specificType="send_text_message" onDragStart={onDragStart} />
+            <DraggableNode type="action" label="Enviar Mídia" specificType="send_media" onDragStart={onDragStart} />
+            <DraggableNode type="action" label="Enviar Msg Interativa" specificType="send_interactive_message" onDragStart={onDragStart} />
             <DraggableNode type="action" label="Adicionar Tag" specificType="add_tag" onDragStart={onDragStart} />
+            <DraggableNode type="action" label="Remover Tag" specificType="remove_tag" onDragStart={onDragStart} />
+            <DraggableNode type="action" label="Definir Campo Personalizado" specificType="set_custom_field" onDragStart={onDragStart} />
+            <DraggableNode type="action" label="Enviar Webhook" specificType="send_webhook" onDragStart={onDragStart} />
         </div>
          <div className="mt-6">
             <h4 className="font-semibold text-purple-300 mb-2">Lógica</h4>
@@ -161,8 +166,6 @@ const FlowCanvas = () => {
     const automationId = pageParams.automationId;
 
     // --- State Synchronization Effect ---
-    // This is the main effect to sync the editor's state with the global context (automations).
-    // It's designed to be robust against re-renders and real-time updates.
     useEffect(() => {
         if (!automationId || !automations) return;
 
@@ -173,27 +176,32 @@ const FlowCanvas = () => {
             setNodes(currentAutomation.nodes || []);
             setEdges(currentAutomation.edges || []);
             
-            // If a node is selected, find its latest version in the updated data
-            // and update our state. This keeps the modal open and synced.
             if (selectedNode) {
                 const updatedSelectedNode = (currentAutomation.nodes || []).find(n => n.id === selectedNode.id);
                 if (updatedSelectedNode) {
-                    // Update the selectedNode state only if the data has actually changed
-                    if (JSON.stringify(selectedNode.data) !== JSON.stringify(updatedSelectedNode.data)) {
+                     if (JSON.stringify(selectedNode) !== JSON.stringify(updatedSelectedNode)) {
                         setSelectedNode(updatedSelectedNode);
                     }
                 } else {
-                    // Node was deleted, so close the modal
                     setSelectedNode(null);
                 }
             }
         }
-    }, [automationId, automations, selectedNode]); // Dependency on 'selectedNode' is crucial for the inner check
+    }, [automationId, automations]);
+
+    // This effect ensures that if the modal is open, it gets the latest node data.
+    useEffect(() => {
+        if (selectedNode) {
+            const currentAutomation = automations.find(a => a.id === automationId);
+            const latestNode = currentAutomation?.nodes.find(n => n.id === selectedNode.id);
+            if (latestNode && JSON.stringify(latestNode) !== JSON.stringify(selectedNode)) {
+                setSelectedNode(latestNode);
+            }
+        }
+    }, [nodes, edges, automations, selectedNode, automationId]);
 
 
     // Effect for real-time updates from Supabase.
-    // It calls 'updateAutomation' to update the global context, which then triggers the main sync effect above.
-    // This avoids direct state manipulation from multiple sources.
     useEffect(() => {
         if (!automationId) return;
 
@@ -205,7 +213,6 @@ const FlowCanvas = () => {
                 filter: `id=eq.${automationId}` 
             }, (payload) => {
                 const updatedAutomation = payload.new as unknown as Automation;
-                // Update the global context. The main useEffect will handle the UI update.
                 updateAutomation(updatedAutomation);
             })
             .subscribe();
@@ -248,7 +255,6 @@ const FlowCanvas = () => {
     const onPaneClick = useCallback(() => setSelectedNode(null), []);
     const onNodesDelete = useCallback(() => setSelectedNode(null), []);
     
-    // This function is now used for partial updates from the modal
     const handlePartialUpdate = async (updatedNodes: AutomationNode[]) => {
          const automationData = {
             id: automationId,
@@ -340,7 +346,6 @@ const FlowCanvas = () => {
                 isOpen={!!selectedNode}
                 onClose={() => setSelectedNode(null)}
                 nodes={nodes}
-                setNodes={setNodes as any}
                 templates={templates}
                 profile={profile}
                 onUpdateNodes={handlePartialUpdate}

@@ -1,13 +1,15 @@
 
 
+
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from './_lib/supabaseAdmin.js';
 import { executeAutomation } from './_lib/engine.js';
-import { Automation, Contact } from './_lib/types.js';
+import { Automation, Contact, TablesInsert } from './_lib/types.js';
 
 // Helper to find a contact by phone and create if not exists
 const findOrCreateContact = async (user_id: string, phone: string, name: string): Promise<Contact | null> => {
-    let { data: contact, error } = await supabaseAdmin
+    let { data: contactData, error } = await supabaseAdmin
         .from('contacts')
         .select('*')
         .eq('user_id', user_id)
@@ -17,19 +19,19 @@ const findOrCreateContact = async (user_id: string, phone: string, name: string)
     if (error && error.code === 'PGRST116') { // Not found
         const { data: newContact, error: insertError } = await supabaseAdmin
             .from('contacts')
-            .insert({ user_id, phone, name, tags: ['new-lead'] } as any)
+            .insert({ user_id, phone, name, tags: ['new-lead'] } as TablesInsert<'contacts'>)
             .select()
             .single();
-        if (insertError) {
+        if (insertError || !newContact) {
              console.error("Error creating new contact:", insertError);
              return null;
         }
-        contact = newContact;
+        contactData = newContact;
     } else if (error) {
          console.error("Error finding contact:", error);
         return null;
     }
-    return contact as Contact;
+    return contactData as unknown as Contact;
 };
 
 // Helper to find automations to trigger based on message content
@@ -111,9 +113,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     if (value.messages) {
                         for (const message of value.messages) {
                             const wabaId = value.metadata.phone_number_id;
-                            const { data: profile, error: profileError } = await supabaseAdmin.from('profiles').select('id').eq('meta_phone_number_id', wabaId).single();
+                            const { data: profileData, error: profileError } = await supabaseAdmin.from('profiles').select('id').eq('meta_phone_number_id', wabaId).single();
                             
-                            if (profileError || !profile) continue;
+                            if (profileError || !profileData) continue;
+                            const profile = profileData;
 
                             const contact = await findOrCreateContact(profile.id, message.from, value.contacts[0].profile.name);
                             if (!contact) continue;
@@ -137,7 +140,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                                contact_id: contact.id,
                                meta_message_id: message.id,
                                message_body: messageBody
-                            } as any);
+                            } as TablesInsert<'received_messages'>);
                             
                             // Find and run automations
                             const automationsToRun = await findAutomationsToTrigger(profile.id, messageBody, buttonPayload);
