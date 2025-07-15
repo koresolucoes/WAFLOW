@@ -95,7 +95,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         // O gatilho handle_new_user deve cuidar disso, mas como fallback:
         const { data: newProfile, error: insertError } = await supabase
           .from('profiles')
-          .insert({ id: user.id } as TablesInsert<'profiles'>)
+          .insert({ id: user.id } as any)
           .select()
           .single();
         
@@ -104,7 +104,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           setLoading(false);
           return;
         }
-        profileData = newProfile as unknown as Profile;
+        profileData = newProfile;
       } else if (profileError) {
         console.error("Error fetching profile:", profileError);
       }
@@ -234,7 +234,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const updateProfile = async (profileData: Partial<Profile>) => {
     if (!user) throw new Error("Usuário não autenticado.");
-    const { data, error } = await supabase.from('profiles').update(profileData).eq('id', user.id).select().single();
+    const { data, error } = await supabase.from('profiles').update(profileData as any).eq('id', user.id).select().single();
     if(error) throw error;
     if (data) setProfile(data as unknown as Profile);
   };
@@ -256,7 +256,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     
     const { data, error } = await supabase
       .from('message_templates')
-      .insert(dbTemplate)
+      .insert(dbTemplate as any)
       .select()
       .single();
     if (error) throw error;
@@ -300,7 +300,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (!user) throw new Error("Usuário não autenticado.");
     const { data, error } = await supabase
       .from('contacts')
-      .insert({ ...contact, user_id: user.id })
+      .insert({ ...contact, user_id: user.id } as any)
       .select()
       .single();
     if (error) throw error;
@@ -317,7 +317,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
      
      const { data, error } = await supabase
         .from('contacts')
-        .update(updatedContact)
+        .update(updatedContact as any)
         .eq('id', updatedContact.id)
         .eq('user_id', user.id)
         .select()
@@ -359,7 +359,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     });
 
     if (contactsToInsert.length > 0) {
-        const { data, error } = await supabase.from('contacts').insert(contactsToInsert).select();
+        const { data, error } = await supabase.from('contacts').insert(contactsToInsert as any).select();
         if (error) throw error;
         if(data) {
           const newContactsData = data as unknown as Contact[];
@@ -379,7 +379,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const sent_at = new Date().toISOString();
     const { data: newCampaign, error: campaignError } = await supabase
         .from('campaigns')
-        .insert({ ...campaign, user_id: user.id, sent_at })
+        .insert({ ...campaign, user_id: user.id, sent_at } as any)
         .select()
         .single();
 
@@ -389,7 +389,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const typedNewCampaign = newCampaign as unknown as Campaign;
 
     const messagesToInsert = messages.map(msg => ({ ...msg, campaign_id: typedNewCampaign.id }));
-    const { error: messagesError } = await supabase.from('campaign_messages').insert(messagesToInsert);
+    const { error: messagesError } = await supabase.from('campaign_messages').insert(messagesToInsert as any);
 
     if (messagesError) {
         await supabase.from('campaigns').delete().eq('id', typedNewCampaign.id);
@@ -434,7 +434,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     const { data, error } = await supabase
         .from('automations')
-        .insert(dbAutomation)
+        .insert(dbAutomation as any)
         .select()
         .single();
 
@@ -459,7 +459,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             status: automation.status,
             nodes: automation.nodes as unknown as Json,
             edges: automation.edges as unknown as Json
-        })
+        } as any)
         .eq('id', automation.id)
         .eq('user_id', user.id)
         .select()

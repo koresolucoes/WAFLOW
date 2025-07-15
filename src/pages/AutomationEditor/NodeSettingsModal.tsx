@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useEffect, memo, useRef, useCallback } from 'react';
 import { Automation, AutomationNode, NodeData, MessageTemplate, Profile } from '../../types';
 import Button from '../../components/common/Button';
@@ -39,10 +40,10 @@ const VariablePill = memo(({ path, value }: { path: string; value: string }) => 
 
 const VariablesPanel = memo(({ nodes }: { nodes: AutomationNode[] }) => {
     const triggerNode = nodes.find(n => n.data.nodeType === 'trigger' && n.data.type === 'webhook_received');
-    const capturedData = triggerNode?.data.config?.last_captured_data;
+    const capturedData = (triggerNode?.data.config as any)?.last_captured_data;
 
-    if (!capturedData) {
-        return <p className="text-xs text-slate-400 p-2 bg-slate-700/50 rounded-md">Para usar variáveis, configure e escute o gatilho "Webhook Recebido" primeiro.</p>;
+    if (!capturedData || Object.keys(capturedData).length === 0) {
+        return <p className="text-xs text-slate-400 p-2 bg-slate-700/50 rounded-md">Para usar variáveis, clique em "Limpar e Escutar" e envie uma requisição de teste para a URL do webhook.</p>;
     }
     
     const flattened = flattenObject(capturedData);
@@ -117,10 +118,12 @@ const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({ node, isOpen, onC
     
     useEffect(() => {
         // Automatically turn off listening indicator when data arrives
-        if (node?.data.config?.last_captured_data) {
+        const config = (node?.data.config as any) || {};
+        const hasData = config.last_captured_data && Object.keys(config.last_captured_data).length > 0;
+        if (hasData) {
             setIsListening(false);
         }
-    }, [node?.data.config?.last_captured_data]);
+    }, [node?.data.config]);
     
     const updateNodeConfig = useCallback((key: string, value: any) => {
         if (!node) return;
@@ -135,11 +138,16 @@ const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({ node, isOpen, onC
 
     const handleStartListening = async () => {
         setIsListening(true);
-        // This function assumes `node` and `automationId` are valid because the button is disabled otherwise.
         const newConfig = { ...(node!.data.config as object || {}), last_captured_data: null };
         const updatedNode = { ...node!, data: { ...node!.data, config: newConfig } };
-        const newNodes = nodes.map(n => n.id === node!.id ? updatedNode : n);
-        const currentAutomation = { id: automationId!, nodes: newNodes } as Automation;
+        
+        // This creates a partial automation object just for the update.
+        // The AppContext merges it with the full automation data.
+        const currentAutomation = { 
+            id: automationId!, 
+            nodes: nodes.map(n => n.id === node!.id ? updatedNode : n) 
+        } as Automation;
+        
         await updateAutomation(currentAutomation);
     };
 
@@ -166,7 +174,7 @@ const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({ node, isOpen, onC
     const config = (data.config as any) || {};
 
     const renderDataMapping = () => {
-        if (!config.last_captured_data) return null;
+        if (!config.last_captured_data || Object.keys(config.last_captured_data).length === 0) return null;
         
         const flattenedData = flattenObject(config.last_captured_data);
         const capturedKeys = Object.keys(flattenedData);
@@ -294,7 +302,7 @@ const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({ node, isOpen, onC
                                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                     </svg>
                                     <p className="text-sm text-sky-300 mt-2">Aguardando dados...</p>
-                                    <p className="text-xs text-slate-400 mt-1">Envie uma requisição de teste para a URL.</p>
+                                    <p className="text-xs text-slate-400 mt-1">Envie uma requisição POST com um corpo JSON para a URL.</p>
                                 </div>
                             ) : (
                                 <Button size="sm" variant="secondary" onClick={handleStartListening} disabled={!automationId}>Limpar e Escutar por Novos Dados</Button>

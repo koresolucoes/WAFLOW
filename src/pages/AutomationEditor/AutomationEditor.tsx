@@ -1,5 +1,6 @@
 
 
+
 import React, { useContext, useState, useEffect, useCallback, memo } from 'react';
 import { ReactFlow, ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, type Node, type Edge, type NodeProps, useReactFlow } from '@xyflow/react';
 import { AppContext } from '../../contexts/AppContext';
@@ -159,8 +160,8 @@ const FlowCanvas = () => {
 
     const automationId = pageParams.automationId;
 
-    // Effect to load data from context when automations list or ID changes.
-    // It does NOT close the modal.
+    // Effect to load automation data from context when ID changes or context reloads.
+    // It also refreshes the selected node to prevent stale data in the modal.
     useEffect(() => {
         if (automationId) {
             const existingAutomation = automations.find(a => a.id === automationId);
@@ -168,11 +169,18 @@ const FlowCanvas = () => {
                 setAutomationName(existingAutomation.name);
                 setNodes(existingAutomation.nodes || []);
                 setEdges(existingAutomation.edges || []);
+                
+                // Refresh selected node with the new data to prevent stale state.
+                // This is key to keeping the modal open and updated.
+                setSelectedNode(currentNode => {
+                    if (!currentNode) return null;
+                    return (existingAutomation.nodes as Node<NodeData>[])?.find(n => n.id === currentNode.id) || null;
+                });
             }
         }
-    }, [automationId, automations, setNodes, setEdges]);
+    }, [automationId, automations, setNodes, setEdges, setSelectedNode]);
     
-    // Effect to reset the modal (close it) ONLY when navigating to a new automation.
+    // Effect to close the modal only when navigating to a different automation.
     useEffect(() => {
         setSelectedNode(null);
     }, [automationId]);
@@ -181,7 +189,7 @@ const FlowCanvas = () => {
     useEffect(() => {
         if (!automationId) return;
 
-        const channel = supabase.channel(`automation-editor-${automationId}`)
+        const channel = supabase.channel(`automation-editor-realtime-${automationId}`)
             .on('postgres_changes', { 
                 event: 'UPDATE', 
                 schema: 'public', 
@@ -191,11 +199,10 @@ const FlowCanvas = () => {
                 const updatedAutomation = payload.new as unknown as Automation;
                 if (updatedAutomation && updatedAutomation.nodes) {
                     setNodes(updatedAutomation.nodes);
-                    // Functional update to avoid stale state for selectedNode
+                    // Refresh selected node to reflect real-time changes in the modal.
                     setSelectedNode(currentNode => {
                         if (!currentNode) return null;
-                        const updatedSelectedNode = updatedAutomation.nodes.find(n => n.id === currentNode.id);
-                        return updatedSelectedNode || currentNode;
+                        return (updatedAutomation.nodes as Node<NodeData>[])?.find(n => n.id === currentNode.id) || null;
                     });
                 }
             })
@@ -204,7 +211,7 @@ const FlowCanvas = () => {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [automationId, setNodes]);
+    }, [automationId, setNodes, setSelectedNode]);
 
     const onConnect = useCallback((params: any) => setEdges((eds) => addEdge(params, eds)), [setEdges]);
 
@@ -235,7 +242,7 @@ const FlowCanvas = () => {
         setNodes((nds) => nds.concat(newNode));
     }, [screenToFlowPosition, setNodes, nodes]);
 
-    const onNodeClick = useCallback((_: any, node: Node<NodeData>) => setSelectedNode(node), []);
+    const onNodeClick = useCallback((_: React.MouseEvent, node: Node) => setSelectedNode(node as AutomationNode), []);
     const onPaneClick = useCallback(() => setSelectedNode(null), []);
     const onNodesDelete = useCallback(() => setSelectedNode(null), []);
 
@@ -243,7 +250,7 @@ const FlowCanvas = () => {
         const payload = {
             id: automationData.id,
             name: automationData.name || automationName,
-            status: automationData.status || 'active',
+            status: automations.find(a => a.id === automationId)?.status || 'active',
             nodes: automationData.nodes,
             edges: automationData.edges || edges
         }
@@ -306,7 +313,7 @@ const FlowCanvas = () => {
 
                 <div className="flex-grow h-full">
                     <ReactFlow
-                        nodes={nodes}
+                        nodes={nodes as Node[]}
                         edges={edges}
                         onNodesChange={onNodesChange}
                         onEdgesChange={onEdgesChange}
@@ -316,7 +323,7 @@ const FlowCanvas = () => {
                         onNodeClick={onNodeClick}
                         onPaneClick={onPaneClick}
                         onNodesDelete={onNodesDelete}
-                        nodeTypes={nodeTypes}
+                        nodeTypes={nodeTypes as any}
                         fitView
                         className="bg-slate-900 xyflow-react"
                     >

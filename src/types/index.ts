@@ -17,13 +17,14 @@ export type AutomationRunStatus = 'success' | 'failed';
 // Tipos para os nós do editor de automação
 export type NodeType = 'trigger' | 'action' | 'logic';
 
-// Tipos simplificados para focar no fluxo de webhook
-export type TriggerType = 'webhook_received';
-export type ActionType = 'send_template' | 'add_tag' | 'send_text_message';
+// Tipos expandidos para corresponderem ao backend
+export type TriggerType = 'new_contact_with_tag' | 'message_received_with_keyword' | 'button_clicked' | 'new_contact' | 'webhook_received';
+export type ActionType = 'send_template' | 'add_tag' | 'remove_tag' | 'send_text_message' | 'send_media' | 'send_interactive_message' | 'set_custom_field' | 'send_webhook';
 export type LogicType = 'condition' | 'split_path';
 
 
 export interface NodeData {
+  [key: string]: any; // Fix for @xyflow/react constraint
   nodeType: NodeType;
   type: TriggerType | ActionType | LogicType;
   label: string;

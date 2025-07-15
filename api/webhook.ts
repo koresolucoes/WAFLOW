@@ -1,4 +1,5 @@
 
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from './_lib/supabaseAdmin.js';
 import { executeAutomation } from './_lib/engine.js';
@@ -16,7 +17,7 @@ const findOrCreateContact = async (user_id: string, phone: string, name: string)
     if (error && error.code === 'PGRST116') { // Not found
         const { data: newContact, error: insertError } = await supabaseAdmin
             .from('contacts')
-            .insert({ user_id, phone, name, tags: ['new-lead'] })
+            .insert({ user_id, phone, name, tags: ['new-lead'] } as any)
             .select()
             .single();
         if (insertError) {
@@ -110,9 +111,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     if (value.messages) {
                         for (const message of value.messages) {
                             const wabaId = value.metadata.phone_number_id;
-                            const { data: profile } = await supabaseAdmin.from('profiles').select('id').eq('meta_phone_number_id', wabaId).single();
-
-                            if (!profile) continue;
+                            const { data: profile, error: profileError } = await supabaseAdmin.from('profiles').select('id').eq('meta_phone_number_id', wabaId).single();
+                            
+                            if (profileError || !profile) continue;
 
                             const contact = await findOrCreateContact(profile.id, message.from, value.contacts[0].profile.name);
                             if (!contact) continue;
@@ -136,7 +137,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                                contact_id: contact.id,
                                meta_message_id: message.id,
                                message_body: messageBody
-                            });
+                            } as any);
                             
                             // Find and run automations
                             const automationsToRun = await findAutomationsToTrigger(profile.id, messageBody, buttonPayload);

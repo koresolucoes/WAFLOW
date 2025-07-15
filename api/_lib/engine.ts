@@ -1,6 +1,7 @@
 
 
 
+
 import { supabaseAdmin } from './supabaseAdmin.js';
 import { sendTemplatedMessage, sendTextMessage, sendMediaMessage, sendInteractiveMessage } from './meta/messages.js';
 import { Automation, Contact, Json, MetaConfig, NodeData, MessageTemplate } from './types.js';
@@ -43,9 +44,9 @@ export const executeAutomation = async (
         contact_id: contact.id,
         status: 'running',
         details: `Started from node ${startNodeId}`
-    }).select().single();
+    } as any).select().single();
 
-    if (runError) {
+    if (runError || !run) {
         console.error(`Engine Error: Failed to create run log for automation ${automation.id}`, runError);
         return;
     }
@@ -78,7 +79,8 @@ export const executeAutomation = async (
 
             switch (node.data.type as NodeData['type']) {
                 case 'send_template':
-                    const { data: template } = await supabaseAdmin.from('message_templates').select('*').eq('id', config.template_id).single();
+                    const { data: template, error: templateError } = await supabaseAdmin.from('message_templates').select('*').eq('id', config.template_id).single();
+                    if (templateError) throw templateError;
                     if (template) {
                          const templateTyped = template as unknown as MessageTemplate;
                          const textForVars = (templateTyped.components as any[])?.reduce((acc, c) => acc + (c.text || ''), '') || '';
@@ -122,7 +124,8 @@ export const executeAutomation = async (
                     if (config.tag) {
                         const tagToAdd = resolveVariables(config.tag, context);
                         const newTags = Array.from(new Set([...(currentContactState.tags || []), tagToAdd]));
-                        const { data } = await supabaseAdmin.from('contacts').update({ tags: newTags }).eq('id', currentContactState.id).select().single();
+                        const { data, error } = await supabaseAdmin.from('contacts').update({ tags: newTags } as any).eq('id', currentContactState.id).select().single();
+                        if (error) throw error;
                         if (data) currentContactState = data as Contact;
                     }
                     break;
@@ -130,7 +133,8 @@ export const executeAutomation = async (
                     if (config.tag) {
                         const tagToRemove = resolveVariables(config.tag, context);
                         const newTags = (currentContactState.tags || []).filter(t => t !== tagToRemove);
-                        const { data } = await supabaseAdmin.from('contacts').update({ tags: newTags }).eq('id', currentContactState.id).select().single();
+                        const { data, error } = await supabaseAdmin.from('contacts').update({ tags: newTags } as any).eq('id', currentContactState.id).select().single();
+                        if (error) throw error;
                         if (data) currentContactState = data as Contact;
                     }
                     break;
@@ -139,7 +143,8 @@ export const executeAutomation = async (
                         const fieldName = resolveVariables(config.field_name, context);
                         const fieldValue = resolveVariables(config.field_value || '', context);
                         const newCustomFields = { ...(currentContactState.custom_fields as object || {}), [fieldName]: fieldValue };
-                        const { data } = await supabaseAdmin.from('contacts').update({ custom_fields: newCustomFields }).eq('id', currentContactState.id).select().single();
+                        const { data, error } = await supabaseAdmin.from('contacts').update({ custom_fields: newCustomFields } as any).eq('id', currentContactState.id).select().single();
+                        if (error) throw error;
                         if (data) currentContactState = data as Contact;
                     }
                     break;
@@ -195,10 +200,10 @@ export const executeAutomation = async (
 
         } catch (err: any) {
             console.error(`Engine Error on node ${nodeId} in automation ${automation.id}:`, err);
-            await supabaseAdmin.from('automation_runs').update({ status: 'failed', details: `Error on node ${node.data.label}: ${err.message}` }).eq('id', run.id);
+            await supabaseAdmin.from('automation_runs').update({ status: 'failed', details: `Error on node ${node.data.label}: ${err.message}` } as any).eq('id', run.id);
             return; // Stop execution on error
         }
     }
 
-    await supabaseAdmin.from('automation_runs').update({ status: 'success', details: 'Completed successfully.' }).eq('id', run.id);
+    await supabaseAdmin.from('automation_runs').update({ status: 'success', details: 'Completed successfully.' } as any).eq('id', run.id);
 };
