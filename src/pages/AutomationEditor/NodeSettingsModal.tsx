@@ -1,8 +1,9 @@
 
 
 
+
 import React, { useState, useEffect, memo, useRef, useCallback } from 'react';
-import { Automation, AutomationNode, NodeData, MessageTemplate, Profile } from '../../types';
+import { AutomationNode, NodeData, MessageTemplate, Profile } from '../../types';
 import Button from '../../components/common/Button';
 import { COPY_ICON, INFO_ICON } from '../../components/icons';
 
@@ -109,11 +110,10 @@ interface NodeSettingsModalProps {
     setNodes: React.Dispatch<React.SetStateAction<AutomationNode[]>>;
     templates: MessageTemplate[];
     profile: Profile | null;
-    automationId?: string;
-    updateAutomation: (automation: Automation) => Promise<void>;
+    onUpdateNodes: (nodes: AutomationNode[]) => Promise<void>;
 }
 
-const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({ node, isOpen, onClose, nodes, setNodes, templates, profile, automationId, updateAutomation }) => {
+const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({ node, isOpen, onClose, nodes, setNodes, templates, profile, onUpdateNodes }) => {
     const [isListening, setIsListening] = useState(false);
     
     useEffect(() => {
@@ -127,28 +127,22 @@ const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({ node, isOpen, onC
     
     const updateNodeConfig = useCallback((key: string, value: any) => {
         if (!node) return;
-        setNodes(nds => nds.map(n => {
+        const updatedNodes = nodes.map(n => {
             if (n.id === node.id) {
                 const oldConfig = (typeof n.data.config === 'object' && n.data.config && !Array.isArray(n.data.config)) ? n.data.config : {};
                 return { ...n, data: { ...n.data, config: { ...oldConfig, [key]: value } } };
             }
             return n;
-        }));
-    }, [node, setNodes]);
+        });
+        setNodes(updatedNodes);
+        onUpdateNodes(updatedNodes); // Persist change
+    }, [node, nodes, setNodes, onUpdateNodes]);
 
     const handleStartListening = async () => {
+        if (!node) return;
         setIsListening(true);
-        const newConfig = { ...(node!.data.config as object || {}), last_captured_data: null };
-        const updatedNode = { ...node!, data: { ...node!.data, config: newConfig } };
-        
-        // This creates a partial automation object just for the update.
-        // The AppContext merges it with the full automation data.
-        const currentAutomation = { 
-            id: automationId!, 
-            nodes: nodes.map(n => n.id === node!.id ? updatedNode : n) 
-        } as Automation;
-        
-        await updateAutomation(currentAutomation);
+        // We only need to update the config on the specific node
+        updateNodeConfig('last_captured_data', null);
     };
 
     const handleMappingChange = useCallback((source: string, destination: string, destination_key?: string) => {
@@ -305,7 +299,7 @@ const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({ node, isOpen, onC
                                     <p className="text-xs text-slate-400 mt-1">Envie uma requisição POST com um corpo JSON para a URL.</p>
                                 </div>
                             ) : (
-                                <Button size="sm" variant="secondary" onClick={handleStartListening} disabled={!automationId}>Limpar e Escutar por Novos Dados</Button>
+                                <Button size="sm" variant="secondary" onClick={handleStartListening}>Limpar e Escutar por Novos Dados</Button>
                             )}
                         </div>
                         {renderDataMapping()}
