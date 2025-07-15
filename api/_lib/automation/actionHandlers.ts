@@ -55,6 +55,18 @@ interface ActionResult {
 
 type ActionHandler = (context: ActionContext) => Promise<ActionResult>;
 
+const getMetaConfig = (profile: Profile): MetaConfig => {
+    const metaConfig = {
+        accessToken: profile.meta_access_token || '',
+        wabaId: profile.meta_waba_id || '',
+        phoneNumberId: profile.meta_phone_number_id || '',
+    };
+    if (!metaConfig.accessToken || !metaConfig.wabaId || !metaConfig.phoneNumberId) {
+        throw new Error(`Meta configuration missing in profile for user ${profile.id}`);
+    }
+    return metaConfig;
+};
+
 // ====================================================================================
 // Action Handler Implementations
 // ====================================================================================
@@ -64,6 +76,7 @@ const sendTemplate: ActionHandler = async ({ profile, contact, node, triggerData
     const { data: template, error: templateError } = await supabaseAdmin.from('message_templates').select('*').eq('id', config.template_id).single();
     if (templateError) throw templateError;
     if (template) {
+         const metaConfig = getMetaConfig(profile);
          const templateTyped = template as unknown as MessageTemplate;
          
          let allText = '';
@@ -87,7 +100,7 @@ const sendTemplate: ActionHandler = async ({ profile, contact, node, triggerData
          const components = [{ type: 'body', parameters: bodyParameters }];
 
         await sendTemplatedMessage(
-            profile as unknown as MetaConfig, 
+            metaConfig, 
             contact.phone, 
             templateTyped.template_name, 
             components
@@ -99,8 +112,9 @@ const sendTemplate: ActionHandler = async ({ profile, contact, node, triggerData
 const sendTextMessageAction: ActionHandler = async ({ profile, contact, node, triggerData }) => {
     const config = (node.data.config || {}) as any;
     if (config.message_text) {
+        const metaConfig = getMetaConfig(profile);
         const message = resolveVariables(config.message_text, { contact, triggerData });
-        await sendTextMessage(profile as unknown as MetaConfig, contact.phone, message);
+        await sendTextMessage(metaConfig, contact.phone, message);
     }
     return {};
 };
@@ -108,9 +122,10 @@ const sendTextMessageAction: ActionHandler = async ({ profile, contact, node, tr
 const sendMediaAction: ActionHandler = async ({ profile, contact, node, triggerData }) => {
     const config = (node.data.config || {}) as any;
     if(config.media_url && config.media_type){
+        const metaConfig = getMetaConfig(profile);
         const mediaUrl = resolveVariables(config.media_url, { contact, triggerData });
         const caption = config.caption ? resolveVariables(config.caption, { contact, triggerData }) : undefined;
-        await sendMediaMessage(profile as unknown as MetaConfig, contact.phone, config.media_type, mediaUrl, caption);
+        await sendMediaMessage(metaConfig, contact.phone, config.media_type, mediaUrl, caption);
     }
     return {};
 };
@@ -118,9 +133,10 @@ const sendMediaAction: ActionHandler = async ({ profile, contact, node, triggerD
 const sendInteractiveMessageAction: ActionHandler = async ({ profile, contact, node, triggerData }) => {
     const config = (node.data.config || {}) as any;
     if(config.message_text && Array.isArray(config.buttons)){
+         const metaConfig = getMetaConfig(profile);
          const message = resolveVariables(config.message_text, { contact, triggerData });
          const buttons = config.buttons.map((b: any) => ({...b, text: resolveVariables(b.text, { contact, triggerData })}));
-         await sendInteractiveMessage(profile as unknown as MetaConfig, contact.phone, message, buttons);
+         await sendInteractiveMessage(metaConfig, contact.phone, message, buttons);
     }
     return {};
 };

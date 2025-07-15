@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { NodeSettingsProps, InputWithVariables, TextareaWithVariables } from './common';
 import Button from '../../../components/common/Button';
@@ -56,6 +57,7 @@ const SendWebhookSettings: React.FC<NodeSettingsProps> = ({ node, onConfigChange
 
     const httpMethods = ['POST', 'GET', 'PUT', 'PATCH', 'DELETE'];
     const showBody = ['POST', 'PUT', 'PATCH'].includes(config.method || 'POST');
+    const placeholderText = `{ "id": {{contact.id}}, "event": "new_tag" }`;
 
     return (
         <div className="space-y-3">
@@ -75,12 +77,12 @@ const SendWebhookSettings: React.FC<NodeSettingsProps> = ({ node, onConfigChange
                     <TextareaWithVariables 
                         onValueChange={val => handleConfigChange('body', val)} 
                         value={config.body || ''} 
-                        placeholder='{ "id": {{contact.id}}, "event": "new_tag" }' 
+                        placeholder={placeholderText}
                         rows={5} 
                         className={`${baseInputClass} font-mono`} 
                         variables={availableVariables} 
                     />
-                    <p className="text-xs text-slate-400 mt-1">Dica: Insira placeholders (ex: `{{contact.name}}`) sem aspas ao redor.</p>
+                    <p className="text-xs text-slate-400 mt-1">Dica: Insira placeholders (ex: `{"{{contact.name}}"`}) sem aspas ao redor.</p>
                 </div>
             )}
             <div className="mt-4 pt-4 border-t border-slate-700 space-y-3">
@@ -100,7 +102,7 @@ const SendWebhookSettings: React.FC<NodeSettingsProps> = ({ node, onConfigChange
                             <div>
                                 <p className="font-bold text-slate-300">Corpo:</p>
                                 <pre className="mt-1 p-2 bg-slate-800 rounded-md whitespace-pre-wrap max-h-48 overflow-y-auto text-slate-400">
-                                    {typeof testResponse.body === 'object' ? JSON.stringify(testResponse.body, null, 2) : String(testResponse.body)}
+                                    {typeof testResponse.body === 'object' ? JSON.stringify(testResponse.body, null, 2) : (testResponse.body ?? '').toString()}
                                 </pre>
                             </div>
                         </div>

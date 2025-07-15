@@ -7,6 +7,7 @@ import { MetaTemplateComponent } from './meta/types.js';
 
 export type Json = DbJson;
 export type { Tables, TablesInsert, TablesUpdate };
+export type Profile = Tables<'profiles'>;
 
 // --- Backend-safe Flow Types ---
 

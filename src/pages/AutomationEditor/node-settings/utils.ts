@@ -1,3 +1,4 @@
+
 import { MessageTemplate } from '../../../types';
 
 export const getTemplatePlaceholders = (template: MessageTemplate | undefined) => {

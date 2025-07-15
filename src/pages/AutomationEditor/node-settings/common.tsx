@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, memo } from 'react';
 import { AutomationNode, MessageTemplate, Profile } from '../../../types';
 
@@ -108,7 +109,7 @@ export const InputWithVariables: React.FC<InputWithVariablesProps> = ({ onValueC
         if (!inputRef.current) return;
         const { selectionStart, selectionEnd } = inputRef.current;
         const currentValStr = String(value || '');
-        const newValue = `${currentValStr.substring(0, selectionStart as number)}${variablePath}${currentValStr.substring(selectionEnd as number)}`;
+        const newValue = `${currentValStr.substring(selectionStart as number)}${variablePath}${currentValStr.substring(selectionEnd as number)}`;
         onValueChange(newValue);
         inputRef.current.focus();
     };

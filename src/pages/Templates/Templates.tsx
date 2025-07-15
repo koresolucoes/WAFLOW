@@ -1,5 +1,6 @@
 
 
+
 import React, { useContext, useState, useMemo } from 'react';
 import { Json, MessageTemplate, Tables, TablesInsert, TemplateCategory, TemplateStatus } from '../../types';
 import { AppContext } from '../../contexts/AppContext';
@@ -72,38 +73,17 @@ const Templates: React.FC = () => {
     try {
         const metaTemplates = await getMetaTemplates(metaConfig);
 
-        const { data: existingTemplates, error: fetchError } = await supabase
-            .from('message_templates')
-            .select('id, meta_id')
-            .eq('user_id', user.id)
-            .in('meta_id', metaTemplates.map(mt => mt.id));
-
-        if (fetchError) throw fetchError;
-        
-        const existingMetaIdMap = new Map((existingTemplates as unknown as { meta_id: string; id: string }[] | null)?.map(t => [t.meta_id, t.id]));
-
-        const templatesToUpsert: Tables<"message_templates">[] = metaTemplates.map(mt => {
-            const templateData: Partial<Tables<"message_templates">> = {
-                id: existingMetaIdMap.get(mt.id)!, // a chave primária para o upsert
-                meta_id: mt.id,
-                user_id: user.id,
-                template_name: mt.name,
-                status: mt.status,
-                category: mt.category,
-                components: mt.components as unknown as Json,
-                created_at: new Date().toISOString(), // Add default for missing property
-            };
-            
-            // Remove id if it's undefined, so upsert works correctly for new items.
-            if (!templateData.id) {
-                delete (templateData as any).id;
-            }
-
-            return templateData as Tables<"message_templates">;
-        });
+        const templatesToUpsert: TablesInsert<'message_templates'>[] = metaTemplates.map(mt => ({
+            meta_id: mt.id,
+            user_id: user.id,
+            template_name: mt.name,
+            status: mt.status,
+            category: mt.category,
+            components: mt.components as unknown as Json,
+        }));
         
         if (templatesToUpsert.length > 0) {
-            const { error: upsertError } = await supabase.from('message_templates').upsert(templatesToUpsert as any, { onConflict: 'meta_id, user_id' });
+            const { error: upsertError } = await supabase.from('message_templates').upsert(templatesToUpsert, { onConflict: 'meta_id, user_id' });
             if (upsertError) throw upsertError;
         }
 

@@ -320,7 +320,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
      const { id, created_at, user_id, ...updatePayload } = updatedContact;
      const { data, error } = await supabase
         .from('contacts')
-        .update(updatePayload as any)
+        .update(updatePayload)
         .eq('id', updatedContact.id)
         .eq('user_id', user.id)
         .select()

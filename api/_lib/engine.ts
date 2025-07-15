@@ -1,6 +1,4 @@
 
-
-
 import { supabaseAdmin } from './supabaseAdmin.js';
 import { Automation, Contact, Json, TablesInsert } from './types.js';
 import { actionHandlers, ActionContext } from './automation/actionHandlers.js';

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { NodeSettingsProps } from './common';
 import Button from '../../../components/common/Button';
@@ -14,7 +15,7 @@ const TriggerSettings: React.FC<NodeSettingsProps> = ({ node, onConfigChange, pr
 
     const handleStartListening = () => {
         setIsListening(true);
-        onConfigChange({ ...config, last_captured_data: null });
+        onConfigChange({ ...config, last_captured_data: null, data_mapping: [] });
     };
 
     const handleMappingChange = useCallback((source: string, destination: string, destination_key?: string) => {
@@ -87,47 +88,37 @@ const TriggerSettings: React.FC<NodeSettingsProps> = ({ node, onConfigChange, pr
                                 />
                             )}
                         </div>
-                    )
+                    );
                 })}
                 </div>
             </div>
-        )
+        );
     };
 
-    if (node.data.type === 'webhook_received') {
-        const webhookPrefix = profile?.webhook_path_prefix || profile?.id;
-        const webhookUrl = `${window.location.origin}/api/trigger/${webhookPrefix}_${node.id}`;
-        return (
-             <div className="space-y-4">
-                <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-1">URL do Webhook</label>
-                    <div className="flex items-center gap-2">
-                        <input type="text" readOnly value={webhookUrl} className="w-full bg-slate-900 border border-slate-700 rounded-md p-2 text-slate-400 font-mono text-xs" />
-                        <Button size="sm" variant="ghost" onClick={() => navigator.clipboard.writeText(webhookUrl)}><COPY_ICON className="w-4 h-4"/></Button>
-                    </div>
-                     <p className="text-xs text-slate-400 mt-1">Esta URL é única para este nó e já está ativa.</p>
-                </div>
-                <div className="border-t border-slate-700 pt-4">
-                    <label className="block text-sm font-medium text-slate-300 mb-2">Escuta de Webhook</label>
-                     {isListening ? (
-                        <div className="text-center p-4 bg-slate-700/50 rounded-lg">
-                            <svg className="animate-spin h-6 w-6 text-sky-400 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            <p className="text-sm text-sky-300 mt-2">Aguardando dados...</p>
-                            <p className="text-xs text-slate-400 mt-1">Envie uma requisição POST com um corpo JSON para a URL.</p>
-                        </div>
-                    ) : (
-                        <Button size="sm" variant="secondary" onClick={handleStartListening}>Limpar e Escutar por Novos Dados</Button>
-                    )}
-                </div>
-                {renderDataMapping()}
-            </div>
-        )
-    }
+    const webhookUrl = `${window.location.origin}/api/trigger/${profile?.webhook_path_prefix || profile?.id}_${node.id}`;
 
-    return <p className="text-slate-400">Configuração de gatilho não reconhecida.</p>;
+    return (
+        <div className="space-y-4">
+            <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1">URL do Webhook</label>
+                <div className="flex items-center gap-2">
+                    <input type="text" readOnly value={webhookUrl} className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white font-mono text-sm" />
+                    <Button variant="ghost" size="sm" onClick={() => navigator.clipboard.writeText(webhookUrl)}><COPY_ICON className="w-4 h-4"/></Button>
+                </div>
+                <p className="text-xs text-slate-400 mt-1">Esta URL é única para este nó e já está ativa.</p>
+            </div>
+            
+            <div className="mt-4 border-t border-slate-700 pt-4">
+                <h4 className="text-md font-semibold text-white mb-2">Escuta de Webhook</h4>
+                <Button variant="secondary" onClick={handleStartListening} isLoading={isListening}>
+                  {isListening ? 'Aguardando dados...' : 'Limpar e Escutar por Novos Dados'}
+                </Button>
+                <p className="text-xs text-slate-400 mt-1">Clique para limpar dados antigos e aguardar uma nova requisição de teste.</p>
+            </div>
+
+            {renderDataMapping()}
+        </div>
+    );
 };
 
 export default TriggerSettings;

@@ -47,12 +47,22 @@ const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     };
     
     const renderVariablesPanel = () => {
+       const showPanel = ['action', 'logic'].includes(node.data.nodeType) || (node.data.nodeType === 'trigger' && (node.data.config as any)?.last_captured_data);
+       if (!showPanel) return null;
+
        return (
            <div className="max-h-[70vh] overflow-y-auto">
                <h4 className="text-lg font-semibold text-white">Variáveis Disponíveis</h4>
-               <p className="text-sm text-slate-400 mb-3">
-                   Clique em um campo de texto e use o seletor para inserir uma variável.
-               </p>
+                {node.data.nodeType !== 'trigger' && (
+                    <p className="text-sm text-slate-400 mb-3">
+                        Clique em um campo de texto e use o seletor para inserir uma variável.
+                    </p>
+                )}
+                 {node.data.nodeType === 'trigger' && (
+                     <p className="text-sm text-slate-400 mb-3">
+                        Estas são as variáveis que foram capturadas e que podem ser usadas em outros nós.
+                    </p>
+                 )}
 
                <div className="space-y-2 pr-2">
                    {availableVariables.length > 0 ? availableVariables.map(group => (
@@ -74,6 +84,8 @@ const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
        )
     }
 
+    const gridColsClass = ['action', 'logic'].includes(node.data.nodeType) || (node.data.nodeType === 'trigger' && (node.data.config as any)?.last_captured_data) ? 'md:grid-cols-2' : 'md:grid-cols-1';
+
     return (
         <div 
             className={`fixed inset-0 z-50 flex items-center justify-center transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
@@ -92,7 +104,7 @@ const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
                     </Button>
                 </header>
                 
-                <main className="flex-grow p-6 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-8">
+                <main className={`flex-grow p-6 overflow-y-auto grid grid-cols-1 ${gridColsClass} gap-8`}>
                     <div className="space-y-4">
                         <h4 className="text-lg font-semibold text-white">Configurações</h4>
                         <SettingsComponent 
