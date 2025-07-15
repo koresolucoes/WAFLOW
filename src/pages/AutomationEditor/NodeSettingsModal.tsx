@@ -1,7 +1,4 @@
 
-
-
-
 import React, { useState, useEffect, memo, useRef, useCallback, useMemo } from 'react';
 import { AutomationNode, MessageTemplate, Profile } from '../../types';
 import Button from '../../components/common/Button';
@@ -122,8 +119,8 @@ const InputWithVariables: React.FC<InputWithVariablesProps> = ({ onValueChange, 
     const handleSelectVariable = (variablePath: string) => {
         if (!inputRef.current) return;
         const { selectionStart, selectionEnd } = inputRef.current;
-        const currentValue = value || '';
-        const newValue = `${currentValue.substring(0, selectionStart as number)}${variablePath}${currentValue.substring(selectionEnd as number)}`;
+        const currentValStr = String(value || '');
+        const newValue = `${currentValStr.substring(0, selectionStart as number)}${variablePath}${currentValStr.substring(selectionEnd as number)}`;
         onValueChange(newValue);
         inputRef.current.focus();
     };
@@ -154,8 +151,8 @@ const TextareaWithVariables: React.FC<TextareaWithVariablesProps> = ({ onValueCh
     const handleSelectVariable = (variablePath: string) => {
         if (!textareaRef.current) return;
         const { selectionStart, selectionEnd } = textareaRef.current;
-        const currentValue = value || '';
-        const newValue = `${currentValue.substring(0, selectionStart as number)}${variablePath}${currentValue.substring(selectionEnd as number)}`;
+        const currentValStr = String(value || '');
+        const newValue = `${currentValStr.substring(0, selectionStart as number)}${variablePath}${currentValStr.substring(selectionEnd as number)}`;
         onValueChange(newValue);
         textareaRef.current.focus();
     };
@@ -460,18 +457,28 @@ const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({ node, isOpen, onC
                     </div>
                 )
             case 'send_webhook':
+                const httpMethods = ['POST', 'GET', 'PUT', 'PATCH', 'DELETE'];
+                const showBody = ['POST', 'PUT', 'PATCH'].includes(config.method || 'POST');
                 return (
                      <div className="space-y-3">
                         <div>
-                            <label className="block text-sm font-medium text-slate-300 mb-1">URL para Envio (POST)</label>
+                            <label className="block text-sm font-medium text-slate-300 mb-1">Método HTTP</label>
+                            <select value={config.method || 'POST'} onChange={(e) => handleConfigChange('method', e.target.value)} className={baseInputClass}>
+                                {httpMethods.map(m => <option key={m} value={m}>{m}</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-300 mb-1">URL para Envio</label>
                             <InputWithVariables onValueChange={val => handleConfigChange('url', val)} value={config.url || ''} type="text" placeholder="https://..." className={baseInputClass} variables={availableVariables} />
                         </div>
-                         <div>
-                            <label className="block text-sm font-medium text-slate-300 mb-1">Corpo (JSON)</label>
-                            <TextareaWithVariables onValueChange={val => handleConfigChange('body', val)} value={config.body || ''} placeholder={`{ "id": "{{contact.id}}", "event": "new_tag" }`} rows={5} className={`${baseInputClass} font-mono`} variables={availableVariables} />
-                        </div>
+                         {showBody && (
+                            <div>
+                                <label className="block text-sm font-medium text-slate-300 mb-1">Corpo (JSON)</label>
+                                <TextareaWithVariables onValueChange={val => handleConfigChange('body', val)} value={config.body || ''} placeholder={`{ "id": "{{contact.id}}", "event": "new_tag" }`} rows={5} className={`${baseInputClass} font-mono`} variables={availableVariables} />
+                            </div>
+                        )}
                     </div>
-                )
+                );
             case 'condition':
                  return (
                     <div className="space-y-3">
@@ -502,14 +509,12 @@ const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({ node, isOpen, onC
     };
     
     const renderVariablesPanel = () => {
-       if (data.type === 'webhook_received') return null;
-
        return (
            <div>
                <h4 className="text-lg font-semibold text-white">Variáveis Disponíveis</h4>
                <p className="text-sm text-slate-400 mb-3">Clique em um campo de texto à esquerda e use o seletor para inserir uma variável.</p>
                <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-2">
-                   {availableVariables.map(group => (
+                   {availableVariables.length > 0 ? availableVariables.map(group => (
                         <div key={group.group}>
                             <h5 className="text-sm font-bold text-slate-300 px-2 pt-2">{group.group}</h5>
                             <ul className="pl-2">
@@ -520,7 +525,9 @@ const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({ node, isOpen, onC
                                 ))}
                             </ul>
                         </div>
-                   ))}
+                   )) : (
+                       <p className="text-slate-400 text-sm">Nenhuma variável disponível. Configure um gatilho de Webhook e capture dados para ver as variáveis.</p>
+                   )}
                </div>
            </div>
        )

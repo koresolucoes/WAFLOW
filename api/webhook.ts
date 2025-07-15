@@ -1,11 +1,8 @@
 
-
-
-
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { supabaseAdmin } from './_lib/supabaseAdmin.js';
-import { executeAutomation } from './_lib/engine.js';
-import { Automation, Contact, TablesInsert } from './_lib/types.js';
+import { supabaseAdmin } from './_lib/supabaseAdmin';
+import { executeAutomation } from './_lib/engine';
+import { Automation, Contact, TablesInsert } from './_lib/types';
 
 // Helper to find a contact by phone and create if not exists
 const findOrCreateContact = async (user_id: string, phone: string, name: string): Promise<Contact | null> => {
@@ -31,22 +28,23 @@ const findOrCreateContact = async (user_id: string, phone: string, name: string)
          console.error("Error finding contact:", error);
         return null;
     }
-    return contactData as unknown as Contact;
+    return contactData as Contact;
 };
 
 // Helper to find automations to trigger based on message content
 const findAutomationsToTrigger = async (user_id: string, messageBody: string, buttonPayload?: string): Promise<{automation: Automation, startNodeId: string}[]> => {
-    const { data: automations, error } = await supabaseAdmin
+    const { data, error } = await supabaseAdmin
         .from('automations')
         .select('*')
         .eq('user_id', user_id)
         .eq('status', 'active');
 
+    const automations = data as Automation[] | null;
     if (error || !automations) return [];
 
     const triggers: {automation: Automation, startNodeId: string}[] = [];
 
-    for (const auto of (automations as unknown as Automation[])) {
+    for (const auto of automations) {
         if (!auto.nodes) continue;
         for (const node of auto.nodes) {
             const config = (node.data.config || {}) as any;
@@ -97,15 +95,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     // ---- STATUS UPDATES ----
                     if (value.statuses) {
                         for (const status of value.statuses) {
-                            const { message_id, status: newStatus, timestamp } = status;
+                            const { recipient_id, ...statusUpdate } = status;
+                            const newStatus = statusUpdate.status;
                             const updateData: any = { status: newStatus };
-                            if (newStatus === 'delivered') updateData.delivered_at = new Date(timestamp * 1000).toISOString();
-                            if (newStatus === 'read') updateData.read_at = new Date(timestamp * 1000).toISOString();
+                            if (newStatus === 'delivered') updateData.delivered_at = new Date(statusUpdate.timestamp * 1000).toISOString();
+                            if (newStatus === 'read') updateData.read_at = new Date(statusUpdate.timestamp * 1000).toISOString();
                             
                             await supabaseAdmin
                                 .from('campaign_messages')
                                 .update(updateData)
-                                .eq('meta_message_id', message_id);
+                                .eq('meta_message_id', statusUpdate.id);
                         }
                     }
 

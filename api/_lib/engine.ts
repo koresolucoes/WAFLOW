@@ -1,11 +1,7 @@
 
-
-
-
-
 import { supabaseAdmin } from './supabaseAdmin.js';
 import { sendTemplatedMessage, sendTextMessage, sendMediaMessage, sendInteractiveMessage } from './meta/messages.js';
-import { Automation, Contact, Json, MetaConfig, NodeData, MessageTemplate } from './types.js';
+import { Automation, Contact, Json, MetaConfig, NodeData, MessageTemplate, TablesInsert, TablesUpdate } from './types.js';
 
 // Helper to resolve nested values from an object path (e.g., 'contact.custom_fields.order_id')
 const getValueFromPath = (obj: any, path: string): any => {
@@ -42,12 +38,13 @@ export const executeAutomation = async (
     }
     const profile = profileData;
 
-    const { data: run, error: runError } = await supabaseAdmin.from('automation_runs').insert({
+    const runPayload: TablesInsert<'automation_runs'> = {
         automation_id: automation.id,
         contact_id: contact.id,
         status: 'running',
         details: `Started from node ${startNodeId}`
-    }).select().single();
+    };
+    const { data: run, error: runError } = await supabaseAdmin.from('automation_runs').insert(runPayload).select().single();
 
     if (runError || !run) {
         console.error(`Engine Error: Failed to create run log for automation ${automation.id}`, runError);
@@ -85,7 +82,7 @@ export const executeAutomation = async (
                     const { data: template, error: templateError } = await supabaseAdmin.from('message_templates').select('*').eq('id', config.template_id).single();
                     if (templateError) throw templateError;
                     if (template) {
-                         const templateTyped = template as unknown as MessageTemplate;
+                         const templateTyped = template as MessageTemplate;
                          
                          let allText = '';
                          templateTyped.components.forEach(c => {
@@ -137,18 +134,20 @@ export const executeAutomation = async (
                     if (config.tag) {
                         const tagToAdd = resolveVariables(config.tag, context);
                         const newTags = Array.from(new Set([...(currentContactState.tags || []), tagToAdd]));
-                        const { data, error } = await supabaseAdmin.from('contacts').update({ tags: newTags }).eq('id', currentContactState.id).select().single();
+                        const updatePayload: TablesUpdate<'contacts'> = { tags: newTags };
+                        const { data, error } = await supabaseAdmin.from('contacts').update(updatePayload).eq('id', currentContactState.id).select().single();
                         if (error) throw error;
-                        if (data) currentContactState = data as unknown as Contact;
+                        if (data) currentContactState = data as Contact;
                     }
                     break;
                 case 'remove_tag':
                     if (config.tag) {
                         const tagToRemove = resolveVariables(config.tag, context);
                         const newTags = (currentContactState.tags || []).filter(t => t !== tagToRemove);
-                        const { data, error } = await supabaseAdmin.from('contacts').update({ tags: newTags }).eq('id', currentContactState.id).select().single();
+                        const updatePayload: TablesUpdate<'contacts'> = { tags: newTags };
+                        const { data, error } = await supabaseAdmin.from('contacts').update(updatePayload).eq('id', currentContactState.id).select().single();
                         if (error) throw error;
-                        if (data) currentContactState = data as unknown as Contact;
+                        if (data) currentContactState = data as Contact;
                     }
                     break;
                 case 'set_custom_field':
@@ -156,9 +155,10 @@ export const executeAutomation = async (
                         const fieldName = resolveVariables(config.field_name, context);
                         const fieldValue = resolveVariables(config.field_value || '', context);
                         const newCustomFields = { ...(currentContactState.custom_fields as object || {}), [fieldName]: fieldValue };
-                        const { data, error } = await supabaseAdmin.from('contacts').update({ custom_fields: newCustomFields }).eq('id', currentContactState.id).select().single();
+                        const updatePayload: TablesUpdate<'contacts'> = { custom_fields: newCustomFields };
+                        const { data, error } = await supabaseAdmin.from('contacts').update(updatePayload).eq('id', currentContactState.id).select().single();
                         if (error) throw error;
-                        if (data) currentContactState = data as unknown as Contact;
+                        if (data) currentContactState = data as Contact;
                     }
                     break;
                 case 'condition':
@@ -195,12 +195,21 @@ export const executeAutomation = async (
                 case 'send_webhook':
                     if(config.url){
                         const url = resolveVariables(config.url, context);
-                        const body = config.body ? JSON.parse(resolveVariables(config.body, context)) : {};
-                        await fetch(url, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(body),
-                        });
+                        const method = config.method || 'POST';
+                        const headers = { 'Content-Type': 'application/json' };
+                        const requestOptions: RequestInit = { method, headers };
+
+                        if (method !== 'GET' && method !== 'DELETE' && config.body) {
+                             try {
+                                const body = JSON.parse(resolveVariables(config.body, context));
+                                requestOptions.body = JSON.stringify(body);
+                             } catch (e) {
+                                console.error("Webhook Body Error: Invalid JSON.", e);
+                                throw new Error("O corpo do Webhook não é um JSON válido.");
+                             }
+                        }
+                        
+                        await fetch(url, requestOptions);
                     }
                     break;
             }

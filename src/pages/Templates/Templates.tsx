@@ -1,7 +1,6 @@
 
-
 import React, { useContext, useState, useMemo } from 'react';
-import { Json, MessageTemplate, TablesInsert } from '../../types';
+import { Json, MessageTemplate, TablesInsert, TemplateCategory, TemplateStatus } from '../../types';
 import { AppContext } from '../../contexts/AppContext';
 import { getMetaTemplates } from '../../services/meta/templates';
 import { supabase } from '../../lib/supabaseClient';
@@ -10,7 +9,7 @@ import Button from '../../components/common/Button';
 import { SPARKLES_ICON } from '../../components/icons';
 
 const StatusBadge: React.FC<{ status: MessageTemplate['status'] }> = ({ status }) => {
-    const statusStyles = {
+    const statusStyles: Record<TemplateStatus, string> = {
         APPROVED: 'bg-green-500/20 text-green-400 border-green-500/30',
         PENDING: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
         REJECTED: 'bg-red-500/20 text-red-400 border-red-500/30',
@@ -18,7 +17,8 @@ const StatusBadge: React.FC<{ status: MessageTemplate['status'] }> = ({ status }
         LOCAL: 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30',
     };
     const style = status ? statusStyles[status] : statusStyles.LOCAL;
-    return <span className={`px-2 py-1 text-xs font-semibold rounded-full border ${style}`}>{status || 'LOCAL'}</span>;
+    const text = status ? status.charAt(0).toUpperCase() + status.slice(1).toLowerCase() : 'Local';
+    return <span className={`px-2 py-1 text-xs font-semibold rounded-full border ${style}`}>{text}</span>;
 };
 
 const TemplateCard: React.FC<{ template: MessageTemplate; onUse: () => void }> = ({ template, onUse }) => {
@@ -79,7 +79,7 @@ const Templates: React.FC = () => {
 
         if (fetchError) throw fetchError;
         
-        const existingMetaIdMap = new Map((existingTemplates as unknown as { meta_id: string, id: string }[])?.map(t => [t.meta_id, t.id]));
+        const existingMetaIdMap = new Map((existingTemplates as { meta_id: string; id: string }[] | null)?.map(t => [t.meta_id, t.id]));
 
         const templatesToUpsert: TablesInsert<'message_templates'>[] = metaTemplates.map(mt => {
             const templateData: TablesInsert<'message_templates'> = {
@@ -89,14 +89,14 @@ const Templates: React.FC = () => {
                 template_name: mt.name,
                 status: mt.status,
                 category: mt.category,
-                components: mt.components as unknown as Json,
+                components: mt.components as Json,
             };
 
             return templateData;
         });
         
         if (templatesToUpsert.length > 0) {
-            const { error: upsertError } = await supabase.from('message_templates').upsert(templatesToUpsert as any);
+            const { error: upsertError } = await supabase.from('message_templates').upsert(templatesToUpsert, { onConflict: 'meta_id, user_id' });
             if (upsertError) throw upsertError;
         }
 
@@ -108,7 +108,7 @@ const Templates: React.FC = () => {
 
         if (refetchError) throw refetchError;
         
-        setTemplates((dbTemplates as unknown as MessageTemplate[]) || []);
+        setTemplates((dbTemplates as MessageTemplate[]) || []);
         setSyncMessage("Sincronização concluída! Os status dos templates foram atualizados.");
         setTimeout(() => setSyncMessage(null), 4000);
 

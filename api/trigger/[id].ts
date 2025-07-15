@@ -1,13 +1,8 @@
 
-
-
-
-
-
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
-import { executeAutomation } from '../_lib/engine.js';
-import { Contact, Automation, TablesInsert } from '../_lib/types.js';
+import { supabaseAdmin } from '../_lib/supabaseAdmin';
+import { executeAutomation } from '../_lib/engine';
+import { Contact, Automation, TablesInsert, TablesUpdate } from '../_lib/types';
 
 const getValueFromPath = (obj: any, path: string): any => {
     if (!path || !obj) return undefined;
@@ -40,16 +35,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     const profile = profileData;
 
-    const { data: automations, error: automationsError } = await supabaseAdmin
+    const { data, error: automationsError } = await supabaseAdmin
         .from('automations')
         .select('*')
         .eq('user_id', profile.id);
     
+    const automations = data as Automation[] | null;
     if(automationsError || !automations) {
          return res.status(500).json({ error: 'Failed to retrieve automations.' });
     }
         
-    const automation = (automations as unknown as Automation[])?.find(a => a.nodes?.some(n => n.id === nodeId));
+    const automation = automations?.find(a => a.nodes?.some(n => n.id === nodeId));
 
     if (!automation) {
         return res.status(404).json({ error: 'Automation not found for this trigger ID.' });
@@ -70,13 +66,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // 3. Handle "Listening Mode" for UI setup
     const config = (triggerNode.data.config || {}) as any;
     if (config.last_captured_data === null) {
+        const updatePayload: TablesUpdate<'automations'> = {
+            nodes: automation.nodes.map(n => 
+                n.id === nodeId ? { ...n, data: { ...n.data, config: { ...config, last_captured_data: structuredPayload } } } : n
+            )
+        };
         const { error: updateError } = await supabaseAdmin
             .from('automations')
-            .update({
-                nodes: automation.nodes.map(n => 
-                    n.id === nodeId ? { ...n, data: { ...n.data, config: { ...config, last_captured_data: structuredPayload } } } : n
-                )
-            })
+            .update(updatePayload)
             .eq('id', automation.id);
         
         if (updateError) {
@@ -126,7 +123,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 console.error('Failed to create new contact for webhook trigger.', insertError);
                 continue;
             }
-            contact = newContact as unknown as Contact;
+            contact = newContact as Contact;
         } else if (contactError) {
             console.error('Failed to query contact.', contactError);
             continue;
@@ -152,11 +149,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
 
         if (needsUpdate) {
-            const { data: updatedContact, error: updateContactError } = await supabaseAdmin.from('contacts').update({ tags: Array.from(newTags), custom_fields: newCustomFields }).eq('id', contact.id).select().single();
+            const updatePayload: TablesUpdate<'contacts'> = { tags: Array.from(newTags), custom_fields: newCustomFields };
+            const { data: updatedContact, error: updateContactError } = await supabaseAdmin.from('contacts').update(updatePayload).eq('id', contact.id).select().single();
             if(updateContactError) {
                 console.error("Failed to update contact with webhook data", updateContactError);
             } else if(updatedContact) {
-                 contact = updatedContact as unknown as Contact;
+                 contact = updatedContact as Contact;
             }
         }
         
@@ -166,9 +164,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         executeAutomation(automation, contact, nodeId, fullPayloadForEvent);
         
         if (isNewContact) {
-             const { data: newContactAutomations } = await supabaseAdmin.from('automations').select('*').eq('user_id', profile.id).eq('status', 'active');
+             const { data: newContactAutomationsData } = await supabaseAdmin.from('automations').select('*').eq('user_id', profile.id).eq('status', 'active');
+             const newContactAutomations = newContactAutomationsData as Automation[] | null;
              if (newContactAutomations) {
-                for (const auto of (newContactAutomations as unknown as Automation[])) {
+                for (const auto of newContactAutomations) {
                     const trigger = auto.nodes?.find(n => n.data.type === 'new_contact');
                     if (trigger) {
                         executeAutomation(auto, contact, trigger.id, null);

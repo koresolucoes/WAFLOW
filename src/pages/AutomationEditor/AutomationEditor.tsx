@@ -1,8 +1,6 @@
 
-
-
 import React, { useContext, useState, useEffect, useCallback, memo } from 'react';
-import { ReactFlow, ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, type Node, type Edge, type NodeProps, useReactFlow } from '@xyflow/react';
+import { ReactFlow, ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, type Node, type Edge, type NodeProps, useReactFlow, NodeTypes } from '@xyflow/react';
 import { AppContext } from '../../contexts/AppContext';
 import { Automation, AutomationNode, NodeData, TriggerType, ActionType, LogicType } from '../../types';
 import Button from '../../components/common/Button';
@@ -104,7 +102,7 @@ const SplitPathNode = ({ data }: NodeProps<NodeData>) => {
 };
 
 
-const nodeTypes = {
+const nodeTypes: NodeTypes = {
     trigger: CustomNode,
     action: CustomNode,
     logic: (props: NodeProps<NodeData>) => {
@@ -332,7 +330,7 @@ const FlowCanvas = () => {
                         onNodeClick={onNodeClick}
                         onPaneClick={onPaneClick}
                         onNodesDelete={onNodesDelete}
-                        nodeTypes={nodeTypes as any}
+                        nodeTypes={nodeTypes}
                         fitView
                         className="bg-slate-900 xyflow-react"
                     >
