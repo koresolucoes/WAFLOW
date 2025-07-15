@@ -39,7 +39,7 @@ interface AppContextType {
   segments: Segment[];
   
   automations: Automation[];
-  addAutomation: (automation: Omit<AutomationInsert, 'id' | 'user_id' | 'created_at'>) => Promise<void>;
+  createAndNavigateToAutomation: () => Promise<void>;
   updateAutomation: (automation: Automation) => Promise<void>;
   deleteAutomation: (automationId: string) => Promise<void>;
 }
@@ -92,9 +92,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
       if (profileError && profileError.code === 'PGRST116') {
         console.warn("Profile not found for user, creating a default one.");
+        // O gatilho handle_new_user deve cuidar disso, mas como fallback:
         const { data: newProfile, error: insertError } = await supabase
           .from('profiles')
-          .insert({ id: user.id, company_name: 'Minha Nova Empresa' } as TablesInsert<'profiles'>)
+          .insert({ id: user.id } as TablesInsert<'profiles'>)
           .select()
           .single();
         
@@ -408,21 +409,44 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setCampaigns(prev => [newCampaignWithMetrics, ...prev]);
   };
 
-  const addAutomation = async (automation: Omit<AutomationInsert, 'id' | 'user_id' | 'created_at'>) => {
+  const createAndNavigateToAutomation = async () => {
     if (!user) throw new Error("Usuário não autenticado.");
-    const dbAutomation = {
-      ...automation,
-      user_id: user.id,
-      nodes: automation.nodes as unknown as Json,
-      edges: automation.edges as unknown as Json,
+
+    const triggerNode: AutomationNode = {
+      id: `webhook_received_${Date.now()}`,
+      type: 'trigger',
+      position: { x: 100, y: 150 },
+      data: {
+        nodeType: 'trigger',
+        type: 'webhook_received',
+        label: 'Webhook Recebido',
+        config: { last_captured_data: null }
+      },
     };
+
+    const dbAutomation: TablesInsert<'automations'> = {
+        user_id: user.id,
+        name: 'Nova Automação (Rascunho)',
+        status: 'paused',
+        nodes: [triggerNode] as unknown as Json,
+        edges: [] as unknown as Json,
+    };
+
     const { data, error } = await supabase
         .from('automations')
         .insert(dbAutomation)
         .select()
         .single();
-    if (error) throw error;
-    if(data) setAutomations(prev => [data as unknown as Automation, ...prev]);
+
+    if (error) {
+        console.error("Erro ao criar rascunho de automação:", error);
+        throw error;
+    }
+    if (data) {
+        const newAutomation = data as unknown as Automation;
+        setAutomations(prev => [newAutomation, ...prev]);
+        setCurrentPage('automation-editor', { automationId: newAutomation.id });
+    }
   };
 
   const updateAutomation = async (automation: Automation) => {
@@ -475,7 +499,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     fetchCampaignDetails,
     segments,
     automations,
-    addAutomation,
+    createAndNavigateToAutomation,
     updateAutomation,
     deleteAutomation
   };

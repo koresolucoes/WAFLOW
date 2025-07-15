@@ -1,8 +1,9 @@
 
+
 import React, { useContext, useState, useEffect, useCallback, memo } from 'react';
 import { ReactFlow, ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, type Node, type Edge, type NodeProps, useReactFlow } from '@xyflow/react';
 import { AppContext } from '../../contexts/AppContext';
-import { Automation, AutomationInsert, AutomationNode, NodeData, TriggerType, ActionType, LogicType } from '../../types';
+import { Automation, AutomationNode, NodeData, TriggerType, ActionType, LogicType } from '../../types';
 import Button from '../../components/common/Button';
 import Card from '../../components/common/Card';
 import { supabase } from '../../lib/supabaseClient';
@@ -146,7 +147,7 @@ const NodeSidebar = memo(({ onDragStart }: { onDragStart: (event: React.DragEven
 ));
 
 const FlowCanvas = () => {
-    const { pageParams, automations, templates, addAutomation, updateAutomation, setCurrentPage, profile } = useContext(AppContext);
+    const { pageParams, automations, templates, updateAutomation, setCurrentPage, profile } = useContext(AppContext);
     const { screenToFlowPosition } = useReactFlow();
     const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
     const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -156,24 +157,19 @@ const FlowCanvas = () => {
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const isEditing = Boolean(pageParams.automationId);
     const automationId = pageParams.automationId;
 
     useEffect(() => {
-        if (isEditing) {
-            const existingAutomation = automations.find(a => a.id === pageParams.automationId);
+        if (automationId) {
+            const existingAutomation = automations.find(a => a.id === automationId);
             if (existingAutomation) {
                 setAutomationName(existingAutomation.name);
                 setNodes(existingAutomation.nodes || []);
                 setEdges(existingAutomation.edges || []);
             }
-        } else {
-             setAutomationName('Nova Automação');
-             setNodes([]);
-             setEdges([]);
         }
         setSelectedNode(null);
-    }, [isEditing, pageParams.automationId, automations, setNodes, setEdges]);
+    }, [automationId, automations, setNodes, setEdges]);
     
     useEffect(() => {
         if (!automationId) return;
@@ -254,20 +250,18 @@ const FlowCanvas = () => {
         setError(null);
         if (!automationName.trim()) return setError("O nome da automação é obrigatório.");
         if (nodes.filter(n => n.data.nodeType === 'trigger').length !== 1) return setError("A automação precisa de exatamente um gatilho.");
+        if (!automationId) return setError("ID da automação não encontrado. Não é possível salvar.");
 
         setIsSaving(true);
         const automationData = {
+            id: automationId,
             name: automationName,
-            status: isEditing ? (automations.find(a => a.id === pageParams.automationId)?.status || 'active') : 'active',
+            status: automations.find(a => a.id === automationId)?.status || 'active',
             nodes,
             edges,
         };
         try {
-            if (isEditing) {
-                await updateAutomation({ ...automationData, id: pageParams.automationId } as unknown as Automation);
-            } else {
-                await addAutomation(automationData as unknown as Omit<AutomationInsert, 'id' | 'user_id' | 'created_at'>);
-            }
+            await updateAutomation(automationData as unknown as Automation);
             setCurrentPage('automations');
         } catch (err: any) {
              setError(err.message || 'Ocorreu um erro ao salvar.');
@@ -297,7 +291,7 @@ const FlowCanvas = () => {
                     {error && <p className="text-red-400 text-sm">{error}</p>}
                     <Button variant="secondary" onClick={() => setCurrentPage('automations')} disabled={isSaving}>Cancelar</Button>
                     <Button variant="primary" onClick={onSave} isLoading={isSaving}>
-                        {isEditing ? 'Salvar Alterações' : 'Criar Automação'}
+                        Salvar Alterações
                     </Button>
                 </div>
             </header>
