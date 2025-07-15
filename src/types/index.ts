@@ -1,5 +1,6 @@
 
 
+
 import { Session, User } from '@supabase/supabase-js';
 import { Json, Tables, TablesInsert, TablesUpdate } from './database.types';
 import { MetaTemplateComponent } from '../services/meta/types';
@@ -24,11 +25,11 @@ export type LogicType = 'condition' | 'split_path';
 
 
 export interface NodeData {
-  [key: string]: any; // To satisfy @xyflow/react's Node data constraint
   nodeType: NodeType;
   type: TriggerType | ActionType | LogicType;
   label: string;
   config: Json;
+  [key: string]: any; // To satisfy @xyflow/react's Node data constraint
 }
 
 export type AutomationNode = Node<NodeData>;

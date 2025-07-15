@@ -1,4 +1,6 @@
 
+
+
 import { supabaseAdmin } from './supabaseAdmin.js';
 import { sendTemplatedMessage, sendTextMessage, sendMediaMessage, sendInteractiveMessage } from './meta/messages.js';
 import { Automation, Contact, Json, MetaConfig, NodeData, MessageTemplate } from './types.js';
@@ -79,12 +81,12 @@ export const executeAutomation = async (
                     const { data: template } = await supabaseAdmin.from('message_templates').select('*').eq('id', config.template_id).single();
                     if (template) {
                          const templateTyped = template as unknown as MessageTemplate;
-                         const placeholders = (templateTyped.components as any[])?.flatMap(c => c.text?.match(/\{\{\d+\}\}/g) || []).filter(Boolean) || [];
+                         const textForVars = (templateTyped.components as any[])?.reduce((acc, c) => acc + (c.text || ''), '') || '';
+                         const placeholders = textForVars.match(/\{\{\d+\}\}/g) || [];
                          const uniquePlaceholders = [...new Set(placeholders)];
                          
                          const bodyParameters = uniquePlaceholders.map(p => {
-                            const varNumber = p.replace(/\{|\}/g, '');
-                            const textValue = p === '{{1}}' ? currentContactState.name : resolveVariables(`{{trigger.body[${parseInt(varNumber, 10) - 2}]}}`, context); // Example mapping
+                            const textValue = p === '{{1}}' ? currentContactState.name : resolveVariables(p, context);
                             return { type: 'text', text: textValue || '' };
                          });
 
@@ -93,7 +95,7 @@ export const executeAutomation = async (
                             parameters: bodyParameters
                          }];
 
-                        await sendTemplatedMessage(metaConfig, currentContactState.phone, template.template_name, components);
+                        await sendTemplatedMessage(metaConfig, currentContactState.phone, templateTyped.template_name, components);
                     }
                     break;
                 case 'send_text_message':
@@ -104,8 +106,9 @@ export const executeAutomation = async (
                     break;
                 case 'send_media':
                     if(config.media_url && config.media_type){
+                        const mediaUrl = resolveVariables(config.media_url, context);
                         const caption = config.caption ? resolveVariables(config.caption, context) : undefined;
-                        await sendMediaMessage(metaConfig, currentContactState.phone, config.media_type, config.media_url, caption);
+                        await sendMediaMessage(metaConfig, currentContactState.phone, config.media_type, mediaUrl, caption);
                     }
                     break;
                 case 'send_interactive_message':
@@ -141,15 +144,13 @@ export const executeAutomation = async (
                     }
                     break;
                 case 'condition':
-                    const field = config.field;
+                    const sourceType = config.source_type || 'contact'; // default to contact
+                    const fieldPath = config.field || '';
                     const operator = config.operator;
                     const value = resolveVariables(config.value, context);
-                    let sourceValue: any;
-                    if(field === 'custom_fields' && config.custom_field_name){
-                        sourceValue = getValueFromPath(currentContactState, `custom_fields.${config.custom_field_name}`);
-                    } else {
-                        sourceValue = getValueFromPath(currentContactState, field);
-                    }
+                    
+                    const sourceObject = sourceType === 'trigger' ? context.trigger : context.contact;
+                    const sourceValue = getValueFromPath(sourceObject, fieldPath);
 
                     let conditionMet = false;
                     const lowerCaseValue = String(value).toLowerCase();
