@@ -1,6 +1,7 @@
 
+
 import React, { useContext, useState, useMemo } from 'react';
-import { Json, MessageTemplate, TablesInsert, TemplateCategory, TemplateStatus } from '../../types';
+import { Json, MessageTemplate, Tables, TablesInsert, TemplateCategory, TemplateStatus } from '../../types';
 import { AppContext } from '../../contexts/AppContext';
 import { getMetaTemplates } from '../../services/meta/templates';
 import { supabase } from '../../lib/supabaseClient';
@@ -81,18 +82,24 @@ const Templates: React.FC = () => {
         
         const existingMetaIdMap = new Map((existingTemplates as { meta_id: string; id: string }[] | null)?.map(t => [t.meta_id, t.id]));
 
-        const templatesToUpsert: TablesInsert<'message_templates'>[] = metaTemplates.map(mt => {
-            const templateData: TablesInsert<'message_templates'> = {
+        const templatesToUpsert: Tables<"message_templates">[] = metaTemplates.map(mt => {
+            const templateData = {
                 id: existingMetaIdMap.get(mt.id)!, // a chave primária para o upsert
                 meta_id: mt.id,
                 user_id: user.id,
                 template_name: mt.name,
                 status: mt.status,
                 category: mt.category,
-                components: mt.components as Json,
+                components: mt.components as unknown as Json,
+                created_at: new Date().toISOString(), // Add default for missing property
             };
+            
+            // Remove id if it's undefined, so upsert works correctly for new items.
+            if (!templateData.id) {
+                delete (templateData as any).id;
+            }
 
-            return templateData;
+            return templateData as Tables<"message_templates">;
         });
         
         if (templatesToUpsert.length > 0) {

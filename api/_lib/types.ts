@@ -2,8 +2,8 @@
 // This file contains types shared across serverless functions,
 // decoupled from frontend dependencies like React or @xyflow.
 
-import { Json as DbJson, Tables, TablesInsert, TablesUpdate } from './database.types';
-import { MetaTemplateComponent } from './meta/types';
+import { Json as DbJson, Tables, TablesInsert, TablesUpdate } from './database.types.js';
+import { MetaTemplateComponent } from './meta/types.js';
 
 export type Json = DbJson;
 export type { Tables, TablesInsert, TablesUpdate };

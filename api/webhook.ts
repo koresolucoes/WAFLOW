@@ -1,8 +1,9 @@
 
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { supabaseAdmin } from './_lib/supabaseAdmin';
-import { executeAutomation } from './_lib/engine';
-import { Automation, Contact, TablesInsert } from './_lib/types';
+import { supabaseAdmin } from './_lib/supabaseAdmin.js';
+import { executeAutomation } from './_lib/engine.js';
+import { Automation, Contact, TablesInsert } from './_lib/types.js';
 
 // Helper to find a contact by phone and create if not exists
 const findOrCreateContact = async (user_id: string, phone: string, name: string): Promise<Contact | null> => {
@@ -39,8 +40,12 @@ const findAutomationsToTrigger = async (user_id: string, messageBody: string, bu
         .eq('user_id', user_id)
         .eq('status', 'active');
 
+    if (error) {
+        console.error("Error fetching automations:", error);
+        return [];
+    }
     const automations = data as Automation[] | null;
-    if (error || !automations) return [];
+    if (!automations) return [];
 
     const triggers: {automation: Automation, startNodeId: string}[] = [];
 

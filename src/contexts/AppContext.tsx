@@ -1,7 +1,8 @@
 
+
 import React, { createContext, useState, useCallback, ReactNode, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import { Page, Profile, MessageTemplate, Contact, Campaign, CampaignWithMetrics, EditableContact, Session, User, CampaignMessageInsert, CampaignWithDetails, CampaignMessageWithContact, Segment, MessageTemplateInsert, Automation, AutomationInsert, AutomationNode, Edge, TablesInsert, Json, TablesUpdate } from '../types';
+import { Page, Profile, MessageTemplate, Contact, Campaign, CampaignWithMetrics, EditableContact, Session, User, CampaignMessageInsert, CampaignWithDetails, CampaignMessageWithContact, Segment, MessageTemplateInsert, Automation, AutomationInsert, AutomationNode, Edge, TablesInsert, Json, TablesUpdate, Tables } from '../types';
 
 interface AppContextType {
   session: Session | null;
@@ -91,7 +92,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
       if (profileError && profileError.code === 'PGRST116') {
         console.warn("Profile not found for user, creating a default one.");
-        // O gatilho handle_new_user deve cuidar disso, mas como fallback:
         const newUserProfile: TablesInsert<'profiles'> = { id: user.id };
         const { data: newProfile, error: insertError } = await supabase
           .from('profiles')
@@ -195,7 +195,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         throw campaignError || new Error("Campanha não encontrada ou acesso negado.");
       }
       
-      const typedCampaignData = campaignData as (Campaign & { message_templates: MessageTemplate | null });
+      const typedCampaignData = campaignData as unknown as (Campaign & { message_templates: MessageTemplate | null });
 
       const { data: messagesData, error: messagesError } = await supabase
         .from('campaign_messages')
@@ -252,7 +252,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     
     const dbTemplate: TablesInsert<'message_templates'> = {
         ...template,
-        components: template.components as Json,
+        components: template.components as unknown as Json,
     };
     
     const { data, error } = await supabase
@@ -460,8 +460,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const updatePayload: TablesUpdate<'automations'> = {
         name: automation.name,
         status: automation.status,
-        nodes: automation.nodes as Json,
-        edges: automation.edges as Json
+        nodes: automation.nodes as unknown as Json,
+        edges: automation.edges as unknown as Json
     };
 
     const { data, error } = await supabase
