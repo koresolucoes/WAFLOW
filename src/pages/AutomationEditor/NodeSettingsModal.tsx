@@ -4,6 +4,7 @@ import React, { useState, useEffect, memo, useRef, useCallback, useMemo } from '
 import { AutomationNode, MessageTemplate, Profile } from '../../types';
 import Button from '../../components/common/Button';
 import { COPY_ICON, INFO_ICON, PLUS_ICON, TRASH_ICON } from '../../components/icons';
+import { supabase } from '../../lib/supabaseClient';
 
 // ====================================================================================
 // Helper Functions
@@ -533,7 +534,7 @@ const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({ node, isOpen, onC
                                 <TextareaWithVariables 
                                     onValueChange={val => handleConfigChange('body', val)} 
                                     value={config.body || ''} 
-                                    placeholder={`{ "id": {{contact.id}}, "event": "new_tag" }`} 
+                                    placeholder='{ "id": {{contact.id}}, "event": "new_tag" }' 
                                     rows={5} 
                                     className={`${baseInputClass} font-mono`} 
                                     variables={availableVariables} 
