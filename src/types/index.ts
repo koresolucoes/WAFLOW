@@ -1,10 +1,8 @@
 
-
-
 import { Session, User } from '@supabase/supabase-js';
 import { Json, Tables, TablesInsert, TablesUpdate } from './database.types';
 import { MetaTemplateComponent } from '../services/meta/types';
-import type { Node, Edge } from '@xyflow/react';
+import type { Node as XyNode, Edge } from '@xyflow/react';
 
 export type Page = 'dashboard' | 'campaigns' | 'templates' | 'template-editor' | 'contacts' | 'new-campaign' | 'profile' | 'settings' | 'auth' | 'campaign-details' | 'automations' | 'automation-editor';
 
@@ -19,8 +17,9 @@ export type AutomationRunStatus = 'success' | 'failed';
 // Tipos para os nós do editor de automação
 export type NodeType = 'trigger' | 'action' | 'logic';
 
-export type TriggerType = 'new_contact_with_tag' | 'message_received_with_keyword' | 'button_clicked' | 'new_contact' | 'webhook_received';
-export type ActionType = 'send_template' | 'add_tag' | 'remove_tag' | 'send_text_message' | 'send_media' | 'send_interactive_message' | 'set_custom_field' | 'send_webhook';
+// Tipos simplificados para focar no fluxo de webhook
+export type TriggerType = 'webhook_received';
+export type ActionType = 'send_template' | 'add_tag' | 'send_text_message';
 export type LogicType = 'condition' | 'split_path';
 
 
@@ -29,10 +28,9 @@ export interface NodeData {
   type: TriggerType | ActionType | LogicType;
   label: string;
   config: Json;
-  [key: string]: any; // To satisfy @xyflow/react's Node data constraint
 }
 
-export type AutomationNode = Node<NodeData>;
+export type AutomationNode = XyNode<NodeData>;
 
 // --- DATABASE TABLE TYPES ---
 export type Profile = Tables<'profiles'>;

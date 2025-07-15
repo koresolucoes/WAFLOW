@@ -1,13 +1,11 @@
 
-
-
-
-import React, { useContext, useState, useEffect, useCallback, memo } from 'react';
-import { ReactFlow, ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, type Node, type Edge, type NodeProps } from '@xyflow/react';
+import React, { useContext, useState, useEffect, useCallback, memo, useRef } from 'react';
+import { ReactFlow, ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, type Node, type Edge, type NodeProps, useReactFlow } from '@xyflow/react';
 import { AppContext } from '../../contexts/AppContext';
 import { Automation, AutomationInsert, AutomationNode, NodeData, TriggerType, ActionType, LogicType, MessageTemplate, Profile } from '../../types';
 import Button from '../../components/common/Button';
 import Card from '../../components/common/Card';
+import { supabase } from '../../lib/supabaseClient';
 import { AUTOMATION_ICON, PLUS_ICON, TRASH_ICON, COPY_ICON, INFO_ICON } from '../../components/icons';
 
 
@@ -19,6 +17,7 @@ const initialEdges: Edge[] = [];
 // ====================================================================================
 
 const flattenObject = (obj: any, parentKey = '', res: Record<string, any> = {}) => {
+  if (typeof obj !== 'object' || obj === null) return res;
   for (const key in obj) {
     if (Object.prototype.hasOwnProperty.call(obj, key)) {
       const propName = parentKey ? `${parentKey}.${key}` : key;
@@ -74,6 +73,8 @@ const CustomNode = ({ data }: NodeProps<NodeData>) => {
 };
 
 const ConditionNode = ({ data }: NodeProps<NodeData>) => {
+    const config = (data.config as any) || {};
+    const conditionText = `${config.field || ''} ${config.operator || ''} "${config.value || ''}"`;
     return (
       <div className={`${nodeStyles.base} ${nodeStyles.logic}`}>
         <div className={`${nodeStyles.header} ${nodeStyles.logicHeader}`}>
@@ -82,8 +83,8 @@ const ConditionNode = ({ data }: NodeProps<NodeData>) => {
         </div>
         <div className={nodeStyles.body}>
             <p className={nodeStyles.label}>{data.label}</p>
-            <p className={nodeStyles.description}>
-                {`${(data.config as any)?.field || ''} ${(data.config as any)?.operator || ''} "${(data.config as any)?.value || ''}"`}
+            <p className={nodeStyles.description} title={conditionText}>
+               {conditionText.length > 35 ? `${conditionText.substring(0, 32)}...` : conditionText}
             </p>
         </div>
         <Handle type="target" position={Position.Left} className="!bg-slate-400" />
@@ -121,21 +122,17 @@ const SplitPathNode = ({ data }: NodeProps<NodeData>) => {
 
 
 const nodeTypes = {
-    trigger: (props: NodeProps<NodeData>) => <CustomNode {...props} />,
-    action: (props: NodeProps<NodeData>) => <CustomNode {...props} />,
+    trigger: CustomNode,
+    action: CustomNode,
     logic: (props: NodeProps<NodeData>) => {
-        if (props.data.type === 'condition') {
-            return <ConditionNode {...props} />;
-        }
-        if (props.data.type === 'split_path') {
-            return <SplitPathNode {...props} />;
-        }
+        if (props.data.type === 'condition') return <ConditionNode {...props} />;
+        if (props.data.type === 'split_path') return <SplitPathNode {...props} />;
         return <CustomNode {...props} />;
     },
 };
 
 // ====================================================================================
-// Sidebar & Settings Panel Components
+// Sidebar, Settings & Drag-n-Drop Components
 // ====================================================================================
 
 const DraggableNode = ({ type, label, onDragStart, specificType }: { type: 'trigger' | 'action' | 'logic', label: string, onDragStart: (event: React.DragEvent, nodeType: string, type: string, label: string) => void, specificType: string }) => (
@@ -154,22 +151,13 @@ const NodeSidebar = ({ onDragStart }: { onDragStart: (event: React.DragEvent, no
         <p className="text-sm text-slate-400 mb-4">Arraste os blocos para a área de trabalho para construir sua automação.</p>
         <div>
             <h4 className="font-semibold text-sky-300 mb-2">Gatilhos (Início)</h4>
-            <DraggableNode type="trigger" label="Novo Contato" specificType="new_contact" onDragStart={onDragStart} />
-            <DraggableNode type="trigger" label="Tag Adicionada" specificType="new_contact_with_tag" onDragStart={onDragStart} />
-            <DraggableNode type="trigger" label="Msg com Palavra-chave" specificType="message_received_with_keyword" onDragStart={onDragStart} />
-            <DraggableNode type="trigger" label="Botão Clicado" specificType="button_clicked" onDragStart={onDragStart} />
             <DraggableNode type="trigger" label="Webhook Recebido" specificType="webhook_received" onDragStart={onDragStart} />
         </div>
         <div className="mt-6">
             <h4 className="font-semibold text-pink-300 mb-2">Ações</h4>
             <DraggableNode type="action" label="Enviar Template" specificType="send_template" onDragStart={onDragStart} />
             <DraggableNode type="action" label="Enviar Texto Simples" specificType="send_text_message" onDragStart={onDragStart} />
-            <DraggableNode type="action" label="Enviar Mídia" specificType="send_media" onDragStart={onDragStart} />
-            <DraggableNode type="action" label="Enviar Msg com Botões" specificType="send_interactive_message" onDragStart={onDragStart} />
             <DraggableNode type="action" label="Adicionar Tag" specificType="add_tag" onDragStart={onDragStart} />
-            <DraggableNode type="action" label="Remover Tag" specificType="remove_tag" onDragStart={onDragStart} />
-            <DraggableNode type="action" label="Definir Campo" specificType="set_custom_field" onDragStart={onDragStart} />
-            <DraggableNode type="action" label="Enviar Webhook" specificType="send_webhook" onDragStart={onDragStart} />
         </div>
          <div className="mt-6">
             <h4 className="font-semibold text-purple-300 mb-2">Lógica</h4>
@@ -179,9 +167,88 @@ const NodeSidebar = ({ onDragStart }: { onDragStart: (event: React.DragEvent, no
     </Card>
 );
 
-const SettingsPanel = ({ node, setNodes, templates, profile, automationId }: { node: AutomationNode, setNodes: React.Dispatch<React.SetStateAction<AutomationNode[]>>, templates: MessageTemplate[], profile: Profile | null, automationId?: string }) => {
+const VariablePill = memo(({ path, value }: { path: string; value: string }) => {
+    const handleDragStart = (e: React.DragEvent) => {
+        e.dataTransfer.setData('application/variable-path', `{{trigger.${path}}}`);
+        e.dataTransfer.effectAllowed = 'copy';
+    };
+    return (
+        <div draggable onDragStart={handleDragStart} className="flex justify-between items-center bg-slate-800 p-1.5 rounded-md cursor-grab hover:bg-sky-500/20 group">
+            <span className="text-xs font-mono text-sky-300 group-hover:text-sky-200" title={path}>{path}</span>
+            <span className="text-xs text-slate-400 truncate ml-2" title={String(value)}>{String(value)}</span>
+        </div>
+    );
+});
+
+const VariablesPanel = memo(({ nodes }: { nodes: AutomationNode[] }) => {
+    const triggerNode = nodes.find(n => n.data.nodeType === 'trigger' && n.data.type === 'webhook_received');
+    const capturedData = triggerNode?.data.config?.last_captured_data;
+
+    if (!capturedData) {
+        return <p className="text-xs text-slate-400 p-2 bg-slate-700/50 rounded-md">Para usar variáveis, primeiro configure e escute o gatilho "Webhook Recebido".</p>;
+    }
+    
+    const flattened = flattenObject(capturedData);
+
+    return (
+        <div>
+            <h4 className="text-md font-semibold text-white mb-2">Variáveis Disponíveis</h4>
+            <p className="text-xs text-slate-400 mb-2">Arraste uma variável para um campo de texto abaixo.</p>
+            <div className="space-y-1 max-h-48 overflow-y-auto pr-2 bg-slate-900/50 p-2 rounded-md">
+                {Object.entries(flattened).map(([key, value]) => (
+                    <VariablePill key={key} path={key} value={value} />
+                ))}
+            </div>
+        </div>
+    );
+});
+
+const DroppableInput = (props: React.InputHTMLAttributes<HTMLInputElement> & { onValueChange: (value: string) => void }) => {
+    const { onValueChange, ...rest } = props;
+    const [isDragOver, setIsDragOver] = useState(false);
+    const ref = useRef<HTMLInputElement>(null);
+
+    const onDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragOver(false);
+        const path = e.dataTransfer.getData('application/variable-path');
+        if (path && ref.current) {
+            const { selectionStart, selectionEnd } = ref.current;
+            const currentValue = ref.current.value;
+            const newValue = `${currentValue.substring(0, selectionStart)}${path}${currentValue.substring(selectionEnd as number)}`;
+            onValueChange(newValue);
+        }
+    };
+    
+    return <input ref={ref} {...rest} onDrop={onDrop} onDragOver={e => { e.preventDefault(); setIsDragOver(true); }} onDragLeave={() => setIsDragOver(false)} className={`${props.className} ${isDragOver ? 'ring-2 ring-sky-500' : ''}`} />;
+};
+
+const DroppableTextarea = (props: React.TextareaHTMLAttributes<HTMLTextAreaElement> & { onValueChange: (value: string) => void }) => {
+    const { onValueChange, ...rest } = props;
+    const [isDragOver, setIsDragOver] = useState(false);
+    const ref = useRef<HTMLTextAreaElement>(null);
+
+     const onDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragOver(false);
+        const path = e.dataTransfer.getData('application/variable-path');
+        if (path && ref.current) {
+            const { selectionStart, selectionEnd } = ref.current;
+            const currentValue = ref.current.value;
+            const newValue = `${currentValue.substring(0, selectionStart)}${path}${currentValue.substring(selectionEnd as number)}`;
+            onValueChange(newValue);
+        }
+    };
+
+    return <textarea ref={ref} {...rest} onDrop={onDrop} onDragOver={e => { e.preventDefault(); setIsDragOver(true); }} onDragLeave={() => setIsDragOver(false)} className={`${props.className} ${isDragOver ? 'ring-2 ring-sky-500' : ''}`} />;
+};
+
+
+const SettingsPanel = ({ node, nodes, setNodes, templates, profile, automationId, updateAutomation }: { node: AutomationNode; nodes: AutomationNode[]; setNodes: React.Dispatch<React.SetStateAction<AutomationNode[]>>; templates: MessageTemplate[]; profile: Profile | null; automationId?: string; updateAutomation: (automation: Automation) => Promise<void>}) => {
     const { data, id } = node;
     const config = (data.config as any) || {};
+
+    const [isListening, setIsListening] = useState(false);
 
     const updateNodeConfig = (key: string, value: any) => {
         setNodes(nds => nds.map(n => {
@@ -193,14 +260,29 @@ const SettingsPanel = ({ node, setNodes, templates, profile, automationId }: { n
         }));
     };
     
-    const handleStartListening = () => {
+    const handleStartListening = async () => {
         if (!automationId) {
             alert("Por favor, salve a automação primeiro para ativar o modo de escuta.");
             return;
         }
-        updateNodeConfig('last_captured_data', null);
-        alert("Modo de escuta ativado. Salve a automação e envie uma requisição de teste para a URL do webhook para capturar os dados. Depois, recarregue o editor.");
-    }
+        setIsListening(true);
+        const newNodes = nodes.map(n => {
+            if (n.id === id) {
+                return { ...n, data: { ...n.data, config: { ...config, last_captured_data: null } } };
+            }
+            return n;
+        });
+
+        const currentAutomation = { id: automationId, nodes: newNodes } as Automation;
+        await updateAutomation(currentAutomation);
+    };
+
+    useEffect(() => {
+        // Stop listening if data arrives
+        if (config.last_captured_data) {
+            setIsListening(false);
+        }
+    }, [config.last_captured_data]);
     
     const handleMappingChange = (source: string, destination: string, destination_key?: string) => {
         let newMapping = [...(config.data_mapping || [])];
@@ -210,15 +292,9 @@ const SettingsPanel = ({ node, setNodes, templates, profile, automationId }: { n
              newMapping = newMapping.filter(m => m.source !== source);
         } else {
              const newRule = { source, destination, destination_key };
-            // Ensure only one field is mapped to phone
-            if (destination === 'phone') {
-                newMapping = newMapping.filter(m => m.destination !== 'phone');
-            }
-             if (existingIndex > -1) {
-                newMapping[existingIndex] = newRule;
-            } else {
-                newMapping.push(newRule);
-            }
+            if (destination === 'phone') newMapping = newMapping.filter(m => m.destination !== 'phone');
+            if (existingIndex > -1) newMapping[existingIndex] = newRule;
+            else newMapping.push(newRule);
         }
         updateNodeConfig('data_mapping', newMapping);
     };
@@ -279,29 +355,14 @@ const SettingsPanel = ({ node, setNodes, templates, profile, automationId }: { n
     }
 
     const renderConfig = () => {
+        const baseInputClass = "w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white";
+
         switch (data.type) {
-            case 'new_contact_with_tag':
             case 'add_tag':
-            case 'remove_tag':
                 return (
                     <div>
                         <label className="block text-sm font-medium text-slate-300 mb-1">Nome da Tag</label>
-                        <input type="text" value={config.tag || ''} onChange={(e) => updateNodeConfig('tag', e.target.value)} placeholder="Ex: vip" className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white" />
-                    </div>
-                );
-            case 'message_received_with_keyword':
-                 return (
-                    <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-1">Palavra-chave</label>
-                        <input type="text" value={config.keyword || ''} onChange={(e) => updateNodeConfig('keyword', e.target.value)} placeholder="Ex: promoção" className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white" />
-                         <p className="text-xs text-slate-400 mt-1">A automação iniciará se a mensagem do contato contiver esta palavra.</p>
-                    </div>
-                );
-            case 'button_clicked':
-                 return (
-                    <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-1">ID do Botão</label>
-                        <input type="text" value={config.button_payload || ''} onChange={(e) => updateNodeConfig('button_payload', e.target.value)} placeholder="O ID único do botão" className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white" />
+                        <DroppableInput type="text" value={config.tag || ''} onValueChange={val => updateNodeConfig('tag', val)} placeholder="Ex: vip" className={baseInputClass} />
                     </div>
                 );
             case 'send_template':
@@ -309,7 +370,7 @@ const SettingsPanel = ({ node, setNodes, templates, profile, automationId }: { n
                  return (
                     <div>
                         <label className="block text-sm font-medium text-slate-300 mb-1">Selecione o Template</label>
-                        <select value={config.template_id || ''} onChange={(e) => updateNodeConfig('template_id', e.target.value)} className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white">
+                        <select value={config.template_id || ''} onChange={(e) => updateNodeConfig('template_id', e.target.value)} className={baseInputClass}>
                             <option value="">-- Selecione um template --</option>
                             {approvedTemplates.map(t => <option key={t.id} value={t.id}>{t.template_name}</option>)}
                         </select>
@@ -320,27 +381,20 @@ const SettingsPanel = ({ node, setNodes, templates, profile, automationId }: { n
                 return (
                     <div>
                         <label className="block text-sm font-medium text-slate-300 mb-1">Texto da Mensagem</label>
-                        <textarea value={config.message_text || ''} onChange={(e) => updateNodeConfig('message_text', e.target.value)} placeholder="Digite sua mensagem. Use {{contact.name}} para o nome do contato ou {{trigger.campo}} para um dado do webhook." rows={4} className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white" />
+                        <DroppableTextarea value={config.message_text || ''} onValueChange={val => updateNodeConfig('message_text', val)} placeholder="Digite sua mensagem..." rows={4} className={baseInputClass} />
                     </div>
                 );
             case 'condition':
                  return (
                     <div className="space-y-3">
                         <div>
-                            <label className="block text-xs font-medium text-slate-400 mb-1">Fonte do Dado</label>
-                            <select value={config.source_type || 'contact'} onChange={(e) => updateNodeConfig('source_type', e.target.value)} className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white">
-                                <option value="contact">Dados do Contato</option>
-                                <option value="trigger">Dados do Gatilho (Webhook)</option>
-                            </select>
-                        </div>
-                        <div>
                             <label className="block text-xs font-medium text-slate-400 mb-1">Campo</label>
-                             <input type="text" value={config.field || ''} onChange={(e) => updateNodeConfig('field', e.target.value)} placeholder={config.source_type === 'trigger' ? 'caminho.no.payload' : 'tags'} className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white" />
-                             <p className="text-xs text-slate-400 mt-1">Para contato: 'tags', 'name', 'custom_fields.seu_campo'. Para gatilho: 'body.id_pedido'.</p>
+                             <DroppableInput type="text" value={config.field || ''} onValueChange={val => updateNodeConfig('field', val)} placeholder={'tags ou {{trigger.body.id}}'} className={baseInputClass} />
+                             <p className="text-xs text-slate-400 mt-1">Para contato: 'tags', 'name'. Para gatilho: arraste a variável.</p>
                         </div>
                          <div>
                             <label className="block text-xs font-medium text-slate-400 mb-1">Operador</label>
-                            <select value={config.operator || 'contains'} onChange={(e) => updateNodeConfig('operator', e.target.value)} className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white">
+                            <select value={config.operator || 'contains'} onChange={(e) => updateNodeConfig('operator', e.target.value)} className={baseInputClass}>
                                 <option value="contains">Contém</option>
                                 <option value="not_contains">Não contém</option>
                                 <option value="equals">É igual a</option>
@@ -348,14 +402,13 @@ const SettingsPanel = ({ node, setNodes, templates, profile, automationId }: { n
                         </div>
                         <div>
                             <label className="block text-xs font-medium text-slate-400 mb-1">Valor</label>
-                            <input type="text" value={config.value || ''} onChange={(e) => updateNodeConfig('value', e.target.value)} placeholder="Valor a comparar" className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white" />
+                            <DroppableInput type="text" value={config.value || ''} onValueChange={val => updateNodeConfig('value', val)} placeholder="Valor a comparar" className={baseInputClass} />
                         </div>
                     </div>
                  );
             case 'webhook_received':
                 const webhookPrefix = profile?.webhook_path_prefix || profile?.id;
                 const webhookUrl = `${window.location.origin}/api/trigger/${webhookPrefix}_${id}`;
-                const isListeningMode = config.last_captured_data === null;
                 return (
                      <div className="space-y-4">
                         <div>
@@ -368,104 +421,20 @@ const SettingsPanel = ({ node, setNodes, templates, profile, automationId }: { n
                         </div>
                         <div className="border-t border-slate-700 pt-4">
                             <label className="block text-sm font-medium text-slate-300 mb-2">Escuta de Webhook</label>
-                             {isListeningMode ? (
+                             {isListening ? (
                                 <div className="text-center p-4 bg-slate-700/50 rounded-lg">
                                     <svg className="animate-spin h-6 w-6 text-sky-400 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                     </svg>
                                     <p className="text-sm text-sky-300 mt-2">Aguardando dados...</p>
-                                    <p className="text-xs text-slate-400 mt-1">Envie uma requisição de teste para a URL. Depois, recarregue este editor.</p>
+                                    <p className="text-xs text-slate-400 mt-1">Envie uma requisição de teste para a URL.</p>
                                 </div>
                             ) : (
                                 <Button size="sm" variant="secondary" onClick={handleStartListening} disabled={!automationId}>Limpar e Escutar por Novos Dados</Button>
                             )}
                         </div>
                         {renderDataMapping()}
-                    </div>
-                )
-            case 'send_media':
-                return (
-                    <div className="space-y-3">
-                         <div>
-                            <label className="block text-sm font-medium text-slate-300 mb-1">Tipo de Mídia</label>
-                            <select value={config.media_type || 'image'} onChange={(e) => updateNodeConfig('media_type', e.target.value)} className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white">
-                                <option value="image">Imagem</option>
-                                <option value="video">Vídeo</option>
-                                <option value="document">Documento</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-300 mb-1">URL da Mídia</label>
-                            <input type="url" value={config.media_url || ''} onChange={(e) => updateNodeConfig('media_url', e.target.value)} placeholder="https://..." className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white" />
-                        </div>
-                         <div>
-                            <label className="block text-sm font-medium text-slate-300 mb-1">Legenda (Opcional)</label>
-                            <textarea value={config.caption || ''} onChange={(e) => updateNodeConfig('caption', e.target.value)} rows={2} className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white" />
-                        </div>
-                    </div>
-                )
-            case 'send_interactive_message':
-                const buttons = Array.isArray(config.buttons) ? config.buttons : [];
-                const handleButtonChange = (index: number, field: string, value: string) => {
-                    const newButtons = buttons.map((b, i) => i === index ? {...b, [field]: value} : b);
-                    updateNodeConfig('buttons', newButtons);
-                }
-                const addButton = () => {
-                    if (buttons.length < 3) {
-                        const newButtons = [...buttons, {id: `btn_${Date.now()}`, text: ''}];
-                        updateNodeConfig('buttons', newButtons);
-                    }
-                }
-                 const removeButton = (index: number) => {
-                    const newButtons = buttons.filter((_, i) => i !== index);
-                    updateNodeConfig('buttons', newButtons);
-                }
-
-                return (
-                    <div className="space-y-3">
-                        <div>
-                            <label className="block text-sm font-medium text-slate-300 mb-1">Texto Principal</label>
-                            <textarea value={config.message_text || ''} onChange={(e) => updateNodeConfig('message_text', e.target.value)} rows={3} className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white" />
-                        </div>
-                        <div>
-                             <label className="block text-sm font-medium text-slate-300 mb-1">Botões (Quick Reply)</label>
-                             <div className="space-y-2">
-                                {buttons.map((btn: any, index: number) => (
-                                    <div key={index} className="flex items-center gap-2">
-                                        <input type="text" value={btn.text} onChange={e => handleButtonChange(index, 'text', e.target.value)} placeholder={`Botão ${index + 1}`} className="flex-grow bg-slate-800 border border-slate-600 rounded-md p-1.5 text-white text-sm" />
-                                        <button onClick={() => removeButton(index)} className="p-1 text-slate-400 hover:text-red-400"><TRASH_ICON className="w-4 h-4" /></button>
-                                    </div>
-                                ))}
-                             </div>
-                             {buttons.length < 3 && <Button size="sm" variant="ghost" className="mt-2" onClick={addButton}>+ Adicionar Botão</Button>}
-                        </div>
-                    </div>
-                )
-             case 'set_custom_field':
-                 return (
-                    <div className="space-y-3">
-                        <div>
-                            <label className="block text-sm font-medium text-slate-300 mb-1">Nome do Campo</label>
-                            <input type="text" value={config.field_name || ''} onChange={(e) => updateNodeConfig('field_name', e.target.value)} placeholder="Ex: plano" className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white" />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-300 mb-1">Valor do Campo</label>
-                            <input type="text" value={config.field_value || ''} onChange={(e) => updateNodeConfig('field_value', e.target.value)} placeholder="Ex: premium. Use {{trigger.campo}} para usar um dado do webhook." className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white" />
-                        </div>
-                    </div>
-                );
-            case 'send_webhook':
-                return (
-                     <div className="space-y-3">
-                        <div>
-                            <label className="block text-sm font-medium text-slate-300 mb-1">URL do Webhook</label>
-                            <input type="url" value={config.url || ''} onChange={(e) => updateNodeConfig('url', e.target.value)} placeholder="https://..." className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white" />
-                        </div>
-                        <div>
-                             <label className="block text-sm font-medium text-slate-300 mb-1">Corpo da Requisição (JSON)</label>
-                             <textarea value={config.body || ''} onChange={(e) => updateNodeConfig('body', e.target.value)} rows={5} placeholder={`{ "name": "{{contact.name}}", "pedido_id": "{{trigger.body.id}}" }`} className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white font-mono text-xs" />
-                        </div>
                     </div>
                 )
             case 'split_path':
@@ -477,12 +446,14 @@ const SettingsPanel = ({ node, setNodes, templates, profile, automationId }: { n
 
     return (
          <Card className="w-80 h-full overflow-y-auto">
-            <h3 className="text-xl font-bold text-white mb-4">Configurações</h3>
             <div className="space-y-4">
                 <div>
-                    <p className="block text-sm font-medium text-slate-300">Nó Selecionado</p>
-                    <p className="font-semibold text-white">{data.label}</p>
+                    <p className="block text-sm font-medium text-slate-300">Configurações do nó</p>
+                    <p className="font-semibold text-white text-lg">{data.label}</p>
                 </div>
+                
+                { data.nodeType === 'action' && <VariablesPanel nodes={nodes} /> }
+
                 <div className="border-t border-slate-700 pt-4">
                      {renderConfig()}
                 </div>
@@ -497,7 +468,7 @@ const SettingsPanel = ({ node, setNodes, templates, profile, automationId }: { n
 
 const FlowCanvas = () => {
     const { pageParams, automations, templates, addAutomation, updateAutomation, setCurrentPage, profile } = useContext(AppContext);
-    const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
+    const { screenToFlowPosition } = useReactFlow();
     const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
     const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
     const [selectedNode, setSelectedNode] = useState<AutomationNode | null>(null);
@@ -516,15 +487,47 @@ const FlowCanvas = () => {
                 setAutomationName(existingAutomation.name);
                 setNodes(existingAutomation.nodes || []);
                 setEdges(existingAutomation.edges || []);
-                setSelectedNode(null); // Clear selection on load
             }
         } else {
              setAutomationName('Nova Automação');
              setNodes([]);
              setEdges([]);
-             setSelectedNode(null);
         }
+        setSelectedNode(null);
     }, [isEditing, pageParams.automationId, automations, setNodes, setEdges]);
+    
+    useEffect(() => {
+        if (!automationId) return;
+
+        const channel = supabase.channel(`automation-editor-${automationId}`)
+            .on('postgres_changes', { 
+                event: 'UPDATE', 
+                schema: 'public', 
+                table: 'automations', 
+                filter: `id=eq.${automationId}` 
+            }, (payload) => {
+                const updatedAutomation = payload.new as unknown as Automation;
+                if (updatedAutomation && updatedAutomation.nodes) {
+                    setNodes(nds => {
+                       // Only update if there's a meaningful change to avoid loops
+                       if (JSON.stringify(nds) !== JSON.stringify(updatedAutomation.nodes)) {
+                           // When data is captured, update the selected node's data
+                           if (selectedNode) {
+                               const updatedSelectedNode = updatedAutomation.nodes.find(n => n.id === selectedNode.id);
+                               if(updatedSelectedNode) setSelectedNode(updatedSelectedNode);
+                           }
+                           return updatedAutomation.nodes;
+                       }
+                       return nds;
+                    });
+                }
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [automationId, setNodes, selectedNode]);
 
     const onConnect = useCallback((params: any) => setEdges((eds) => addEdge(params, eds)), [setEdges]);
 
@@ -539,49 +542,46 @@ const FlowCanvas = () => {
         const specificType = event.dataTransfer.getData('application/reactflow-specifictype') as TriggerType | ActionType | LogicType;
         const label = event.dataTransfer.getData('application/reactflow-label');
 
-        if (typeof nodeType === 'undefined' || !nodeType || !reactFlowInstance) return;
-
-        // Prevent multiple triggers
+        if (typeof nodeType === 'undefined' || !nodeType) return;
         if (nodeType === 'trigger' && nodes.some(n => n.data.nodeType === 'trigger')) {
             alert("Uma automação só pode ter um gatilho.");
             return;
         }
 
-        const position = reactFlowInstance.screenToFlowPosition({ x: event.clientX, y: event.clientY });
+        const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
         const newNode: AutomationNode = {
             id: `${specificType}_${Date.now()}`,
             type: nodeType,
             position,
-            data: {
-                nodeType: nodeType,
-                type: specificType,
-                label,
-                config: {},
-            },
+            data: { nodeType, type: specificType, label, config: {} },
         };
         setNodes((nds) => nds.concat(newNode));
-    }, [reactFlowInstance, setNodes, nodes]);
+    }, [screenToFlowPosition, setNodes, nodes]);
 
-    const onNodeClick = useCallback((_: any, node: Node<NodeData>) => {
-        setSelectedNode(node);
-    }, []);
-    
-    const onPaneClick = useCallback(() => {
-        setSelectedNode(null);
-    }, []);
+    const onNodeClick = useCallback((_: any, node: Node<NodeData>) => setSelectedNode(node), []);
+    const onPaneClick = useCallback(() => setSelectedNode(null), []);
+
+    const handleUpdateAutomation = async (automationData: Automation) => {
+        const payload = {
+            id: automationData.id,
+            name: automationData.name || automationName,
+            status: automationData.status || 'active',
+            nodes: automationData.nodes,
+            edges: automationData.edges || edges
+        }
+        await updateAutomation(payload as Automation);
+    }
 
     const onSave = async () => {
         setError(null);
         if (!automationName.trim()) return setError("O nome da automação é obrigatório.");
-        const triggerNodes = nodes.filter(n => n.data.nodeType === 'trigger');
-        if (triggerNodes.length === 0) return setError("A automação precisa de pelo menos um gatilho.");
-        if (triggerNodes.length > 1) return setError("A automação só pode ter um gatilho.");
+        if (nodes.filter(n => n.data.nodeType === 'trigger').length !== 1) return setError("A automação precisa de exatamente um gatilho.");
 
         setIsSaving(true);
         const automationData = {
             name: automationName,
             status: isEditing ? (automations.find(a => a.id === pageParams.automationId)?.status || 'active') : 'active',
-            nodes: nodes as AutomationNode[],
+            nodes,
             edges,
         };
         try {
@@ -632,12 +632,11 @@ const FlowCanvas = () => {
                         onNodesChange={onNodesChange}
                         onEdgesChange={onEdgesChange}
                         onConnect={onConnect}
-                        onInit={setReactFlowInstance}
                         onDrop={onDrop}
                         onDragOver={onDragOver}
                         onNodeClick={onNodeClick}
                         onPaneClick={onPaneClick}
-                        onNodesDelete={(deletedNodes) => setSelectedNode(null)}
+                        onNodesDelete={() => setSelectedNode(null)}
                         nodeTypes={nodeTypes}
                         fitView
                         className="bg-slate-900 xyflow-react"
@@ -648,7 +647,7 @@ const FlowCanvas = () => {
                 </div>
                 <aside className="absolute right-0 top-0 h-full bg-slate-800/50 p-4 border-l border-slate-700 backdrop-blur-sm z-10">
                    {selectedNode ? 
-                    <SettingsPanel node={selectedNode} setNodes={setNodes as any} templates={templates} profile={profile} automationId={automationId}/> 
+                    <SettingsPanel node={selectedNode} nodes={nodes} setNodes={setNodes as any} templates={templates} profile={profile} automationId={automationId} updateAutomation={handleUpdateAutomation}/> 
                     : <NodeSidebar onDragStart={handleDragStart} />}
                 </aside>
             </div>

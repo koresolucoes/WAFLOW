@@ -30,29 +30,13 @@ const AutomationCard: React.FC<AutomationCardProps> = ({ automation }) => {
     };
 
     const description = useMemo(() => {
-        if (!Array.isArray(automation.nodes) || automation.nodes.length === 0) {
-            return "Automação vazia.";
-        }
-        const triggerNode = automation.nodes.find(n => n.data.nodeType === 'trigger');
-        const actionNodeCount = automation.nodes.filter(n => n.data.nodeType === 'action').length;
-        const logicNodeCount = automation.nodes.filter(n => n.data.nodeType === 'logic').length;
+        const nodes = Array.isArray(automation.nodes) ? automation.nodes : [];
+        const triggerNode = nodes.find(n => n.data.nodeType === 'trigger');
         
-        if (!triggerNode) {
-            return "Automação inválida sem gatilho.";
-        }
+        if (!triggerNode) return "Automação sem gatilho.";
 
-        let desc = `Inicia com "${triggerNode.data.label}"`;
-        const parts = [];
-        if (actionNodeCount > 0) parts.push(`${actionNodeCount} ação(ões)`);
-        if (logicNodeCount > 0) parts.push(`${logicNodeCount} lógica(s)`);
-        
-        if(parts.length > 0) {
-            desc += ` e contém ${parts.join(' e ')}.`;
-        } else {
-            desc += '.';
-        }
+        return `Inicia com "${triggerNode.data.label}" e tem ${nodes.length} etapa(s).`;
 
-        return desc;
     }, [automation]);
 
 
