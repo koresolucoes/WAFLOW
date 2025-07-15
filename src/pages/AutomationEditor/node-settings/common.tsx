@@ -1,0 +1,161 @@
+import React, { useState, useRef, memo } from 'react';
+import { AutomationNode, MessageTemplate, Profile } from '../../../types';
+
+
+// ====================================================================================
+// Common Types
+// ====================================================================================
+export interface NodeSettingsProps {
+    node: AutomationNode;
+    onConfigChange: (newConfig: any) => void;
+    availableVariables: ReturnType<typeof getContextVariables>;
+    templates: MessageTemplate[]; // For SendTemplateSettings
+    profile: Profile | null; // For TriggerSettings
+}
+
+
+// ====================================================================================
+// Helper Functions
+// ====================================================================================
+export const getContextVariables = (nodes: AutomationNode[]) => {
+    const triggerNode = nodes.find(n => n.data.nodeType === 'trigger' && n.data.type === 'webhook_received');
+    const capturedData = (triggerNode?.data.config as any)?.last_captured_data;
+
+    const variables = [
+        {
+            group: 'Contato',
+            vars: [
+                { path: 'contact.name', label: 'Nome do Contato' },
+                { path: 'contact.phone', label: 'Telefone do Contato' },
+                { path: 'contact.tags', label: 'Tags do Contato' },
+                 { path: 'contact.id', label: 'ID do Contato' },
+            ],
+        }
+    ];
+
+    if (capturedData) {
+        const flattenObject = (obj: any, parentKey = '', res: { path: string, label: string }[] = []) => {
+            if (typeof obj !== 'object' || obj === null) return res;
+            for (const key in obj) {
+                if (Object.prototype.hasOwnProperty.call(obj, key)) {
+                    const propName = parentKey ? `${parentKey}.${key}` : key;
+                    if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
+                        flattenObject(obj[key], propName, res);
+                    } else {
+                        res.push({ path: `trigger.${propName}`, label: propName });
+                    }
+                }
+            }
+            return res;
+        };
+        const triggerVars = flattenObject(capturedData);
+        if (triggerVars.length > 0) {
+            variables.push({ group: 'Gatilho (Webhook)', vars: triggerVars });
+        }
+    }
+    return variables;
+};
+
+
+// ====================================================================================
+// Variable Selector Component
+// ====================================================================================
+interface VariableSelectorProps {
+    variables: ReturnType<typeof getContextVariables>;
+    onSelect: (variablePath: string) => void;
+}
+export const VariableSelector: React.FC<VariableSelectorProps> = memo(({ variables, onSelect }) => {
+    return (
+        <div className="absolute z-10 mt-1 w-full rounded-md bg-slate-700 shadow-lg p-2 border border-slate-600">
+            <div className="max-h-48 overflow-y-auto">
+                {variables.map(group => (
+                    <div key={group.group}>
+                        <h5 className="text-xs font-bold text-slate-400 px-2 pt-2">{group.group}</h5>
+                        <ul>
+                            {group.vars.map(v => (
+                                <li key={v.path}>
+                                    <button
+                                        type="button"
+                                        className="w-full text-left px-2 py-1.5 text-sm text-slate-300 hover:bg-sky-500/20 rounded-md"
+                                        onClick={() => onSelect(`{{${v.path}}}`)}
+                                        title={`Inserir {{${v.path}}}`}
+                                    >
+                                        {v.label}
+                                    </button>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+});
+
+
+// ====================================================================================
+// Input with Variable Selector
+// ====================================================================================
+interface InputWithVariablesProps extends React.InputHTMLAttributes<HTMLInputElement> {
+    onValueChange: (value: string) => void;
+    variables: ReturnType<typeof getContextVariables>;
+}
+export const InputWithVariables: React.FC<InputWithVariablesProps> = ({ onValueChange, value, variables, ...props }) => {
+    const [isFocused, setIsFocused] = useState(false);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    const handleSelectVariable = (variablePath: string) => {
+        if (!inputRef.current) return;
+        const { selectionStart, selectionEnd } = inputRef.current;
+        const currentValStr = String(value || '');
+        const newValue = `${currentValStr.substring(0, selectionStart as number)}${variablePath}${currentValStr.substring(selectionEnd as number)}`;
+        onValueChange(newValue);
+        inputRef.current.focus();
+    };
+
+    return (
+        <div className="relative">
+            <input
+                ref={inputRef}
+                value={value}
+                onChange={e => onValueChange(e.target.value)}
+                onFocus={() => setIsFocused(true)}
+                onBlur={() => setTimeout(() => setIsFocused(false), 150)} // Delay to allow click on selector
+                {...props}
+            />
+            {isFocused && <VariableSelector variables={variables} onSelect={handleSelectVariable} />}
+        </div>
+    );
+};
+
+interface TextareaWithVariablesProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
+    onValueChange: (value: string) => void;
+    variables: ReturnType<typeof getContextVariables>;
+}
+export const TextareaWithVariables: React.FC<TextareaWithVariablesProps> = ({ onValueChange, value, variables, ...props }) => {
+    const [isFocused, setIsFocused] = useState(false);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+    const handleSelectVariable = (variablePath: string) => {
+        if (!textareaRef.current) return;
+        const { selectionStart, selectionEnd } = textareaRef.current;
+        const currentValStr = String(value || '');
+        const newValue = `${currentValStr.substring(0, selectionStart as number)}${variablePath}${currentValStr.substring(selectionEnd as number)}`;
+        onValueChange(newValue);
+        textareaRef.current.focus();
+    };
+    
+    return (
+        <div className="relative">
+            <textarea
+                ref={textareaRef}
+                value={value}
+                onChange={e => onValueChange(e.target.value)}
+                onFocus={() => setIsFocused(true)}
+                onBlur={() => setTimeout(() => setIsFocused(false), 150)}
+                {...props}
+            />
+            {isFocused && <VariableSelector variables={variables} onSelect={handleSelectVariable} />}
+        </div>
+    );
+};

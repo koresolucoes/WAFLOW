@@ -3,12 +3,13 @@
 import React, { useContext, useState, useEffect, useCallback, memo, FC } from 'react';
 import { ReactFlow, ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, type Node, type Edge, type NodeProps, useReactFlow, NodeTypes } from '@xyflow/react';
 import { AppContext } from '../../contexts/AppContext';
-import { Automation, AutomationNode, NodeData, TriggerType, ActionType, LogicType } from '../../types';
+import { Automation, AutomationNode, NodeData } from '../../types';
 import Button from '../../components/common/Button';
 import Card from '../../components/common/Card';
 import { supabase } from '../../lib/supabaseClient';
 import { AUTOMATION_ICON } from '../../components/icons';
 import NodeSettingsModal from './NodeSettingsModal';
+import { nodeConfigs } from '../../lib/automation/nodeConfigs';
 
 const initialNodes: AutomationNode[] = [];
 const initialEdges: Edge[] = [];
@@ -119,42 +120,46 @@ const nodeTypes: NodeTypes = {
 };
 
 
-const DraggableNode = ({ type, label, onDragStart, specificType }: { type: 'trigger' | 'action' | 'logic', label: string, onDragStart: (event: React.DragEvent, nodeType: string, type: string, label: string) => void, specificType: string }) => (
-    <div
-        className="p-3 mb-2 border-2 border-dashed border-slate-600 rounded-lg text-center cursor-grab bg-slate-800 hover:bg-slate-700 hover:border-sky-500"
-        onDragStart={(event) => onDragStart(event, type, specificType, label)}
-        draggable
-    >
-        <p className="font-semibold text-sm">{label}</p>
-    </div>
-);
+const DraggableNode = ({ nodeType, onDragStart }: { nodeType: string, onDragStart: (event: React.DragEvent, nodeData: NodeData) => void }) => {
+    const config = nodeConfigs[nodeType];
+    if (!config) return null;
 
-const NodeSidebar = memo(({ onDragStart }: { onDragStart: (event: React.DragEvent, nodeType: string, specificType: string, label: string) => void }) => (
-    <Card className="w-full h-full overflow-y-auto !p-4 bg-transparent shadow-none">
-        <h3 className="text-xl font-bold text-white mb-4">Blocos</h3>
-        <p className="text-sm text-slate-400 mb-4">Arraste os blocos para a área de trabalho para construir sua automação.</p>
-        <div>
-            <h4 className="font-semibold text-sky-300 mb-2">Gatilhos (Início)</h4>
-            <DraggableNode type="trigger" label="Webhook Recebido" specificType="webhook_received" onDragStart={onDragStart} />
+    return (
+        <div
+            className="p-3 mb-2 border-2 border-dashed border-slate-600 rounded-lg text-center cursor-grab bg-slate-800 hover:bg-slate-700 hover:border-sky-500"
+            onDragStart={(event) => onDragStart(event, config.data as NodeData)}
+            draggable
+        >
+            <p className="font-semibold text-sm">{config.label}</p>
         </div>
-        <div className="mt-6">
-            <h4 className="font-semibold text-pink-300 mb-2">Ações</h4>
-            <DraggableNode type="action" label="Enviar Template" specificType="send_template" onDragStart={onDragStart} />
-            <DraggableNode type="action" label="Enviar Texto Simples" specificType="send_text_message" onDragStart={onDragStart} />
-            <DraggableNode type="action" label="Enviar Mídia" specificType="send_media" onDragStart={onDragStart} />
-            <DraggableNode type="action" label="Enviar Msg Interativa" specificType="send_interactive_message" onDragStart={onDragStart} />
-            <DraggableNode type="action" label="Adicionar Tag" specificType="add_tag" onDragStart={onDragStart} />
-            <DraggableNode type="action" label="Remover Tag" specificType="remove_tag" onDragStart={onDragStart} />
-            <DraggableNode type="action" label="Definir Campo Personalizado" specificType="set_custom_field" onDragStart={onDragStart} />
-            <DraggableNode type="action" label="Enviar Webhook" specificType="send_webhook" onDragStart={onDragStart} />
-        </div>
-         <div className="mt-6">
-            <h4 className="font-semibold text-purple-300 mb-2">Lógica</h4>
-            <DraggableNode type="logic" label="Condição (Se/Senão)" specificType="condition" onDragStart={onDragStart} />
-            <DraggableNode type="logic" label="Dividir Caminho (A/B)" specificType="split_path" onDragStart={onDragStart} />
-        </div>
-    </Card>
-));
+    );
+};
+
+const NodeSidebar = memo(({ onDragStart }: { onDragStart: (event: React.DragEvent, nodeData: NodeData) => void }) => {
+    const triggerNodes = Object.keys(nodeConfigs).filter(key => nodeConfigs[key].nodeType === 'trigger');
+    const actionNodes = Object.keys(nodeConfigs).filter(key => nodeConfigs[key].nodeType === 'action');
+    const logicNodes = Object.keys(nodeConfigs).filter(key => nodeConfigs[key].nodeType === 'logic');
+
+    return (
+        <Card className="w-full h-full overflow-y-auto !p-4 bg-transparent shadow-none">
+            <h3 className="text-xl font-bold text-white mb-4">Blocos</h3>
+            <p className="text-sm text-slate-400 mb-4">Arraste os blocos para a área de trabalho para construir sua automação.</p>
+            <div>
+                <h4 className="font-semibold text-sky-300 mb-2">Gatilhos (Início)</h4>
+                {triggerNodes.map(type => <DraggableNode key={type} nodeType={type} onDragStart={onDragStart} />)}
+            </div>
+            <div className="mt-6">
+                <h4 className="font-semibold text-pink-300 mb-2">Ações</h4>
+                {actionNodes.map(type => <DraggableNode key={type} nodeType={type} onDragStart={onDragStart} />)}
+            </div>
+             <div className="mt-6">
+                <h4 className="font-semibold text-purple-300 mb-2">Lógica</h4>
+                {logicNodes.map(type => <DraggableNode key={type} nodeType={type} onDragStart={onDragStart} />)}
+            </div>
+        </Card>
+    );
+});
+
 
 const FlowCanvas = () => {
     const { pageParams, automations, templates, updateAutomation, setCurrentPage, profile } = useContext(AppContext);
@@ -235,22 +240,23 @@ const FlowCanvas = () => {
 
     const onDrop = useCallback((event: React.DragEvent) => {
         event.preventDefault();
-        const nodeType = event.dataTransfer.getData('application/reactflow-nodetype') as 'trigger' | 'action' | 'logic';
-        const specificType = event.dataTransfer.getData('application/reactflow-specifictype') as TriggerType | ActionType | LogicType;
-        const label = event.dataTransfer.getData('application/reactflow-label');
+        const nodeDataString = event.dataTransfer.getData('application/reactflow-nodedata');
 
-        if (typeof nodeType === 'undefined' || !nodeType) return;
-        if (nodeType === 'trigger' && nodes.some(n => n.data.nodeType === 'trigger')) {
+        if (!nodeDataString) return;
+
+        const nodeData: NodeData = JSON.parse(nodeDataString);
+
+        if (nodeData.nodeType === 'trigger' && nodes.some(n => n.data.nodeType === 'trigger')) {
             alert("Uma automação só pode ter um gatilho.");
             return;
         }
 
         const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
         const newNode: AutomationNode = {
-            id: `${specificType}_${Date.now()}`,
-            type: nodeType,
+            id: `${nodeData.type}_${Date.now()}`,
+            type: nodeData.nodeType,
             position,
-            data: { nodeType, type: specificType, label, config: {} },
+            data: nodeData,
         };
         setNodes((nds) => nds.concat(newNode));
     }, [screenToFlowPosition, setNodes, nodes]);
@@ -294,10 +300,8 @@ const FlowCanvas = () => {
         }
     };
     
-    const handleDragStart = (event: React.DragEvent, nodeType: string, specificType: string, label: string) => {
-        event.dataTransfer.setData('application/reactflow-nodetype', nodeType);
-        event.dataTransfer.setData('application/reactflow-specifictype', specificType);
-        event.dataTransfer.setData('application/reactflow-label', label);
+    const handleDragStart = (event: React.DragEvent, nodeData: NodeData) => {
+        event.dataTransfer.setData('application/reactflow-nodedata', JSON.stringify(nodeData));
         event.dataTransfer.effectAllowed = 'move';
     };
 
