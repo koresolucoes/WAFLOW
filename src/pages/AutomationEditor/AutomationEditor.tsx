@@ -344,7 +344,7 @@ const Editor: React.FC = () => {
 
         const newNode: AutomationNode = {
             id: `${type}_${Date.now()}`,
-            type: nodeType,
+            type: nodeType === 'logic' && type === 'condition' ? 'logic' : nodeType, // Special case for condition node type
             position,
             data: {
                 nodeType: nodeType,

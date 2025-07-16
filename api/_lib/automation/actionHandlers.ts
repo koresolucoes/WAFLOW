@@ -1,17 +1,9 @@
 
 
-
-
-
-
-
-
-
-
 import { supabaseAdmin } from '../supabaseAdmin.js';
 import { sendTemplatedMessage, sendTextMessage, sendMediaMessage, sendInteractiveMessage } from '../meta/messages.js';
 import { AutomationNode, Contact, Json, MetaConfig, MessageTemplate, Profile } from '../types.js';
-import { TablesUpdate } from '../database.types.js';
+import { TablesUpdate, TablesInsert } from '../database.types.js';
 
 // ====================================================================================
 // Helper Functions
@@ -25,8 +17,15 @@ const getValueFromPath = (obj: any, path: string): any => {
 const resolveVariables = (text: string, context: { contact: Contact | null, trigger: any }): string => {
     if (typeof text !== 'string') return text;
     return text.replace(/\{\{([^}]+)\}\}/g, (_match, path) => {
-        const value = getValueFromPath(context, path.trim());
-        return value !== undefined ? String(value) : `{{${path}}}`;
+        const trimmedPath = path.trim();
+        const value = getValueFromPath(context, trimmedPath);
+        
+        // Handle array values (like tags) by joining them
+        if (Array.isArray(value)) {
+            return value.join(', ');
+        }
+        
+        return value !== undefined ? String(value) : `{{${trimmedPath}}}`;
     });
 };
 
@@ -88,41 +87,38 @@ const sendTemplate: ActionHandler = async ({ profile, contact, node, trigger }) 
     }
     const config = (node.data.config || {}) as any;
     const { data: template, error: templateError } = await supabaseAdmin.from('message_templates').select('*').eq('id', config.template_id).single();
-    if (templateError) throw new Error(`Erro ao buscar template: ${templateError.message}`);
+    if (templateError || !template) throw new Error(`Erro ao buscar template: ${templateError?.message || 'Template não encontrado.'}`);
     
-    if (template) {
-         const metaConfig = getMetaConfig(profile);
-         const templateTyped = template as MessageTemplate;
-         
-         let allText = '';
-         templateTyped.components.forEach(c => {
-             if(c.text) allText += c.text + ' ';
-             if(c.type === 'BUTTONS' && c.buttons) {
-                 c.buttons.forEach(b => {
-                     if(b.type === 'URL' && b.url) allText += b.url + ' ';
-                 });
-             }
-         });
-         const placeholders = allText.match(/\{\{\d+\}\}/g) || [];
-         const uniquePlaceholders = [...new Set(placeholders)];
-         
-         const bodyParameters = uniquePlaceholders.map(p => {
-            const rawValue = p === '{{1}}' ? '{{contact.name}}' : (config[p] || '');
-            const resolvedValue = resolveVariables(rawValue, { contact, trigger });
-            return { type: 'text', text: resolvedValue };
-         });
+    const metaConfig = getMetaConfig(profile);
+    const templateTyped = template as MessageTemplate;
+    
+    let allText = '';
+    templateTyped.components.forEach(c => {
+        if(c.text) allText += c.text + ' ';
+        if(c.type === 'BUTTONS' && c.buttons) {
+            c.buttons.forEach(b => {
+                if(b.type === 'URL' && b.url) allText += b.url + ' ';
+            });
+        }
+    });
+    const placeholders = allText.match(/\{\{\d+\}\}/g) || [];
+    const uniquePlaceholders = [...new Set(placeholders)];
+    
+    const bodyParameters = uniquePlaceholders.map(p => {
+       const rawValue = p === '{{1}}' ? '{{contact.name}}' : (config[p] || '');
+       const resolvedValue = resolveVariables(rawValue, { contact, trigger });
+       return { type: 'text', text: resolvedValue };
+    });
 
-         const components = [{ type: 'body', parameters: bodyParameters }];
+    const components = [{ type: 'body', parameters: bodyParameters }];
 
-        await sendTemplatedMessage(
-            metaConfig, 
-            contact.phone, 
-            templateTyped.template_name, 
-            components
-        );
-        return { details: `Template '${templateTyped.template_name}' enviado para ${contact.name}.` };
-    }
-    throw new Error('Template configurado não foi encontrado.');
+    await sendTemplatedMessage(
+       metaConfig, 
+       contact.phone, 
+       templateTyped.template_name, 
+       components
+    );
+    return { details: `Template '${templateTyped.template_name}' enviado para ${contact.name}.` };
 };
 
 const sendTextMessageAction: ActionHandler = async ({ profile, contact, node, trigger }) => {
@@ -180,7 +176,7 @@ const addTag: ActionHandler = async ({ contact, node, trigger }) => {
         const updatePayload: TablesUpdate<'contacts'> = { tags: newTags };
         const { data, error } = await supabaseAdmin.from('contacts').update(updatePayload).eq('id', contact.id).select().single();
         if (error) throw error;
-        if (data) return { updatedContact: data as Contact, details: `Tag '${tagToAdd}' adicionada ao contato.` };
+        return { updatedContact: data, details: `Tag '${tagToAdd}' adicionada ao contato.` };
     }
      throw new Error('Tag a ser adicionada não está configurada.');
 };
@@ -196,7 +192,7 @@ const removeTag: ActionHandler = async ({ contact, node, trigger }) => {
         const updatePayload: TablesUpdate<'contacts'> = { tags: newTags };
         const { data, error } = await supabaseAdmin.from('contacts').update(updatePayload).eq('id', contact.id).select().single();
         if (error) throw error;
-        if (data) return { updatedContact: data as Contact, details: `Tag '${tagToRemove}' removida do contato.` };
+        return { updatedContact: data, details: `Tag '${tagToRemove}' removida do contato.` };
     }
     throw new Error('Tag a ser removida não está configurada.');
 };
@@ -207,13 +203,13 @@ const setCustomField: ActionHandler = async ({ contact, node, trigger }) => {
     }
     const config = (node.data.config || {}) as any;
     if(config.field_name){
-        const fieldName = resolveVariables(config.field_name, { contact, trigger });
+        const fieldName = resolveVariables(config.field_name, { contact, trigger }).replace(/\s+/g, '_');
         const fieldValue = resolveVariables(config.field_value || '', { contact, trigger });
         const newCustomFields = { ...(contact.custom_fields as object || {}), [fieldName]: fieldValue };
         const updatePayload: TablesUpdate<'contacts'> = { custom_fields: newCustomFields };
         const { data, error } = await supabaseAdmin.from('contacts').update(updatePayload).eq('id', contact.id).select().single();
         if (error) throw error;
-        if (data) return { updatedContact: data as Contact, details: `Campo '${fieldName}' atualizado para '${fieldValue}'.` };
+        return { updatedContact: data, details: `Campo '${fieldName}' atualizado para '${fieldValue}'.` };
     }
     throw new Error('Nome do campo personalizado não está configurado.');
 };
@@ -272,7 +268,8 @@ const sendWebhook: ActionHandler = async ({ contact, node, trigger }) => {
         const response = await fetch(resolvedUrl, requestOptions);
         responseStatus = response.status;
         if (!response.ok) {
-            throw new Error(`Request failed with status ${response.status}`);
+            const errorBody = await response.text();
+            throw new Error(`Request failed with status ${response.status}: ${errorBody}`);
         }
          return { details: `Webhook enviado para ${resolvedUrl}. Resposta: ${response.status}` };
     } catch (e: any) {
@@ -284,7 +281,7 @@ const sendWebhook: ActionHandler = async ({ contact, node, trigger }) => {
 
 const condition: ActionHandler = async ({ contact, node, trigger }) => {
     const config = (node.data.config || {}) as any;
-    const fieldPath = config.field || '';
+    const fieldPath = config.field ? config.field.replace(/\{\{|\}\}/g, '') : '';
     const operator = config.operator;
     const value = resolveVariables(config.value, { contact, trigger });
     
@@ -293,21 +290,30 @@ const condition: ActionHandler = async ({ contact, node, trigger }) => {
 
     let conditionMet = false;
     const lowerCaseValue = String(value).toLowerCase();
-    const lowerCaseSourceValue = String(sourceValue).toLowerCase();
-
-    if (operator === 'contains') {
-        conditionMet = Array.isArray(sourceValue) 
-            ? sourceValue.map(v => String(v).toLowerCase()).includes(lowerCaseValue)
-            : lowerCaseSourceValue.includes(lowerCaseValue);
-    } else if (operator === 'not_contains') {
-         conditionMet = Array.isArray(sourceValue) 
-            ? !sourceValue.map(v => String(v).toLowerCase()).includes(lowerCaseValue)
-            : !lowerCaseSourceValue.includes(lowerCaseValue);
-    } else if (operator === 'equals') {
-        conditionMet = lowerCaseSourceValue === lowerCaseValue;
+    
+    // Check if sourceValue is an array (like tags)
+    if (Array.isArray(sourceValue)) {
+        const lowerCaseArray = sourceValue.map(v => String(v).toLowerCase());
+        if (operator === 'contains') {
+            conditionMet = lowerCaseArray.includes(lowerCaseValue);
+        } else if (operator === 'not_contains') {
+            conditionMet = !lowerCaseArray.includes(lowerCaseValue);
+        } else if (operator === 'equals') {
+            // For arrays, 'equals' might not be intuitive. We'll check if any element is an exact match.
+             conditionMet = lowerCaseArray.includes(lowerCaseValue);
+        }
+    } else { // It's not an array
+        const lowerCaseSourceValue = String(sourceValue ?? '').toLowerCase();
+        if (operator === 'contains') {
+            conditionMet = lowerCaseSourceValue.includes(lowerCaseValue);
+        } else if (operator === 'not_contains') {
+             conditionMet = !lowerCaseSourceValue.includes(lowerCaseValue);
+        } else if (operator === 'equals') {
+            conditionMet = lowerCaseSourceValue === lowerCaseValue;
+        }
     }
     
-    const details = `Condição avaliada: '${sourceValue}' ${operator} '${value}'. Resultado: ${conditionMet ? 'Sim' : 'Não'}`;
+    const details = `Condição avaliada: '${fieldPath}' (${sourceValue}) ${operator} '${value}'. Resultado: ${conditionMet ? 'Sim' : 'Não'}`;
     return { nextNodeHandle: conditionMet ? 'yes' : 'no', details };
 };
 

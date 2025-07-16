@@ -1,4 +1,5 @@
 
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from './_lib/supabaseAdmin.js';
 import { Contact } from './_lib/types.js';
@@ -15,21 +16,22 @@ const findOrCreateContact = async (user_id: string, phone: string, name: string)
         .single();
 
     if (error && error.code === 'PGRST116') { // Not found
+        const newContactPayload: TablesInsert<'contacts'> = { user_id, phone, name, tags: ['new-lead'], custom_fields: null };
         const { data: newContact, error: insertError } = await supabaseAdmin
             .from('contacts')
-            .insert({ user_id, phone, name, tags: ['new-lead'], custom_fields: null } as TablesInsert<'contacts'>)
+            .insert([newContactPayload])
             .select()
             .single();
         if (insertError || !newContact) {
              console.error("Error creating new contact:", insertError);
              return { contact: null, isNew: false };
         }
-        return { contact: newContact as Contact, isNew: true };
+        return { contact: newContact, isNew: true };
     } else if (error) {
          console.error("Error finding contact:", error);
         return { contact: null, isNew: false };
     }
-    return { contact: contactData as Contact, isNew: false };
+    return { contact: contactData, isNew: false };
 };
 
 
@@ -99,14 +101,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                             } else {
                                 messageBody = `[${message.type}]`;
                             }
-
-                            // Store received message
-                            await supabaseAdmin.from('received_messages').insert({
+                            
+                            const receivedMessagePayload: TablesInsert<'received_messages'> = {
                                user_id: userId,
                                contact_id: contact.id,
                                meta_message_id: message.id,
                                message_body: messageBody
-                            } as TablesInsert<'received_messages'>);
+                            };
+                            // Store received message
+                            await supabaseAdmin.from('received_messages').insert([receivedMessagePayload]);
                             
                             // ---- NEW: Use centralized trigger handler ----
                             // Don't await these, let them run in the background

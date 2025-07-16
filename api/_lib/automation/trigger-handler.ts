@@ -20,10 +20,10 @@ const getActiveAutomations = async (userId: string): Promise<Automation[]> => {
 };
 
 // Dispatches an automation to the engine without waiting for it to complete.
-const dispatchAutomation = (automation: Automation, contact: Contact | null, startNodeId: string, triggerData: Json | null) => {
+const dispatchAutomation = (automation: Automation, contact: Contact | null, startNodeId: string, trigger: Json | null) => {
     console.log(`Dispatching automation '${automation.name}' (ID: ${automation.id}) starting from node ${startNodeId}`);
     // Non-blocking call
-    executeAutomation(automation, contact, startNodeId, triggerData);
+    executeAutomation(automation, contact, startNodeId, trigger);
 };
 
 // Handles events related to incoming messages from Meta
@@ -34,14 +34,14 @@ export const handleMetaMessageEvent = async (userId: string, contact: Contact, m
         : (message.type === 'interactive' && message.interactive.type === 'button_reply' ? message.interactive.button_reply.title.toLowerCase() : '');
     const buttonPayload = message.type === 'interactive' && message.interactive.type === 'button_reply' ? message.interactive.button_reply.id : undefined;
 
-    const triggerPayload = { type: 'meta_message', payload: message };
+    const triggerData = { type: 'meta_message', payload: message };
 
     for (const auto of automations) {
         if (!auto.nodes) continue;
         
-        const triggerNodes = auto.nodes.filter(n => n.data.nodeType === 'trigger');
+        for (const node of auto.nodes) {
+            if (node.data.nodeType !== 'trigger') continue;
 
-        for (const node of triggerNodes) {
             const config = (node.data.config || {}) as any;
             let shouldTrigger = false;
 
@@ -55,7 +55,7 @@ export const handleMetaMessageEvent = async (userId: string, contact: Contact, m
             }
             
             if (shouldTrigger) {
-                dispatchAutomation(auto, contact, node.id, triggerPayload);
+                dispatchAutomation(auto, contact, node.id, triggerData);
             }
         }
     }
@@ -64,12 +64,12 @@ export const handleMetaMessageEvent = async (userId: string, contact: Contact, m
 // Handles events for newly created contacts
 export const handleNewContactEvent = async (userId: string, contact: Contact) => {
     const automations = await getActiveAutomations(userId);
-    const triggerPayload = { type: 'new_contact', payload: { contact } };
+    const triggerData = { type: 'new_contact', payload: { contact } };
     for (const auto of automations) {
         if (!auto.nodes) continue;
         const triggerNode = auto.nodes.find(n => n.data.nodeType === 'trigger' && n.data.type === 'new_contact');
         if (triggerNode) {
-            dispatchAutomation(auto, contact, triggerNode.id, triggerPayload);
+            dispatchAutomation(auto, contact, triggerNode.id, triggerData);
         }
     }
 };
@@ -77,16 +77,17 @@ export const handleNewContactEvent = async (userId: string, contact: Contact) =>
 // Handles events when a specific tag is added to a contact
 export const handleTagAddedEvent = async (userId: string, contact: Contact, addedTag: string) => {
     const automations = await getActiveAutomations(userId);
-    const triggerPayload = { type: 'tag_added', payload: { contact, addedTag } };
+    const triggerData = { type: 'tag_added', payload: { contact, addedTag } };
 
     for (const auto of automations) {
         if (!auto.nodes) continue;
-        const triggerNodes = auto.nodes.filter(n => n.data.nodeType === 'trigger' && n.data.type === 'new_contact_with_tag');
         
-        for (const triggerNode of triggerNodes) {
+        for (const triggerNode of auto.nodes) {
+            if (triggerNode.data.nodeType !== 'trigger' || triggerNode.data.type !== 'new_contact_with_tag') continue;
+            
             const config = (triggerNode.data.config || {}) as any;
             if (config?.tag?.toLowerCase() === addedTag.toLowerCase()) {
-                dispatchAutomation(auto, contact, triggerNode.id, triggerPayload);
+                dispatchAutomation(auto, contact, triggerNode.id, triggerData);
             }
         }
     }

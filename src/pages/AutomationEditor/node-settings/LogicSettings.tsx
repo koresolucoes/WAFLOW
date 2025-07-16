@@ -19,8 +19,8 @@ const LogicSettings: React.FC<NodeSettingsProps> = ({ node, onConfigChange, avai
                 <div className="space-y-3">
                     <div>
                         <label className="block text-xs font-medium text-slate-400 mb-1">Verificar Variável</label>
-                         <InputWithVariables onValueChange={val => handleConfigChange('field', val)} value={config.field || ''} type="text" placeholder={'Ex: contact.tags ou {{trigger.body.id}}'} className={baseInputClass} variables={availableVariables} />
-                         <p className="text-xs text-slate-400 mt-1">Insira o caminho da variável a ser verificada. Use o seletor para ajuda.</p>
+                         <InputWithVariables onValueChange={val => handleConfigChange('field', val)} value={config.field || ''} type="text" placeholder={'Ex: {{contact.tags}} ou {{trigger.body.id}}'} className={baseInputClass} variables={availableVariables} />
+                         <p className="text-xs text-slate-400 mt-1">Insira a variável a ser verificada. Use o seletor para ajuda.</p>
                     </div>
                      <div>
                         <label className="block text-xs font-medium text-slate-400 mb-1">Operador</label>

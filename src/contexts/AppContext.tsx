@@ -79,49 +79,34 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     getSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      const newUser = session?.user ?? null;
+      if (user?.id !== newUser?.id) {
+          setProfile(null);
+      }
       setSession(session);
-      setUser(session?.user ?? null);
+      setUser(newUser);
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [user]);
 
   const fetchInitialData = useCallback(async () => {
       if (!user) return;
       setLoading(true);
       
-      let { data: profileData, error: profileError } = await supabase
+      const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', user.id)
         .single();
 
-      if (profileError && profileError.code === 'PGRST116') {
-        console.warn("Profile not found for user, creating a default one.");
-        const newUserProfile: TablesInsert<'profiles'> = { id: user.id };
-        const { data: newProfile, error: insertError } = await supabase
-          .from('profiles')
-          .insert(newUserProfile)
-          .select()
-          .single();
-        
-        if (insertError) {
-          console.error("Fatal: Could not create profile for user.", insertError);
-          setLoading(false);
-          return;
-        }
-        profileData = newProfile;
-      } else if (profileError) {
-        console.error("Error fetching profile:", profileError);
-      }
-
-      if (profileData) {
-        setProfile(profileData as Profile);
-      } else {
-        console.error("Could not load or create a user profile. App may not function correctly.");
+      if (profileError) {
+        console.error("Error fetching profile, user might not have one yet. Relying on DB trigger.", profileError);
         setLoading(false);
         return;
       }
+
+      setProfile(profileData);
 
       const [templatesRes, contactsRes, campaignsRes, segmentsRes, automationsRes] = await Promise.all([
           supabase.from('message_templates').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
@@ -132,13 +117,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       ]);
 
       if (templatesRes.error) console.error("Error fetching templates:", templatesRes.error);
-      else setTemplates((templatesRes.data as MessageTemplate[]) || []);
+      else setTemplates(templatesRes.data || []);
 
       if (contactsRes.error) console.error("Error fetching contacts:", contactsRes.error);
-      else setContacts((contactsRes.data as Contact[]) || []);
+      else setContacts(contactsRes.data || []);
 
-      if (campaignsRes.error) console.error("Error fetching campaigns:", campaignsRes.error);
-      else if (campaignsRes.data) await fetchCampaignsWithMetrics(campaignsRes.data as Campaign[]);
+      if (campaignsRes.error) {
+        console.error("Error fetching campaigns:", campaignsRes.error);
+      } else if (campaignsRes.data) {
+        await fetchCampaignsWithMetrics(campaignsRes.data);
+      }
       
       if (segmentsRes.error) console.error("Error fetching segments:", segmentsRes.error);
       else setSegments(segmentsRes.data || []);
@@ -159,10 +147,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }, [user]);
 
   useEffect(() => {
-    if (user && session) {
+    if (user && session && !profile) {
         fetchInitialData();
     }
-  }, [user, session, fetchInitialData]);
+  }, [user, session, profile, fetchInitialData]);
 
   const fetchCampaignsWithMetrics = async (campaignsData: Campaign[]) => {
     const campaignsWithMetrics: CampaignWithMetrics[] = await Promise.all(
@@ -248,7 +236,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const updatePayload: TablesUpdate<'profiles'> = profileData;
     const { data, error } = await supabase.from('profiles').update(updatePayload).eq('id', user.id).select().single();
     if(error) throw error;
-    if (data) setProfile(data as Profile);
+    if (data) setProfile(data);
   };
   
   const metaConfig = useMemo(() => ({
@@ -268,12 +256,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     
     const { data, error } = await supabase
       .from('message_templates')
-      .insert(dbTemplate)
+      .insert([dbTemplate])
       .select()
       .single();
     if (error) throw error;
     if (data) {
-        setTemplates(prev => [data as MessageTemplate, ...prev]);
+        setTemplates(prev => [data, ...prev]);
     }
   };
   
@@ -313,12 +301,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const payload: TablesInsert<'contacts'> = { ...contact, user_id: user.id };
     const { data, error } = await supabase
       .from('contacts')
-      .insert(payload)
+      .insert([payload])
       .select()
       .single();
     if (error) throw error;
     if(data) {
-      const newContact = data as Contact;
+      const newContact = data;
       setContacts(prev => [newContact, ...prev]);
       await checkAndRunContactAutomations(newContact);
     }
@@ -338,7 +326,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         .single();
     if (error) throw error;
     if(data) {
-      const newContact = data as Contact;
+      const newContact = data;
       setContacts(prev => prev.map(c => c.id === newContact.id ? newContact : c));
       await checkAndRunContactAutomations(newContact, oldContact);
     }
@@ -376,7 +364,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         const { data, error } = await supabase.from('contacts').insert(contactsToInsert).select();
         if (error) throw error;
         if(data) {
-          const newContactsData = data as Contact[];
+          const newContactsData = data;
           setContacts(prev => [...newContactsData, ...prev].sort((a,b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()));
           for(const contact of newContactsData) {
               await checkAndRunContactAutomations(contact);
@@ -395,14 +383,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     const { data: newCampaign, error: campaignError } = await supabase
         .from('campaigns')
-        .insert(campaignPayload)
+        .insert([campaignPayload])
         .select()
         .single();
 
     if (campaignError) throw campaignError;
     if (!newCampaign) throw new Error("Failed to create campaign.");
 
-    const typedNewCampaign = newCampaign as Campaign;
+    const typedNewCampaign = newCampaign;
 
     const messagesToInsert: TablesInsert<'campaign_messages'>[] = messages.map(msg => ({ ...msg, campaign_id: typedNewCampaign.id }));
     const { error: messagesError } = await supabase.from('campaign_messages').insert(messagesToInsert);
@@ -415,7 +403,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const sentCount = messages.filter(m => m.status !== 'failed').length;
 
     const newCampaignWithMetrics: CampaignWithMetrics = {
-        ...(typedNewCampaign as Campaign),
+        ...typedNewCampaign,
         metrics: {
             sent: sentCount,
             delivered: 0,
@@ -450,7 +438,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     const { data, error } = await supabase
         .from('automations')
-        .insert(dbAutomation)
+        .insert([dbAutomation])
         .select()
         .single();
 
@@ -515,7 +503,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     
     if (data) {
         const statsMap = data.reduce((acc, stat) => {
-            acc[stat.node_id] = stat as AutomationNodeStats;
+            acc[stat.node_id] = stat;
             return acc;
         }, {} as Record<string, AutomationNodeStats>);
         setAutomationStats(prev => ({...prev, ...statsMap}));
@@ -550,7 +538,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         console.error("Error fetching node logs:", error);
         return [];
     }
-    return (data as AutomationNodeLog[]) || [];
+    return data || [];
   }, [user]);
 
 

@@ -1,9 +1,4 @@
 
-
-
-
-
-
 // This file contains types shared across serverless functions,
 // decoupled from frontend dependencies like React or @xyflow.
 
@@ -76,4 +71,11 @@ export interface MetaConfig {
   accessToken: string;
   phoneNumberId: string;
   wabaId: string;
+}
+
+export interface ActionContext {
+    profile: Profile;
+    contact: Contact | null;
+    trigger: Json | null;
+    node: AutomationNode;
 }

@@ -3,6 +3,7 @@
 
 
 
+
 import React, { useContext, useState, useMemo } from 'react';
 import { MessageTemplate, TemplateStatus } from '../../types';
 import { AppContext } from '../../contexts/AppContext';
@@ -98,7 +99,7 @@ const Templates: React.FC = () => {
 
         if (refetchError) throw refetchError;
         
-        setTemplates(dbTemplates as MessageTemplate[] || []);
+        setTemplates(dbTemplates || []);
         setSyncMessage("Sincronização concluída! Os status dos templates foram atualizados.");
         setTimeout(() => setSyncMessage(null), 4000);
 
