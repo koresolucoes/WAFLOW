@@ -13,6 +13,8 @@ const ContactForm: React.FC<ContactFormProps> = ({ contact, onSave, onCancel, is
   const [formData, setFormData] = useState<EditableContact & { tags: string[] }>({
     name: '',
     phone: '',
+    email: '',
+    company: '',
     tags: [],
     custom_fields: null,
   });
@@ -22,10 +24,12 @@ const ContactForm: React.FC<ContactFormProps> = ({ contact, onSave, onCancel, is
     if (contact) {
       setFormData({
         ...contact,
-        tags: contact.tags || []
+        tags: contact.tags || [],
+        email: contact.email || '',
+        company: contact.company || ''
       });
     } else {
-      setFormData({ name: '', phone: '', tags: [], custom_fields: null });
+      setFormData({ name: '', phone: '', email: '', company: '', tags: [], custom_fields: null });
     }
   }, [contact]);
 
@@ -88,6 +92,32 @@ const ContactForm: React.FC<ContactFormProps> = ({ contact, onSave, onCancel, is
           placeholder="ex: +5511987654321"
           className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white placeholder-slate-400 focus:ring-2 focus:ring-sky-500"
         />
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label htmlFor="email" className="block text-sm font-medium text-slate-300 mb-1">E-mail</label>
+          <input
+            type="email"
+            id="email"
+            name="email"
+            value={formData.email || ''}
+            onChange={handleChange}
+            placeholder="contato@exemplo.com"
+            className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white placeholder-slate-400 focus:ring-2 focus:ring-sky-500"
+          />
+        </div>
+        <div>
+          <label htmlFor="company" className="block text-sm font-medium text-slate-300 mb-1">Empresa</label>
+          <input
+            type="text"
+            id="company"
+            name="company"
+            value={formData.company || ''}
+            onChange={handleChange}
+            placeholder="Nome da Empresa"
+            className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white placeholder-slate-400 focus:ring-2 focus:ring-sky-500"
+          />
+        </div>
       </div>
       <div>
           <label htmlFor="tags" className="block text-sm font-medium text-slate-300 mb-1">Tags (pressione Enter para adicionar)</label>

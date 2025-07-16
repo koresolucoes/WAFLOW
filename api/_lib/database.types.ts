@@ -18,7 +18,8 @@
  *
  *
  * --- INÍCIO DO SCRIPT SQL ---
- *
+*/
+/*
 -- Garante que a extensão uuid-ossp está habilitada
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA extensions;
 -- Garante que a extensão pgcrypto está habilitada para gerar strings aleatórias
@@ -256,11 +257,8 @@ BEGIN
     END IF;
 END;
 $$ LANGUAGE plpgsql;
-
- *
- * --- FIM DO SCRIPT SQL ---
- *
- */
+*/
+ 
 
 export type Json =
   | string

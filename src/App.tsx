@@ -1,4 +1,6 @@
 
+
+
 import React, { useContext, Suspense, lazy } from 'react';
 import { AppContext } from './contexts/AppContext';
 import MainLayout from './components/layout/MainLayout';
@@ -10,6 +12,8 @@ const CampaignDetails = lazy(() => import('./pages/CampaignDetails/CampaignDetai
 const Templates = lazy(() => import('./pages/Templates/Templates'));
 const TemplateEditor = lazy(() => import('./pages/TemplateEditor/TemplateEditor'));
 const Contacts = lazy(() => import('./pages/Contacts/Contacts'));
+const ContactDetails = lazy(() => import('./pages/ContactDetails/ContactDetails'));
+const Funnel = lazy(() => import('./pages/Funnel/Funnel'));
 const NewCampaign = lazy(() => import('./pages/NewCampaign/NewCampaign'));
 const CompanyProfile = lazy(() => import('./pages/Profile/CompanyProfile'));
 const MetaSettings = lazy(() => import('./pages/Settings/MetaSettings'));
@@ -48,6 +52,10 @@ const App: React.FC = () => {
         return <TemplateEditor />;
       case 'contacts':
         return <Contacts />;
+      case 'contact-details':
+        return <ContactDetails />;
+      case 'funnel':
+        return <Funnel />;
       case 'automations':
         return <Automations />;
       case 'automation-editor':

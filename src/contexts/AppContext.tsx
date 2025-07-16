@@ -1,9 +1,12 @@
 
 
 
+
+
+
 import React, { createContext, useState, useCallback, ReactNode, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import { Page, Profile, MessageTemplate, Contact, Campaign, CampaignWithMetrics, EditableContact, Session, User, CampaignMessageInsert, CampaignWithDetails, CampaignMessageWithContact, Segment, MessageTemplateInsert, Automation, AutomationInsert, AutomationNode, Edge, AutomationNodeStats, AutomationNodeLog, CampaignStatus, MessageStatus } from '../types';
+import { Page, Profile, MessageTemplate, Contact, Campaign, CampaignWithMetrics, EditableContact, Session, User, CampaignMessageInsert, CampaignWithDetails, CampaignMessageWithContact, Segment, MessageTemplateInsert, Automation, AutomationInsert, AutomationNode, Edge, AutomationNodeStats, AutomationNodeLog, CampaignStatus, MessageStatus, Pipeline, PipelineStage, Deal, DealInsert, ContactWithDetails, DealWithContact } from '../types';
 import { Json, TablesInsert, TablesUpdate } from '../types/database.types';
 
 interface AppContextType {
@@ -31,6 +34,9 @@ interface AppContextType {
   updateContact: (contact: Contact) => Promise<void>;
   deleteContact: (contactId: string) => Promise<void>;
   importContacts: (newContacts: EditableContact[]) => Promise<{ importedCount: number; skippedCount: number }>;
+  contactDetails: ContactWithDetails | null;
+  fetchContactDetails: (contactId: string) => Promise<void>;
+
 
   campaigns: CampaignWithMetrics[];
   addCampaign: (campaign: Omit<Campaign, 'id' | 'user_id' | 'sent_at' | 'created_at' | 'recipient_count' | 'status'> & { status: CampaignStatus }, messages: Omit<CampaignMessageInsert, 'campaign_id'>[]) => Promise<void>;
@@ -49,6 +55,13 @@ interface AppContextType {
   fetchAutomationStats: (automationId: string) => Promise<void>;
   fetchNodeLogs: (automationId: string, nodeId: string) => Promise<AutomationNodeLog[]>;
   setAutomationStats: React.Dispatch<React.SetStateAction<Record<string, AutomationNodeStats>>>;
+  
+  pipelines: Pipeline[];
+  stages: PipelineStage[];
+  deals: DealWithContact[];
+  addDeal: (dealData: DealInsert) => Promise<void>;
+  updateDealStage: (dealId: string, newStageId: string) => Promise<void>;
+
 }
 
 export const AppContext = createContext<AppContextType>(null!);
@@ -64,11 +77,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   
   const [templates, setTemplates] = useState<MessageTemplate[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [contactDetails, setContactDetails] = useState<ContactWithDetails | null>(null);
   const [campaigns, setCampaigns] = useState<CampaignWithMetrics[]>([]);
   const [campaignDetails, setCampaignDetails] = useState<CampaignWithDetails | null>(null);
   const [segments, setSegments] = useState<Segment[]>([]);
   const [automations, setAutomations] = useState<Automation[]>([]);
   const [automationStats, setAutomationStats] = useState<Record<string, AutomationNodeStats>>({});
+  
+  const [pipelines, setPipelines] = useState<Pipeline[]>([]);
+  const [stages, setStages] = useState<PipelineStage[]>([]);
+  const [deals, setDeals] = useState<DealWithContact[]>([]);
+
 
   useEffect(() => {
     const getSession = async () => {
@@ -104,18 +123,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
       if (profileError) {
         console.error("Error fetching profile, user might not have one yet. Relying on DB trigger.", profileError);
-        setLoading(false);
-        return;
+      } else {
+        setProfile(profileData as Profile);
       }
 
-      setProfile(profileData as Profile);
-
-      const [templatesRes, contactsRes, campaignsRes, segmentsRes, automationsRes] = await Promise.all([
+      const [templatesRes, contactsRes, campaignsRes, segmentsRes, automationsRes, pipelinesRes, stagesRes, dealsRes] = await Promise.all([
           supabase.from('message_templates').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
           supabase.from('contacts').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
           supabase.from('campaigns').select('*').eq('user_id', user.id).order('sent_at', { ascending: false }),
           supabase.from('segments').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
-          supabase.from('automations').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
+          supabase.from('automations').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+          supabase.from('pipelines').select('*').eq('user_id', user.id).order('created_at', { ascending: true }),
+          supabase.from('pipeline_stages').select('*, pipelines!inner(user_id)'),
+          supabase.from('deals').select('*, contacts(id, name)').eq('user_id', user.id).order('created_at', { ascending: false }),
       ]);
 
       if (templatesRes.error) console.error("Error fetching templates:", templatesRes.error);
@@ -144,6 +164,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }));
         setAutomations(sanitizedAutomations);
       }
+      
+      if (pipelinesRes.error) console.error("Error fetching pipelines:", pipelinesRes.error);
+      else setPipelines((pipelinesRes.data as unknown as Pipeline[]) || []);
+      
+      if (stagesRes.error) console.error("Error fetching stages:", stagesRes.error);
+      else {
+          const userStages = stagesRes.data?.filter((s: any) => s.pipelines.user_id === user.id)
+          setStages((userStages as unknown as PipelineStage[]) || []);
+      }
+      
+      if (dealsRes.error) console.error("Error fetching deals:", dealsRes.error);
+      else setDeals((dealsRes.data as unknown as DealWithContact[]) || []);
 
 
       setLoading(false);
@@ -168,7 +200,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 return { ...campaign, recipient_count: campaign.recipient_count || 0, metrics: { sent: campaign.recipient_count || 0, delivered: 0, read: 0 } };
             }
             
-            const typedData = (data as { status: MessageStatus }[]) || [];
+            const typedData = (data as unknown as { status: MessageStatus }[]) || [];
             const delivered = typedData.filter(d => d.status === 'delivered' || d.status === 'read').length || 0;
             const read = typedData.filter(d => d.status === 'read').length || 0;
 
@@ -228,6 +260,39 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       throw err;
     }
   }, [user]);
+  
+  const fetchContactDetails = useCallback(async (contactId: string) => {
+    if (!user) return;
+    setContactDetails(null);
+    try {
+        const { data: contactData, error: contactError } = await supabase
+            .from('contacts')
+            .select('*')
+            .eq('id', contactId)
+            .eq('user_id', user.id)
+            .single();
+
+        if (contactError || !contactData) {
+            throw contactError || new Error("Contato não encontrado ou acesso negado.");
+        }
+
+        const { data: dealsData, error: dealsError } = await supabase
+            .from('deals')
+            .select('*')
+            .eq('contact_id', contactId);
+        
+        if (dealsError) throw dealsError;
+        
+        setContactDetails({
+            ...(contactData as Contact),
+            deals: (dealsData as unknown as Deal[]) || []
+        });
+
+    } catch (err) {
+        console.error("Error fetching contact details:", (err as any).message || err);
+        throw err;
+    }
+  }, [user]);
 
 
   const setCurrentPage = useCallback((page: Page, params: Record<string, any> = {}) => {
@@ -237,7 +302,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const updateProfile = async (profileData: Partial<Profile>) => {
     if (!user) throw new Error("Usuário não autenticado.");
-    const { data, error } = await supabase.from('profiles').update(profileData as TablesUpdate<'profiles'>).eq('id', user.id).select().single();
+    const { data, error } = await supabase.from('profiles').update(profileData as any).eq('id', user.id).select().single();
     if(error) throw error;
     if (data) setProfile(data as Profile);
   };
@@ -259,7 +324,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     
     const { data, error } = await supabase
       .from('message_templates')
-      .insert(dbTemplate as never) // Cast to never to bypass strict insert type
+      .insert(dbTemplate as any)
       .select()
       .single();
     if (error) throw error;
@@ -333,7 +398,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const payload: TablesInsert<'contacts'> = { ...contact, user_id: user.id };
     const { data, error } = await supabase
       .from('contacts')
-      .insert(payload as never)
+      .insert(payload as any)
       .select()
       .single();
     if (error) throw error;
@@ -351,7 +416,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
      const { id, created_at, user_id, ...updatePayload } = updatedContact;
      const { data, error } = await supabase
         .from('contacts')
-        .update(updatePayload as TablesUpdate<'contacts'>)
+        .update(updatePayload as any)
         .eq('id', updatedContact.id)
         .eq('user_id', user.id)
         .select()
@@ -360,6 +425,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if(data) {
       const newContact = data as unknown as Contact;
       setContacts(prev => prev.map(c => c.id === newContact.id ? newContact : c));
+      
+      // Update details page if it's the current contact being viewed
+      if(contactDetails?.id === newContact.id) {
+          setContactDetails(prev => prev ? {...prev, ...newContact} : null)
+      }
+
       await checkAndRunContactAutomations(newContact, oldContact);
     }
   };
@@ -393,7 +464,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     });
 
     if (contactsToInsert.length > 0) {
-        const { data, error } = await supabase.from('contacts').insert(contactsToInsert as never[]).select();
+        const { data, error } = await supabase.from('contacts').insert(contactsToInsert as any[]).select();
         if (error) throw error;
         if(data) {
           const newContactsData = data as unknown as Contact[];
@@ -415,7 +486,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     const { data: newCampaign, error: campaignError } = await supabase
         .from('campaigns')
-        .insert(campaignPayload as never)
+        .insert(campaignPayload as any)
         .select()
         .single();
 
@@ -425,7 +496,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
 
     const messagesToInsert: TablesInsert<'campaign_messages'>[] = messages.map(msg => ({ ...msg, campaign_id: typedNewCampaign.id }));
-    const { error: messagesError } = await supabase.from('campaign_messages').insert(messagesToInsert as never[]);
+    const { error: messagesError } = await supabase.from('campaign_messages').insert(messagesToInsert as any[]);
 
     if (messagesError) {
         await supabase.from('campaigns').delete().eq('id', typedNewCampaign.id);
@@ -444,6 +515,25 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     };
     setCampaigns(prev => [newCampaignWithMetrics, ...prev]);
   };
+  
+  const addDeal = async (dealData: DealInsert) => {
+    if (!user) throw new Error("Usuário não autenticado.");
+    const { data, error } = await supabase.from('deals').insert(dealData as any).select('*, contacts(id, name)').single();
+    if(error) throw error;
+    if (data) {
+        setDeals(prev => [data as unknown as DealWithContact, ...prev]);
+    }
+  };
+
+  const updateDealStage = async (dealId: string, newStageId: string) => {
+    if (!user) throw new Error("Usuário não autenticado.");
+    const { data, error } = await supabase.from('deals').update({ stage_id: newStageId } as any).eq('id', dealId).select('*, contacts(id, name)').single();
+    if(error) throw error;
+    if (data) {
+        setDeals(prev => prev.map(d => d.id === dealId ? data as unknown as DealWithContact : d));
+    }
+  };
+
 
   const createAndNavigateToAutomation = async () => {
     if (!user) throw new Error("Usuário não autenticado.");
@@ -458,7 +548,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     const { data, error } = await supabase
         .from('automations')
-        .insert(dbAutomation as never)
+        .insert(dbAutomation as any)
         .select()
         .single();
 
@@ -489,7 +579,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     const { data, error } = await supabase
         .from('automations')
-        .update(updatePayload as never)
+        .update(updatePayload as any)
         .eq('id', automation.id)
         .eq('user_id', user.id)
         .select()
@@ -547,7 +637,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         return [];
     }
 
-    const runIds = (runIdsData as {id: string}[]).map(r => r.id);
+    const runIds = (runIdsData as unknown as {id: string}[]).map(r => r.id);
     if (runIds.length === 0) return [];
 
     const { data, error } = await supabase
@@ -584,6 +674,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     updateContact,
     deleteContact,
     importContacts,
+    contactDetails,
+    fetchContactDetails,
     campaigns,
     addCampaign,
     campaignDetails,
@@ -596,7 +688,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     automationStats,
     fetchAutomationStats,
     fetchNodeLogs,
-    setAutomationStats
+    setAutomationStats,
+    pipelines,
+    stages,
+    deals,
+    addDeal,
+    updateDealStage
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

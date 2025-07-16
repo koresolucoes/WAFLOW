@@ -1,5 +1,6 @@
 
 
+
 import React, { useContext, useState, useRef } from 'react';
 import { AppContext } from '../../contexts/AppContext';
 import Card from '../../components/common/Card';
@@ -15,17 +16,18 @@ const Tag: React.FC<{ children: React.ReactNode }> = ({ children }) => (
     </span>
 );
 
-const ContactRow: React.FC<{ contact: Contact; onEdit: () => void; onDelete: () => void; }> = ({ contact, onEdit, onDelete }) => {
+const ContactRow: React.FC<{ contact: Contact; onViewDetails: () => void; onDelete: () => void; }> = ({ contact, onViewDetails, onDelete }) => {
     return (
-        <tr className="border-b border-slate-700 hover:bg-slate-800/50">
+        <tr className="border-b border-slate-700 hover:bg-slate-800/50 cursor-pointer" onClick={onViewDetails}>
             <td className="p-4 font-medium text-white">{contact.name}</td>
             <td className="p-4 text-slate-300 font-mono">{contact.phone}</td>
+            <td className="p-4 text-slate-300">{contact.email || '-'}</td>
+            <td className="p-4 text-slate-300">{contact.company || '-'}</td>
             <td className="p-4 text-slate-300">
-                {contact.tags.map(tag => <Tag key={tag}>{tag}</Tag>)}
+                {contact.tags?.map(tag => <Tag key={tag}>{tag}</Tag>)}
             </td>
             <td className="p-4 text-right">
-                <div className="flex justify-end gap-2">
-                    <Button variant="ghost" size="sm" onClick={onEdit}>Editar</Button>
+                <div className="flex justify-end gap-2" onClick={e => e.stopPropagation()}>
                     <Button variant="ghost" size="sm" onClick={onDelete} className="text-red-400 hover:bg-red-500/10 hover:text-red-300">
                         <TRASH_ICON className="w-4 h-4" />
                     </Button>
@@ -37,31 +39,25 @@ const ContactRow: React.FC<{ contact: Contact; onEdit: () => void; onDelete: () 
 
 
 const Contacts: React.FC = () => {
-    const { contacts, addContact, updateContact, deleteContact, importContacts } = useContext(AppContext);
+    const { contacts, addContact, updateContact, deleteContact, importContacts, setCurrentPage } = useContext(AppContext);
     const [isFormModalOpen, setIsFormModalOpen] = useState(false);
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-    const [editingContact, setEditingContact] = useState<EditableContact | undefined>(undefined);
     const [isLoading, setIsLoading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const handleOpenFormModal = (contact?: Contact) => {
-        setEditingContact(contact);
+    const handleOpenFormModal = () => {
         setIsFormModalOpen(true);
     };
 
     const handleCloseFormModal = () => {
         setIsFormModalOpen(false);
-        setEditingContact(undefined);
     };
 
     const handleSaveContact = async (contact: EditableContact) => {
         setIsLoading(true);
         try {
-            if (contact.id) {
-                await updateContact(contact as Contact);
-            } else {
-                await addContact(contact);
-            }
+            // A edição agora é feita na página de detalhes
+            await addContact(contact);
             handleCloseFormModal();
         } catch(err: any) {
             alert(`Erro ao salvar contato: ${err.message}`);
@@ -99,10 +95,10 @@ const Contacts: React.FC = () => {
             const startIndex = lines[0].toLowerCase().includes('nome') ? 1 : 0;
             
             for (let i = startIndex; i < lines.length; i++) {
-                const [name, phone, tagsStr] = lines[i].split(',');
+                const [name, phone, email, company, tagsStr] = lines[i].split(',');
                 if (name && phone) {
                     const tags = tagsStr ? tagsStr.trim().split(';').map(t => t.trim()).filter(Boolean) : [];
-                    newContacts.push({ name: name.trim(), phone: phone.trim(), tags, custom_fields: null });
+                    newContacts.push({ name: name.trim(), phone: phone.trim(), email: email?.trim() || '', company: company?.trim() || '', tags, custom_fields: null });
                 }
             }
 
@@ -114,7 +110,7 @@ const Contacts: React.FC = () => {
                     alert(`Erro ao importar contatos: ${err.message}`)
                 }
             } else {
-                alert("Nenhum contato válido encontrado no arquivo. Verifique se o formato é 'nome,telefone,tags'.");
+                alert("Nenhum contato válido encontrado no arquivo. Verifique se o formato é 'nome,telefone,email,empresa,tags'.");
             }
             
             if(event.target) event.target.value = '';
@@ -139,7 +135,7 @@ const Contacts: React.FC = () => {
                         <UPLOAD_ICON className="w-5 h-5 mr-2" />
                         Importar CSV
                     </Button>
-                    <Button variant="primary" onClick={() => handleOpenFormModal()}>
+                    <Button variant="primary" onClick={handleOpenFormModal}>
                         <PLUS_ICON className="w-5 h-5 mr-2" />
                         Adicionar Contato
                     </Button>
@@ -153,6 +149,8 @@ const Contacts: React.FC = () => {
                             <tr className="border-b border-slate-600">
                                 <th className="p-4 text-sm font-semibold text-slate-400">Nome</th>
                                 <th className="p-4 text-sm font-semibold text-slate-400">Telefone</th>
+                                <th className="p-4 text-sm font-semibold text-slate-400">Email</th>
+                                <th className="p-4 text-sm font-semibold text-slate-400">Empresa</th>
                                 <th className="p-4 text-sm font-semibold text-slate-400">Tags</th>
                                 <th className="p-4"></th>
                             </tr>
@@ -162,7 +160,7 @@ const Contacts: React.FC = () => {
                                 <ContactRow
                                     key={contact.id}
                                     contact={contact}
-                                    onEdit={() => handleOpenFormModal(contact)}
+                                    onViewDetails={() => setCurrentPage('contact-details', { contactId: contact.id })}
                                     onDelete={() => handleDeleteContact(contact.id)}
                                 />
                             ))}
@@ -173,7 +171,7 @@ const Contacts: React.FC = () => {
                         <CONTACTS_ICON className="w-12 h-12 mx-auto text-slate-500" />
                         <h2 className="text-xl font-semibold text-white mt-4">Nenhum contato adicionado.</h2>
                         <p className="text-slate-400 mt-2 mb-6">Comece adicionando seu primeiro contato ou importe uma lista de um arquivo CSV.</p>
-                        <Button variant="primary" onClick={() => handleOpenFormModal()}>
+                        <Button variant="primary" onClick={handleOpenFormModal}>
                             Adicionar Primeiro Contato
                         </Button>
                     </div>
@@ -183,10 +181,9 @@ const Contacts: React.FC = () => {
             <Modal
                 isOpen={isFormModalOpen}
                 onClose={handleCloseFormModal}
-                title={editingContact ? 'Editar Contato' : 'Adicionar Novo Contato'}
+                title="Adicionar Novo Contato"
             >
                 <ContactForm
-                    contact={editingContact}
                     onSave={handleSaveContact}
                     onCancel={handleCloseFormModal}
                     isLoading={isLoading}
@@ -199,10 +196,12 @@ const Contacts: React.FC = () => {
                 title="Como Importar Contatos via CSV"
             >
                 <div className="space-y-4 text-slate-300">
-                    <p>Para importar seus contatos, prepare um arquivo <code>.csv</code> com as seguintes colunas:</p>
+                    <p>Para importar seus contatos, prepare um arquivo <code>.csv</code> com as seguintes colunas, nesta ordem:</p>
                     <ol className="list-decimal list-inside space-y-2 pl-2">
                         <li><strong>nome:</strong> O nome completo do contato.</li>
                         <li><strong>telefone:</strong> O número do WhatsApp no formato internacional (ex: <code>5511999998888</code>).</li>
+                        <li><strong>email:</strong> (Opcional) O email do contato.</li>
+                        <li><strong>empresa:</strong> (Opcional) O nome da empresa do contato.</li>
                         <li><strong>tags:</strong> (Opcional) Uma ou mais tags para segmentação, separadas por ponto e vírgula (<code>;</code>).</li>
                     </ol>
 
@@ -213,10 +212,10 @@ const Contacts: React.FC = () => {
                         </div>
                         <pre className="text-xs font-mono whitespace-pre-wrap text-slate-400">
                             <code>
-                                nome,telefone,tags<br/>
-                                Ana Silva,5511987654321,vip;cliente-antigo<br/>
-                                Bruno Costa,5521912345678,novo-cliente<br/>
-                                Carla Dias,5531955554444,
+                                nome,telefone,email,empresa,tags<br/>
+                                Ana Silva,5511987654321,ana.silva@email.com,Empresa X,vip;cliente-antigo<br/>
+                                Bruno Costa,5521912345678,bruno@email.com,Empresa Y,novo-cliente<br/>
+                                Carla Dias,5531955554444,,,
                             </code>
                         </pre>
                     </div>

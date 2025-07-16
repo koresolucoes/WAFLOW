@@ -1,11 +1,12 @@
 
 
+
 import { Session, User } from '@supabase/supabase-js';
 import { Json, Tables, TablesInsert, TablesUpdate } from './database.types';
 import { MetaTemplateComponent } from '../services/meta/types';
 import type { Node as XyNode, Edge } from '@xyflow/react';
 
-export type Page = 'dashboard' | 'campaigns' | 'templates' | 'template-editor' | 'contacts' | 'new-campaign' | 'profile' | 'settings' | 'auth' | 'campaign-details' | 'automations' | 'automation-editor';
+export type Page = 'dashboard' | 'campaigns' | 'templates' | 'template-editor' | 'contacts' | 'new-campaign' | 'profile' | 'settings' | 'auth' | 'campaign-details' | 'automations' | 'automation-editor' | 'funnel' | 'contact-details';
 
 // String literal unions to replace DB enums for type safety in the app
 export type TemplateCategory = 'MARKETING' | 'UTILITY' | 'AUTHENTICATION';
@@ -43,8 +44,13 @@ export type SegmentRule = Tables<'segment_rules'>;
 export type ReceivedMessage = Tables<'received_messages'>;
 export type AutomationRun = Tables<'automation_runs'>;
 export type AutomationNodeStats = Tables<'automation_node_stats'>;
+export type Pipeline = Tables<'pipelines'>;
+export type PipelineStage = Tables<'pipeline_stages'>;
+export type Deal = Tables<'deals'>;
+
 
 // --- CUSTOMIZED INTERFACES ---
+export type DealWithContact = Deal & { contacts: Pick<Contact, 'name' | 'id'> | null };
 
 export type AutomationNodeLog = Omit<Tables<'automation_node_logs'>, 'status'> & {
     status: AutomationLogStatus;
@@ -93,6 +99,7 @@ export type AutomationInsert = Omit<TablesInsert<'automations'>, 'status' | 'nod
   edges: Edge[];
 };
 
+export type DealInsert = TablesInsert<'deals'>;
 
 // Tipos para formulários e operações específicas
 export type EditableContact = Omit<Contact, 'id' | 'user_id' | 'created_at'> & { id?: string };
@@ -122,6 +129,11 @@ export interface CampaignWithDetails extends Campaign {
   };
   messages: CampaignMessageWithContact[];
   message_templates: MessageTemplate | null;
+}
+
+// Tipo para os detalhes de um contato
+export interface ContactWithDetails extends Contact {
+    deals: Deal[];
 }
 
 
