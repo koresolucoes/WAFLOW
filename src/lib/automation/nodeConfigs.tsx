@@ -1,6 +1,3 @@
-
-
-
 import React from 'react';
 import { NodeData } from '../../types';
 import MetaTriggerSettings from '../../pages/AutomationEditor/node-settings/MetaTriggerSettings';

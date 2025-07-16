@@ -1,7 +1,5 @@
-
-
 import React, { useState, useRef, memo } from 'react';
-import { AutomationNode, MessageTemplate, Profile } from '../../../types';
+import { AutomationNode, MessageTemplate, Profile, TriggerType } from '../../../types';
 
 
 // ====================================================================================
@@ -19,15 +17,34 @@ export interface NodeSettingsProps {
 // ====================================================================================
 // Helper Functions
 // ====================================================================================
+
+const flattenObject = (obj: any, parentKey = '', result: { path: string, label: string }[] = []) => {
+    if (!obj || typeof obj !== 'object') {
+        return result;
+    }
+    for (const key in obj) {
+        if (Object.prototype.hasOwnProperty.call(obj, key)) {
+            const propName = parentKey ? `${parentKey}.${key}` : key;
+            if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
+                flattenObject(obj[key], propName, result);
+            } else {
+                result.push({ path: propName, label: propName });
+            }
+        }
+    }
+    return result;
+};
+
+
 export const getContextVariables = (nodes: AutomationNode[]) => {
-    const variables = [
+    let variables = [
         {
             group: 'Contato',
             vars: [
                 { path: 'contact.name', label: 'Nome do Contato' },
                 { path: 'contact.phone', label: 'Telefone do Contato' },
                 { path: 'contact.tags', label: 'Tags do Contato' },
-                 { path: 'contact.id', label: 'ID do Contato' },
+                { path: 'contact.id', label: 'ID do Contato' },
             ],
         }
     ];
@@ -40,7 +57,32 @@ export const getContextVariables = (nodes: AutomationNode[]) => {
              { path: 'trigger.payload.interactive.button_reply.id', label: 'ID do Botão Clicado'},
              { path: 'trigger.payload.interactive.button_reply.title', label: 'Texto do Botão Clicado'},
         ]
-    })
+    });
+    
+    // Find webhook trigger and add its variables
+    const webhookNode = nodes.find(n => n.data.type === 'webhook_received');
+    if (webhookNode && (webhookNode.data.config as any)?.last_captured_data) {
+        const capturedData = (webhookNode.data.config as any).last_captured_data;
+
+        if (capturedData.headers) {
+             variables.push({
+                group: 'Gatilho (Webhook Headers)',
+                vars: flattenObject(capturedData.headers, 'trigger.headers')
+            });
+        }
+        if (capturedData.query) {
+             variables.push({
+                group: 'Gatilho (Webhook Query)',
+                vars: flattenObject(capturedData.query, 'trigger.query')
+            });
+        }
+        if (capturedData.body) {
+             variables.push({
+                group: 'Gatilho (Webhook Body)',
+                vars: flattenObject(capturedData.body, 'trigger.body')
+            });
+        }
+    }
 
 
     return variables;
@@ -95,12 +137,9 @@ export const InputWithVariables: React.FC<InputWithVariablesProps> = ({ onValueC
     const inputRef = useRef<HTMLInputElement>(null);
 
     const handleSelectVariable = (variablePath: string) => {
-        if (!inputRef.current) return;
-        const { selectionStart, selectionEnd } = inputRef.current;
-        const currentValStr = String(value || '');
-        const newValue = `${currentValStr.substring(0, selectionStart as number)}${variablePath}${currentValStr.substring(selectionEnd as number)}`;
+        const newValue = variablePath;
         onValueChange(newValue);
-        inputRef.current.focus();
+        inputRef.current?.focus();
     };
 
     return (

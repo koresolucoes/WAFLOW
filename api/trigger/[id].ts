@@ -1,7 +1,3 @@
-
-
-
-
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
 import { executeAutomation } from '../_lib/engine.js';
@@ -11,13 +7,14 @@ import { Json, TablesInsert, TablesUpdate } from '../_lib/database.types.js';
 
 const getValueFromPath = (obj: any, path: string): any => {
     if (!path || !obj) return undefined;
-    return path.split('.').reduce((o, k) => (o && o[k] !== undefined ? o[k] : undefined), obj);
+    const cleanPath = path.replace(/\{\{|\}\}/g, '').trim();
+    return cleanPath.split('.').reduce((o, k) => (o && o[k] !== undefined ? o[k] : undefined), obj);
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { id: rawId } = req.query;
 
-    if (typeof rawId !== 'string' || !rawId.includes('_')) {
+    if (typeof rawId !== 'string') {
         return res.status(400).json({ error: 'Invalid trigger ID format.' });
     }
 
@@ -40,17 +37,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     const profile = profileData as unknown as Pick<Profile, 'id'>;
 
-    const { data, error: automationsError } = await supabaseAdmin
+    const { data: automationsData, error: automationsError } = await supabaseAdmin
         .from('automations')
         .select('*')
-        .eq('user_id', profile.id);
+        .eq('user_id', profile.id)
+        .eq('status', 'active');
     
-    if(automationsError || !data) {
+    if(automationsError || !automationsData) {
          return res.status(500).json({ error: 'Failed to retrieve automations.' });
     }
-    const automations = data as unknown as Automation[] | null;
-        
-    const automation = automations?.find(a => a.nodes?.some(n => n.id === nodeId));
+    
+    const automations = (automationsData || []) as unknown as Automation[];
+    const automation = automations.find(a => a.nodes?.some(n => n.id === nodeId));
 
     if (!automation) {
         return res.status(404).json({ error: 'Automation not found for this trigger ID.' });
@@ -69,14 +67,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const config = (triggerNode.data.config || {}) as any;
     if (config.last_captured_data === null) {
-        const updatePayload: TablesUpdate<'automations'> = {
-            nodes: automation.nodes.map(n => 
-                n.id === nodeId ? { ...n, data: { ...n.data, config: { ...config, last_captured_data: structuredPayload } } } : n
-            ) as unknown as Json
-        };
+        const updatedNodes = automation.nodes.map(n => 
+            n.id === nodeId ? { ...n, data: { ...n.data, config: { ...config, last_captured_data: structuredPayload } } } : n
+        )
         const { error: updateError } = await supabaseAdmin
             .from('automations')
-            .update(updatePayload as never)
+            .update({ nodes: updatedNodes as unknown as Json })
             .eq('id', automation.id);
         
         if (updateError) {
@@ -96,7 +92,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             let isNewContact = false;
             let originalTags = new Set<string>();
 
-            if (phoneRule) {
+            if (phoneRule && phoneRule.source) {
                 const phone = String(getValueFromPath(fullPayloadForEvent, phoneRule.source)).replace(/\D/g, '');
                 if (phone) {
                     let { data: contactData, error: contactError } = await supabaseAdmin.from('contacts').select('*').eq('user_id', profile.id).eq('phone', phone).single();
@@ -125,29 +121,41 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 let needsUpdate = false;
 
                 mappingRules.forEach((rule: any) => {
+                    if (!rule.source) return;
                     const value = getValueFromPath(fullPayloadForEvent, rule.source);
-                    if (value === undefined || rule.destination === 'phone' || rule.destination === 'name') return;
-
-                    if (rule.destination === 'tag') {
+                    if (value === undefined || rule.destination === 'phone') return;
+                    
+                    if (rule.destination === 'name' && contact?.name !== value) {
+                        (contact as any).name = value;
+                        needsUpdate = true;
+                    } else if (rule.destination === 'tag') {
                         const tagValue = String(value);
                         if (!newTags.has(tagValue)) {
                             newTags.add(tagValue);
                             if (!originalTags.has(tagValue)) {
                                 newlyAddedTags.add(tagValue);
                             }
-                            needsUpdate = true;
                         }
                     } else if (rule.destination === 'custom_field' && rule.destination_key) {
                         if ((newCustomFields as any)[rule.destination_key] !== value) {
                             (newCustomFields as any)[rule.destination_key] = value;
-                            needsUpdate = true;
                         }
                     }
                 });
+                
+                const finalTags = Array.from(newTags);
+                if (JSON.stringify(finalTags) !== JSON.stringify(contact.tags || [])) {
+                    (contact as any).tags = finalTags;
+                    needsUpdate = true;
+                }
+                 if (JSON.stringify(newCustomFields) !== JSON.stringify(contact.custom_fields || {})) {
+                    (contact as any).custom_fields = newCustomFields;
+                    needsUpdate = true;
+                }
 
                 if (needsUpdate) {
-                    const updatePayload: TablesUpdate<'contacts'> = { tags: Array.from(newTags), custom_fields: newCustomFields };
-                    const { data: updatedContact, error: updateContactError } = await supabaseAdmin.from('contacts').update(updatePayload as never).eq('id', contact.id).select().single();
+                    const { id, user_id, created_at, ...updatePayload} = contact;
+                    const { data: updatedContact, error: updateContactError } = await supabaseAdmin.from('contacts').update(updatePayload as any).eq('id', contact.id).select().single();
                     if(updateContactError) console.error("Webhook trigger: Failed to update contact with data", updateContactError);
                     else if(updatedContact) contact = updatedContact as unknown as Contact;
                 }
