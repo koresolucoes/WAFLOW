@@ -1,6 +1,6 @@
 
 import React, { useContext, useState, useEffect, useCallback, memo, FC } from 'react';
-import { ReactFlow, ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, type Node, type Edge, type NodeProps, useReactFlow, NodeTypes } from '@xyflow/react';
+import { ReactFlow, ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, type Node, type Edge, type NodeProps, useReactFlow, NodeTypes, type NodeChange } from '@xyflow/react';
 import { AppContext } from '../../contexts/AppContext';
 import { Automation, AutomationNode, NodeData } from '../../types';
 import Button from '../../components/common/Button';
@@ -229,6 +229,23 @@ const FlowCanvas = () => {
             supabase.removeChannel(channel);
         };
     }, [automationId, updateAutomation]);
+    
+    // Custom handler to prevent trigger node deletion
+    const handleNodesChange = useCallback(
+        (changes: NodeChange[]) => {
+            const DONT_DELETE_TRIGGER_CHANGES = changes.filter(change => {
+                if (change.type === 'remove') {
+                    const nodeToRemove = nodes.find(n => n.id === change.id);
+                    if (nodeToRemove?.data.nodeType === 'trigger') {
+                        return false; 
+                    }
+                }
+                return true;
+            });
+            onNodesChange(DONT_DELETE_TRIGGER_CHANGES);
+        },
+        [nodes, onNodesChange]
+    );
 
     const onConnect = useCallback((params: any) => setEdges((eds) => addEdge(params, eds)), [setEdges]);
 
@@ -331,7 +348,7 @@ const FlowCanvas = () => {
                     <ReactFlow
                         nodes={nodes as Node[]}
                         edges={edges}
-                        onNodesChange={onNodesChange}
+                        onNodesChange={handleNodesChange}
                         onEdgesChange={onEdgesChange}
                         onConnect={onConnect}
                         onDrop={onDrop}

@@ -1,5 +1,3 @@
-
-
 import React, { createContext, useState, useCallback, ReactNode, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { Page, Profile, MessageTemplate, Contact, Campaign, CampaignWithMetrics, EditableContact, Session, User, CampaignMessageInsert, CampaignWithDetails, CampaignMessageWithContact, Segment, MessageTemplateInsert, Automation, AutomationInsert, AutomationNode, Edge, TablesInsert, Json, TablesUpdate, Tables } from '../types';
@@ -140,8 +138,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       if (segmentsRes.data) setSegments(segmentsRes.data as unknown as Segment[]);
       else if (segmentsRes.error) console.error("Error fetching segments:", segmentsRes.error);
       
-      if (automationsRes.data) setAutomations(automationsRes.data as unknown as Automation[]);
-      else if (automationsRes.error) console.error("Error fetching automations:", automationsRes.error);
+      if (automationsRes.data) {
+        const sanitizedAutomations = automationsRes.data.map(a => ({
+          ...a,
+          nodes: Array.isArray(a.nodes) ? a.nodes : [],
+          edges: Array.isArray(a.edges) ? a.edges : [],
+        }));
+        setAutomations(sanitizedAutomations as unknown as Automation[]);
+      } else if (automationsRes.error) {
+        console.error("Error fetching automations:", automationsRes.error);
+      }
 
 
       setLoading(false);
