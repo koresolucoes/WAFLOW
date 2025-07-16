@@ -1,7 +1,9 @@
 
+
 import React from 'react';
 import { NodeData } from '../../types';
 import TriggerSettings from '../../pages/AutomationEditor/node-settings/TriggerSettings';
+import MetaTriggerSettings from '../../pages/AutomationEditor/node-settings/MetaTriggerSettings';
 import SendTemplateSettings from '../../pages/AutomationEditor/node-settings/SendTemplateSettings';
 import SendWebhookSettings from '../../pages/AutomationEditor/node-settings/SendWebhookSettings';
 import ActionSettings from '../../pages/AutomationEditor/node-settings/ActionSettings';
@@ -18,15 +20,59 @@ interface NodeConfig {
 export const nodeConfigs: Record<string, NodeConfig> = {
     // Triggers
     'webhook_received': {
-        label: 'Webhook Recebido',
+        label: 'Gatilho por Webhook (Externo)',
         nodeType: 'trigger',
         data: {
             nodeType: 'trigger',
             type: 'webhook_received',
-            label: 'Webhook Recebido',
+            label: 'Gatilho por Webhook (Externo)',
             config: { last_captured_data: null, data_mapping: [] }
         },
         SettingsComponent: TriggerSettings,
+    },
+     'message_received_with_keyword': {
+        label: 'Mensagem Recebida (Palavra-Chave)',
+        nodeType: 'trigger',
+        data: {
+            nodeType: 'trigger',
+            type: 'message_received_with_keyword',
+            label: 'Mensagem Recebida (Palavra-Chave)',
+            config: { keyword: '' }
+        },
+        SettingsComponent: MetaTriggerSettings,
+    },
+    'button_clicked': {
+        label: 'Botão Clicado',
+        nodeType: 'trigger',
+        data: {
+            nodeType: 'trigger',
+            type: 'button_clicked',
+            label: 'Botão Clicado',
+            config: { button_payload: '' }
+        },
+        SettingsComponent: MetaTriggerSettings,
+    },
+    'new_contact': {
+        label: 'Novo Contato Criado',
+        nodeType: 'trigger',
+        data: {
+            nodeType: 'trigger',
+            type: 'new_contact',
+            label: 'Novo Contato Criado',
+            config: {}
+        },
+        SettingsComponent: MetaTriggerSettings,
+    },
+    'new_contact_with_tag': {
+        label: 'Tag Adicionada a Contato',
+        nodeType: 'trigger',
+        data: {
+            nodeType: 'trigger',
+            type: 'new_contact_with_tag',
+            label: 'Tag Adicionada a Contato',
+            config: { tag: '' }
+        },
+        SettingsComponent: MetaTriggerSettings,
     },
     // Actions
     'send_template': {

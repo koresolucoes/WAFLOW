@@ -1,4 +1,5 @@
 
+
 import React, { useMemo } from 'react';
 import { AutomationNode, MessageTemplate, Profile } from '../../types';
 import Button from '../../components/common/Button';
@@ -58,7 +59,7 @@ const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
                         Clique em um campo de texto e use o seletor para inserir uma variável.
                     </p>
                 )}
-                 {node.data.nodeType === 'trigger' && (
+                 {node.data.nodeType === 'trigger' && (node.data.type === 'webhook_received') && (
                      <p className="text-sm text-slate-400 mb-3">
                         Estas são as variáveis que foram capturadas e que podem ser usadas em outros nós.
                     </p>

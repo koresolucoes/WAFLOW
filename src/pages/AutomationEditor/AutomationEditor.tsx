@@ -2,6 +2,10 @@
 
 
 
+
+
+
+
 import React, { useContext, useState, useEffect, useCallback, memo, FC } from 'react';
 import { ReactFlow, ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, type Node, type Edge, type NodeProps, useReactFlow, NodeTypes, NodeChange, applyNodeChanges, EdgeLabelRenderer, getBezierPath, type EdgeProps as XyEdgeProps } from '@xyflow/react';
 import { AppContext } from '../../contexts/AppContext';
@@ -95,7 +99,7 @@ const nodeStyles = {
     description: "text-xs text-slate-400"
 };
 
-const CustomNode = ({ id, data, selected }: NodeProps<NodeData>) => {
+const CustomNode: FC<NodeProps<NodeData>> = ({ id, data, selected }) => {
     const { deleteElements } = useReactFlow();
     const isTrigger = data.nodeType === 'trigger';
 
@@ -132,7 +136,7 @@ const CustomNode = ({ id, data, selected }: NodeProps<NodeData>) => {
     );
 };
 
-const ConditionNode = ({ id, data, selected }: NodeProps<NodeData>) => {
+const ConditionNode: FC<NodeProps<NodeData>> = ({ id, data, selected }) => {
     const { deleteElements } = useReactFlow();
     const config = (data.config as any) || {};
     const conditionText = `${config.field || ''} ${config.operator || ''} "${config.value || ''}"`;
@@ -172,7 +176,7 @@ const ConditionNode = ({ id, data, selected }: NodeProps<NodeData>) => {
     );
 };
 
-const SplitPathNode = ({ id, data, selected }: NodeProps<NodeData>) => {
+const SplitPathNode: FC<NodeProps<NodeData>> = ({ id, data, selected }) => {
     const { deleteElements } = useReactFlow();
     return (
       <div className={`${nodeStyles.base} ${nodeStyles.logic} relative`}>
@@ -208,7 +212,7 @@ const SplitPathNode = ({ id, data, selected }: NodeProps<NodeData>) => {
     );
 };
 
-const LogicNodeResolver = (props: NodeProps<NodeData>) => {
+const LogicNodeResolver: FC<NodeProps<NodeData>> = (props) => {
     const data = props.data;
     if (data.type === 'condition') return <ConditionNode {...props} />;
     if (data.type === 'split_path') return <SplitPathNode {...props} />;
@@ -371,11 +375,6 @@ const FlowCanvas = () => {
 
         const nodeData: NodeData = JSON.parse(nodeDataString);
 
-        if (nodeData.nodeType === 'trigger' && nodes.some(n => n.data.nodeType === 'trigger')) {
-            alert("Uma automação só pode ter um gatilho.");
-            return;
-        }
-
         const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
         const newNode: AutomationNode = {
             id: `${nodeData.type}_${Date.now()}`,
@@ -404,7 +403,7 @@ const FlowCanvas = () => {
     const onSave = async () => {
         setError(null);
         if (!automationName.trim()) return setError("O nome da automação é obrigatório.");
-        if (nodes.filter(n => n.data.nodeType === 'trigger').length !== 1) return setError("A automação precisa de exatamente um gatilho.");
+        if (nodes.filter(n => n.data.nodeType === 'trigger').length === 0) return setError("A automação precisa de pelo menos um gatilho.");
         if (!automationId) return setError("ID da automação não encontrado. Não é possível salvar.");
 
         setIsSaving(true);
