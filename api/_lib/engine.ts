@@ -1,4 +1,5 @@
 
+
 import { supabaseAdmin } from './supabaseAdmin.js';
 import { Automation, Contact, Json, Profile } from './types.js';
 import { TablesInsert, TablesUpdate } from './database.types.js';
@@ -28,7 +29,8 @@ async function logNodeExecution(
         node_id: nodeId,
         status,
         details
-    });
+    } as TablesInsert<'automation_node_logs'>);
+
     if (logError) {
         console.error(`Engine Log Error (Insert): Failed to insert log for node ${nodeId}`, logError);
     }
@@ -62,7 +64,7 @@ export const executeAutomation = async (
                 contact_id: contact?.id || null,
                 status: 'running',
                 details: `Started from trigger node ${startNodeId}`
-            })
+            } as TablesInsert<'automation_runs'>)
             .select('id')
             .single();
 
@@ -124,17 +126,17 @@ export const executeAutomation = async (
             } catch (err: any) {
                 console.error(`Engine Error on node ${nodeId} in automation ${automation.id}:`, err);
                 await logNodeExecution(runId, automation.id, nodeId, 'failed', err.message || 'Ocorreu um erro desconhecido.');
-                await supabaseAdmin.from('automation_runs').update({ status: 'failed', details: `Error on node ${node.data.label}: ${err.message}` }).eq('id', runId);
+                await supabaseAdmin.from('automation_runs').update({ status: 'failed', details: `Error on node ${node.data.label}: ${err.message}` } as TablesUpdate<'automation_runs'>).eq('id', runId);
                 return; // Stop execution on error
             }
         }
 
-        await supabaseAdmin.from('automation_runs').update({ status: 'success', details: 'Completed successfully.' }).eq('id', runId);
+        await supabaseAdmin.from('automation_runs').update({ status: 'success', details: 'Completed successfully.' } as TablesUpdate<'automation_runs'>).eq('id', runId);
 
     } catch (e: any) {
         console.error("Catastrophic engine failure:", e.message);
         if (runId) {
-             await supabaseAdmin.from('automation_runs').update({ status: 'failed', details: `Catastrophic engine failure: ${e.message}` }).eq('id', runId);
+             await supabaseAdmin.from('automation_runs').update({ status: 'failed', details: `Catastrophic engine failure: ${e.message}` } as TablesUpdate<'automation_runs'>).eq('id', runId);
         }
     }
 };

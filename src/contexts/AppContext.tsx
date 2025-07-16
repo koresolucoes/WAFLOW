@@ -1,3 +1,4 @@
+
 import React, { createContext, useState, useCallback, ReactNode, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { Page, Profile, MessageTemplate, Contact, Campaign, CampaignWithMetrics, EditableContact, Session, User, CampaignMessageInsert, CampaignWithDetails, CampaignMessageWithContact, Segment, MessageTemplateInsert, Automation, AutomationInsert, AutomationNode, Edge, AutomationNodeStats, AutomationNodeLog } from '../types';
@@ -130,30 +131,27 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           supabase.from('automations').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
       ]);
 
-      if (templatesRes.data) setTemplates(templatesRes.data as MessageTemplate[]);
-      else if (templatesRes.error) console.error("Error fetching templates:", templatesRes.error);
+      if (templatesRes.error) console.error("Error fetching templates:", templatesRes.error);
+      else setTemplates((templatesRes.data as MessageTemplate[]) || []);
 
-      if (contactsRes.data) setContacts(contactsRes.data as Contact[]);
-      else if (contactsRes.error) console.error("Error fetching contacts:", contactsRes.error);
+      if (contactsRes.error) console.error("Error fetching contacts:", contactsRes.error);
+      else setContacts((contactsRes.data as Contact[]) || []);
 
-      if (campaignsRes.data) {
-          await fetchCampaignsWithMetrics(campaignsRes.data as Campaign[]);
-      } else if (campaignsRes.error) {
-          console.error("Error fetching campaigns:", campaignsRes.error);
-      }
+      if (campaignsRes.error) console.error("Error fetching campaigns:", campaignsRes.error);
+      else if (campaignsRes.data) await fetchCampaignsWithMetrics(campaignsRes.data as Campaign[]);
       
-      if (segmentsRes.data) setSegments(segmentsRes.data);
-      else if (segmentsRes.error) console.error("Error fetching segments:", segmentsRes.error);
+      if (segmentsRes.error) console.error("Error fetching segments:", segmentsRes.error);
+      else setSegments(segmentsRes.data || []);
       
-      if (automationsRes.data) {
+      if (automationsRes.error) {
+        console.error("Error fetching automations:", automationsRes.error);
+      } else if (automationsRes.data){
         const sanitizedAutomations = automationsRes.data.map(a => ({
           ...a,
           nodes: Array.isArray(a.nodes) ? a.nodes : [],
           edges: Array.isArray(a.edges) ? a.edges : [],
         }));
         setAutomations(sanitizedAutomations as Automation[]);
-      } else if (automationsRes.error) {
-        console.error("Error fetching automations:", automationsRes.error);
       }
 
 
@@ -179,7 +177,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 return { ...campaign, metrics: { sent: campaign.recipient_count || 0, delivered: 0, read: 0 } };
             }
             
-            const typedData = (data as { status: string }[] | null) || [];
+            const typedData = data || [];
             const delivered = typedData.filter(d => d.status === 'delivered' || d.status === 'read').length || 0;
             const read = typedData.filter(d => d.status === 'read').length || 0;
 
@@ -218,13 +216,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         
       if (messagesError) throw messagesError;
 
-      const typedMessagesData = (messagesData as CampaignMessageWithContact[]) || [];
+      const typedMessagesData = messagesData || [];
       const delivered = typedMessagesData.filter(d => d.status === 'delivered' || d.status === 'read').length || 0;
       const read = typedMessagesData.filter(d => d.status === 'read').length || 0;
 
       setCampaignDetails({
         ...typedCampaignData,
-        messages: typedMessagesData,
+        messages: typedMessagesData as CampaignMessageWithContact[],
         metrics: {
           sent: typedCampaignData.recipient_count || 0,
           delivered,
@@ -367,7 +365,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     newContacts.forEach(contact => {
         const sanitizedPhone = contact.phone.replace(/\D/g, '');
         if (sanitizedPhone && !existingPhones.has(sanitizedPhone)) {
-            contactsToInsert.push({ ...contact, user_id: user.id });
+            contactsToInsert.push({ ...contact, user_id: user.id, custom_fields: contact.custom_fields || null });
             existingPhones.add(sanitizedPhone);
         } else {
             skippedCount++;
@@ -517,7 +515,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     
     if (data) {
         const statsMap = data.reduce((acc, stat) => {
-            acc[stat.node_id] = stat;
+            acc[stat.node_id] = stat as AutomationNodeStats;
             return acc;
         }, {} as Record<string, AutomationNodeStats>);
         setAutomationStats(prev => ({...prev, ...statsMap}));

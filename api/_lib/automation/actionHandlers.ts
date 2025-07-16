@@ -5,6 +5,7 @@
 
 
 
+
 import { supabaseAdmin } from '../supabaseAdmin.js';
 import { sendTemplatedMessage, sendTextMessage, sendMediaMessage, sendInteractiveMessage } from '../meta/messages.js';
 import { AutomationNode, Contact, Json, MetaConfig, MessageTemplate, Profile } from '../types.js';
@@ -86,6 +87,7 @@ const sendTemplate: ActionHandler = async ({ profile, contact, node, triggerData
     const config = (node.data.config || {}) as any;
     const { data: template, error: templateError } = await supabaseAdmin.from('message_templates').select('*').eq('id', config.template_id).single();
     if (templateError) throw new Error(`Erro ao buscar template: ${templateError.message}`);
+    
     if (template) {
          const metaConfig = getMetaConfig(profile);
          const templateTyped = template as MessageTemplate;
