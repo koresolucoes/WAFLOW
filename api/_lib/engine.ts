@@ -1,6 +1,7 @@
 
 
 
+
 import { supabaseAdmin } from './supabaseAdmin.js';
 import { Automation, Contact, Json, Profile } from './types.js';
 import { TablesInsert, TablesUpdate } from './database.types.js';
@@ -59,7 +60,7 @@ export const executeAutomation = async (
         if (profileError || !profileData) {
             throw new Error(`Engine Error: Could not find profile for user ${automation.user_id}. Details: ${profileError?.message}`);
         }
-        const profile = profileData as Profile;
+        const profile = profileData as unknown as Profile;
 
         const runEntry: TablesInsert<'automation_runs'> = {
             automation_id: automation.id,
@@ -76,7 +77,7 @@ export const executeAutomation = async (
         if (runError || !runResult) {
             throw new Error(`Engine Error: Failed to create run log for automation ${automation.id}. Details: ${runError?.message}`);
         }
-        runId = runResult.id;
+        runId = (runResult as { id: string }).id;
 
         // Log trigger success immediately
         await logNodeExecution(runId, automation.id, startNodeId, 'success', 'Gatilho da automação disparado com sucesso.');

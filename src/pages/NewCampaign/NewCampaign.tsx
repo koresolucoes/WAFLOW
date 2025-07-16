@@ -172,7 +172,6 @@ const NewCampaign: React.FC = () => {
               name: campaignName,
               template_id: template.id,
               status: 'Sent',
-              recipient_count: recipients.length,
             },
             messagesToInsert
           );

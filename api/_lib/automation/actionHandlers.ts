@@ -1,10 +1,12 @@
 
 
 
+
 import { supabaseAdmin } from '../supabaseAdmin.js';
 import { sendTemplatedMessage, sendTextMessage, sendMediaMessage, sendInteractiveMessage } from '../meta/messages.js';
 import { AutomationNode, Contact, Json, MetaConfig, MessageTemplate, Profile } from '../types.js';
 import { TablesUpdate, TablesInsert } from '../database.types.js';
+import { handleTagAddedEvent } from './trigger-handler.js';
 
 // ====================================================================================
 // Helper Functions
@@ -173,11 +175,28 @@ const addTag: ActionHandler = async ({ contact, node, trigger }) => {
     const config = (node.data.config || {}) as any;
     if (config.tag) {
         const tagToAdd = resolveVariables(config.tag, { contact, trigger });
+
+        // Check if tag already exists to prevent re-triggering
+        if (contact.tags?.includes(tagToAdd)) {
+            return { updatedContact: contact, details: `Contato já possui a tag '${tagToAdd}'. Nenhuma ação executada.` };
+        }
+
         const newTags = Array.from(new Set([...(contact.tags || []), tagToAdd]));
         const updatePayload: TablesUpdate<'contacts'> = { tags: newTags };
-        const { data, error } = await supabaseAdmin.from('contacts').update(updatePayload as never).eq('id', contact.id).select().single();
+        const { data: updatedContact, error } = await supabaseAdmin
+            .from('contacts')
+            .update(updatePayload as never)
+            .eq('id', contact.id)
+            .select()
+            .single();
+
         if (error) throw error;
-        return { updatedContact: data as Contact, details: `Tag '${tagToAdd}' adicionada ao contato.` };
+        const finalContact = updatedContact as unknown as Contact;
+
+        // Non-blocking call to handle triggers for the newly added tag
+        handleTagAddedEvent(contact.user_id, finalContact, tagToAdd);
+        
+        return { updatedContact: finalContact, details: `Tag '${tagToAdd}' adicionada ao contato.` };
     }
      throw new Error('Tag a ser adicionada não está configurada.');
 };
@@ -193,7 +212,7 @@ const removeTag: ActionHandler = async ({ contact, node, trigger }) => {
         const updatePayload: TablesUpdate<'contacts'> = { tags: newTags };
         const { data, error } = await supabaseAdmin.from('contacts').update(updatePayload as never).eq('id', contact.id).select().single();
         if (error) throw error;
-        return { updatedContact: data as Contact, details: `Tag '${tagToRemove}' removida do contato.` };
+        return { updatedContact: data as unknown as Contact, details: `Tag '${tagToRemove}' removida do contato.` };
     }
     throw new Error('Tag a ser removida não está configurada.');
 };
@@ -210,7 +229,7 @@ const setCustomField: ActionHandler = async ({ contact, node, trigger }) => {
         const updatePayload: TablesUpdate<'contacts'> = { custom_fields: newCustomFields };
         const { data, error } = await supabaseAdmin.from('contacts').update(updatePayload as never).eq('id', contact.id).select().single();
         if (error) throw error;
-        return { updatedContact: data as Contact, details: `Campo '${fieldName}' atualizado para '${fieldValue}'.` };
+        return { updatedContact: data as unknown as Contact, details: `Campo '${fieldName}' atualizado para '${fieldValue}'.` };
     }
     throw new Error('Nome do campo personalizado não está configurado.');
 };

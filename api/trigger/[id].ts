@@ -1,6 +1,7 @@
 
 
 
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
 import { executeAutomation } from '../_lib/engine.js';
@@ -37,7 +38,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (profileError || !profileData) {
         return res.status(404).json({ error: 'Profile not found for this webhook prefix or ID.' });
     }
-    const profile = profileData as Pick<Profile, 'id'>;
+    const profile = profileData as unknown as Pick<Profile, 'id'>;
 
     const { data, error: automationsError } = await supabaseAdmin
         .from('automations')
@@ -47,7 +48,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if(automationsError || !data) {
          return res.status(500).json({ error: 'Failed to retrieve automations.' });
     }
-    const automations = data as Automation[] | null;
+    const automations = data as unknown as Automation[] | null;
         
     const automation = automations?.find(a => a.nodes?.some(n => n.id === nodeId));
 
@@ -107,11 +108,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                         const newContactPayload: TablesInsert<'contacts'> = { user_id: profile.id, name, phone, tags: ['new-webhook-lead'], custom_fields: null };
                         const { data: newContact, error: insertError } = await supabaseAdmin.from('contacts').insert(newContactPayload as never).select().single();
                         if (insertError) console.error('Webhook trigger: Failed to create new contact.', insertError);
-                        else contact = newContact as Contact;
+                        else contact = newContact as unknown as Contact;
                     } else if (contactError) {
                         console.error('Webhook trigger: Failed to query contact.', contactError);
                     } else {
-                        contact = contactData as Contact;
+                        contact = contactData as unknown as Contact;
                         if(contact) originalTags = new Set(contact.tags || []);
                     }
                 }
@@ -148,7 +149,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     const updatePayload: TablesUpdate<'contacts'> = { tags: Array.from(newTags), custom_fields: newCustomFields };
                     const { data: updatedContact, error: updateContactError } = await supabaseAdmin.from('contacts').update(updatePayload as never).eq('id', contact.id).select().single();
                     if(updateContactError) console.error("Webhook trigger: Failed to update contact with data", updateContactError);
-                    else if(updatedContact) contact = updatedContact as Contact;
+                    else if(updatedContact) contact = updatedContact as unknown as Contact;
                 }
             }
 

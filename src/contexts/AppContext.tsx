@@ -1,7 +1,8 @@
 
+
 import React, { createContext, useState, useCallback, ReactNode, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import { Page, Profile, MessageTemplate, Contact, Campaign, CampaignWithMetrics, EditableContact, Session, User, CampaignMessageInsert, CampaignWithDetails, CampaignMessageWithContact, Segment, MessageTemplateInsert, Automation, AutomationInsert, AutomationNode, Edge, AutomationNodeStats, AutomationNodeLog } from '../types';
+import { Page, Profile, MessageTemplate, Contact, Campaign, CampaignWithMetrics, EditableContact, Session, User, CampaignMessageInsert, CampaignWithDetails, CampaignMessageWithContact, Segment, MessageTemplateInsert, Automation, AutomationInsert, AutomationNode, Edge, AutomationNodeStats, AutomationNodeLog, CampaignStatus } from '../types';
 import { Json, TablesInsert, TablesUpdate } from '../types/database.types';
 
 interface AppContextType {
@@ -31,7 +32,7 @@ interface AppContextType {
   importContacts: (newContacts: EditableContact[]) => Promise<{ importedCount: number; skippedCount: number }>;
 
   campaigns: CampaignWithMetrics[];
-  addCampaign: (campaign: Omit<Campaign, 'id' | 'user_id' | 'sent_at' | 'created_at' | 'recipient_count'>, messages: Omit<CampaignMessageInsert, 'campaign_id'>[]) => Promise<void>;
+  addCampaign: (campaign: Omit<Campaign, 'id' | 'user_id' | 'sent_at' | 'created_at' | 'recipient_count' | 'status'> & { status: CampaignStatus }, messages: Omit<CampaignMessageInsert, 'campaign_id'>[]) => Promise<void>;
   
   campaignDetails: CampaignWithDetails | null;
   fetchCampaignDetails: (campaignId: string) => Promise<void>;
@@ -106,7 +107,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         return;
       }
 
-      setProfile(profileData);
+      setProfile(profileData as Profile);
 
       const [templatesRes, contactsRes, campaignsRes, segmentsRes, automationsRes] = await Promise.all([
           supabase.from('message_templates').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
@@ -120,7 +121,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       else setTemplates((templatesRes.data as unknown as MessageTemplate[]) || []);
 
       if (contactsRes.error) console.error("Error fetching contacts:", contactsRes.error);
-      else setContacts(contactsRes.data || []);
+      else setContacts((contactsRes.data as unknown as Contact[]) || []);
 
       if (campaignsRes.error) {
         console.error("Error fetching campaigns:", campaignsRes.error);
@@ -129,17 +130,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }
       
       if (segmentsRes.error) console.error("Error fetching segments:", segmentsRes.error);
-      else setSegments(segmentsRes.data || []);
+      else setSegments((segmentsRes.data as unknown as Segment[]) || []);
       
       if (automationsRes.error) {
         console.error("Error fetching automations:", automationsRes.error);
       } else if (automationsRes.data){
-        const sanitizedAutomations = automationsRes.data.map(a => ({
+        const automationsData = automationsRes.data as unknown as Automation[];
+        const sanitizedAutomations = automationsData.map(a => ({
           ...a,
           nodes: Array.isArray(a.nodes) ? a.nodes : [],
           edges: Array.isArray(a.edges) ? a.edges : [],
         }));
-        setAutomations(sanitizedAutomations as unknown as Automation[]);
+        setAutomations(sanitizedAutomations);
       }
 
 
@@ -165,7 +167,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 return { ...campaign, recipient_count: campaign.recipient_count || 0, metrics: { sent: campaign.recipient_count || 0, delivered: 0, read: 0 } };
             }
             
-            const typedData = data || [];
+            const typedData = (data as { status: MessageStatus }[]) || [];
             const delivered = typedData.filter(d => d.status === 'delivered' || d.status === 'read').length || 0;
             const read = typedData.filter(d => d.status === 'read').length || 0;
 
@@ -205,13 +207,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         
       if (messagesError) throw messagesError;
 
-      const typedMessagesData = messagesData || [];
+      const typedMessagesData = (messagesData as unknown as CampaignMessageWithContact[]) || [];
       const delivered = typedMessagesData.filter(d => d.status === 'delivered' || d.status === 'read').length || 0;
       const read = typedMessagesData.filter(d => d.status === 'read').length || 0;
 
       setCampaignDetails({
         ...typedCampaignData,
-        messages: typedMessagesData as unknown as CampaignMessageWithContact[],
+        messages: typedMessagesData,
         metrics: {
           sent: typedCampaignData.recipient_count || 0,
           delivered,
@@ -234,10 +236,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const updateProfile = async (profileData: Partial<Profile>) => {
     if (!user) throw new Error("Usuário não autenticado.");
-    const updatePayload: Partial<Profile> = profileData;
-    const { data, error } = await supabase.from('profiles').update(updatePayload).eq('id', user.id).select().single();
+    const { data, error } = await supabase.from('profiles').update(profileData as TablesUpdate<'profiles'>).eq('id', user.id).select().single();
     if(error) throw error;
-    if (data) setProfile(data);
+    if (data) setProfile(data as Profile);
   };
   
   const metaConfig = useMemo(() => ({
@@ -266,35 +267,64 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
   
-    // --- Automação ---
-  const executeAutomation = async (automation: Automation, contact: Contact) => {
-      // Esta função precisa de uma refatoração completa para o motor de fluxo.
-      // A lógica de execução agora está no webhook.
-      console.log(`Disparando automação ${automation.name} para ${contact.name}`);
-  };
-  
   const checkAndRunContactAutomations = useCallback(async (contact: Contact, previousContactState?: Contact) => {
-    // Esta função precisa ser repensada. O gatilho agora é verificado no webhook.
-    // Manterei uma lógica simples por enquanto.
-    const activeAutomations = automations.filter(a => a.status === 'active');
+    if (!user) return;
 
-    for (const auto of activeAutomations) {
-        const triggerNode = auto.nodes?.find(n => n.data.nodeType === 'trigger' && n.data.type === 'new_contact_with_tag');
-        if (!triggerNode) continue;
+    // A. Handle 'new_contact' trigger
+    // This is fired when a contact is created and there's no previous state.
+    if (!previousContactState) {
+        console.log(`Frontend: Firing 'new_contact' trigger for ${contact.name}`);
+        fetch('/api/run-trigger', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                triggerType: 'new_contact',
+                userId: user.id,
+                contactId: contact.id,
+            })
+        }).catch(err => console.error("Failed to call new_contact trigger API", err));
         
-        const triggerTag = (triggerNode.data.config as any)?.tag;
-        if (!triggerTag) continue;
+        // When a new contact is created, all its initial tags are considered "added".
+        const initialTags = contact.tags || [];
+        for (const tag of initialTags) {
+            console.log(`Frontend: Firing 'new_contact_with_tag' for new contact's tag: ${tag}`);
+             fetch('/api/run-trigger', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    triggerType: 'new_contact_with_tag',
+                    userId: user.id,
+                    contactId: contact.id,
+                    data: { addedTag: tag }
+                })
+            }).catch(err => console.error("Failed to call new_contact_with_tag trigger API", err));
+        }
 
-        const hasTagNow = contact.tags?.includes(triggerTag);
-        const hadTagBefore = previousContactState?.tags?.includes(triggerTag);
-        
-        if(hasTagNow && !hadTagBefore) {
-            console.log(`Gatilho 'new_contact_with_tag' para automação '${auto.name}' disparado para o contato ${contact.name}`);
-            // A execução real acontece no backend/webhook para consistência.
-            // Apenas logamos aqui.
+        return; // Exit after handling new contact case
+    }
+    
+    // B. Handle 'new_contact_with_tag' for existing contacts
+    const oldTags = new Set(previousContactState?.tags || []);
+    const newTags = contact.tags || [];
+    
+    for (const tag of newTags) {
+        if (!oldTags.has(tag)) {
+            console.log(`Frontend: Firing 'new_contact_with_tag' for existing contact's new tag: ${tag}`);
+            // Fire and forget
+            fetch('/api/run-trigger', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    triggerType: 'new_contact_with_tag',
+                    userId: user.id,
+                    contactId: contact.id,
+                    data: { addedTag: tag }
+                })
+            }).catch(err => console.error("Failed to call new_contact_with_tag trigger API", err));
         }
     }
-  }, [automations]);
+
+  }, [user]);
 
 
   const addContact = async (contact: EditableContact) => {
@@ -307,7 +337,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       .single();
     if (error) throw error;
     if(data) {
-      const newContact = data as Contact;
+      const newContact = data as unknown as Contact;
       setContacts(prev => [newContact, ...prev]);
       await checkAndRunContactAutomations(newContact);
     }
@@ -327,7 +357,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         .single();
     if (error) throw error;
     if(data) {
-      const newContact = data as Contact;
+      const newContact = data as unknown as Contact;
       setContacts(prev => prev.map(c => c.id === newContact.id ? newContact : c));
       await checkAndRunContactAutomations(newContact, oldContact);
     }
@@ -365,7 +395,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         const { data, error } = await supabase.from('contacts').insert(contactsToInsert as never[]).select();
         if (error) throw error;
         if(data) {
-          const newContactsData = data as Contact[];
+          const newContactsData = data as unknown as Contact[];
           setContacts(prev => [...newContactsData, ...prev].sort((a,b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()));
           for(const contact of newContactsData) {
               await checkAndRunContactAutomations(contact);
@@ -389,7 +419,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         .single();
 
     if (campaignError) throw campaignError;
-    const typedNewCampaign = newCampaign as Campaign;
+    const typedNewCampaign = newCampaign as unknown as Campaign;
     if (!typedNewCampaign) throw new Error("Failed to create campaign.");
 
 
@@ -437,9 +467,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
     if (data) {
         const newAutomation = {
-          ...data,
-          nodes: Array.isArray(data.nodes) ? data.nodes : [],
-          edges: Array.isArray(data.edges) ? data.edges : [],
+          ...(data as unknown as Automation),
+          nodes: Array.isArray((data as any).nodes) ? (data as any).nodes : [],
+          edges: Array.isArray((data as any).edges) ? (data as any).edges : [],
         } as Automation;
         setAutomations(prev => [newAutomation, ...prev]);
         setCurrentPage('automation-editor', { automationId: newAutomation.id });
@@ -467,9 +497,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if(error) throw error;
     if(data) {
       const updatedAutomation = {
-          ...data,
-          nodes: Array.isArray(data.nodes) ? data.nodes : [],
-          edges: Array.isArray(data.edges) ? data.edges : [],
+          ...(data as unknown as Automation),
+          nodes: Array.isArray((data as any).nodes) ? (data as any).nodes : [],
+          edges: Array.isArray((data as any).edges) ? (data as any).edges : [],
       } as Automation;
       setAutomations(prev => prev.map(a => a.id === updatedAutomation.id ? updatedAutomation : a));
     }
@@ -495,7 +525,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
     
     if (data) {
-        const statsMap = data.reduce((acc, stat) => {
+        const statsMap = (data as unknown as AutomationNodeStats[]).reduce((acc, stat) => {
             acc[stat.node_id] = stat;
             return acc;
         }, {} as Record<string, AutomationNodeStats>);
@@ -516,7 +546,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         return [];
     }
 
-    const runIds = runIdsData.map(r => r.id);
+    const runIds = (runIdsData as {id: string}[]).map(r => r.id);
     if (runIds.length === 0) return [];
 
     const { data, error } = await supabase

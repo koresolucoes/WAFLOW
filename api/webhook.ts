@@ -1,6 +1,7 @@
 
 
 
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from './_lib/supabaseAdmin.js';
 import { Contact, Profile } from './_lib/types.js';
@@ -27,12 +28,12 @@ const findOrCreateContact = async (user_id: string, phone: string, name: string)
              console.error("Error creating new contact:", insertError);
              return { contact: null, isNew: false };
         }
-        return { contact: newContact as Contact, isNew: true };
+        return { contact: newContact as unknown as Contact, isNew: true };
     } else if (error) {
          console.error("Error finding contact:", error);
         return { contact: null, isNew: false };
     }
-    return { contact: contactData as Contact, isNew: false };
+    return { contact: contactData as unknown as Contact, isNew: false };
 };
 
 
@@ -89,7 +90,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                             const { data: profileData, error: profileError } = await supabaseAdmin.from('profiles').select('id').eq('meta_phone_number_id', wabaId).single();
                             
                             if (profileError || !profileData) continue;
-                            const userId = profileData.id;
+                            const userId = (profileData as Profile).id;
 
                             const { contact, isNew } = await findOrCreateContact(userId, message.from, value.contacts[0].profile.name);
                             if (!contact) continue;
