@@ -1,8 +1,9 @@
 
 
 
+
 import React, { useContext, useState, useEffect, useCallback, memo, FC } from 'react';
-import { ReactFlow, ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, type Node, type Edge, type NodeProps, useReactFlow, NodeTypes, type NodeChange, applyNodeChanges } from '@xyflow/react';
+import { ReactFlow, ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, type Node, type Edge, type NodeProps, useReactFlow, NodeTypes, NodeChange, applyNodeChanges, EdgeLabelRenderer, getBezierPath, type EdgeProps as XyEdgeProps } from '@xyflow/react';
 import { AppContext } from '../../contexts/AppContext';
 import { Automation, AutomationNode, NodeData } from '../../types';
 import Button from '../../components/common/Button';
@@ -15,6 +16,66 @@ import { Json } from '../../types/database.types';
 
 const initialNodes: AutomationNode[] = [];
 const initialEdges: Edge[] = [];
+
+// ====================================================================================
+// Custom Edge Component
+// ====================================================================================
+const CustomDeletableEdge: FC<XyEdgeProps> = ({
+  id,
+  sourceX,
+  sourceY,
+  targetX,
+  targetY,
+  sourcePosition,
+  targetPosition,
+  style = {},
+  markerEnd,
+}) => {
+  const { setEdges } = useReactFlow();
+  const [edgePath, labelX, labelY] = getBezierPath({
+    sourceX,
+    sourceY,
+    sourcePosition,
+    targetX,
+    targetY,
+    targetPosition,
+  });
+
+  const onEdgeClick = (evt: React.MouseEvent) => {
+    evt.stopPropagation();
+    setEdges((es) => es.filter((e) => e.id !== id));
+  };
+
+  return (
+    <>
+      <path
+        id={id}
+        style={style}
+        className="react-flow__edge-path"
+        d={edgePath}
+        markerEnd={markerEnd}
+      />
+      <EdgeLabelRenderer>
+        <div
+          style={{
+            position: 'absolute',
+            transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
+            pointerEvents: 'all',
+          }}
+          className="nodrag nopan group"
+        >
+          <button
+            className="w-5 h-5 bg-slate-700 hover:bg-red-500 flex items-center justify-center rounded-full text-white text-xs font-mono transition-colors duration-150 opacity-0 group-hover:opacity-100"
+            onClick={onEdgeClick}
+            title="Deletar conexão"
+          >
+            ×
+          </button>
+        </div>
+      </EdgeLabelRenderer>
+    </>
+  );
+};
 
 // ====================================================================================
 // Custom Node Components
@@ -34,8 +95,8 @@ const nodeStyles = {
     description: "text-xs text-slate-400"
 };
 
-const CustomNode: FC<NodeProps<NodeData>> = (props) => {
-    const data = props.data;
+const CustomNode = ({ id, data, selected }: NodeProps<NodeData>) => {
+    const { deleteElements } = useReactFlow();
     const isTrigger = data.nodeType === 'trigger';
 
     const nodeTypeStyle = data.nodeType;
@@ -43,7 +104,20 @@ const CustomNode: FC<NodeProps<NodeData>> = (props) => {
     const borderStyle = `${nodeStyles.base} ${nodeStyles[nodeTypeStyle]}`;
 
     return (
-        <div className={borderStyle}>
+        <div className={`${borderStyle} relative`}>
+            {!isTrigger && selected && (
+                <button 
+                    onClick={(event) => {
+                        event.stopPropagation();
+                        deleteElements({ nodes: [{ id }] });
+                    }} 
+                    className="absolute top-[-10px] right-[-10px] bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold shadow-lg hover:bg-red-600 z-10"
+                    aria-label="Deletar nó"
+                    title="Deletar nó"
+                >
+                    &times;
+                </button>
+            )}
             <div className={headerStyle}>
                 <AUTOMATION_ICON className="w-4 h-4" />
                 {data.nodeType.charAt(0).toUpperCase() + data.nodeType.slice(1)}
@@ -58,12 +132,25 @@ const CustomNode: FC<NodeProps<NodeData>> = (props) => {
     );
 };
 
-const ConditionNode: FC<NodeProps<NodeData>> = (props) => {
-    const data = props.data;
+const ConditionNode = ({ id, data, selected }: NodeProps<NodeData>) => {
+    const { deleteElements } = useReactFlow();
     const config = (data.config as any) || {};
     const conditionText = `${config.field || ''} ${config.operator || ''} "${config.value || ''}"`;
     return (
-      <div className={`${nodeStyles.base} ${nodeStyles.logic}`}>
+      <div className={`${nodeStyles.base} ${nodeStyles.logic} relative`}>
+        {selected && (
+             <button 
+                onClick={(event) => {
+                    event.stopPropagation();
+                    deleteElements({ nodes: [{ id }] });
+                }} 
+                className="absolute top-[-10px] right-[-10px] bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold shadow-lg hover:bg-red-600 z-10"
+                aria-label="Deletar nó"
+                title="Deletar nó"
+            >
+                &times;
+            </button>
+        )}
         <div className={`${nodeStyles.header} ${nodeStyles.logicHeader}`}>
             <AUTOMATION_ICON className="w-4 h-4" />
             Lógica
@@ -85,10 +172,23 @@ const ConditionNode: FC<NodeProps<NodeData>> = (props) => {
     );
 };
 
-const SplitPathNode: FC<NodeProps<NodeData>> = (props) => {
-    const data = props.data;
+const SplitPathNode = ({ id, data, selected }: NodeProps<NodeData>) => {
+    const { deleteElements } = useReactFlow();
     return (
-      <div className={`${nodeStyles.base} ${nodeStyles.logic}`}>
+      <div className={`${nodeStyles.base} ${nodeStyles.logic} relative`}>
+        {selected && (
+            <button 
+                onClick={(event) => {
+                    event.stopPropagation();
+                    deleteElements({ nodes: [{ id }] });
+                }} 
+                className="absolute top-[-10px] right-[-10px] bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold shadow-lg hover:bg-red-600 z-10"
+                aria-label="Deletar nó"
+                title="Deletar nó"
+            >
+                &times;
+            </button>
+        )}
         <div className={`${nodeStyles.header} ${nodeStyles.logicHeader}`}>
             <AUTOMATION_ICON className="w-4 h-4" />
             Lógica
@@ -108,7 +208,7 @@ const SplitPathNode: FC<NodeProps<NodeData>> = (props) => {
     );
 };
 
-const LogicNodeResolver: FC<NodeProps<NodeData>> = (props) => {
+const LogicNodeResolver = (props: NodeProps<NodeData>) => {
     const data = props.data;
     if (data.type === 'condition') return <ConditionNode {...props} />;
     if (data.type === 'split_path') return <SplitPathNode {...props} />;
@@ -116,9 +216,13 @@ const LogicNodeResolver: FC<NodeProps<NodeData>> = (props) => {
 };
 
 const nodeTypes: NodeTypes = {
-    trigger: CustomNode as FC<NodeProps>,
-    action: CustomNode as FC<NodeProps>,
-    logic: LogicNodeResolver as FC<NodeProps>,
+    trigger: CustomNode,
+    action: CustomNode,
+    logic: LogicNodeResolver,
+};
+
+const edgeTypes = {
+    default: CustomDeletableEdge,
 };
 
 
@@ -246,7 +350,7 @@ const FlowCanvas = () => {
                     }
                     return true;
                 });
-                return applyNodeChanges(filteredChanges, nds);
+                return applyNodeChanges(filteredChanges, nds) as AutomationNode[];
             });
         },
         [setNodes]
@@ -362,6 +466,7 @@ const FlowCanvas = () => {
                         onPaneClick={onPaneClick}
                         onNodesDelete={onNodesDelete}
                         nodeTypes={nodeTypes}
+                        edgeTypes={edgeTypes}
                         fitView
                         className="bg-slate-900 xyflow-react"
                     >
