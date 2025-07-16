@@ -1,5 +1,6 @@
 
 
+
 import { supabaseAdmin } from '../supabaseAdmin.js';
 import { executeAutomation } from '../engine.js';
 import { Automation, Contact, Json } from '../types.js';
@@ -16,7 +17,7 @@ const getActiveAutomations = async (userId: string): Promise<Automation[]> => {
         console.error(`TriggerHandler Error: Failed to fetch automations for user ${userId}`, error);
         return [];
     }
-    return (data as Automation[]) || [];
+    return (data as unknown as Automation[]) || [];
 };
 
 // Dispatches an automation to the engine without waiting for it to complete.

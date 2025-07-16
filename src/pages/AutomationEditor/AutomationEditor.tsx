@@ -1,6 +1,8 @@
 
 
 
+
+
 import React, { useContext, useState, useEffect, useCallback, memo, FC, useMemo, useRef } from 'react';
 import { ReactFlow, ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, type Node, type Edge, type Connection, type NodeProps, useReactFlow, NodeTypes, EdgeLabelRenderer, getBezierPath, type EdgeProps as XyEdgeProps, OnNodesChange, OnEdgesChange, EdgeChange } from '@xyflow/react';
 import { AppContext } from '../../contexts/AppContext';
@@ -97,7 +99,7 @@ const nodeStyles = {
 };
 
 const CustomNode: FC<NodeProps<AutomationNode>> = ({ id, data, selected }) => {
-    const { deleteElements } = useReactFlow();
+    const { setNodes, setEdges } = useReactFlow();
     const { automationStats, pageParams, fetchNodeLogs } = useContext(AppContext);
     const [isLogsModalOpen, setIsLogsModalOpen] = useState(false);
     const [logs, setLogs] = useState<AutomationNodeLog[]>([]);
@@ -117,14 +119,17 @@ const CustomNode: FC<NodeProps<AutomationNode>> = ({ id, data, selected }) => {
         setIsLoadingLogs(false);
     };
 
+    const handleDelete = (event: React.MouseEvent) => {
+        event.stopPropagation();
+        setEdges((eds) => eds.filter((edge) => edge.source !== id && edge.target !== id));
+        setNodes((nds) => nds.filter((node) => node.id !== id));
+    };
+
     return (
         <div className={`${borderStyle} relative group`}>
             {selected && (
                 <button 
-                    onClick={(event) => {
-                        event.stopPropagation();
-                        deleteElements({ nodes: [{ id }] });
-                    }} 
+                    onClick={handleDelete} 
                     className="absolute top-[-10px] right-[-10px] bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold shadow-lg hover:bg-red-600 z-10"
                     aria-label="Deletar Nó"
                 >
@@ -148,7 +153,7 @@ const CustomNode: FC<NodeProps<AutomationNode>> = ({ id, data, selected }) => {
 
 
 const ConditionNode: FC<NodeProps<AutomationNode>> = ({ id, data, selected }) => {
-    const { deleteElements } = useReactFlow();
+    const { setNodes, setEdges } = useReactFlow();
     const { automationStats, pageParams, fetchNodeLogs } = useContext(AppContext);
     const [isLogsModalOpen, setIsLogsModalOpen] = useState(false);
     const [logs, setLogs] = useState<AutomationNodeLog[]>([]);
@@ -163,14 +168,17 @@ const ConditionNode: FC<NodeProps<AutomationNode>> = ({ id, data, selected }) =>
         setIsLoadingLogs(false);
     };
 
+    const handleDelete = (event: React.MouseEvent) => {
+        event.stopPropagation();
+        setEdges((eds) => eds.filter((edge) => edge.source !== id && edge.target !== id));
+        setNodes((nds) => nds.filter((node) => node.id !== id));
+    };
+
     return (
         <div className={`${nodeStyles.base} ${nodeStyles.logic} relative group`}>
             {selected && (
                  <button 
-                    onClick={(event) => {
-                        event.stopPropagation();
-                        deleteElements({ nodes: [{ id }] });
-                    }} 
+                    onClick={handleDelete} 
                     className="absolute top-[-10px] right-[-10px] bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold shadow-lg hover:bg-red-600 z-10"
                     aria-label="Deletar Nó"
                 >
@@ -344,7 +352,7 @@ const Editor: React.FC = () => {
 
         const newNode: AutomationNode = {
             id: `${type}_${Date.now()}`,
-            type: nodeType === 'logic' && type === 'condition' ? 'logic' : nodeType, // Special case for condition node type
+            type: (nodeConfigs[type].nodeType === 'logic' && type === 'condition') ? 'logic' : nodeConfigs[type].nodeType,
             position,
             data: {
                 nodeType: nodeType,

@@ -4,6 +4,7 @@
 
 
 
+
 import React, { useContext, useState, useMemo } from 'react';
 import { MessageTemplate, TemplateStatus } from '../../types';
 import { AppContext } from '../../contexts/AppContext';
@@ -77,7 +78,7 @@ const Templates: React.FC = () => {
     try {
         const metaTemplates = await getMetaTemplates(metaConfig);
 
-        const templatesToUpsert: TablesInsert<'message_templates'>[] = metaTemplates.map(mt => ({
+        const templatesToUpsert = metaTemplates.map(mt => ({
             meta_id: mt.id,
             user_id: user.id,
             template_name: mt.name,
@@ -87,7 +88,7 @@ const Templates: React.FC = () => {
         }));
         
         if (templatesToUpsert.length > 0) {
-            const { error: upsertError } = await supabase.from('message_templates').upsert(templatesToUpsert, { onConflict: 'meta_id, user_id' });
+            const { error: upsertError } = await supabase.from('message_templates').upsert(templatesToUpsert as any, { onConflict: 'meta_id, user_id' });
             if (upsertError) throw upsertError;
         }
 
@@ -99,7 +100,7 @@ const Templates: React.FC = () => {
 
         if (refetchError) throw refetchError;
         
-        setTemplates(dbTemplates || []);
+        setTemplates((dbTemplates as unknown as MessageTemplate[]) || []);
         setSyncMessage("Sincronização concluída! Os status dos templates foram atualizados.");
         setTimeout(() => setSyncMessage(null), 4000);
 

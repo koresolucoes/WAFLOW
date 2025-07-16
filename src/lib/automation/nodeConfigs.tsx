@@ -1,13 +1,14 @@
 
 
+
 import React from 'react';
 import { NodeData } from '../../types';
-import TriggerSettings from '../../pages/AutomationEditor/node-settings/TriggerSettings';
 import MetaTriggerSettings from '../../pages/AutomationEditor/node-settings/MetaTriggerSettings';
 import SendTemplateSettings from '../../pages/AutomationEditor/node-settings/SendTemplateSettings';
 import SendWebhookSettings from '../../pages/AutomationEditor/node-settings/SendWebhookSettings';
 import ActionSettings from '../../pages/AutomationEditor/node-settings/ActionSettings';
 import LogicSettings from '../../pages/AutomationEditor/node-settings/LogicSettings';
+import TriggerSettings from '../../pages/AutomationEditor/node-settings/TriggerSettings';
 
 
 interface NodeConfig {
@@ -19,17 +20,6 @@ interface NodeConfig {
 
 export const nodeConfigs: Record<string, NodeConfig> = {
     // Triggers
-    'webhook_received': {
-        label: 'Gatilho por Webhook (Externo)',
-        nodeType: 'trigger',
-        data: {
-            nodeType: 'trigger',
-            type: 'webhook_received',
-            label: 'Gatilho por Webhook (Externo)',
-            config: { last_captured_data: null, data_mapping: [] }
-        },
-        SettingsComponent: TriggerSettings,
-    },
      'message_received_with_keyword': {
         label: 'Mensagem Recebida (Palavra-Chave)',
         nodeType: 'trigger',
@@ -73,6 +63,17 @@ export const nodeConfigs: Record<string, NodeConfig> = {
             config: { tag: '' }
         },
         SettingsComponent: MetaTriggerSettings,
+    },
+    'webhook_received': {
+        label: 'Webhook Recebido',
+        nodeType: 'trigger',
+        data: {
+            nodeType: 'trigger',
+            type: 'webhook_received',
+            label: 'Webhook Recebido',
+            config: { last_captured_data: null, data_mapping: [] }
+        },
+        SettingsComponent: TriggerSettings,
     },
     // Actions
     'send_template': {

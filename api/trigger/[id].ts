@@ -1,10 +1,11 @@
 
 
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
 import { executeAutomation } from '../_lib/engine.js';
 import { handleNewContactEvent, handleTagAddedEvent } from '../_lib/automation/trigger-handler.js';
-import { Contact, Automation } from '../_lib/types.js';
+import { Contact, Automation, Profile } from '../_lib/types.js';
 import { Json, TablesInsert, TablesUpdate } from '../_lib/database.types.js';
 
 const getValueFromPath = (obj: any, path: string): any => {
@@ -36,7 +37,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (profileError || !profileData) {
         return res.status(404).json({ error: 'Profile not found for this webhook prefix or ID.' });
     }
-    const profile = profileData;
+    const profile = profileData as Pick<Profile, 'id'>;
 
     const { data, error: automationsError } = await supabaseAdmin
         .from('automations')
@@ -74,7 +75,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         };
         const { error: updateError } = await supabaseAdmin
             .from('automations')
-            .update(updatePayload)
+            .update(updatePayload as never)
             .eq('id', automation.id);
         
         if (updateError) {
@@ -104,14 +105,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                         const nameRule = mappingRules.find((m: any) => m.destination === 'name');
                         const name = nameRule ? getValueFromPath(fullPayloadForEvent, nameRule.source) : 'New Webhook Lead';
                         const newContactPayload: TablesInsert<'contacts'> = { user_id: profile.id, name, phone, tags: ['new-webhook-lead'], custom_fields: null };
-                        const { data: newContact, error: insertError } = await supabaseAdmin.from('contacts').insert([newContactPayload]).select().single();
+                        const { data: newContact, error: insertError } = await supabaseAdmin.from('contacts').insert(newContactPayload as never).select().single();
                         if (insertError) console.error('Webhook trigger: Failed to create new contact.', insertError);
-                        else contact = newContact;
+                        else contact = newContact as Contact;
                     } else if (contactError) {
                         console.error('Webhook trigger: Failed to query contact.', contactError);
                     } else {
-                        contact = contactData;
-                        originalTags = new Set(contact.tags || []);
+                        contact = contactData as Contact;
+                        if(contact) originalTags = new Set(contact.tags || []);
                     }
                 }
             }
@@ -145,9 +146,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
                 if (needsUpdate) {
                     const updatePayload: TablesUpdate<'contacts'> = { tags: Array.from(newTags), custom_fields: newCustomFields };
-                    const { data: updatedContact, error: updateContactError } = await supabaseAdmin.from('contacts').update(updatePayload).eq('id', contact.id).select().single();
+                    const { data: updatedContact, error: updateContactError } = await supabaseAdmin.from('contacts').update(updatePayload as never).eq('id', contact.id).select().single();
                     if(updateContactError) console.error("Webhook trigger: Failed to update contact with data", updateContactError);
-                    else if(updatedContact) contact = updatedContact;
+                    else if(updatedContact) contact = updatedContact as Contact;
                 }
             }
 

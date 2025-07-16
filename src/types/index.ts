@@ -1,3 +1,4 @@
+
 import { Session, User } from '@supabase/supabase-js';
 import { Json, Tables, TablesInsert, TablesUpdate } from './database.types';
 import { MetaTemplateComponent } from '../services/meta/types';
@@ -43,59 +44,30 @@ export type AutomationRun = Tables<'automation_runs'>;
 export type AutomationNodeStats = Tables<'automation_node_stats'>;
 
 // --- CUSTOMIZED INTERFACES ---
-// Re-defined as interfaces to avoid complex Omit/& which can cause TS errors.
 
-export interface AutomationNodeLog {
-    id: number;
-    run_id: string;
-    node_id: string;
+export type AutomationNodeLog = Omit<Tables<'automation_node_logs'>, 'status'> & {
     status: AutomationLogStatus;
-    details: string | null;
-    created_at: string;
-}
+};
 
-export interface MessageTemplate {
-  id: string;
-  user_id: string;
-  meta_id: string | null;
-  template_name: string;
-  category: TemplateCategory;
-  components: MetaTemplateComponent[];
-  status: TemplateStatus;
-  created_at: string;
-}
+export type MessageTemplate = Omit<Tables<'message_templates'>, 'category' | 'status' | 'components'> & {
+    category: TemplateCategory;
+    status: TemplateStatus;
+    components: MetaTemplateComponent[];
+};
 
-export interface Campaign {
-  id: string;
-  user_id: string;
-  name: string;
-  template_id: string;
-  status: CampaignStatus;
-  sent_at: string;
-  recipient_count: number;
-}
+export type Campaign = Omit<Tables<'campaigns'>, 'status'> & {
+    status: CampaignStatus;
+};
 
-export interface CampaignMessage {
-  id: string;
-  campaign_id: string;
-  contact_id: string;
-  meta_message_id: string | null;
-  status: MessageStatus;
-  delivered_at: string | null;
-  read_at: string | null;
-  error_message: string | null;
-  created_at: string;
-}
+export type CampaignMessage = Omit<Tables<'campaign_messages'>, 'status'> & {
+    status: MessageStatus;
+};
 
-export interface Automation {
-    id: string;
-    user_id: string;
-    name: string;
+export type Automation = Omit<Tables<'automations'>, 'status' | 'nodes' | 'edges'> & {
     status: AutomationStatus;
     nodes: AutomationNode[];
     edges: Edge[];
-    created_at: string;
-}
+};
 
 
 // --- INSERT TYPES ---
@@ -127,6 +99,7 @@ export type EditableProfile = Partial<Omit<Profile, 'id' | 'updated_at'>>;
 
 // Tipo combinado para o frontend, que inclui métricas calculadas
 export interface CampaignWithMetrics extends Campaign {
+    recipient_count: number;
     metrics: {
         sent: number;
         delivered: number;
@@ -140,6 +113,7 @@ export interface CampaignMessageWithContact extends CampaignMessage {
 }
 
 export interface CampaignWithDetails extends Campaign {
+  recipient_count: number;
   metrics: {
       sent: number;
       delivered: number;

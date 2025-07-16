@@ -1,5 +1,6 @@
 
 
+
 import React, { useMemo } from 'react';
 import { AutomationNode, MessageTemplate, Profile } from '../../types';
 import Button from '../../components/common/Button';
@@ -48,7 +49,7 @@ const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     };
     
     const renderVariablesPanel = () => {
-       const showPanel = ['action', 'logic'].includes(node.data.nodeType) || (node.data.nodeType === 'trigger' && (node.data.config as any)?.last_captured_data);
+       const showPanel = ['action', 'logic'].includes(node.data.nodeType) || (node.data.nodeType === 'trigger' && node.data.type === 'webhook_received' && (node.data.config as any)?.last_captured_data);
        if (!showPanel) return null;
 
        return (
@@ -85,7 +86,7 @@ const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
        )
     }
 
-    const gridColsClass = ['action', 'logic'].includes(node.data.nodeType) || (node.data.nodeType === 'trigger' && (node.data.config as any)?.last_captured_data) ? 'md:grid-cols-2' : 'md:grid-cols-1';
+    const gridColsClass = ['action', 'logic'].includes(node.data.nodeType) || (node.data.nodeType === 'trigger' && node.data.type === 'webhook_received' && (node.data.config as any)?.last_captured_data) ? 'md:grid-cols-2' : 'md:grid-cols-1';
 
     return (
         <div 

@@ -1,6 +1,5 @@
 
 
-
 import React, { useState, useRef, memo } from 'react';
 import { AutomationNode, MessageTemplate, Profile } from '../../../types';
 
@@ -21,9 +20,6 @@ export interface NodeSettingsProps {
 // Helper Functions
 // ====================================================================================
 export const getContextVariables = (nodes: AutomationNode[]) => {
-    const triggerNode = nodes.find(n => n.data.nodeType === 'trigger' && n.data.type === 'webhook_received');
-    const capturedData = (triggerNode?.data.config as any)?.last_captured_data;
-
     const variables = [
         {
             group: 'Contato',
@@ -36,26 +32,6 @@ export const getContextVariables = (nodes: AutomationNode[]) => {
         }
     ];
 
-    if (capturedData) {
-        const flattenObject = (obj: any, parentKey = '', res: { path: string, label: string }[] = []) => {
-            if (typeof obj !== 'object' || obj === null) return res;
-            for (const key in obj) {
-                if (Object.prototype.hasOwnProperty.call(obj, key)) {
-                    const propName = parentKey ? `${parentKey}.${key}` : key;
-                    if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
-                        flattenObject(obj[key], propName, res);
-                    } else {
-                        res.push({ path: `trigger.${propName}`, label: propName });
-                    }
-                }
-            }
-            return res;
-        };
-        const triggerVars = flattenObject(capturedData);
-        if (triggerVars.length > 0) {
-            variables.push({ group: 'Gatilho (Webhook)', vars: triggerVars });
-        }
-    }
     // Adiciona variáveis genéricas para gatilhos internos da Meta
     variables.push({
         group: 'Gatilho (Meta)',
