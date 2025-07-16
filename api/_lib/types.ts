@@ -1,4 +1,5 @@
 
+
 // This file contains types shared across serverless functions,
 // decoupled from frontend dependencies like React or @xyflow.
 
@@ -53,9 +54,7 @@ export interface NodeData {
   config: Json;
 }
 
-export type Contact = Omit<Tables<'contacts'>, 'custom_fields'> & {
-    custom_fields: Json | null;
-};
+export type Contact = Tables<'contacts'>;
 
 export type MessageTemplate = Omit<Tables<'message_templates'>, 'category' | 'status' | 'components'> & {
   category: TemplateCategory;

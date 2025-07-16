@@ -183,25 +183,58 @@ const setCustomField: ActionHandler = async ({ contact, node, triggerData }) => 
 
 const sendWebhook: ActionHandler = async ({ contact, node, triggerData }) => {
     const config = (node.data.config || {}) as any;
-    if (config.url) {
-        const url = resolveVariables(config.url, { contact, triggerData });
-        const method = config.method || 'POST';
-        const headers = { 'Content-Type': 'application/json' };
-        const requestOptions: RequestInit = { method, headers };
+    if (!config.url) return {}; // No URL, do nothing
 
-        if ((method === 'POST' || method === 'PUT' || method === 'PATCH') && config.body) {
-            const jsonBodyString = resolveJsonPlaceholders(config.body, { contact, triggerData });
-            try {
-                JSON.parse(jsonBodyString);
-                requestOptions.body = jsonBodyString;
-            } catch (e) {
-               console.error("Webhook Body Error: Final JSON is invalid after resolving variables.", { body: jsonBodyString, error: e });
-               throw new Error("O corpo do Webhook resultou em um JSON inválido. Verifique a sintaxe e se os placeholders (ex: {{contact.name}}) estão sem aspas ao redor.");
+    const context = { contact, triggerData };
+    const resolvedUrl = resolveVariables(config.url, context);
+    const method = config.method || 'POST';
+    const requestOptions: RequestInit = { method };
+
+    const headers = new Headers();
+
+    // Build Headers
+    if (config.sendHeaders && Array.isArray(config.headers)) {
+        config.headers.forEach((h: { key: string, value: string }) => {
+            if (h.key) {
+                headers.append(h.key, resolveVariables(h.value, context));
             }
-        }
-        
-        await fetch(url, requestOptions);
+        });
     }
+
+    // Build Body and set Content-Type
+    if (config.sendBody && ['POST', 'PUT', 'PATCH'].includes(method)) {
+        const bodyConfig = config.body || {};
+        
+        if (bodyConfig.contentType === 'json') {
+            headers.set('Content-Type', 'application/json');
+            if (bodyConfig.specify === 'raw') {
+                requestOptions.body = resolveJsonPlaceholders(bodyConfig.rawJson || '{}', context);
+            } else { // fields
+                const bodyObject = (bodyConfig.params || []).reduce((acc: any, p: { key: string, value: string }) => {
+                    if (p.key) acc[p.key] = resolveVariables(p.value, context);
+                    return acc;
+                }, {});
+                requestOptions.body = JSON.stringify(bodyObject);
+            }
+        } else if (bodyConfig.contentType === 'form_urlencoded') {
+            headers.set('Content-Type', 'application/x-www-form-urlencoded');
+            const formParams = new URLSearchParams();
+            (bodyConfig.params || []).forEach((p: { key: string, value: string }) => {
+                if(p.key) formParams.append(p.key, resolveVariables(p.value, context));
+            });
+            requestOptions.body = formParams.toString();
+        }
+    }
+
+    requestOptions.headers = headers;
+
+    try {
+        await fetch(resolvedUrl, requestOptions);
+    } catch (e: any) {
+        console.error(`Webhook execution failed for URL: ${resolvedUrl}`, e);
+        // Do not throw to avoid stopping the entire automation run for a single failed webhook
+    }
+    
     return {};
 };
 

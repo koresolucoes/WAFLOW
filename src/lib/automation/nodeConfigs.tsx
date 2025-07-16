@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { NodeData } from '../../types';
 import TriggerSettings from '../../pages/AutomationEditor/node-settings/TriggerSettings';
@@ -106,13 +107,25 @@ export const nodeConfigs: Record<string, NodeConfig> = {
         SettingsComponent: ActionSettings,
     },
     'send_webhook': {
-        label: 'Enviar Webhook',
+        label: 'HTTP Request',
         nodeType: 'action',
         data: {
             nodeType: 'action',
             type: 'send_webhook',
             label: 'Enviar Webhook',
-            config: { method: 'POST', url: '', body: '' }
+            config: {
+                method: 'POST',
+                url: '',
+                sendHeaders: false,
+                headers: [{ key: '', value: '' }],
+                sendBody: false,
+                body: {
+                    contentType: 'json',
+                    specify: 'fields',
+                    params: [{ key: '', value: '' }],
+                    rawJson: '{\n  "id": "{{contact.id}}",\n  "name": "{{contact.name}}"\n}'
+                }
+            }
         },
         SettingsComponent: SendWebhookSettings,
     },

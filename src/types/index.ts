@@ -37,9 +37,7 @@ export type AutomationNode = XyNode<NodeData>;
 
 // --- DATABASE TABLE TYPES ---
 export type Profile = Tables<'profiles'>;
-export type Contact = Omit<Tables<'contacts'>, 'custom_fields'> & {
-    custom_fields: Json | null;
-};
+export type Contact = Tables<'contacts'>;
 export type Segment = Tables<'segments'>;
 export type SegmentRule = Tables<'segment_rules'>;
 export type ReceivedMessage = Tables<'received_messages'>;

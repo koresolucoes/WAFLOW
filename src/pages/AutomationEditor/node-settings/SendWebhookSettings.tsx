@@ -2,18 +2,111 @@
 import React, { useState } from 'react';
 import { NodeSettingsProps, InputWithVariables, TextareaWithVariables } from './common';
 import Button from '../../../components/common/Button';
+import Switch from '../../../components/common/Switch';
+import { PLUS_ICON, TRASH_ICON } from '../../../components/icons';
 
 const baseInputClass = "w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white placeholder-slate-400 focus:ring-2 focus:ring-sky-500 focus:border-sky-500";
+
+const KeyValueRow: React.FC<{
+    item: { key: string, value: string },
+    index: number,
+    onListChange: (index: number, field: 'key' | 'value', value: string) => void,
+    onRemove: (index: number) => void,
+    variables: NodeSettingsProps['availableVariables'],
+    keyPlaceholder: string,
+    valuePlaceholder: string,
+}> = ({ item, index, onListChange, onRemove, variables, keyPlaceholder, valuePlaceholder }) => (
+    <div className="flex items-center gap-2">
+        <InputWithVariables
+            value={item.key}
+            onValueChange={(v) => onListChange(index, 'key', v)}
+            placeholder={keyPlaceholder}
+            className={`${baseInputClass} text-sm`}
+            variables={variables}
+        />
+        <InputWithVariables
+            value={item.value}
+            onValueChange={(v) => onListChange(index, 'value', v)}
+            placeholder={valuePlaceholder}
+            className={`${baseInputClass} text-sm`}
+            variables={variables}
+        />
+        <Button size="sm" variant="ghost" className="text-slate-400 hover:text-red-400" onClick={() => onRemove(index)}>
+            <TRASH_ICON className="w-4 h-4" />
+        </Button>
+    </div>
+);
+
 
 const SendWebhookSettings: React.FC<NodeSettingsProps> = ({ node, onConfigChange, availableVariables }) => {
     const config = (node.data.config as any) || {};
     const [isTesting, setIsTesting] = useState(false);
     const [testResponse, setTestResponse] = useState<any>(null);
 
+    const httpMethods = ['POST', 'GET', 'PUT', 'PATCH', 'DELETE'];
+    const showBody = ['POST', 'PUT', 'PATCH'].includes(config.method || 'POST');
+
     const handleConfigChange = (key: string, value: any) => {
         onConfigChange({ ...config, [key]: value });
     };
+
+    const handleNestedChange = (path: string[], value: any) => {
+        const newConfig = { ...config };
+        let current = newConfig;
+        for (let i = 0; i < path.length - 1; i++) {
+            current = current[path[i]];
+        }
+        current[path[path.length - 1]] = value;
+        onConfigChange(newConfig);
+    };
     
+    const handleListChange = (listName: 'headers' | 'queryParams' | 'params', index: number, field: 'key' | 'value', value: string) => {
+        const listPath = listName === 'params' ? ['body', 'params'] : [listName];
+        let newConfig = { ...config };
+        let list = listPath.reduce((acc, key) => acc[key], newConfig);
+
+        const newList = [...list];
+        newList[index][field] = value;
+        
+        let current = newConfig;
+        for (let i = 0; i < listPath.length - 1; i++) {
+            current = current[listPath[i]];
+        }
+        current[listPath[listPath.length - 1]] = newList;
+        
+        onConfigChange(newConfig);
+    };
+
+    const addListItem = (listName: 'headers' | 'params') => {
+        const listPath = listName === 'params' ? ['body', 'params'] : [listName];
+        const newConfig = { ...config };
+        let list = listPath.reduce((acc, key) => acc[key], newConfig);
+        const newList = [...(list || []), { key: '', value: '' }];
+
+        let current = newConfig;
+        for (let i = 0; i < listPath.length - 1; i++) {
+            current = current[listPath[i]];
+        }
+        current[listPath[listPath.length - 1]] = newList;
+
+        onConfigChange(newConfig);
+    };
+    
+    const removeListItem = (listName: 'headers' | 'params', index: number) => {
+        const listPath = listName === 'params' ? ['body', 'params'] : [listName];
+        const newConfig = { ...config };
+        let list = listPath.reduce((acc, key) => acc[key], newConfig);
+        const newList = list.filter((_: any, i: number) => i !== index);
+
+        let current = newConfig;
+        for (let i = 0; i < listPath.length - 1; i++) {
+            current = current[listPath[i]];
+        }
+        current[listPath[listPath.length - 1]] = newList;
+
+        onConfigChange(newConfig);
+    };
+
     const handleTestWebhook = async () => {
         setIsTesting(true);
         setTestResponse(null);
@@ -55,37 +148,102 @@ const SendWebhookSettings: React.FC<NodeSettingsProps> = ({ node, onConfigChange
         }
     };
 
-    const httpMethods = ['POST', 'GET', 'PUT', 'PATCH', 'DELETE'];
-    const showBody = ['POST', 'PUT', 'PATCH'].includes(config.method || 'POST');
-    const placeholderText = `{ "id": {{contact.id}}, "event": "new_tag" }`;
-
     return (
-        <div className="space-y-3">
-            <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1">Método HTTP</label>
-                <select value={config.method || 'POST'} onChange={(e) => handleConfigChange('method', e.target.value)} className={baseInputClass}>
-                    {httpMethods.map(m => <option key={m} value={m}>{m}</option>)}
-                </select>
+        <div className="space-y-4">
+            {/* --- BASIC CONFIG --- */}
+            <div className="flex gap-2">
+                <div className="w-1/3">
+                    <label className="block text-sm font-medium text-slate-300 mb-1">Método</label>
+                    <select value={config.method || 'POST'} onChange={(e) => handleConfigChange('method', e.target.value)} className={baseInputClass}>
+                        {httpMethods.map(m => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                </div>
+                <div className="w-2/3">
+                    <label className="block text-sm font-medium text-slate-300 mb-1">URL</label>
+                    <InputWithVariables onValueChange={val => handleConfigChange('url', val)} value={config.url || ''} type="text" placeholder="https://..." className={baseInputClass} variables={availableVariables} />
+                </div>
             </div>
-            <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1">URL para Envio</label>
-                <InputWithVariables onValueChange={val => handleConfigChange('url', val)} value={config.url || ''} type="text" placeholder="https://..." className={baseInputClass} variables={availableVariables} />
+
+            {/* --- HEADERS --- */}
+            <div className="p-3 bg-slate-800/50 rounded-lg">
+                <Switch checked={config.sendHeaders || false} onChange={val => handleConfigChange('sendHeaders', val)} label="Enviar Cabeçalhos" />
+                {config.sendHeaders && (
+                    <div className="mt-3 space-y-2">
+                       {(config.headers || []).map((header: {key: string, value: string}, index: number) => (
+                           <KeyValueRow 
+                               key={index} 
+                               item={header} 
+                               index={index}
+                               onListChange={(idx, f, v) => handleListChange('headers', idx, f, v)}
+                               onRemove={() => removeListItem('headers', index)}
+                               variables={availableVariables}
+                               keyPlaceholder="Header-Name"
+                               valuePlaceholder="Header Value"
+                           />
+                       ))}
+                       <Button size="sm" variant="ghost" onClick={() => addListItem('headers')}><PLUS_ICON className="w-4 h-4 mr-1" /> Adicionar Cabeçalho</Button>
+                    </div>
+                )}
             </div>
-             {showBody && (
-                <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-1">Corpo (JSON)</label>
-                    <TextareaWithVariables 
-                        onValueChange={val => handleConfigChange('body', val)} 
-                        value={config.body || ''} 
-                        placeholder={placeholderText}
-                        rows={5} 
-                        className={`${baseInputClass} font-mono`} 
-                        variables={availableVariables} 
-                    />
-                    <p className="text-xs text-slate-400 mt-1">{'Dica: Insira placeholders (ex: `{"{{contact.name}}"`}) sem aspas ao redor.'}</p>
+
+            {/* --- BODY --- */}
+            {showBody && (
+                 <div className="p-3 bg-slate-800/50 rounded-lg">
+                    <Switch checked={config.sendBody || false} onChange={val => handleConfigChange('sendBody', val)} label="Enviar Corpo (Body)" />
+                    {config.sendBody && (
+                        <div className="mt-3 space-y-3">
+                            <div>
+                                <label className="block text-xs font-medium text-slate-400 mb-1">Tipo de Conteúdo do Corpo</label>
+                                <select value={config.body?.contentType || 'json'} onChange={e => handleNestedChange(['body', 'contentType'], e.target.value)} className={`${baseInputClass} text-sm`}>
+                                    <option value="json">JSON (application/json)</option>
+                                    <option value="form_urlencoded">Form (x-www-form-urlencoded)</option>
+                                </select>
+                            </div>
+                             <div>
+                                <label className="block text-xs font-medium text-slate-400 mb-1">Especificar Corpo</label>
+                                <select value={config.body?.specify || 'fields'} onChange={e => handleNestedChange(['body', 'specify'], e.target.value)} className={`${baseInputClass} text-sm`}>
+                                    <option value="fields">Usando Campos (Key-Value)</option>
+                                    <option value="raw">JSON Bruto (Raw)</option>
+                                </select>
+                            </div>
+                            
+                            {config.body?.specify === 'fields' ? (
+                                <div className="space-y-2">
+                                     {(config.body?.params || []).map((param: {key: string, value: string}, index: number) => (
+                                       <KeyValueRow 
+                                            key={index} 
+                                            item={param} 
+                                            index={index}
+                                            onListChange={(idx, f, v) => handleListChange('params', idx, f, v)}
+                                            onRemove={() => removeListItem('params', index)}
+                                            variables={availableVariables}
+                                            keyPlaceholder="nome_do_campo"
+                                            valuePlaceholder="Valor do campo"
+                                       />
+                                    ))}
+                                    <Button size="sm" variant="ghost" onClick={() => addListItem('params')}><PLUS_ICON className="w-4 h-4 mr-1" /> Adicionar Parâmetro</Button>
+                                </div>
+                            ) : (
+                                <div>
+                                    <label className="block text-xs font-medium text-slate-400 mb-1">Corpo JSON Bruto</label>
+                                    <TextareaWithVariables
+                                        onValueChange={val => handleNestedChange(['body', 'rawJson'], val)}
+                                        value={config.body?.rawJson || ''}
+                                        placeholder={'{\n  "id": "{{contact.id}}"\n}'}
+                                        rows={6}
+                                        className={`${baseInputClass} font-mono text-sm`}
+                                        variables={availableVariables}
+                                    />
+                                </div>
+                            )}
+
+                        </div>
+                    )}
                 </div>
             )}
-            <div className="mt-4 pt-4 border-t border-slate-700 space-y-3">
+            
+            {/* --- TESTING --- */}
+            <div className="mt-2 pt-4 border-t border-slate-700 space-y-3">
                 <Button variant="secondary" onClick={handleTestWebhook} isLoading={isTesting} disabled={!config.url}>
                     Testar Requisição
                 </Button>
