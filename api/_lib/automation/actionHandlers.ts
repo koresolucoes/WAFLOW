@@ -1,7 +1,8 @@
 
-import { supabaseAdmin } from '../supabaseAdmin.js';
-import { sendTemplatedMessage, sendTextMessage, sendMediaMessage, sendInteractiveMessage } from '../meta/messages.js';
-import { AutomationNode, Contact, Json, MetaConfig, MessageTemplate, Profile, TablesUpdate } from '../types.js';
+
+import { supabaseAdmin } from '../supabaseAdmin';
+import { sendTemplatedMessage, sendTextMessage, sendMediaMessage, sendInteractiveMessage } from '../meta/messages';
+import { AutomationNode, Contact, Json, MetaConfig, MessageTemplate, Profile, TablesUpdate } from '../types';
 
 // ====================================================================================
 // Helper Functions
@@ -14,9 +15,9 @@ const getValueFromPath = (obj: any, path: string): any => {
 
 const resolveVariables = (text: string, context: { contact: Contact, triggerData: any }): string => {
     if (typeof text !== 'string') return text;
-    return text.replace(/\{\{([^}]+)\}\}/g, (match, path) => {
+    return text.replace(/\{\{([^}]+)\}\}/g, (_match, path) => {
         const value = getValueFromPath(context, path.trim());
-        return value !== undefined ? String(value) : match;
+        return value !== undefined ? String(value) : `{{${path}}}`;
     });
 };
 
@@ -25,7 +26,7 @@ const resolveJsonPlaceholders = (jsonString: string, context: any): string => {
         return JSON.stringify(jsonString);
     }
     let processedJsonString = jsonString.replace(/"\{\{([^}]+)\}\}"/g, '{{$1}}');
-    return processedJsonString.replace(/\{\{([^}]+)\}\}/g, (match, path) => {
+    return processedJsonString.replace(/\{\{([^}]+)\}\}/g, (_match, path) => {
         const value = getValueFromPath(context, path.trim());
         if (value === undefined || value === null) {
             return 'null';

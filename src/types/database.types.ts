@@ -210,13 +210,7 @@ CREATE TRIGGER on_auth_user_created
  *
  */
 
-export type Json =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: any }
-  | any[]
+export type Json = string | number | boolean | null | { [key: string]: any } | any[];
 
 export type Database = {
   public: {

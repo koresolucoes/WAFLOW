@@ -1,4 +1,6 @@
 
+
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 // Helper to resolve nested values from an object path (e.g., 'contact.custom_fields.order_id')
@@ -26,7 +28,7 @@ const resolveJsonPlaceholders = (jsonString: string, context: any): string => {
     // Pre-process to handle placeholders inside quotes like "{{var}}" -> {{var}}
     let processedJsonString = jsonString.replace(/"\{\{([^}]+)\}\}"/g, '{{$1}}');
 
-    return processedJsonString.replace(/\{\{([^}]+)\}\}/g, (match, path) => {
+    return processedJsonString.replace(/\{\{([^}]+)\}\}/g, (_match, path) => {
         const value = getValueFromPath(context, path.trim());
 
         if (value === undefined) {

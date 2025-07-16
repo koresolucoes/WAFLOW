@@ -1,7 +1,7 @@
 
-import { supabaseAdmin } from './supabaseAdmin.js';
-import { Automation, Contact, Json, TablesInsert } from './types.js';
-import { actionHandlers, ActionContext } from './automation/actionHandlers.js';
+import { supabaseAdmin } from './supabaseAdmin';
+import { Automation, Contact, Json, TablesInsert } from './types';
+import { actionHandlers, ActionContext } from './automation/actionHandlers';
 
 // Main function to execute an automation flow
 export const executeAutomation = async (

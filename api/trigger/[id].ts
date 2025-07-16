@@ -2,10 +2,11 @@
 
 
 
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
-import { executeAutomation } from '../_lib/engine.js';
-import { Contact, Automation, TablesInsert, TablesUpdate, Json } from '../_lib/types.js';
+import { supabaseAdmin } from '../_lib/supabaseAdmin';
+import { executeAutomation } from '../_lib/engine';
+import { Contact, Automation, TablesInsert, TablesUpdate, Json } from '../_lib/types';
 
 const getValueFromPath = (obj: any, path: string): any => {
     if (!path || !obj) return undefined;
@@ -91,6 +92,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const phoneRule = mappingRules.find((m: any) => m.destination === 'phone');
 
     if (!phoneRule) {
+        await supabaseAdmin.from('automation_runs').insert({
+            automation_id: automation.id,
+            contact_id: null,
+            status: 'failed',
+            details: 'Trigger failed: Data mapping for the contact\'s phone number is not configured in the "Webhook Received" node.'
+        } as TablesInsert<'automation_runs'>);
         return res.status(400).json({ error: 'Data mapping for contact phone number is not configured.' });
     }
 
@@ -104,6 +111,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const phone = String(getValueFromPath(fullPayloadForEvent, phoneRule.source)).replace(/\D/g, '');
         if (!phone) {
             console.warn('Could not extract phone number from event, skipping:', fullPayloadForEvent);
+             await supabaseAdmin.from('automation_runs').insert({
+                automation_id: automation.id,
+                contact_id: null,
+                status: 'failed',
+                details: `Trigger failed: Could not extract a valid phone number from the source path "${phoneRule.source}".`
+            } as TablesInsert<'automation_runs'>);
             continue;
         }
 
