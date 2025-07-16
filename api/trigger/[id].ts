@@ -3,10 +3,12 @@
 
 
 
+
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { supabaseAdmin } from '../_lib/supabaseAdmin';
-import { executeAutomation } from '../_lib/engine';
-import { Contact, Automation, TablesInsert, TablesUpdate, Json } from '../_lib/types';
+import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
+import { executeAutomation } from '../_lib/engine.js';
+import { Contact, Automation, TablesInsert, TablesUpdate, Json } from '../_lib/types.js';
 
 const getValueFromPath = (obj: any, path: string): any => {
     if (!path || !obj) return undefined;

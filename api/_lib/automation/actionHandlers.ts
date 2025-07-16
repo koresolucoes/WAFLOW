@@ -1,8 +1,8 @@
 
 
-import { supabaseAdmin } from '../supabaseAdmin';
-import { sendTemplatedMessage, sendTextMessage, sendMediaMessage, sendInteractiveMessage } from '../meta/messages';
-import { AutomationNode, Contact, Json, MetaConfig, MessageTemplate, Profile, TablesUpdate } from '../types';
+import { supabaseAdmin } from '../supabaseAdmin.js';
+import { sendTemplatedMessage, sendTextMessage, sendMediaMessage, sendInteractiveMessage } from '../meta/messages.js';
+import { AutomationNode, Contact, Json, MetaConfig, MessageTemplate, Profile, TablesUpdate } from '../types.js';
 
 // ====================================================================================
 // Helper Functions
