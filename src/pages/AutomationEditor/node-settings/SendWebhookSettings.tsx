@@ -43,68 +43,70 @@ const SendWebhookSettings: React.FC<NodeSettingsProps> = ({ node, onConfigChange
     const [isTesting, setIsTesting] = useState(false);
     const [testResponse, setTestResponse] = useState<any>(null);
 
+    // Helper to create a deep copy and apply changes before calling onConfigChange
+    const updateConfig = (updater: (draft: any) => void) => {
+        const newConfig = JSON.parse(JSON.stringify(config)); // Deep copy to prevent mutation issues
+        updater(newConfig);
+        onConfigChange(newConfig);
+    };
+
     const httpMethods = ['POST', 'GET', 'PUT', 'PATCH', 'DELETE'];
     const showBody = ['POST', 'PUT', 'PATCH'].includes(config.method || 'POST');
 
     const handleConfigChange = (key: string, value: any) => {
-        onConfigChange({ ...config, [key]: value });
+        updateConfig(draft => {
+            draft[key] = value;
+        });
     };
 
     const handleNestedChange = (path: string[], value: any) => {
-        const newConfig = { ...config };
-        let current = newConfig;
-        for (let i = 0; i < path.length - 1; i++) {
-            current = current[path[i]];
-        }
-        current[path[path.length - 1]] = value;
-        onConfigChange(newConfig);
+        updateConfig(draft => {
+            let current = draft;
+            for (let i = 0; i < path.length - 1; i++) {
+                const key = path[i];
+                if (current[key] === undefined || typeof current[key] !== 'object' || current[key] === null) {
+                    current[key] = {};
+                }
+                current = current[key];
+            }
+            current[path[path.length - 1]] = value;
+        });
     };
     
-    const handleListChange = (listName: 'headers' | 'queryParams' | 'params', index: number, field: 'key' | 'value', value: string) => {
-        const listPath = listName === 'params' ? ['body', 'params'] : [listName];
-        let newConfig = { ...config };
-        let list = listPath.reduce((acc, key) => acc[key], newConfig);
-
-        const newList = [...list];
-        newList[index][field] = value;
-        
-        let current = newConfig;
-        for (let i = 0; i < listPath.length - 1; i++) {
-            current = current[listPath[i]];
-        }
-        current[listPath[listPath.length - 1]] = newList;
-        
-        onConfigChange(newConfig);
+    const handleListChange = (listName: 'headers' | 'params', index: number, field: 'key' | 'value', value: string) => {
+        updateConfig(draft => {
+            const list = listName === 'params' ? draft.body?.params : draft.headers;
+            if (list && list[index]) {
+                list[index][field] = value;
+            }
+        });
     };
 
     const addListItem = (listName: 'headers' | 'params') => {
-        const listPath = listName === 'params' ? ['body', 'params'] : [listName];
-        const newConfig = { ...config };
-        let list = listPath.reduce((acc, key) => acc[key], newConfig);
-        const newList = [...(list || []), { key: '', value: '' }];
-
-        let current = newConfig;
-        for (let i = 0; i < listPath.length - 1; i++) {
-            current = current[listPath[i]];
-        }
-        current[listPath[listPath.length - 1]] = newList;
-
-        onConfigChange(newConfig);
+        updateConfig(draft => {
+            if (listName === 'params') {
+                if (!draft.body) draft.body = {};
+                if (!draft.body.params) draft.body.params = [];
+                draft.body.params.push({ key: '', value: '' });
+            } else { // headers
+                if (!draft.headers) draft.headers = [];
+                draft.headers.push({ key: '', value: '' });
+            }
+        });
     };
     
     const removeListItem = (listName: 'headers' | 'params', index: number) => {
-        const listPath = listName === 'params' ? ['body', 'params'] : [listName];
-        const newConfig = { ...config };
-        let list = listPath.reduce((acc, key) => acc[key], newConfig);
-        const newList = list.filter((_: any, i: number) => i !== index);
-
-        let current = newConfig;
-        for (let i = 0; i < listPath.length - 1; i++) {
-            current = current[listPath[i]];
-        }
-        current[listPath[listPath.length - 1]] = newList;
-
-        onConfigChange(newConfig);
+        updateConfig(draft => {
+            if (listName === 'params') {
+                if (draft.body?.params) {
+                    draft.body.params.splice(index, 1);
+                }
+            } else { // headers
+                 if (draft.headers) {
+                    draft.headers.splice(index, 1);
+                 }
+            }
+        });
     };
 
     const handleTestWebhook = async () => {
@@ -209,6 +211,7 @@ const SendWebhookSettings: React.FC<NodeSettingsProps> = ({ node, onConfigChange
                             
                             {config.body?.specify === 'fields' ? (
                                 <div className="space-y-2">
+                                     <label className="block text-xs font-medium text-slate-400 mb-1">Parâmetros do Corpo</label>
                                      {(config.body?.params || []).map((param: {key: string, value: string}, index: number) => (
                                        <KeyValueRow 
                                             key={index} 
