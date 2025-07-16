@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, memo } from 'react';
 import { AutomationNode, MessageTemplate, Profile, TriggerType } from '../../../types';
 
@@ -7,10 +8,11 @@ import { AutomationNode, MessageTemplate, Profile, TriggerType } from '../../../
 // ====================================================================================
 export interface NodeSettingsProps {
     node: AutomationNode;
-    onConfigChange: (newConfig: any) => void;
+    onConfigChange: (newConfig: any, options?: { immediate?: boolean }) => void;
     availableVariables: ReturnType<typeof getContextVariables>;
     templates: MessageTemplate[]; // For SendTemplateSettings
     profile: Profile | null; // For TriggerSettings
+    automationId?: string;
 }
 
 

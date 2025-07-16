@@ -1,10 +1,4 @@
 
-
-
-
-
-
-
 import React, { useContext, useState, useEffect, useCallback, memo, FC, useMemo, useRef } from 'react';
 import { ReactFlow, ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, type Node, type Edge, type Connection, type NodeProps, useReactFlow, NodeTypes, EdgeLabelRenderer, getBezierPath, type EdgeProps as XyEdgeProps, OnNodesChange, OnEdgesChange, EdgeChange } from '@xyflow/react';
 import { AppContext } from '../../contexts/AppContext';
@@ -214,6 +208,66 @@ const ConditionNode: FC<NodeProps<AutomationNode>> = ({ id, data, selected }) =>
     );
 };
 
+const SplitPathNode: FC<NodeProps<AutomationNode>> = ({ id, data, selected }) => {
+    const { setNodes, setEdges } = useReactFlow();
+    const { automationStats, pageParams, fetchNodeLogs } = useContext(AppContext);
+    const [isLogsModalOpen, setIsLogsModalOpen] = useState(false);
+    const [logs, setLogs] = useState<AutomationNodeLog[]>([]);
+    const [isLoadingLogs, setIsLoadingLogs] = useState(false);
+    const stats = automationStats[id];
+
+    const handleViewLogs = async () => {
+        setIsLoadingLogs(true);
+        setIsLogsModalOpen(true);
+        const fetchedLogs = await fetchNodeLogs(pageParams.automationId, id);
+        setLogs(fetchedLogs);
+        setIsLoadingLogs(false);
+    };
+
+    const handleDelete = (event: React.MouseEvent) => {
+        event.stopPropagation();
+        setEdges((eds) => eds.filter((edge) => edge.source !== id && edge.target !== id));
+        setNodes((nds) => nds.filter((node) => node.id !== id));
+    };
+
+    return (
+        <div className={`${nodeStyles.base} ${nodeStyles.logic} relative group`}>
+            {selected && (
+                 <button 
+                    onClick={handleDelete} 
+                    className="absolute top-[-10px] right-[-10px] bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold shadow-lg hover:bg-red-600 z-10"
+                    aria-label="Deletar Nó"
+                >
+                    &times;
+                </button>
+            )}
+            <Handle type="target" position={Position.Top} className="!bg-slate-500" />
+            
+            <div className={`${nodeStyles.header} ${nodeStyles.logicHeader}`}>
+                <AUTOMATION_ICON className="w-4 h-4" />
+                <span>{data.label}</span>
+            </div>
+            
+            <div className={`${nodeStyles.body} text-center`}>
+                <p className={nodeStyles.description}>Divide o fluxo em dois caminhos (50/50).</p>
+                <NodeStats stats={stats} onViewLogs={handleViewLogs}/>
+            </div>
+
+            <div className="flex justify-between relative px-5 py-2">
+                <div className="text-center">
+                    <Handle type="source" position={Position.Bottom} id="a" className="!bg-cyan-500 !bottom-[-5px]" />
+                    <span className="text-xs font-semibold text-cyan-400">Via A</span>
+                </div>
+                <div className="text-center">
+                    <Handle type="source" position={Position.Bottom} id="b" className="!bg-indigo-500 !bottom-[-5px]" />
+                    <span className="text-xs font-semibold text-indigo-400">Via B</span>
+                </div>
+            </div>
+             <NodeLogsModal isOpen={isLogsModalOpen} onClose={() => setIsLogsModalOpen(false)} nodeLabel={data.label} logs={logs} isLoading={isLoadingLogs} />
+        </div>
+    );
+};
+
 // ====================================================================================
 // Editor Sidebar
 // ====================================================================================
@@ -354,7 +408,7 @@ const Editor: React.FC = () => {
 
         const newNode: AutomationNode = {
             id: `${type}_${Date.now()}`,
-            type: (nodeConfigs[type].nodeType === 'logic' && type === 'condition') ? 'logic' : nodeConfigs[type].nodeType,
+            type: nodeType === 'logic' ? type : nodeType,
             position,
             data: {
                 nodeType: nodeType,
@@ -367,9 +421,18 @@ const Editor: React.FC = () => {
         setNodes((nds) => nds.concat(newNode));
     };
 
-    const handleUpdateNodesFromModal = useCallback(async (updatedNodes: AutomationNode[]) => {
+    const handleUpdateNodesFromModal = useCallback(async (updatedNodes: AutomationNode[], options?: { immediate?: boolean }) => {
         setNodes(updatedNodes);
-    }, [setNodes]);
+        if (options?.immediate && automation) {
+            if (saveTimeoutRef.current) {
+                clearTimeout(saveTimeoutRef.current);
+            }
+            setIsSaving(true);
+            await updateAutomation({ ...automation, nodes: updatedNodes, edges });
+            setIsSaving(false);
+        }
+    }, [setNodes, automation, edges, updateAutomation]);
+
 
     const onNodeClick = useCallback((event: React.MouseEvent, node: AutomationNode) => {
         setSelectedNode(node);
@@ -385,7 +448,8 @@ const Editor: React.FC = () => {
     const nodeTypes: NodeTypes = React.useMemo(() => ({
         trigger: CustomNode,
         action: CustomNode,
-        logic: ConditionNode,
+        condition: ConditionNode,
+        split_path: SplitPathNode,
     }), []);
 
     const edgeTypes = React.useMemo(() => ({
@@ -414,7 +478,7 @@ const Editor: React.FC = () => {
                     <span className={`text-sm ${isSaving ? 'text-yellow-400' : 'text-green-400'}`}>
                         {isSaving ? 'Salvando...' : 'Salvo'}
                     </span>
-                    <Button variant="secondary" onClick={() => setCurrentPage('automations')}>Voltar</Button>
+                    <Button variant="secondary" onClick={() => setCurrentPage('automations', {})}>Voltar</Button>
                 </div>
             </header>
             <div className="flex-grow flex">
@@ -445,6 +509,7 @@ const Editor: React.FC = () => {
                 templates={templates}
                 profile={profile}
                 onUpdateNodes={handleUpdateNodesFromModal}
+                automationId={automation?.id}
              />
         </div>
     );

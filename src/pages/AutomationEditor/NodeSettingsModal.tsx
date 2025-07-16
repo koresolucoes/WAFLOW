@@ -1,6 +1,4 @@
 
-
-
 import React, { useMemo } from 'react';
 import { AutomationNode, MessageTemplate, Profile } from '../../types';
 import Button from '../../components/common/Button';
@@ -15,7 +13,8 @@ interface NodeSettingsModalProps {
     nodes: AutomationNode[];
     templates: MessageTemplate[];
     profile: Profile | null;
-    onUpdateNodes: (nodes: AutomationNode[]) => Promise<void>;
+    onUpdateNodes: (nodes: AutomationNode[], options?: { immediate?: boolean }) => Promise<void>;
+    automationId?: string;
 }
 
 const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({ 
@@ -25,7 +24,8 @@ const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     nodes, 
     templates, 
     profile, 
-    onUpdateNodes 
+    onUpdateNodes,
+    automationId
 }) => {
     
     const availableVariables = useMemo(() => getContextVariables(nodes), [nodes]);
@@ -42,10 +42,10 @@ const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
 
     const SettingsComponent = nodeConfig.SettingsComponent;
 
-    const handleConfigChange = (updatedConfig: any) => {
+    const handleConfigChange = (updatedConfig: any, options?: { immediate?: boolean }) => {
         if (!node) return;
         const updatedNodes = nodes.map(n => n.id === node.id ? { ...n, data: { ...n.data, config: updatedConfig } } : n);
-        onUpdateNodes(updatedNodes);
+        onUpdateNodes(updatedNodes, options);
     };
     
     const renderVariablesPanel = () => {
@@ -115,6 +115,7 @@ const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
                            availableVariables={availableVariables}
                            templates={templates}
                            profile={profile}
+                           automationId={automationId}
                         />
                     </div>
                     

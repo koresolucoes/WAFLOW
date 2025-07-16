@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { NodeSettingsProps, InputWithVariables } from './common';
 import { supabase } from '../../../lib/supabaseClient';
@@ -30,23 +31,23 @@ const DataTreeView: React.FC<{ data: any; parentKey?: string }> = ({ data, paren
     );
 };
 
-const TriggerSettings: React.FC<NodeSettingsProps> = ({ node, onConfigChange, profile, availableVariables }) => {
+const TriggerSettings: React.FC<NodeSettingsProps> = ({ node, onConfigChange, profile, availableVariables, automationId }) => {
     const config = (node.data.config as any) || {};
     const [isListening, setIsListening] = useState(false);
 
     // Subscribe to realtime updates for this automation
     useEffect(() => {
-        if (!node || !profile) return;
+        if (!node || !automationId) return;
 
         const channel = supabase
-            .channel(`automation-update-${profile.id}`)
+            .channel(`automation-update-${automationId}`)
             .on(
                 'postgres_changes',
                 {
                     event: 'UPDATE',
                     schema: 'public',
                     table: 'automations',
-                    filter: `id=eq.${(window as any).automationIdForSubscription}`, // Use a stable ID
+                    filter: `id=eq.${automationId}`,
                 },
                 (payload) => {
                     const updatedAutomation = payload.new as any;
@@ -63,19 +64,16 @@ const TriggerSettings: React.FC<NodeSettingsProps> = ({ node, onConfigChange, pr
                 }
             )
             .subscribe();
-        
-        // Hacky way to pass a stable automation ID to the subscription
-        (window as any).automationIdForSubscription = (node as any).automationId;
 
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [node, profile, onConfigChange]);
+    }, [node, automationId, onConfigChange]);
 
 
     const handleStartListening = () => {
         setIsListening(true);
-        onConfigChange({ ...config, last_captured_data: null, data_mapping: [] });
+        onConfigChange({ ...config, last_captured_data: null, data_mapping: [] }, { immediate: true });
     };
 
     const handleMappingChange = (index: number, field: string, value: string) => {
