@@ -35,6 +35,8 @@ export const executeAutomation = async (
     }
 
     let currentContactState = { ...contact };
+    const nodes = Array.isArray(automation.nodes) ? automation.nodes : [];
+    const edges = Array.isArray(automation.edges) ? automation.edges : [];
     const nodeQueue: { nodeId: string }[] = [{ nodeId: startNodeId }];
     const processedNodes = new Set<string>();
 
@@ -42,7 +44,7 @@ export const executeAutomation = async (
         const { nodeId } = nodeQueue.shift()!;
         if (processedNodes.has(nodeId)) continue; // Avoid infinite loops
 
-        const node = automation.nodes.find(n => n.id === nodeId);
+        const node = nodes.find(n => n.id === nodeId);
         if (!node) continue;
         
         processedNodes.add(nodeId); // Mark as processed for this run
@@ -69,7 +71,7 @@ export const executeAutomation = async (
             }
 
             // Find next node(s) in the flow
-            const outgoingEdges = automation.edges.filter(e => e.source === nodeId && (!nextNodeHandle || e.sourceHandle === nextNodeHandle || !e.sourceHandle));
+            const outgoingEdges = edges.filter(e => e.source === nodeId && (!nextNodeHandle || e.sourceHandle === nextNodeHandle || !e.sourceHandle));
             for (const edge of outgoingEdges) {
                 nodeQueue.push({ nodeId: edge.target });
             }
