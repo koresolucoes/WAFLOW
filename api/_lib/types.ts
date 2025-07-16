@@ -1,17 +1,11 @@
 
-
-// This file contains types shared across serverless functions,
-// decoupled from frontend dependencies like React or @xyflow.
-
-import { Json as DbJson, Tables, TablesInsert, TablesUpdate } from './database.types.js';
+import { Json as DbJson, Database, Tables, TablesInsert, TablesUpdate } from './database.types.js';
 import { MetaTemplateComponent } from './meta/types.js';
 
 export type Json = DbJson;
 export type { Tables, TablesInsert, TablesUpdate };
-export type Profile = Tables<'profiles'>;
 
 // --- Backend-safe Flow Types ---
-
 export interface BackendNode<T = any> {
   id: string;
   position: { x: number; y: number };
@@ -45,7 +39,6 @@ export type ActionType = 'send_template' | 'add_tag' | 'remove_tag' | 'send_text
 export type LogicType = 'condition' | 'split_path';
 
 // --- Data Structures ---
-
 export interface NodeData {
   [key: string]: any;
   nodeType: NodeType;
@@ -54,19 +47,55 @@ export interface NodeData {
   config: Json;
 }
 
-export type Contact = Tables<'contacts'>;
-
-export type MessageTemplate = Omit<Tables<'message_templates'>, 'category' | 'status' | 'components'> & {
-  category: TemplateCategory;
-  status: TemplateStatus;
-  components: MetaTemplateComponent[];
+// --- Plain object types to avoid TS recursion from generated types ---
+export type Profile = {
+    id: string;
+    updated_at: string | null;
+    company_name: string | null;
+    company_description: string | null;
+    company_products: string | null;
+    company_audience: string | null;
+    company_tone: string | null;
+    meta_access_token: string | null;
+    meta_waba_id: string | null;
+    meta_phone_number_id: string | null;
+    webhook_path_prefix: string | null;
 };
 
-export type Automation = Omit<Tables<'automations'>, 'status' | 'nodes' | 'edges'> & {
-  status: AutomationStatus;
-  nodes: AutomationNode[];
-  edges: BackendEdge[];
+export type Contact = {
+    id: string;
+    user_id: string;
+    name: string;
+    phone: string;
+    email: string | null;
+    company: string | null;
+    tags: string[] | null;
+    custom_fields: Json | null;
+    created_at: string;
 };
+
+export type MessageTemplate = {
+    id: string;
+    user_id: string;
+    meta_id: string | null;
+    template_name: string;
+    category: TemplateCategory;
+    components: MetaTemplateComponent[];
+    status: TemplateStatus;
+    created_at: string;
+};
+
+export type Automation = {
+    created_at: string;
+    edges: BackendEdge[];
+    id: string;
+    name: string;
+    nodes: AutomationNode[];
+    status: AutomationStatus;
+    user_id: string;
+};
+// --- END of Plain object types ---
+
 
 export interface MetaConfig {
   accessToken: string;

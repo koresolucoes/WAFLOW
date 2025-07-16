@@ -1,6 +1,4 @@
 
-
-
 import { Session, User } from '@supabase/supabase-js';
 import { Json, Tables, TablesInsert, TablesUpdate } from './database.types';
 import { MetaTemplateComponent } from '../services/meta/types';
@@ -36,46 +34,89 @@ export interface NodeData {
 
 export type AutomationNode = XyNode<NodeData>;
 
-// --- DATABASE TABLE TYPES ---
-export type Profile = Tables<'profiles'>;
-export type Contact = Tables<'contacts'>;
+// --- Plain object types to avoid TS recursion from generated types ---
+export type Profile = {
+    id: string;
+    updated_at: string | null;
+    company_name: string | null;
+    company_description: string | null;
+    company_products: string | null;
+    company_audience: string | null;
+    company_tone: string | null;
+    meta_access_token: string | null;
+    meta_waba_id: string | null;
+    meta_phone_number_id: string | null;
+    webhook_path_prefix: string | null;
+};
+
+export type Contact = {
+    id: string;
+    user_id: string;
+    name: string;
+    phone: string;
+    email: string | null;
+    company: string | null;
+    tags: string[] | null;
+    custom_fields: Json | null;
+    created_at: string;
+};
+
+export type MessageTemplate = {
+    id: string;
+    user_id: string;
+    meta_id: string | null;
+    template_name: string;
+    category: TemplateCategory;
+    components: MetaTemplateComponent[];
+    status: TemplateStatus;
+    created_at: string;
+};
+
+export type Campaign = {
+    id: string;
+    user_id: string;
+    name: string;
+    template_id: string;
+    status: CampaignStatus;
+    sent_at: string;
+    recipient_count: number;
+};
+
+export type CampaignMessage = {
+    id: string;
+    campaign_id: string;
+    contact_id: string;
+    meta_message_id: string | null;
+    status: MessageStatus;
+    delivered_at: string | null;
+    read_at: string | null;
+    error_message: string | null;
+    created_at: string;
+};
+
+export type Automation = {
+    created_at: string;
+    edges: Edge[];
+    id: string;
+    name: string;
+    nodes: AutomationNode[];
+    status: AutomationStatus;
+    user_id: string;
+};
+
+export type Deal = Tables<'deals'>;
+export type Pipeline = Tables<'pipelines'>;
+export type PipelineStage = Tables<'pipeline_stages'>;
 export type Segment = Tables<'segments'>;
 export type SegmentRule = Tables<'segment_rules'>;
 export type ReceivedMessage = Tables<'received_messages'>;
 export type AutomationRun = Tables<'automation_runs'>;
 export type AutomationNodeStats = Tables<'automation_node_stats'>;
-export type Pipeline = Tables<'pipelines'>;
-export type PipelineStage = Tables<'pipeline_stages'>;
-export type Deal = Tables<'deals'>;
-
+export type AutomationNodeLog = Tables<'automation_node_logs'>;
+// --- END of Plain object types ---
 
 // --- CUSTOMIZED INTERFACES ---
 export type DealWithContact = Deal & { contacts: Pick<Contact, 'name' | 'id'> | null };
-
-export type AutomationNodeLog = Omit<Tables<'automation_node_logs'>, 'status'> & {
-    status: AutomationLogStatus;
-};
-
-export type MessageTemplate = Omit<Tables<'message_templates'>, 'category' | 'status' | 'components'> & {
-    category: TemplateCategory;
-    status: TemplateStatus;
-    components: MetaTemplateComponent[];
-};
-
-export type Campaign = Omit<Tables<'campaigns'>, 'status'> & {
-    status: CampaignStatus;
-};
-
-export type CampaignMessage = Omit<Tables<'campaign_messages'>, 'status'> & {
-    status: MessageStatus;
-};
-
-export type Automation = Omit<Tables<'automations'>, 'status' | 'nodes' | 'edges'> & {
-    status: AutomationStatus;
-    nodes: AutomationNode[];
-    edges: Edge[];
-};
-
 
 // --- INSERT TYPES ---
 export type MessageTemplateInsert = Omit<TablesInsert<'message_templates'>, 'category' | 'status' | 'components'> & {

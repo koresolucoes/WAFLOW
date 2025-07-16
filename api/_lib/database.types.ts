@@ -1,3 +1,4 @@
+
 /**
  * =================================================================================================
  * ZAPFLOW AI - SUPABASE DATABASE SCHEMA (v7 - Node Stats & Logs)
@@ -62,6 +63,8 @@ CREATE TABLE public.contacts (
     user_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
     name text NOT NULL,
     phone text NOT NULL,
+    email text,
+    company text,
     tags text[],
     custom_fields jsonb,
     created_at timestamp with time zone NOT NULL DEFAULT now()
@@ -516,8 +519,10 @@ export type Database = {
       }
       contacts: {
         Row: {
+          company: string | null
           created_at: string
           custom_fields: Json | null
+          email: string | null
           id: string
           name: string
           phone: string
@@ -525,8 +530,10 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          company?: string | null
           created_at?: string
           custom_fields?: Json | null
+          email?: string | null
           id?: string
           name: string
           phone: string
@@ -534,8 +541,10 @@ export type Database = {
           user_id: string
         }
         Update: {
+          company?: string | null
           created_at?: string
           custom_fields?: Json | null
+          email?: string | null
           id?: string
           name?: string
           phone?: string
