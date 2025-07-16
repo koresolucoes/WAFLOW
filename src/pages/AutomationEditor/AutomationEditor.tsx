@@ -1,19 +1,8 @@
 
-
-
-
-
-
-
-
-
-
-
-
 import React, { useContext, useState, useEffect, useCallback, memo, FC } from 'react';
 import { ReactFlow, ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, type Node, type Edge, type NodeProps, useReactFlow, NodeTypes, NodeChange, applyNodeChanges, EdgeLabelRenderer, getBezierPath, type EdgeProps as XyEdgeProps } from '@xyflow/react';
 import { AppContext } from '../../contexts/AppContext';
-import { Automation, AutomationNode, NodeData, AutomationNodeStats, AutomationNodeLog } from '../../types';
+import { Automation, AutomationNode, NodeData, AutomationNodeStats, AutomationNodeLog, TriggerType, ActionType, LogicType } from '../../types';
 import Button from '../../components/common/Button';
 import Card from '../../components/common/Card';
 import { supabase } from '../../lib/supabaseClient';
@@ -136,485 +125,318 @@ const CustomNode: FC<NodeProps<AutomationNode>> = ({ id, data, selected }) => {
                         deleteElements({ nodes: [{ id }] });
                     }} 
                     className="absolute top-[-10px] right-[-10px] bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold shadow-lg hover:bg-red-600 z-10"
-                    aria-label="Deletar nó"
-                    title="Deletar nó"
+                    aria-label="Deletar Nó"
                 >
                     &times;
                 </button>
             )}
+            <Handle type="target" position={Position.Left} className="!bg-slate-500" isConnectable={!isTrigger} />
             <div className={headerStyle}>
                 <AUTOMATION_ICON className="w-4 h-4" />
-                {data.nodeType.charAt(0).toUpperCase() + data.nodeType.slice(1)}
+                <span>{data.label}</span>
             </div>
             <div className={nodeStyles.body}>
-                <div className="space-y-1">
-                    <p className={nodeStyles.label}>{data.label}</p>
-                    <p className={nodeStyles.description}>Tipo: {data.type}</p>
-                </div>
-                <NodeStats stats={stats} onViewLogs={handleViewLogs} />
+                <p className={nodeStyles.description}>Clique para configurar este nó.</p>
+                <NodeStats stats={stats} onViewLogs={handleViewLogs}/>
             </div>
-            {!isTrigger && <Handle type="target" position={Position.Left} className="!bg-slate-400" />}
-            <Handle type="source" position={Position.Right} className="!bg-slate-400" />
+            <Handle type="source" position={Position.Right} className="!bg-slate-500" />
+            <NodeLogsModal isOpen={isLogsModalOpen} onClose={() => setIsLogsModalOpen(false)} nodeLabel={data.label} logs={logs} isLoading={isLoadingLogs} />
+        </div>
+    );
+};
+
+
+const ConditionNode: FC<NodeProps<AutomationNode>> = ({ id, data, selected }) => {
+    const { deleteElements } = useReactFlow();
+    const { automationStats, pageParams, fetchNodeLogs } = useContext(AppContext);
+    const [isLogsModalOpen, setIsLogsModalOpen] = useState(false);
+    const [logs, setLogs] = useState<AutomationNodeLog[]>([]);
+    const [isLoadingLogs, setIsLoadingLogs] = useState(false);
+    const stats = automationStats[id];
+
+    const isTrigger = data.nodeType === 'trigger';
+
+    const handleViewLogs = async () => {
+        setIsLoadingLogs(true);
+        setIsLogsModalOpen(true);
+        const fetchedLogs = await fetchNodeLogs(pageParams.automationId, id);
+        setLogs(fetchedLogs);
+        setIsLoadingLogs(false);
+    };
+
+    return (
+        <div className={`${nodeStyles.base} ${nodeStyles.logic} relative group`}>
+            {selected && (
+                 <button 
+                    onClick={(event) => {
+                        event.stopPropagation();
+                        deleteElements({ nodes: [{ id }] });
+                    }} 
+                    className="absolute top-[-10px] right-[-10px] bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold shadow-lg hover:bg-red-600 z-10"
+                    aria-label="Deletar Nó"
+                >
+                    &times;
+                </button>
+            )}
+            <Handle type="target" position={Position.Top} className="!bg-slate-500" />
             
-            <NodeLogsModal
-                isOpen={isLogsModalOpen}
-                onClose={() => setIsLogsModalOpen(false)}
-                nodeLabel={data.label}
-                logs={logs}
-                isLoading={isLoadingLogs}
-            />
+            <div className={`${nodeStyles.header} ${nodeStyles.logicHeader}`}>
+                <AUTOMATION_ICON className="w-4 h-4" />
+                <span>{data.label}</span>
+            </div>
+            
+            <div className={`${nodeStyles.body} text-center`}>
+                <p className={nodeStyles.description}>Clique para configurar as regras de condição.</p>
+                <NodeStats stats={stats} onViewLogs={handleViewLogs}/>
+            </div>
+
+            <div className="flex justify-between relative px-5 py-2">
+                <div className="text-center">
+                    <Handle type="source" position={Position.Bottom} id="yes" className="!bg-green-500 !bottom-[-5px]" />
+                    <span className="text-xs font-semibold text-green-400">SIM</span>
+                </div>
+                <div className="text-center">
+                    <Handle type="source" position={Position.Bottom} id="no" className="!bg-red-500 !bottom-[-5px]" />
+                    <span className="text-xs font-semibold text-red-400">NÃO</span>
+                </div>
+            </div>
+             <NodeLogsModal isOpen={isLogsModalOpen} onClose={() => setIsLogsModalOpen(false)} nodeLabel={data.label} logs={logs} isLoading={isLoadingLogs} />
         </div>
     );
 };
 
-const ConditionNode: FC<NodeProps<AutomationNode>> = (props) => {
-    const { id, data, selected } = props;
-    const { deleteElements } = useReactFlow();
-    const { automationStats, pageParams, fetchNodeLogs } = useContext(AppContext);
-    const [isLogsModalOpen, setIsLogsModalOpen] = useState(false);
-    const [logs, setLogs] = useState<AutomationNodeLog[]>([]);
-    const [isLoadingLogs, setIsLoadingLogs] = useState(false);
-    
-    const stats = automationStats[id];
-    const config = (data.config as any) || {};
-    const conditionText = `${config.field || ''} ${config.operator || ''} "${config.value || ''}"`;
-
-    const handleViewLogs = async () => {
-        setIsLoadingLogs(true);
-        setIsLogsModalOpen(true);
-        const fetchedLogs = await fetchNodeLogs(pageParams.automationId, id);
-        setLogs(fetchedLogs);
-        setIsLoadingLogs(false);
+// ====================================================================================
+// Editor Sidebar
+// ====================================================================================
+const Sidebar: React.FC<{ onAddNode: (type: string) => void }> = memo(({ onAddNode }) => {
+    const nodeGroups = {
+        Triggers: Object.entries(nodeConfigs).filter(([, c]) => c.nodeType === 'trigger'),
+        Actions: Object.entries(nodeConfigs).filter(([, c]) => c.nodeType === 'action'),
+        Logic: Object.entries(nodeConfigs).filter(([, c]) => c.nodeType === 'logic'),
     };
     
     return (
-      <div className={`${nodeStyles.base} ${nodeStyles.logic} relative group`}>
-        {selected && (
-             <button 
-                onClick={(event) => {
-                    event.stopPropagation();
-                    deleteElements({ nodes: [{ id }] });
-                }} 
-                className="absolute top-[-10px] right-[-10px] bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold shadow-lg hover:bg-red-600 z-10"
-                aria-label="Deletar nó"
-                title="Deletar nó"
-            >
-                &times;
-            </button>
-        )}
-        <div className={`${nodeStyles.header} ${nodeStyles.logicHeader}`}>
-            <AUTOMATION_ICON className="w-4 h-4" />
-            Lógica
-        </div>
-        <div className={nodeStyles.body}>
-            <div className="space-y-1">
-                <p className={nodeStyles.label}>{data.label}</p>
-                <p className={nodeStyles.description} title={conditionText}>
-                   {conditionText.length > 35 ? `${conditionText.substring(0, 32)}...` : conditionText}
-                </p>
-            </div>
-            <NodeStats stats={stats} onViewLogs={handleViewLogs} />
-        </div>
-        <Handle type="target" position={Position.Left} className="!bg-slate-400" />
-        
-        <Handle type="source" id="yes" position={Position.Right} style={{ top: '40%' }} className="!bg-green-500" />
-        <div className="absolute right-[-25px] top-[40%] -translate-y-1/2 text-xs text-green-400 font-bold">Sim</div>
-        
-        <Handle type="source" id="no" position={Position.Right} style={{ top: '70%' }} className="!bg-red-500" />
-        <div className="absolute right-[-25px] top-[70%] -translate-y-1/2 text-xs text-red-400 font-bold">Não</div>
-        
-        <NodeLogsModal
-            isOpen={isLogsModalOpen}
-            onClose={() => setIsLogsModalOpen(false)}
-            nodeLabel={data.label}
-            logs={logs}
-            isLoading={isLoadingLogs}
-        />
-      </div>
-    );
-};
-
-const SplitPathNode: FC<NodeProps<AutomationNode>> = (props) => {
-    const { id, data, selected } = props;
-    const { deleteElements } = useReactFlow();
-    const { automationStats, pageParams, fetchNodeLogs } = useContext(AppContext);
-    const [isLogsModalOpen, setIsLogsModalOpen] = useState(false);
-    const [logs, setLogs] = useState<AutomationNodeLog[]>([]);
-    const [isLoadingLogs, setIsLoadingLogs] = useState(false);
-
-    const stats = automationStats[id];
-    
-    const handleViewLogs = async () => {
-        setIsLoadingLogs(true);
-        setIsLogsModalOpen(true);
-        const fetchedLogs = await fetchNodeLogs(pageParams.automationId, id);
-        setLogs(fetchedLogs);
-        setIsLoadingLogs(false);
-    };
-
-    return (
-      <div className={`${nodeStyles.base} ${nodeStyles.logic} relative group`}>
-        {selected && (
-            <button 
-                onClick={(event) => {
-                    event.stopPropagation();
-                    deleteElements({ nodes: [{ id }] });
-                }} 
-                className="absolute top-[-10px] right-[-10px] bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold shadow-lg hover:bg-red-600 z-10"
-                aria-label="Deletar nó"
-                title="Deletar nó"
-            >
-                &times;
-            </button>
-        )}
-        <div className={`${nodeStyles.header} ${nodeStyles.logicHeader}`}>
-            <AUTOMATION_ICON className="w-4 h-4" />
-            Lógica
-        </div>
-        <div className={nodeStyles.body}>
-            <div className="space-y-1">
-                <p className={nodeStyles.label}>{data.label}</p>
-                <p className={nodeStyles.description}>Divide o fluxo em 50/50 aleatoriamente.</p>
-            </div>
-             <NodeStats stats={stats} onViewLogs={handleViewLogs} />
-        </div>
-        <Handle type="target" position={Position.Left} className="!bg-slate-400" />
-        
-        <Handle type="source" id="a" position={Position.Right} style={{ top: '40%' }} className="!bg-sky-500" />
-        <div className="absolute right-[-35px] top-[40%] -translate-y-1/2 text-xs text-sky-400 font-bold">Via A</div>
-        
-        <Handle type="source" id="b" position={Position.Right} style={{ top: '70%' }} className="!bg-amber-500" />
-        <div className="absolute right-[-35px] top-[70%] -translate-y-1/2 text-xs text-amber-400 font-bold">Via B</div>
-
-        <NodeLogsModal
-            isOpen={isLogsModalOpen}
-            onClose={() => setIsLogsModalOpen(false)}
-            nodeLabel={data.label}
-            logs={logs}
-            isLoading={isLoadingLogs}
-        />
-      </div>
-    );
-};
-
-const LogicNodeResolver: FC<NodeProps<AutomationNode>> = (props) => {
-    const data = props.data;
-    if (data.type === 'condition') return <ConditionNode {...props} />;
-    if (data.type === 'split_path') return <SplitPathNode {...props} />;
-    return <CustomNode {...props} />;
-};
-
-const nodeTypes: NodeTypes = {
-    trigger: CustomNode,
-    action: CustomNode,
-    logic: LogicNodeResolver,
-};
-
-const edgeTypes = {
-    default: CustomDeletableEdge,
-};
-
-
-const DraggableNode = ({ nodeType, onDragStart }: { nodeType: string, onDragStart: (event: React.DragEvent, nodeData: NodeData) => void }) => {
-    const config = nodeConfigs[nodeType];
-    if (!config) return null;
-
-    return (
-        <div
-            className="p-3 mb-2 border-2 border-dashed border-slate-600 rounded-lg text-center cursor-grab bg-slate-800 hover:bg-slate-700 hover:border-sky-500"
-            onDragStart={(event) => onDragStart(event, config.data as NodeData)}
-            draggable
-        >
-            <p className="font-semibold text-sm">{config.label}</p>
-        </div>
-    );
-};
-
-const NodeSidebar = memo(({ onDragStart }: { onDragStart: (event: React.DragEvent, nodeData: NodeData) => void }) => {
-    const triggerNodes = Object.keys(nodeConfigs).filter(key => nodeConfigs[key].nodeType === 'trigger');
-    const actionNodes = Object.keys(nodeConfigs).filter(key => nodeConfigs[key].nodeType === 'action');
-    const logicNodes = Object.keys(nodeConfigs).filter(key => nodeConfigs[key].nodeType === 'logic');
-
-    return (
-        <Card className="w-full h-full overflow-y-auto !p-4 bg-transparent shadow-none">
-            <h3 className="text-xl font-bold text-white mb-4">Blocos</h3>
-            <p className="text-sm text-slate-400 mb-4">Arraste os blocos para a área de trabalho para construir sua automação.</p>
-            <div>
-                <h4 className="font-semibold text-sky-300 mb-2">Gatilhos (Início)</h4>
-                {triggerNodes.map(type => <DraggableNode key={type} nodeType={type} onDragStart={onDragStart} />)}
-            </div>
-            <div className="mt-6">
-                <h4 className="font-semibold text-pink-300 mb-2">Ações</h4>
-                {actionNodes.map(type => <DraggableNode key={type} nodeType={type} onDragStart={onDragStart} />)}
-            </div>
-             <div className="mt-6">
-                <h4 className="font-semibold text-purple-300 mb-2">Lógica</h4>
-                {logicNodes.map(type => <DraggableNode key={type} nodeType={type} onDragStart={onDragStart} />)}
-            </div>
+        <Card className="w-80 h-full flex-shrink-0 overflow-y-auto">
+            <h2 className="text-xl font-bold text-white mb-4">Adicionar Etapa</h2>
+            {Object.entries(nodeGroups).map(([groupName, configs]) => (
+                <div key={groupName} className="mb-4">
+                    <h3 className="font-semibold text-sky-300 mb-2">{groupName}</h3>
+                    <div className="grid grid-cols-1 gap-2">
+                        {configs.map(([type, config]) => (
+                            <button
+                                key={type}
+                                onClick={() => onAddNode(config.data.type as string)}
+                                className="p-3 text-left bg-slate-700/50 hover:bg-slate-700 rounded-lg transition-colors text-white"
+                            >
+                                {config.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            ))}
         </Card>
     );
 });
 
+// ====================================================================================
+// Main Editor Component
+// ====================================================================================
 
-const FlowCanvas = () => {
-    const { pageParams, automations, templates, updateAutomation, setCurrentPage, profile, fetchAutomationStats, setAutomationStats } = useContext(AppContext);
-    const { screenToFlowPosition } = useReactFlow();
-    const [nodes, setNodes, onNodesChangeOriginal] = useNodesState(initialNodes);
+const Editor: React.FC = () => {
+    const { automations, updateAutomation, pageParams, setCurrentPage, templates, profile, fetchAutomationStats, automationStats, fetchNodeLogs, setAutomationStats } = useContext(AppContext);
+    
+    const [automation, setAutomation] = useState<Automation | null>(null);
+    const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
     const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+    const [isSaving, setIsSaving] = useState(false);
+    const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
     const [selectedNode, setSelectedNode] = useState<AutomationNode | null>(null);
 
-    const [automationName, setAutomationName] = useState('');
-    const [isSaving, setIsSaving] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const { setViewport, screenToFlowPosition, deleteElements } = useReactFlow();
+    const saveTimeoutRef = React.useRef<NodeJS.Timeout>();
+    const hasFetchedStats = React.useRef(false);
 
-    const automationId = pageParams.automationId;
-
-    // --- State Synchronization Effect ---
     useEffect(() => {
-        if (!automationId || !automations) return;
-
-        const currentAutomation = automations.find(a => a.id === automationId);
-
+        const currentAutomation = automations.find(a => a.id === pageParams.automationId);
         if (currentAutomation) {
-            setAutomationName(currentAutomation.name);
-            
-            // Only update nodes/edges if they are different to avoid re-renders
-            setNodes(nds => {
-                const newNodes = currentAutomation.nodes || [];
-                return JSON.stringify(nds) !== JSON.stringify(newNodes) ? newNodes : nds;
-            });
-            setEdges(eds => {
-                const newEdges = currentAutomation.edges || [];
-                return JSON.stringify(eds) !== JSON.stringify(newEdges) ? newEdges : eds;
-            });
-            
-            if (selectedNode) {
-                const updatedSelectedNode = (currentAutomation.nodes || []).find(n => n.id === selectedNode.id);
-                if (updatedSelectedNode) {
-                     if (JSON.stringify(selectedNode) !== JSON.stringify(updatedSelectedNode)) {
-                        setSelectedNode(updatedSelectedNode);
-                    }
-                } else {
-                    setSelectedNode(null);
-                }
+            setAutomation(currentAutomation);
+            // Initialize stats for this automation if not present
+            if (!hasFetchedStats.current) {
+                fetchAutomationStats(currentAutomation.id);
+                hasFetchedStats.current = true;
             }
+        } else if (pageParams.automationId) {
+            console.error(`Automação com ID ${pageParams.automationId} não encontrada.`);
         }
-    }, [automationId, automations, setNodes, setEdges, selectedNode]);
-
-    // This effect ensures that if the modal is open, it gets the latest node data.
-    useEffect(() => {
-        if (selectedNode) {
-            const currentAutomation = automations.find(a => a.id === automationId);
-            const latestNode = currentAutomation?.nodes.find(n => n.id === selectedNode.id);
-            if (latestNode && JSON.stringify(latestNode) !== JSON.stringify(selectedNode)) {
-                setSelectedNode(latestNode);
-            }
-        }
-    }, [nodes, automations, selectedNode, automationId]);
-
-    // --- Stats and Real-time Updates ---
-     useEffect(() => {
-        if (!automationId) return;
-
-        // Initial fetch
-        fetchAutomationStats(automationId);
 
         // Real-time subscription for stats
-        const statsChannel = supabase.channel(`automation-stats-realtime-${automationId}`)
+        const channel = supabase
+            .channel(`automation-stats-${pageParams.automationId}`)
             .on('postgres_changes', { 
                 event: '*', 
                 schema: 'public', 
                 table: 'automation_node_stats', 
-                filter: `automation_id=eq.${automationId}` 
-            }, (payload) => {
+                filter: `automation_id=eq.${pageParams.automationId}` 
+            }, 
+            (payload) => {
                 const newStat = payload.new as AutomationNodeStats;
                 if (newStat && newStat.node_id) {
                     setAutomationStats(prev => ({ ...prev, [newStat.node_id]: newStat }));
                 }
             })
             .subscribe();
-            
-        // Real-time subscription for automation changes (e.g. config updates)
-        const automationChannel = supabase.channel(`automation-editor-realtime-${automationId}`)
-            .on('postgres_changes', { 
-                event: 'UPDATE', 
-                schema: 'public', 
-                table: 'automations', 
-                filter: `id=eq.${automationId}` 
-            }, (payload) => {
-                const updatedAutomation = payload.new as unknown as Automation;
-                 if(updatedAutomation) {
-                    // This re-syncs the entire automation from the context
-                    updateAutomation(updatedAutomation);
-                }
-            })
-            .subscribe();
 
         return () => {
-            supabase.removeChannel(statsChannel);
-            supabase.removeChannel(automationChannel);
+            supabase.removeChannel(channel);
+            hasFetchedStats.current = false;
         };
-    }, [automationId, fetchAutomationStats, setAutomationStats, updateAutomation]);
+
+    }, [automations, pageParams.automationId, fetchAutomationStats, setAutomationStats]);
+
+    useEffect(() => {
+        if (automation) {
+            setNodes(automation.nodes || []);
+            setEdges(automation.edges || []);
+        }
+    }, [automation, setNodes, setEdges]);
     
-    // Custom handler to prevent trigger node deletion
-    const onNodesChange = useCallback(
-        (changes: NodeChange[]) => {
-            setNodes((nds) => {
-                const filteredChanges = changes.filter(change => {
-                    if (change.type === 'remove') {
-                        const nodeToRemove = nds.find(n => n.id === change.id);
-                        if (nodeToRemove?.data.nodeType === 'trigger') {
-                            return false; 
-                        }
-                    }
-                    return true;
-                });
-                return applyNodeChanges(filteredChanges, nds) as AutomationNode[];
-            });
-        },
-        [setNodes]
-    );
+    const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!automation) return;
+        const newAutomation = { ...automation, name: e.target.value };
+        setAutomation(newAutomation);
+        saveChanges(newAutomation);
+    };
 
-    const onConnect = useCallback((params: any) => setEdges((eds) => addEdge(params, eds)), [setEdges]);
+    const saveChanges = useCallback((dataToSave: Automation) => {
+        setIsSaving(true);
+        if (saveTimeoutRef.current) {
+            clearTimeout(saveTimeoutRef.current);
+        }
+        saveTimeoutRef.current = setTimeout(async () => {
+            await updateAutomation(dataToSave);
+            setIsSaving(false);
+        }, 1000);
+    }, [updateAutomation]);
+    
+    const onConnect = useCallback((params: any) => {
+        if (!automation) return;
+        const newEdge = { ...params, type: 'deletable' };
+        const newEdges = addEdge(newEdge, edges);
+        setEdges(newEdges);
+        saveChanges({ ...automation, nodes, edges: newEdges });
+    }, [automation, edges, nodes, saveChanges, setEdges]);
 
-    const onDragOver = useCallback((event: React.DragEvent) => {
-        event.preventDefault();
-        event.dataTransfer.dropEffect = 'move';
+    const addNode = (type: string) => {
+        if (!automation) return;
+
+        const { label, nodeType, data: nodeData } = nodeConfigs[type];
+
+        const position = screenToFlowPosition({
+            x: 350,
+            y: 150,
+        });
+
+        const newNode: AutomationNode = {
+            id: `${type}_${Date.now()}`,
+            type: nodeType,
+            position,
+            data: {
+                nodeType: nodeType,
+                type: type as TriggerType | ActionType | LogicType,
+                label: label,
+                config: nodeData.config || {},
+            },
+        };
+        
+        const newNodes = [...nodes, newNode];
+        setNodes(newNodes);
+        saveChanges({ ...automation, nodes: newNodes, edges });
+    };
+
+    const handleUpdateNodes = useCallback(async (updatedNodes: AutomationNode[]) => {
+        if (!automation) return;
+        setNodes(updatedNodes);
+        saveChanges({ ...automation, nodes: updatedNodes, edges });
+    }, [automation, edges, saveChanges, setNodes]);
+
+    const onNodeClick = useCallback((event: React.MouseEvent, node: AutomationNode) => {
+        setSelectedNode(node);
+        setIsSettingsModalOpen(true);
     }, []);
 
-    const onDrop = useCallback((event: React.DragEvent) => {
-        event.preventDefault();
-        const nodeDataString = event.dataTransfer.getData('application/reactflow-nodedata');
-
-        if (!nodeDataString) return;
-
-        const nodeData: NodeData = JSON.parse(nodeDataString);
-        
-        // Prevent adding more than one trigger if you want to enforce that rule
-        // if (nodeData.nodeType === 'trigger' && nodes.some(n => n.data.nodeType === 'trigger')) {
-        //     alert("A automação só pode ter um gatilho.");
-        //     return;
-        // }
-
-        const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
-        const newNode: AutomationNode = {
-            id: `${nodeData.type}_${Date.now()}`,
-            type: nodeData.nodeType,
-            position,
-            data: nodeData,
-        };
-        setNodes((nds) => nds.concat(newNode));
-    }, [screenToFlowPosition, setNodes]);
-
-    const onNodeClick = useCallback((_: React.MouseEvent, node: Node) => setSelectedNode(node as AutomationNode), []);
-    const onPaneClick = useCallback(() => setSelectedNode(null), []);
-    const onNodesDelete = useCallback(() => setSelectedNode(null), []);
-    
-    const handlePartialUpdate = async (updatedNodes: AutomationNode[]) => {
-         const automationData = {
-            id: automationId,
-            name: automationName,
-            status: automations.find(a => a.id === automationId)?.status || 'active',
-            nodes: updatedNodes,
-            edges,
-        };
-        await updateAutomation(automationData as Automation);
-    };
-
-    const onSave = async () => {
-        setError(null);
-        if (!automationName.trim()) return setError("O nome da automação é obrigatório.");
-        if (nodes.filter(n => n.data.nodeType === 'trigger').length === 0) return setError("A automação precisa de pelo menos um gatilho.");
-        if (!automationId) return setError("ID da automação não encontrado. Não é possível salvar.");
-
-        setIsSaving(true);
-        const automationData = {
-            id: automationId,
-            name: automationName,
-            status: automations.find(a => a.id === automationId)?.status || 'active',
-            nodes,
-            edges,
-        };
-        try {
-            await updateAutomation(automationData as Automation);
-            setCurrentPage('automations');
-        } catch (err: any) {
-             setError(err.message || 'Ocorreu um erro ao salvar.');
-        } finally {
-            setIsSaving(false);
-        }
+    const handleCloseModal = () => {
+        setIsSettingsModalOpen(false);
+        setSelectedNode(null);
     };
     
-    const handleDragStart = (event: React.DragEvent, nodeData: NodeData) => {
-        event.dataTransfer.setData('application/reactflow-nodedata', JSON.stringify(nodeData));
-        event.dataTransfer.effectAllowed = 'move';
-    };
+    const nodeTypes: NodeTypes = React.useMemo(() => ({
+        trigger: CustomNode,
+        action: CustomNode,
+        logic: ConditionNode,
+    }), []);
+
+    const edgeTypes = React.useMemo(() => ({
+        deletable: CustomDeletableEdge,
+    }), []);
+    
+    if (!automation) {
+        return <div className="text-center text-white">Carregando automação...</div>;
+    }
 
     return (
-        <div className="h-full flex flex-col bg-slate-900">
-             <header className="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-900/80 backdrop-blur-sm z-10 shrink-0">
+        <div className="flex flex-col h-full">
+            <header className="flex-shrink-0 p-4 border-b border-slate-700/50 flex items-center justify-between">
                 <input
                     type="text"
-                    value={automationName}
-                    onChange={(e) => setAutomationName(e.target.value)}
-                    placeholder="Nome da sua Automação"
-                    className="bg-transparent text-xl font-bold text-white focus:outline-none w-1/2"
+                    value={automation.name}
+                    onChange={handleNameChange}
+                    className="bg-transparent text-2xl font-bold text-white focus:outline-none focus:ring-2 focus:ring-sky-500 rounded-md px-2 py-1"
                 />
-                 <div className="flex items-center gap-3">
-                    {error && <p className="text-red-400 text-sm">{error}</p>}
-                    <Button variant="secondary" onClick={() => setCurrentPage('automations')} disabled={isSaving}>Cancelar</Button>
-                    <Button variant="primary" onClick={onSave} isLoading={isSaving}>
-                        Salvar Alterações
-                    </Button>
+                <div className="flex items-center gap-4">
+                    <span className={`text-sm ${isSaving ? 'text-yellow-400' : 'text-green-400'}`}>
+                        {isSaving ? 'Salvando...' : 'Salvo'}
+                    </span>
+                    <Button variant="secondary" onClick={() => setCurrentPage('automations')}>Voltar</Button>
                 </div>
             </header>
-            <div className="flex-grow flex relative">
-                 <aside className="w-80 h-full p-4 border-r border-slate-700 bg-slate-800/50 backdrop-blur-sm z-10">
-                   <NodeSidebar onDragStart={handleDragStart} />
-                </aside>
-
-                <div className="flex-grow h-full">
+            <div className="flex-grow flex">
+                <main className="flex-grow h-full relative">
                     <ReactFlow
                         nodes={nodes}
                         edges={edges}
                         onNodesChange={onNodesChange}
                         onEdgesChange={onEdgesChange}
                         onConnect={onConnect}
-                        onDrop={onDrop}
-                        onDragOver={onDragOver}
-                        onNodeClick={onNodeClick}
-                        onPaneClick={onPaneClick}
-                        onNodesDelete={onNodesDelete}
                         nodeTypes={nodeTypes}
                         edgeTypes={edgeTypes}
+                        onNodeClick={onNodeClick}
                         fitView
-                        className="bg-slate-900 xyflow-react"
+                        className="bg-slate-900"
                     >
                         <Background color="#475569" gap={16} />
-                        <Controls />
+                        <Controls showInteractive={false} />
                     </ReactFlow>
-                </div>
+                </main>
+                <Sidebar onAddNode={addNode} />
             </div>
-             <NodeSettingsModal
+             <NodeSettingsModal 
                 node={selectedNode}
-                isOpen={!!selectedNode}
-                onClose={() => setSelectedNode(null)}
+                isOpen={isSettingsModalOpen}
+                onClose={handleCloseModal}
                 nodes={nodes}
                 templates={templates}
                 profile={profile}
-                onUpdateNodes={handlePartialUpdate}
-            />
+                onUpdateNodes={handleUpdateNodes}
+             />
         </div>
     );
 };
 
 const AutomationEditor: React.FC = () => {
     return (
-        <div className="w-full h-full -m-8">
-            <ReactFlowProvider>
-                <FlowCanvas />
-            </ReactFlowProvider>
-        </div>
+        <ReactFlowProvider>
+            <Editor />
+        </ReactFlowProvider>
     );
 };
 
