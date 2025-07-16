@@ -6,6 +6,8 @@
 
 
 
+
+
 import { supabaseAdmin } from '../supabaseAdmin.js';
 import { sendTemplatedMessage, sendTextMessage, sendMediaMessage, sendInteractiveMessage } from '../meta/messages.js';
 import { AutomationNode, Contact, Json, MetaConfig, MessageTemplate, Profile } from '../types.js';
@@ -20,7 +22,7 @@ const getValueFromPath = (obj: any, path: string): any => {
     return path.split('.').reduce((o, k) => (o && o[k] !== undefined ? o[k] : undefined), obj);
 };
 
-const resolveVariables = (text: string, context: { contact: Contact | null, triggerData: any }): string => {
+const resolveVariables = (text: string, context: { contact: Contact | null, trigger: any }): string => {
     if (typeof text !== 'string') return text;
     return text.replace(/\{\{([^}]+)\}\}/g, (_match, path) => {
         const value = getValueFromPath(context, path.trim());
@@ -52,7 +54,7 @@ const resolveJsonPlaceholders = (jsonString: string, context: any): string => {
 export interface ActionContext {
     profile: Profile;
     contact: Contact | null;
-    triggerData: Json | null;
+    trigger: Json | null;
     node: AutomationNode;
 }
 
@@ -80,7 +82,7 @@ const getMetaConfig = (profile: Profile): MetaConfig => {
 // Action Handler Implementations
 // ====================================================================================
 
-const sendTemplate: ActionHandler = async ({ profile, contact, node, triggerData }) => {
+const sendTemplate: ActionHandler = async ({ profile, contact, node, trigger }) => {
     if (!contact) {
         throw new Error('Ação "Enviar Template" requer um contato. A automação foi iniciada por um gatilho que não fornece um contato.');
     }
@@ -106,7 +108,7 @@ const sendTemplate: ActionHandler = async ({ profile, contact, node, triggerData
          
          const bodyParameters = uniquePlaceholders.map(p => {
             const rawValue = p === '{{1}}' ? '{{contact.name}}' : (config[p] || '');
-            const resolvedValue = resolveVariables(rawValue, { contact, triggerData });
+            const resolvedValue = resolveVariables(rawValue, { contact, trigger });
             return { type: 'text', text: resolvedValue };
          });
 
@@ -123,57 +125,57 @@ const sendTemplate: ActionHandler = async ({ profile, contact, node, triggerData
     throw new Error('Template configurado não foi encontrado.');
 };
 
-const sendTextMessageAction: ActionHandler = async ({ profile, contact, node, triggerData }) => {
+const sendTextMessageAction: ActionHandler = async ({ profile, contact, node, trigger }) => {
     if (!contact) {
         throw new Error('Ação "Enviar Texto Simples" requer um contato.');
     }
     const config = (node.data.config || {}) as any;
     if (config.message_text) {
         const metaConfig = getMetaConfig(profile);
-        const message = resolveVariables(config.message_text, { contact, triggerData });
+        const message = resolveVariables(config.message_text, { contact, trigger });
         await sendTextMessage(metaConfig, contact.phone, message);
         return { details: `Mensagem de texto enviada para ${contact.name}.` };
     }
     throw new Error('O texto da mensagem não está configurado.');
 };
 
-const sendMediaAction: ActionHandler = async ({ profile, contact, node, triggerData }) => {
+const sendMediaAction: ActionHandler = async ({ profile, contact, node, trigger }) => {
     if (!contact) {
         throw new Error('Ação "Enviar Mídia" requer um contato.');
     }
     const config = (node.data.config || {}) as any;
     if(config.media_url && config.media_type){
         const metaConfig = getMetaConfig(profile);
-        const mediaUrl = resolveVariables(config.media_url, { contact, triggerData });
-        const caption = config.caption ? resolveVariables(config.caption, { contact, triggerData }) : undefined;
+        const mediaUrl = resolveVariables(config.media_url, { contact, trigger });
+        const caption = config.caption ? resolveVariables(config.caption, { contact, trigger }) : undefined;
         await sendMediaMessage(metaConfig, contact.phone, config.media_type, mediaUrl, caption);
         return { details: `Mídia (${config.media_type}) enviada para ${contact.name}.` };
     }
     throw new Error('URL da mídia ou tipo não estão configurados.');
 };
 
-const sendInteractiveMessageAction: ActionHandler = async ({ profile, contact, node, triggerData }) => {
+const sendInteractiveMessageAction: ActionHandler = async ({ profile, contact, node, trigger }) => {
     if (!contact) {
         throw new Error('Ação "Enviar Mensagem Interativa" requer um contato.');
     }
     const config = (node.data.config || {}) as any;
     if(config.message_text && Array.isArray(config.buttons)){
          const metaConfig = getMetaConfig(profile);
-         const message = resolveVariables(config.message_text, { contact, triggerData });
-         const buttons = config.buttons.map((b: any) => ({...b, text: resolveVariables(b.text, { contact, triggerData })}));
+         const message = resolveVariables(config.message_text, { contact, trigger });
+         const buttons = config.buttons.map((b: any) => ({...b, text: resolveVariables(b.text, { contact, trigger })}));
          await sendInteractiveMessage(metaConfig, contact.phone, message, buttons);
          return { details: `Mensagem interativa enviada para ${contact.name}.` };
     }
     throw new Error('Texto da mensagem ou botões não configurados.');
 };
 
-const addTag: ActionHandler = async ({ contact, node, triggerData }) => {
+const addTag: ActionHandler = async ({ contact, node, trigger }) => {
     if (!contact) {
         throw new Error('Ação "Adicionar Tag" requer um contato.');
     }
     const config = (node.data.config || {}) as any;
     if (config.tag) {
-        const tagToAdd = resolveVariables(config.tag, { contact, triggerData });
+        const tagToAdd = resolveVariables(config.tag, { contact, trigger });
         const newTags = Array.from(new Set([...(contact.tags || []), tagToAdd]));
         const updatePayload: TablesUpdate<'contacts'> = { tags: newTags };
         const { data, error } = await supabaseAdmin.from('contacts').update(updatePayload).eq('id', contact.id).select().single();
@@ -183,13 +185,13 @@ const addTag: ActionHandler = async ({ contact, node, triggerData }) => {
      throw new Error('Tag a ser adicionada não está configurada.');
 };
 
-const removeTag: ActionHandler = async ({ contact, node, triggerData }) => {
+const removeTag: ActionHandler = async ({ contact, node, trigger }) => {
     if (!contact) {
         throw new Error('Ação "Remover Tag" requer um contato.');
     }
     const config = (node.data.config || {}) as any;
     if (config.tag) {
-        const tagToRemove = resolveVariables(config.tag, { contact, triggerData });
+        const tagToRemove = resolveVariables(config.tag, { contact, trigger });
         const newTags = (contact.tags || []).filter(t => t !== tagToRemove);
         const updatePayload: TablesUpdate<'contacts'> = { tags: newTags };
         const { data, error } = await supabaseAdmin.from('contacts').update(updatePayload).eq('id', contact.id).select().single();
@@ -199,14 +201,14 @@ const removeTag: ActionHandler = async ({ contact, node, triggerData }) => {
     throw new Error('Tag a ser removida não está configurada.');
 };
 
-const setCustomField: ActionHandler = async ({ contact, node, triggerData }) => {
+const setCustomField: ActionHandler = async ({ contact, node, trigger }) => {
     if (!contact) {
         throw new Error('Ação "Definir Campo Personalizado" requer um contato.');
     }
     const config = (node.data.config || {}) as any;
     if(config.field_name){
-        const fieldName = resolveVariables(config.field_name, { contact, triggerData });
-        const fieldValue = resolveVariables(config.field_value || '', { contact, triggerData });
+        const fieldName = resolveVariables(config.field_name, { contact, trigger });
+        const fieldValue = resolveVariables(config.field_value || '', { contact, trigger });
         const newCustomFields = { ...(contact.custom_fields as object || {}), [fieldName]: fieldValue };
         const updatePayload: TablesUpdate<'contacts'> = { custom_fields: newCustomFields };
         const { data, error } = await supabaseAdmin.from('contacts').update(updatePayload).eq('id', contact.id).select().single();
@@ -216,13 +218,13 @@ const setCustomField: ActionHandler = async ({ contact, node, triggerData }) => 
     throw new Error('Nome do campo personalizado não está configurado.');
 };
 
-const sendWebhook: ActionHandler = async ({ contact, node, triggerData }) => {
+const sendWebhook: ActionHandler = async ({ contact, node, trigger }) => {
     const config = (node.data.config || {}) as any;
     if (!config.url) {
         return { details: "Webhook não executado: URL não configurada." };
     }
 
-    const context = { contact, triggerData };
+    const context = { contact, trigger };
     const resolvedUrl = resolveVariables(config.url, context);
     const method = config.method || 'POST';
     const requestOptions: RequestInit = { method };
@@ -280,17 +282,14 @@ const sendWebhook: ActionHandler = async ({ contact, node, triggerData }) => {
     }
 };
 
-const condition: ActionHandler = async ({ contact, node, triggerData }) => {
+const condition: ActionHandler = async ({ contact, node, trigger }) => {
     const config = (node.data.config || {}) as any;
     const fieldPath = config.field || '';
     const operator = config.operator;
-    const value = resolveVariables(config.value, { contact, triggerData });
+    const value = resolveVariables(config.value, { contact, trigger });
     
-    // Determine the source object based on the prefix of the field path.
-    const sourceObject = fieldPath.startsWith('trigger.') ? triggerData : contact;
-    // Remove prefix for lookup if it exists.
-    const cleanFieldPath = fieldPath.startsWith('trigger.') ? fieldPath.substring(8) : fieldPath;
-    const sourceValue = getValueFromPath(sourceObject, cleanFieldPath);
+    const context = { contact, trigger };
+    const sourceValue = getValueFromPath(context, fieldPath);
 
     let conditionMet = false;
     const lowerCaseValue = String(value).toLowerCase();

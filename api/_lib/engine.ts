@@ -45,6 +45,7 @@ export const executeAutomation = async (
     triggerData: Json | null = null
 ) => {
     let runId: string | null = null;
+    console.log(`[Engine Start] Automation: ${automation.id}, Contact: ${contact?.id}, Trigger: ${startNodeId}`);
     try {
         const { data: profileData, error: profileError } = await supabaseAdmin
             .from('profiles')
@@ -81,7 +82,7 @@ export const executeAutomation = async (
         
         // Initialize the queue with nodes connected to the trigger
         const initialEdges = edges.filter(e => e.source === startNodeId);
-        const nodeQueue = initialEdges.map(edge => ({ nodeId: edge.target }));
+        const nodeQueue = initialEdges.map(edge => ({ nodeId: edge.target, sourceHandle: edge.sourceHandle || null }));
         
         const processedNodes = new Set<string>([startNodeId]); // Start with trigger node already processed
         
@@ -89,17 +90,23 @@ export const executeAutomation = async (
 
         while (nodeQueue.length > 0) {
             const { nodeId } = nodeQueue.shift()!;
+            
+            // This check prevents re-processing in complex flows (loops), though loops are not yet supported.
+            // If a node has multiple inputs, it will run once the first input path reaches it.
             if (processedNodes.has(nodeId)) continue;
 
             const node = nodes.find(n => n.id === nodeId);
-            if (!node) continue;
+            if (!node) {
+                 console.warn(`[Engine Warning] Node with ID ${nodeId} not found in automation ${automation.id}. Skipping.`);
+                 continue;
+            }
             
             processedNodes.add(nodeId);
 
             const context: ActionContext = {
                 profile: profile,
                 contact: currentContactState,
-                triggerData,
+                trigger: triggerData,
                 node,
             };
             
@@ -118,23 +125,34 @@ export const executeAutomation = async (
                 
                 await logNodeExecution(runId, automation.id, nodeId, 'success', result.details || 'Executado com sucesso.');
 
-                const outgoingEdges = edges.filter(e => e.source === nodeId && (!result.nextNodeHandle || e.sourceHandle === result.nextNodeHandle || !e.sourceHandle));
+                const outgoingEdges = edges.filter(e => e.source === nodeId);
                 for (const edge of outgoingEdges) {
-                    nodeQueue.push({ nodeId: edge.target });
+                    // For conditional nodes, only follow the path that matches the result handle ('yes' or 'no')
+                    // For other nodes, follow all outgoing paths (if sourceHandle is null/undefined or matches)
+                     if (result.nextNodeHandle) {
+                        if(edge.sourceHandle === result.nextNodeHandle){
+                           nodeQueue.push({ nodeId: edge.target, sourceHandle: edge.sourceHandle });
+                        }
+                    } else {
+                        nodeQueue.push({ nodeId: edge.target, sourceHandle: edge.sourceHandle });
+                    }
                 }
 
             } catch (err: any) {
                 console.error(`Engine Error on node ${nodeId} in automation ${automation.id}:`, err);
                 await logNodeExecution(runId, automation.id, nodeId, 'failed', err.message || 'Ocorreu um erro desconhecido.');
                 await supabaseAdmin.from('automation_runs').update({ status: 'failed', details: `Error on node ${node.data.label}: ${err.message}` } as TablesUpdate<'automation_runs'>).eq('id', runId);
-                return; // Stop execution on error
+                // Stop execution on this path, but allow other parallel paths to continue if implemented.
+                // For now, we stop the entire flow.
+                throw err;
             }
         }
 
         await supabaseAdmin.from('automation_runs').update({ status: 'success', details: 'Completed successfully.' } as TablesUpdate<'automation_runs'>).eq('id', runId);
+         console.log(`[Engine End] Automation ${automation.id} finished successfully.`);
 
     } catch (e: any) {
-        console.error("Catastrophic engine failure:", e.message);
+        console.error(`[Engine Failure] Automation ${automation.id} failed. Error:`, e.message);
         if (runId) {
              await supabaseAdmin.from('automation_runs').update({ status: 'failed', details: `Catastrophic engine failure: ${e.message}` } as TablesUpdate<'automation_runs'>).eq('id', runId);
         }

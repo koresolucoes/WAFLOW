@@ -1,4 +1,5 @@
 
+
 import { supabaseAdmin } from '../supabaseAdmin.js';
 import { executeAutomation } from '../engine.js';
 import { Automation, Contact, Json } from '../types.js';
@@ -33,9 +34,14 @@ export const handleMetaMessageEvent = async (userId: string, contact: Contact, m
         : (message.type === 'interactive' && message.interactive.type === 'button_reply' ? message.interactive.button_reply.title.toLowerCase() : '');
     const buttonPayload = message.type === 'interactive' && message.interactive.type === 'button_reply' ? message.interactive.button_reply.id : undefined;
 
+    const triggerPayload = { type: 'meta_message', payload: message };
+
     for (const auto of automations) {
         if (!auto.nodes) continue;
-        for (const node of auto.nodes) {
+        
+        const triggerNodes = auto.nodes.filter(n => n.data.nodeType === 'trigger');
+
+        for (const node of triggerNodes) {
             const config = (node.data.config || {}) as any;
             let shouldTrigger = false;
 
@@ -49,7 +55,7 @@ export const handleMetaMessageEvent = async (userId: string, contact: Contact, m
             }
             
             if (shouldTrigger) {
-                dispatchAutomation(auto, contact, node.id, { message });
+                dispatchAutomation(auto, contact, node.id, triggerPayload);
             }
         }
     }
@@ -58,11 +64,12 @@ export const handleMetaMessageEvent = async (userId: string, contact: Contact, m
 // Handles events for newly created contacts
 export const handleNewContactEvent = async (userId: string, contact: Contact) => {
     const automations = await getActiveAutomations(userId);
+    const triggerPayload = { type: 'new_contact', payload: { contact } };
     for (const auto of automations) {
         if (!auto.nodes) continue;
-        const triggerNode = auto.nodes.find(n => n.data.type === 'new_contact');
+        const triggerNode = auto.nodes.find(n => n.data.nodeType === 'trigger' && n.data.type === 'new_contact');
         if (triggerNode) {
-            dispatchAutomation(auto, contact, triggerNode.id, { contact });
+            dispatchAutomation(auto, contact, triggerNode.id, triggerPayload);
         }
     }
 };
@@ -70,11 +77,17 @@ export const handleNewContactEvent = async (userId: string, contact: Contact) =>
 // Handles events when a specific tag is added to a contact
 export const handleTagAddedEvent = async (userId: string, contact: Contact, addedTag: string) => {
     const automations = await getActiveAutomations(userId);
+    const triggerPayload = { type: 'tag_added', payload: { contact, addedTag } };
+
     for (const auto of automations) {
         if (!auto.nodes) continue;
-        const triggerNode = auto.nodes.find(n => n.data.type === 'new_contact_with_tag' && (n.data.config as any)?.tag?.toLowerCase() === addedTag.toLowerCase());
-        if (triggerNode) {
-            dispatchAutomation(auto, contact, triggerNode.id, { contact, addedTag });
+        const triggerNodes = auto.nodes.filter(n => n.data.nodeType === 'trigger' && n.data.type === 'new_contact_with_tag');
+        
+        for (const triggerNode of triggerNodes) {
+            const config = (triggerNode.data.config || {}) as any;
+            if (config?.tag?.toLowerCase() === addedTag.toLowerCase()) {
+                dispatchAutomation(auto, contact, triggerNode.id, triggerPayload);
+            }
         }
     }
 };

@@ -1,5 +1,6 @@
 
 
+
 import React, { useContext, useState, useEffect, useCallback, memo, FC, useMemo, useRef } from 'react';
 import { ReactFlow, ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, type Node, type Edge, type Connection, type NodeProps, useReactFlow, NodeTypes, EdgeLabelRenderer, getBezierPath, type EdgeProps as XyEdgeProps, OnNodesChange, OnEdgesChange, EdgeChange } from '@xyflow/react';
 import { AppContext } from '../../contexts/AppContext';
@@ -102,7 +103,6 @@ const CustomNode: FC<NodeProps<AutomationNode>> = ({ id, data, selected }) => {
     const [logs, setLogs] = useState<AutomationNodeLog[]>([]);
     const [isLoadingLogs, setIsLoadingLogs] = useState(false);
 
-    const isTrigger = data.nodeType === 'trigger';
     const stats = automationStats[id];
 
     const nodeTypeStyle = data.nodeType;
@@ -119,7 +119,7 @@ const CustomNode: FC<NodeProps<AutomationNode>> = ({ id, data, selected }) => {
 
     return (
         <div className={`${borderStyle} relative group`}>
-            {selected && !isTrigger && (
+            {selected && (
                 <button 
                     onClick={(event) => {
                         event.stopPropagation();
@@ -131,7 +131,7 @@ const CustomNode: FC<NodeProps<AutomationNode>> = ({ id, data, selected }) => {
                     &times;
                 </button>
             )}
-            <Handle type="target" position={Position.Left} className="!bg-slate-500" isConnectable={!isTrigger} />
+            <Handle type="target" position={Position.Left} className="!bg-slate-500" isConnectable={data.nodeType !== 'trigger'} />
             <div className={headerStyle}>
                 <AUTOMATION_ICON className="w-4 h-4" />
                 <span>{data.label}</span>
@@ -207,12 +207,14 @@ const ConditionNode: FC<NodeProps<AutomationNode>> = ({ id, data, selected }) =>
 // ====================================================================================
 // Editor Sidebar
 // ====================================================================================
-const Sidebar: React.FC<{ onAddNode: (type: string) => void }> = memo(({ onAddNode }) => {
+const Sidebar: React.FC<{ onAddNode: (type: string) => void; nodes: AutomationNode[] }> = memo(({ onAddNode, nodes }) => {
     const nodeGroups = {
         Triggers: Object.entries(nodeConfigs).filter(([, c]) => c.nodeType === 'trigger'),
         Actions: Object.entries(nodeConfigs).filter(([, c]) => c.nodeType === 'action'),
         Logic: Object.entries(nodeConfigs).filter(([, c]) => c.nodeType === 'logic'),
     };
+
+    const hasTrigger = useMemo(() => nodes.some(n => n.data.nodeType === 'trigger'), [nodes]);
     
     return (
         <Card className="w-80 h-full flex-shrink-0 overflow-y-auto">
@@ -225,8 +227,9 @@ const Sidebar: React.FC<{ onAddNode: (type: string) => void }> = memo(({ onAddNo
                             <button
                                 key={type}
                                 onClick={() => onAddNode(config.data.type as string)}
-                                className="p-3 text-left bg-slate-700/50 hover:bg-slate-700 rounded-lg transition-colors text-white"
-                                disabled={groupName === 'Triggers'} // Apenas 1 gatilho por automação
+                                className="p-3 text-left bg-slate-700/50 hover:bg-slate-700 rounded-lg transition-colors text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                                disabled={groupName === 'Triggers' && hasTrigger}
+                                title={groupName === 'Triggers' && hasTrigger ? 'A automação já possui um gatilho. Exclua o atual para adicionar um novo.' : ''}
                             >
                                 {config.label}
                             </button>
@@ -422,7 +425,7 @@ const Editor: React.FC = () => {
                         <Controls showInteractive={false} />
                     </ReactFlow>
                 </main>
-                <Sidebar onAddNode={addNode} />
+                <Sidebar onAddNode={addNode} nodes={nodes} />
             </div>
              <NodeSettingsModal 
                 node={currentNodeForModal}
