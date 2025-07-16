@@ -1,6 +1,3 @@
-
-
-
 import { Session, User } from '@supabase/supabase-js';
 import { Json, Tables, TablesInsert, TablesUpdate } from './database.types';
 import { MetaTemplateComponent } from '../services/meta/types';
@@ -15,6 +12,7 @@ export type CampaignStatus = 'Sent' | 'Draft' | 'Failed';
 export type MessageStatus = 'sent' | 'delivered' | 'read' | 'failed';
 export type AutomationStatus = 'active' | 'paused';
 export type AutomationRunStatus = 'success' | 'failed';
+export type AutomationLogStatus = 'success' | 'failed';
 
 // Tipos para os nós do editor de automação
 export type NodeType = 'trigger' | 'action' | 'logic';
@@ -42,28 +40,63 @@ export type Segment = Tables<'segments'>;
 export type SegmentRule = Tables<'segment_rules'>;
 export type ReceivedMessage = Tables<'received_messages'>;
 export type AutomationRun = Tables<'automation_runs'>;
+export type AutomationNodeStats = Tables<'automation_node_stats'>;
 
+// --- CUSTOMIZED INTERFACES ---
+// Re-defined as interfaces to avoid complex Omit/& which can cause TS errors.
 
-// --- CUSTOMIZED TYPES ---
-export type MessageTemplate = Omit<Tables<'message_templates'>, 'category' | 'status' | 'components'> & {
+export interface AutomationNodeLog {
+    id: number;
+    run_id: string;
+    node_id: string;
+    status: AutomationLogStatus;
+    details: string | null;
+    created_at: string;
+}
+
+export interface MessageTemplate {
+  id: string;
+  user_id: string;
+  meta_id: string | null;
+  template_name: string;
   category: TemplateCategory;
-  status: TemplateStatus;
   components: MetaTemplateComponent[];
-};
+  status: TemplateStatus;
+  created_at: string;
+}
 
-export type Campaign = Omit<Tables<'campaigns'>, 'status'> & {
+export interface Campaign {
+  id: string;
+  user_id: string;
+  name: string;
+  template_id: string;
   status: CampaignStatus;
-};
+  sent_at: string;
+  recipient_count: number;
+}
 
-export type CampaignMessage = Omit<Tables<'campaign_messages'>, 'status'> & {
+export interface CampaignMessage {
+  id: string;
+  campaign_id: string;
+  contact_id: string;
+  meta_message_id: string | null;
   status: MessageStatus;
-};
+  delivered_at: string | null;
+  read_at: string | null;
+  error_message: string | null;
+  created_at: string;
+}
 
-export type Automation = Omit<Tables<'automations'>, 'status' | 'nodes' | 'edges'> & {
-  status: AutomationStatus;
-  nodes: AutomationNode[];
-  edges: Edge[];
-};
+export interface Automation {
+    id: string;
+    user_id: string;
+    name: string;
+    status: AutomationStatus;
+    nodes: AutomationNode[];
+    edges: Edge[];
+    created_at: string;
+}
+
 
 // --- INSERT TYPES ---
 export type MessageTemplateInsert = Omit<TablesInsert<'message_templates'>, 'category' | 'status' | 'components'> & {

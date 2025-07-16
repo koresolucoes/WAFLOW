@@ -1,6 +1,6 @@
 /**
  * =================================================================================================
- * ZAPFLOW AI - SUPABASE DATABASE SCHEMA (v6 - Simplified Webhook Verification)
+ * ZAPFLOW AI - SUPABASE DATABASE SCHEMA (v7 - Node Stats & Logs)
  * =================================================================================================
  * 
  * INSTRUÇÕES IMPORTANTES:
@@ -9,12 +9,12 @@
  * 3. Navegue até o "SQL Editor".
  * 4. Cole o script e clique em "RUN".
  *
- * Este script irá (re)criar todas as tabelas, relações e políticas de segurança necessárias.
- * Ele foi atualizado para remover o campo `meta_webhook_verify_token` da tabela de perfis,
- * simplificando a configuração do webhook e eliminando confusão. A verificação agora depende
- * exclusivamente de uma variável de ambiente no servidor.
+ * Este script irá (re)criar todas as tabelas e adicionar as NOVAS tabelas para estatísticas
+ * e logs de nós de automação. Também adiciona uma função RPC para incrementar os contadores
+ * de forma atômica, garantindo a precisão dos dados.
+ *
  * É seguro executá-lo múltiplas vezes.
- * CUIDADO: A execução deste script apagará dados existentes. FAÇA UM BACKUP PRIMEIRO.
+ * CUIDADO: A execução deste script apagará dados existentes nas tabelas antigas. FAÇA UM BACKUP PRIMEIRO.
  *
  *
  * --- INÍCIO DO SCRIPT SQL ---
@@ -26,6 +26,8 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto" WITH SCHEMA extensions;
 
 
 -- Remove tabelas existentes na ordem correta para evitar erros de dependência.
+DROP TABLE IF EXISTS public.automation_node_logs CASCADE;
+DROP TABLE IF EXISTS public.automation_node_stats CASCADE;
 DROP TABLE IF EXISTS public.automation_runs CASCADE;
 DROP TABLE IF EXISTS public.automations CASCADE;
 DROP TABLE IF EXISTS public.campaign_messages CASCADE;
@@ -150,7 +152,7 @@ CREATE TABLE public.automations (
 );
 comment on table public.automations is 'Armazena fluxos de trabalho de automação baseados em nós e arestas.';
 
--- Tabela de logs de execução das automações
+-- Tabela de logs de execução das automações (visão geral)
 CREATE TABLE public.automation_runs (
     id uuid NOT NULL PRIMARY KEY DEFAULT uuid_generate_v4(),
     automation_id uuid NOT NULL REFERENCES public.automations(id) ON DELETE CASCADE,
@@ -160,6 +162,31 @@ CREATE TABLE public.automation_runs (
     details text
 );
 comment on table public.automation_runs is 'Registra a execução de cada automação.';
+
+-- Tabela para estatísticas por nó
+CREATE TABLE public.automation_node_stats (
+    automation_id uuid NOT NULL REFERENCES public.automations(id) ON DELETE CASCADE,
+    node_id text NOT NULL,
+    success_count integer NOT NULL DEFAULT 0,
+    error_count integer NOT NULL DEFAULT 0,
+    last_run_at timestamp with time zone,
+    PRIMARY KEY (automation_id, node_id)
+);
+comment on table public.automation_node_stats is 'Armazena contadores de sucesso e erro para cada nó de uma automação.';
+
+-- Tabela para logs detalhados por nó
+CREATE TABLE public.automation_node_logs (
+    id bigserial PRIMARY KEY,
+    run_id uuid NOT NULL REFERENCES public.automation_runs(id) ON DELETE CASCADE,
+    node_id text NOT NULL,
+    status text NOT NULL, -- 'success' or 'failed'
+    details text,
+    created_at timestamp with time zone NOT NULL DEFAULT now()
+);
+CREATE INDEX automation_node_logs_run_id_idx ON public.automation_node_logs(run_id);
+CREATE INDEX automation_node_logs_node_id_idx ON public.automation_node_logs(node_id);
+comment on table public.automation_node_logs is 'Registra um log detalhado para cada execução de nó.';
+
 
 -- Habilita a Segurança a Nível de Linha (RLS) para todas as tabelas
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
@@ -172,6 +199,8 @@ ALTER TABLE public.campaign_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.received_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.automations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.automation_runs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.automation_node_stats ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.automation_node_logs ENABLE ROW LEVEL SECURITY;
 
 -- Define as políticas de RLS
 CREATE POLICY "Users can manage their own profile." ON public.profiles FOR ALL USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
@@ -184,6 +213,9 @@ CREATE POLICY "Users can manage messages from their own campaigns." ON public.ca
 CREATE POLICY "Users can manage their own received messages." ON public.received_messages FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users can manage their own automations." ON public.automations FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users can view their own automation runs." ON public.automation_runs FOR ALL USING (auth.uid() = (SELECT user_id FROM public.automations WHERE id = automation_id));
+CREATE POLICY "Users can view stats for their own automations." ON public.automation_node_stats FOR ALL USING (auth.uid() = (SELECT user_id FROM public.automations WHERE id = automation_id));
+CREATE POLICY "Users can view logs for their own automations." ON public.automation_node_logs FOR ALL USING (auth.uid() = (SELECT a.user_id FROM public.automation_runs r JOIN public.automations a ON r.automation_id = a.id WHERE r.id = run_id));
+
 
 -- Função para criar um perfil automaticamente quando um novo usuário se cadastra
 CREATE OR REPLACE FUNCTION public.handle_new_user()
@@ -205,6 +237,26 @@ CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
 
+-- Função RPC para incrementar contadores de estatísticas de forma atômica
+CREATE OR REPLACE FUNCTION public.increment_node_stat(p_automation_id uuid, p_node_id text, p_status text)
+RETURNS void AS $$
+BEGIN
+    INSERT INTO public.automation_node_stats (automation_id, node_id, success_count, error_count, last_run_at)
+    VALUES (p_automation_id, p_node_id, 0, 0, now())
+    ON CONFLICT (automation_id, node_id) DO NOTHING;
+
+    IF p_status = 'success' THEN
+        UPDATE public.automation_node_stats
+        SET success_count = success_count + 1, last_run_at = now()
+        WHERE automation_id = p_automation_id AND node_id = p_node_id;
+    ELSE
+        UPDATE public.automation_node_stats
+        SET error_count = error_count + 1, last_run_at = now()
+        WHERE automation_id = p_automation_id AND node_id = p_node_id;
+    END IF;
+END;
+$$ LANGUAGE plpgsql;
+
  *
  * --- FIM DO SCRIPT SQL ---
  *
@@ -215,6 +267,73 @@ export type Json = string | number | boolean | null | { [key: string]: any } | a
 export type Database = {
   public: {
     Tables: {
+      automation_node_logs: {
+        Row: {
+          created_at: string
+          details: string | null
+          id: number
+          node_id: string
+          run_id: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          details?: string | null
+          id?: number
+          node_id: string
+          run_id: string
+          status: string
+        }
+        Update: {
+          created_at?: string
+          details?: string | null
+          id?: number
+          node_id?: string
+          run_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automation_node_logs_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "automation_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      automation_node_stats: {
+        Row: {
+          automation_id: string
+          error_count: number
+          last_run_at: string | null
+          node_id: string
+          success_count: number
+        }
+        Insert: {
+          automation_id: string
+          error_count?: number
+          last_run_at?: string | null
+          node_id: string
+          success_count?: number
+        }
+        Update: {
+          automation_id?: string
+          error_count?: number
+          last_run_at?: string | null
+          node_id?: string
+          success_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automation_node_stats_automation_id_fkey"
+            columns: ["automation_id"]
+            isOneToOne: false
+            referencedRelation: "automations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       automation_runs: {
         Row: {
           automation_id: string
@@ -634,6 +753,14 @@ export type Database = {
       handle_new_user: {
         Args: Record<PropertyKey, never>
         Returns: unknown
+      }
+      increment_node_stat: {
+        Args: {
+          p_automation_id: string
+          p_node_id: string
+          p_status: string
+        }
+        Returns: undefined
       }
     }
     Enums: {

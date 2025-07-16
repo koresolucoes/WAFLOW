@@ -7,7 +7,38 @@
 import { supabaseAdmin } from './supabaseAdmin.js';
 import { Automation, Contact, Json, Profile } from './types.js';
 import { TablesInsert, TablesUpdate } from './database.types.js';
-import { actionHandlers, ActionContext } from './automation/actionHandlers.js';
+import { actionHandlers, ActionContext, ActionResult } from './automation/actionHandlers.js';
+
+
+async function logNodeExecution(
+    runId: string,
+    automationId: string,
+    nodeId: string,
+    status: 'success' | 'failed',
+    details: string
+) {
+    // Upsert stats using RPC for atomicity
+    const { error: rpcError } = await supabaseAdmin.rpc('increment_node_stat', {
+        p_automation_id: automationId,
+        p_node_id: nodeId,
+        p_status: status,
+    });
+    if (rpcError) {
+        console.error(`Engine Log Error (RPC): Failed to increment stat for node ${nodeId}`, rpcError);
+    }
+    
+    // Insert detailed log
+    const { error: logError } = await supabaseAdmin.from('automation_node_logs').insert({
+        run_id: runId,
+        node_id: nodeId,
+        status,
+        details
+    });
+    if (logError) {
+        console.error(`Engine Log Error (Insert): Failed to insert log for node ${nodeId}`, logError);
+    }
+}
+
 
 // Main function to execute an automation flow
 export const executeAutomation = async (
@@ -65,26 +96,26 @@ export const executeAutomation = async (
         
         try {
             const handler = actionHandlers[node.data.type];
-            let nextNodeHandle: string | undefined = undefined;
+            let result: ActionResult = {};
 
             if (handler) {
-                const result = await handler(context);
+                result = await handler(context);
                 if(result.updatedContact) {
                     currentContactState = result.updatedContact;
                 }
-                if(result.nextNodeHandle) {
-                    nextNodeHandle = result.nextNodeHandle;
-                }
             }
+            
+            await logNodeExecution(run.id, automation.id, nodeId, 'success', result.details || 'Executado com sucesso.');
 
             // Find next node(s) in the flow
-            const outgoingEdges = edges.filter(e => e.source === nodeId && (!nextNodeHandle || e.sourceHandle === nextNodeHandle || !e.sourceHandle));
+            const outgoingEdges = edges.filter(e => e.source === nodeId && (!result.nextNodeHandle || e.sourceHandle === result.nextNodeHandle || !e.sourceHandle));
             for (const edge of outgoingEdges) {
                 nodeQueue.push({ nodeId: edge.target });
             }
 
         } catch (err: any) {
             console.error(`Engine Error on node ${nodeId} in automation ${automation.id}:`, err);
+            await logNodeExecution(run.id, automation.id, nodeId, 'failed', err.message || 'Ocorreu um erro desconhecido.');
             await supabaseAdmin.from('automation_runs').update({ status: 'failed', details: `Error on node ${node.data.label}: ${err.message}` }).eq('id', run.id);
             return; // Stop execution on error
         }

@@ -3,6 +3,8 @@
 
 
 
+
+
 import { supabaseAdmin } from '../supabaseAdmin.js';
 import { sendTemplatedMessage, sendTextMessage, sendMediaMessage, sendInteractiveMessage } from '../meta/messages.js';
 import { AutomationNode, Contact, Json, MetaConfig, MessageTemplate, Profile } from '../types.js';
@@ -53,9 +55,10 @@ export interface ActionContext {
     node: AutomationNode;
 }
 
-interface ActionResult {
+export interface ActionResult {
     updatedContact?: Contact;
     nextNodeHandle?: 'yes' | 'no' | 'a' | 'b';
+    details?: string;
 }
 
 type ActionHandler = (context: ActionContext) => Promise<ActionResult>;
@@ -82,7 +85,7 @@ const sendTemplate: ActionHandler = async ({ profile, contact, node, triggerData
     }
     const config = (node.data.config || {}) as any;
     const { data: template, error: templateError } = await supabaseAdmin.from('message_templates').select('*').eq('id', config.template_id).single();
-    if (templateError) throw templateError;
+    if (templateError) throw new Error(`Erro ao buscar template: ${templateError.message}`);
     if (template) {
          const metaConfig = getMetaConfig(profile);
          const templateTyped = template as MessageTemplate;
@@ -113,26 +116,28 @@ const sendTemplate: ActionHandler = async ({ profile, contact, node, triggerData
             templateTyped.template_name, 
             components
         );
+        return { details: `Template '${templateTyped.template_name}' enviado para ${contact.name}.` };
     }
-    return {};
+    throw new Error('Template configurado não foi encontrado.');
 };
 
 const sendTextMessageAction: ActionHandler = async ({ profile, contact, node, triggerData }) => {
     if (!contact) {
-        throw new Error('Ação "Enviar Texto Simples" requer um contato. A automação foi iniciada por um gatilho que não fornece um contato.');
+        throw new Error('Ação "Enviar Texto Simples" requer um contato.');
     }
     const config = (node.data.config || {}) as any;
     if (config.message_text) {
         const metaConfig = getMetaConfig(profile);
         const message = resolveVariables(config.message_text, { contact, triggerData });
         await sendTextMessage(metaConfig, contact.phone, message);
+        return { details: `Mensagem de texto enviada para ${contact.name}.` };
     }
-    return {};
+    throw new Error('O texto da mensagem não está configurado.');
 };
 
 const sendMediaAction: ActionHandler = async ({ profile, contact, node, triggerData }) => {
     if (!contact) {
-        throw new Error('Ação "Enviar Mídia" requer um contato. A automação foi iniciada por um gatilho que não fornece um contato.');
+        throw new Error('Ação "Enviar Mídia" requer um contato.');
     }
     const config = (node.data.config || {}) as any;
     if(config.media_url && config.media_type){
@@ -140,13 +145,14 @@ const sendMediaAction: ActionHandler = async ({ profile, contact, node, triggerD
         const mediaUrl = resolveVariables(config.media_url, { contact, triggerData });
         const caption = config.caption ? resolveVariables(config.caption, { contact, triggerData }) : undefined;
         await sendMediaMessage(metaConfig, contact.phone, config.media_type, mediaUrl, caption);
+        return { details: `Mídia (${config.media_type}) enviada para ${contact.name}.` };
     }
-    return {};
+    throw new Error('URL da mídia ou tipo não estão configurados.');
 };
 
 const sendInteractiveMessageAction: ActionHandler = async ({ profile, contact, node, triggerData }) => {
     if (!contact) {
-        throw new Error('Ação "Enviar Mensagem Interativa" requer um contato. A automação foi iniciada por um gatilho que não fornece um contato.');
+        throw new Error('Ação "Enviar Mensagem Interativa" requer um contato.');
     }
     const config = (node.data.config || {}) as any;
     if(config.message_text && Array.isArray(config.buttons)){
@@ -154,13 +160,14 @@ const sendInteractiveMessageAction: ActionHandler = async ({ profile, contact, n
          const message = resolveVariables(config.message_text, { contact, triggerData });
          const buttons = config.buttons.map((b: any) => ({...b, text: resolveVariables(b.text, { contact, triggerData })}));
          await sendInteractiveMessage(metaConfig, contact.phone, message, buttons);
+         return { details: `Mensagem interativa enviada para ${contact.name}.` };
     }
-    return {};
+    throw new Error('Texto da mensagem ou botões não configurados.');
 };
 
 const addTag: ActionHandler = async ({ contact, node, triggerData }) => {
     if (!contact) {
-        throw new Error('Ação "Adicionar Tag" requer um contato. A automação foi iniciada por um gatilho que não fornece um contato.');
+        throw new Error('Ação "Adicionar Tag" requer um contato.');
     }
     const config = (node.data.config || {}) as any;
     if (config.tag) {
@@ -169,14 +176,14 @@ const addTag: ActionHandler = async ({ contact, node, triggerData }) => {
         const updatePayload: TablesUpdate<'contacts'> = { tags: newTags };
         const { data, error } = await supabaseAdmin.from('contacts').update(updatePayload).eq('id', contact.id).select().single();
         if (error) throw error;
-        if (data) return { updatedContact: data as Contact };
+        if (data) return { updatedContact: data as Contact, details: `Tag '${tagToAdd}' adicionada ao contato.` };
     }
-    return {};
+     throw new Error('Tag a ser adicionada não está configurada.');
 };
 
 const removeTag: ActionHandler = async ({ contact, node, triggerData }) => {
     if (!contact) {
-        throw new Error('Ação "Remover Tag" requer um contato. A automação foi iniciada por um gatilho que não fornece um contato.');
+        throw new Error('Ação "Remover Tag" requer um contato.');
     }
     const config = (node.data.config || {}) as any;
     if (config.tag) {
@@ -185,14 +192,14 @@ const removeTag: ActionHandler = async ({ contact, node, triggerData }) => {
         const updatePayload: TablesUpdate<'contacts'> = { tags: newTags };
         const { data, error } = await supabaseAdmin.from('contacts').update(updatePayload).eq('id', contact.id).select().single();
         if (error) throw error;
-        if (data) return { updatedContact: data as Contact };
+        if (data) return { updatedContact: data as Contact, details: `Tag '${tagToRemove}' removida do contato.` };
     }
-    return {};
+    throw new Error('Tag a ser removida não está configurada.');
 };
 
 const setCustomField: ActionHandler = async ({ contact, node, triggerData }) => {
     if (!contact) {
-        throw new Error('Ação "Definir Campo Personalizado" requer um contato. A automação foi iniciada por um gatilho que não fornece um contato.');
+        throw new Error('Ação "Definir Campo Personalizado" requer um contato.');
     }
     const config = (node.data.config || {}) as any;
     if(config.field_name){
@@ -202,14 +209,16 @@ const setCustomField: ActionHandler = async ({ contact, node, triggerData }) => 
         const updatePayload: TablesUpdate<'contacts'> = { custom_fields: newCustomFields };
         const { data, error } = await supabaseAdmin.from('contacts').update(updatePayload).eq('id', contact.id).select().single();
         if (error) throw error;
-        if (data) return { updatedContact: data as Contact };
+        if (data) return { updatedContact: data as Contact, details: `Campo '${fieldName}' atualizado para '${fieldValue}'.` };
     }
-    return {};
+    throw new Error('Nome do campo personalizado não está configurado.');
 };
 
 const sendWebhook: ActionHandler = async ({ contact, node, triggerData }) => {
     const config = (node.data.config || {}) as any;
-    if (!config.url) return {}; // No URL, do nothing
+    if (!config.url) {
+        return { details: "Webhook não executado: URL não configurada." };
+    }
 
     const context = { contact, triggerData };
     const resolvedUrl = resolveVariables(config.url, context);
@@ -253,15 +262,20 @@ const sendWebhook: ActionHandler = async ({ contact, node, triggerData }) => {
     }
 
     requestOptions.headers = headers;
-
+    
+    let responseStatus = 0;
     try {
-        await fetch(resolvedUrl, requestOptions);
+        const response = await fetch(resolvedUrl, requestOptions);
+        responseStatus = response.status;
+        if (!response.ok) {
+            throw new Error(`Request failed with status ${response.status}`);
+        }
+         return { details: `Webhook enviado para ${resolvedUrl}. Resposta: ${response.status}` };
     } catch (e: any) {
         console.error(`Webhook execution failed for URL: ${resolvedUrl}`, e);
-        // Do not throw to avoid stopping the entire automation run for a single failed webhook
+        // Do not throw, but log as an error in the automation details
+        throw new Error(`Falha ao enviar webhook para ${resolvedUrl}. Status: ${responseStatus}. Erro: ${e.message}`);
     }
-    
-    return {};
 };
 
 const condition: ActionHandler = async ({ contact, node, triggerData }) => {
@@ -292,11 +306,13 @@ const condition: ActionHandler = async ({ contact, node, triggerData }) => {
         conditionMet = lowerCaseSourceValue === lowerCaseValue;
     }
     
-    return { nextNodeHandle: conditionMet ? 'yes' : 'no' };
+    const details = `Condição avaliada: '${sourceValue}' ${operator} '${value}'. Resultado: ${conditionMet ? 'Sim' : 'Não'}`;
+    return { nextNodeHandle: conditionMet ? 'yes' : 'no', details };
 };
 
 const splitPath: ActionHandler = async () => {
-    return { nextNodeHandle: Math.random() < 0.5 ? 'a' : 'b' };
+    const path = Math.random() < 0.5 ? 'a' : 'b';
+    return { nextNodeHandle: path, details: `Caminho dividido aleatoriamente para a Via ${path.toUpperCase()}.` };
 };
 
 
