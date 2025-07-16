@@ -1,4 +1,5 @@
 
+
 import React, { useContext, useState, useEffect, useCallback, memo, FC, useMemo, useRef } from 'react';
 import { ReactFlow, ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, type Node, type Edge, type Connection, type NodeProps, useReactFlow, NodeTypes, EdgeLabelRenderer, getBezierPath, type EdgeProps as XyEdgeProps, OnNodesChange, OnEdgesChange, EdgeChange } from '@xyflow/react';
 import { AppContext } from '../../contexts/AppContext';
@@ -320,7 +321,7 @@ const Editor: React.FC = () => {
     const [selectedNode, setSelectedNode] = useState<AutomationNode | null>(null);
 
     const { screenToFlowPosition } = useReactFlow();
-    const saveTimeoutRef = useRef<NodeJS.Timeout>();
+    const saveTimeoutRef = useRef<number>();
     const hasFetchedStats = useRef(false);
     const isMounted = useRef(false);
 
@@ -373,7 +374,7 @@ const Editor: React.FC = () => {
         if (saveTimeoutRef.current) {
             clearTimeout(saveTimeoutRef.current);
         }
-        saveTimeoutRef.current = setTimeout(async () => {
+        saveTimeoutRef.current = window.setTimeout(async () => {
             await updateAutomation(dataToSave);
             setIsSaving(false);
         }, 1000);
@@ -478,7 +479,7 @@ const Editor: React.FC = () => {
                     <span className={`text-sm ${isSaving ? 'text-yellow-400' : 'text-green-400'}`}>
                         {isSaving ? 'Salvando...' : 'Salvo'}
                     </span>
-                    <Button variant="secondary" onClick={() => setCurrentPage('automations', {})}>Voltar</Button>
+                    <Button variant="secondary" onClick={() => setCurrentPage('automations')}>Voltar</Button>
                 </div>
             </header>
             <div className="flex-grow flex">

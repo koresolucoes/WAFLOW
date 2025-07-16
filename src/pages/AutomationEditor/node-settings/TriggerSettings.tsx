@@ -120,11 +120,16 @@ const TriggerSettings: React.FC<NodeSettingsProps> = ({ node, onConfigChange, pr
 
             <div className="mt-4 pt-4 border-t border-slate-700">
                 {!hasCapturedData ? (
-                     <div className="text-center p-4 bg-slate-800/50 rounded-lg">
-                        <Button variant="secondary" onClick={handleStartListening} isLoading={isListening} size="lg">
+                     <div className="text-center p-4">
+                        <Button variant="secondary" onClick={handleStartListening} isLoading={isListening} disabled={isListening}>
                             {isListening ? 'Aguardando Requisição...' : 'Iniciar Escuta'}
                         </Button>
-                        <p className="text-xs text-slate-400 mt-2">Clique para aguardar uma requisição de teste e configurar o mapeamento.</p>
+                        <p className="text-xs text-slate-400 mt-2">
+                           {isListening
+                                ? "Envie uma requisição POST para a URL acima para capturar os dados."
+                                : "Clique para aguardar uma requisição de teste e configurar o mapeamento."
+                            }
+                        </p>
                      </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

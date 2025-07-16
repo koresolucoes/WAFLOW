@@ -1,9 +1,9 @@
 
 import React, { useMemo } from 'react';
 import { AutomationNode, MessageTemplate, Profile } from '../../types';
-import Button from '../../components/common/Button';
-import { getContextVariables } from './node-settings/common';
-import { nodeConfigs } from '../../lib/automation/nodeConfigs';
+import Button from '../../../components/common/Button';
+import { getContextVariables } from './common';
+import { nodeConfigs } from '../../../lib/automation/nodeConfigs';
 
 
 interface NodeSettingsModalProps {
@@ -48,9 +48,14 @@ const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
         onUpdateNodes(updatedNodes, options);
     };
     
+    const hasCapturedWebhookData = node.data.type === 'webhook_received' && !!(node.data.config as any)?.last_captured_data;
+    const showVariablesPanel = ['action', 'logic'].includes(node.data.nodeType) || hasCapturedWebhookData;
+
+    const gridColsClass = showVariablesPanel ? 'md:grid-cols-2' : 'md:grid-cols-1';
+    const modalWidthClass = showVariablesPanel ? 'max-w-4xl' : 'max-w-lg';
+
     const renderVariablesPanel = () => {
-       const showPanel = ['action', 'logic'].includes(node.data.nodeType) || (node.data.nodeType === 'trigger' && node.data.type === 'webhook_received' && (node.data.config as any)?.last_captured_data);
-       if (!showPanel) return null;
+       if (!showVariablesPanel) return null;
 
        return (
            <div className="max-h-[70vh] overflow-y-auto">
@@ -60,7 +65,7 @@ const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
                         Clique em um campo de texto e use o seletor para inserir uma variável.
                     </p>
                 )}
-                 {node.data.nodeType === 'trigger' && (node.data.type === 'webhook_received') && (
+                 {(node.data.type === 'webhook_received' && hasCapturedWebhookData) && (
                      <p className="text-sm text-slate-400 mb-3">
                         Estas são as variáveis que foram capturadas e que podem ser usadas em outros nós.
                     </p>
@@ -86,7 +91,6 @@ const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
        )
     }
 
-    const gridColsClass = ['action', 'logic'].includes(node.data.nodeType) || (node.data.nodeType === 'trigger' && node.data.type === 'webhook_received' && (node.data.config as any)?.last_captured_data) ? 'md:grid-cols-2' : 'md:grid-cols-1';
 
     return (
         <div 
@@ -96,7 +100,7 @@ const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
             <div className="absolute inset-0 bg-black/70 backdrop-blur-sm"></div>
             
             <div 
-                className={`bg-slate-800 rounded-2xl shadow-2xl border border-slate-700 w-full max-w-4xl max-h-[90vh] flex flex-col transition-all duration-300 ${isOpen ? 'scale-100 opacity-100' : 'scale-95 opacity-0'}`}
+                className={`bg-slate-800 rounded-2xl shadow-2xl border border-slate-700 w-full ${modalWidthClass} max-h-[90vh] flex flex-col transition-all duration-300 ${isOpen ? 'scale-100 opacity-100' : 'scale-95 opacity-0'}`}
                 onClick={(e) => e.stopPropagation()}
             >
                 <header className="flex-shrink-0 flex items-center justify-between p-4 border-b border-slate-700">
@@ -119,9 +123,11 @@ const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
                         />
                     </div>
                     
-                    <div className="space-y-4">
-                       {renderVariablesPanel()}
-                    </div>
+                    {showVariablesPanel && (
+                        <div className="space-y-4">
+                            {renderVariablesPanel()}
+                        </div>
+                    )}
                 </main>
 
                 <footer className="flex-shrink-0 p-4 border-t border-slate-700 flex justify-end">
