@@ -95,7 +95,7 @@ const nodeStyles = {
     description: "text-xs text-slate-400"
 };
 
-const CustomNode: FC<NodeProps<AutomationNode>> = ({ id, data, selected }) => {
+const CustomNode = memo(({ id, data, selected }: NodeProps<AutomationNode>) => {
     const { setNodes, setEdges } = useReactFlow();
     const { automationStats, pageParams, fetchNodeLogs } = useContext(AppContext);
     const [isLogsModalOpen, setIsLogsModalOpen] = useState(false);
@@ -146,10 +146,10 @@ const CustomNode: FC<NodeProps<AutomationNode>> = ({ id, data, selected }) => {
             <NodeLogsModal isOpen={isLogsModalOpen} onClose={() => setIsLogsModalOpen(false)} nodeLabel={data.label} logs={logs} isLoading={isLoadingLogs} />
         </div>
     );
-};
+});
 
 
-const ConditionNode: FC<NodeProps<AutomationNode>> = ({ id, data, selected }) => {
+const ConditionNode = memo(({ id, data, selected }: NodeProps<AutomationNode>) => {
     const { setNodes, setEdges } = useReactFlow();
     const { automationStats, pageParams, fetchNodeLogs } = useContext(AppContext);
     const [isLogsModalOpen, setIsLogsModalOpen] = useState(false);
@@ -207,9 +207,9 @@ const ConditionNode: FC<NodeProps<AutomationNode>> = ({ id, data, selected }) =>
              <NodeLogsModal isOpen={isLogsModalOpen} onClose={() => setIsLogsModalOpen(false)} nodeLabel={data.label} logs={logs} isLoading={isLoadingLogs} />
         </div>
     );
-};
+});
 
-const SplitPathNode: FC<NodeProps<AutomationNode>> = ({ id, data, selected }) => {
+const SplitPathNode = memo(({ id, data, selected }: NodeProps<AutomationNode>) => {
     const { setNodes, setEdges } = useReactFlow();
     const { automationStats, pageParams, fetchNodeLogs } = useContext(AppContext);
     const [isLogsModalOpen, setIsLogsModalOpen] = useState(false);
@@ -267,12 +267,12 @@ const SplitPathNode: FC<NodeProps<AutomationNode>> = ({ id, data, selected }) =>
              <NodeLogsModal isOpen={isLogsModalOpen} onClose={() => setIsLogsModalOpen(false)} nodeLabel={data.label} logs={logs} isLoading={isLoadingLogs} />
         </div>
     );
-};
+});
 
 // ====================================================================================
 // Editor Sidebar
 // ====================================================================================
-const Sidebar: React.FC<{ onAddNode: (type: string) => void; nodes: AutomationNode[] }> = memo(({ onAddNode, nodes }) => {
+const Sidebar = memo(({ onAddNode, nodes }: { onAddNode: (type: string) => void; nodes: AutomationNode[] }) => {
     const nodeGroups = {
         Triggers: Object.entries(nodeConfigs).filter(([, c]) => c.nodeType === 'trigger'),
         Actions: Object.entries(nodeConfigs).filter(([, c]) => c.nodeType === 'action'),

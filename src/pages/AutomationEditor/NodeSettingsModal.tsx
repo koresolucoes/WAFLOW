@@ -1,9 +1,9 @@
 
 import React, { useMemo } from 'react';
 import { AutomationNode, MessageTemplate, Profile } from '../../types';
-import Button from '../../../components/common/Button';
-import { getContextVariables } from './common';
-import { nodeConfigs } from '../../../lib/automation/nodeConfigs';
+import Button from '../../components/common/Button';
+import { getContextVariables } from './node-settings/common';
+import { nodeConfigs } from '../../lib/automation/nodeConfigs';
 
 
 interface NodeSettingsModalProps {
