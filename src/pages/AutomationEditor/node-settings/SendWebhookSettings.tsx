@@ -82,7 +82,7 @@ const SendWebhookSettings: React.FC<NodeSettingsProps> = ({ node, onConfigChange
                         className={`${baseInputClass} font-mono`} 
                         variables={availableVariables} 
                     />
-                    <p className="text-xs text-slate-400 mt-1">Dica: Insira placeholders (ex: `{"{{contact.name}}"`}) sem aspas ao redor.</p>
+                    <p className="text-xs text-slate-400 mt-1">{'Dica: Insira placeholders (ex: `{"{{contact.name}}"`}) sem aspas ao redor.'}</p>
                 </div>
             )}
             <div className="mt-4 pt-4 border-t border-slate-700 space-y-3">
