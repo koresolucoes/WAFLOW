@@ -2,6 +2,8 @@
 
 
 
+
+
 import { supabaseAdmin } from './supabaseAdmin.js';
 import { Automation, Contact, Json, Profile } from './types.js';
 import { TablesInsert, TablesUpdate } from './database.types.js';
@@ -10,7 +12,7 @@ import { actionHandlers, ActionContext } from './automation/actionHandlers.js';
 // Main function to execute an automation flow
 export const executeAutomation = async (
     automation: Automation,
-    contact: Contact,
+    contact: Contact | null,
     startNodeId: string,
     triggerData: Json | null = null
 ) => {
@@ -27,7 +29,7 @@ export const executeAutomation = async (
 
     const runPayload: TablesInsert<'automation_runs'> = {
         automation_id: automation.id,
-        contact_id: contact.id,
+        contact_id: contact?.id || null,
         status: 'running',
         details: `Started from node ${startNodeId}`
     };
@@ -39,7 +41,7 @@ export const executeAutomation = async (
     }
     const run = runResult;
 
-    let currentContactState = { ...contact };
+    let currentContactState: Contact | null = contact ? { ...contact } : null;
     const nodes = Array.isArray(automation.nodes) ? automation.nodes : [];
     const edges = Array.isArray(automation.edges) ? automation.edges : [];
     const nodeQueue: { nodeId: string }[] = [{ nodeId: startNodeId }];

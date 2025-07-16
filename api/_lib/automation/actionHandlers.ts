@@ -1,6 +1,8 @@
 
 
 
+
+
 import { supabaseAdmin } from '../supabaseAdmin.js';
 import { sendTemplatedMessage, sendTextMessage, sendMediaMessage, sendInteractiveMessage } from '../meta/messages.js';
 import { AutomationNode, Contact, Json, MetaConfig, MessageTemplate, Profile } from '../types.js';
@@ -15,7 +17,7 @@ const getValueFromPath = (obj: any, path: string): any => {
     return path.split('.').reduce((o, k) => (o && o[k] !== undefined ? o[k] : undefined), obj);
 };
 
-const resolveVariables = (text: string, context: { contact: Contact, triggerData: any }): string => {
+const resolveVariables = (text: string, context: { contact: Contact | null, triggerData: any }): string => {
     if (typeof text !== 'string') return text;
     return text.replace(/\{\{([^}]+)\}\}/g, (_match, path) => {
         const value = getValueFromPath(context, path.trim());
@@ -46,7 +48,7 @@ const resolveJsonPlaceholders = (jsonString: string, context: any): string => {
 
 export interface ActionContext {
     profile: Profile;
-    contact: Contact;
+    contact: Contact | null;
     triggerData: Json | null;
     node: AutomationNode;
 }
@@ -75,6 +77,9 @@ const getMetaConfig = (profile: Profile): MetaConfig => {
 // ====================================================================================
 
 const sendTemplate: ActionHandler = async ({ profile, contact, node, triggerData }) => {
+    if (!contact) {
+        throw new Error('Ação "Enviar Template" requer um contato. A automação foi iniciada por um gatilho que não fornece um contato.');
+    }
     const config = (node.data.config || {}) as any;
     const { data: template, error: templateError } = await supabaseAdmin.from('message_templates').select('*').eq('id', config.template_id).single();
     if (templateError) throw templateError;
@@ -113,6 +118,9 @@ const sendTemplate: ActionHandler = async ({ profile, contact, node, triggerData
 };
 
 const sendTextMessageAction: ActionHandler = async ({ profile, contact, node, triggerData }) => {
+    if (!contact) {
+        throw new Error('Ação "Enviar Texto Simples" requer um contato. A automação foi iniciada por um gatilho que não fornece um contato.');
+    }
     const config = (node.data.config || {}) as any;
     if (config.message_text) {
         const metaConfig = getMetaConfig(profile);
@@ -123,6 +131,9 @@ const sendTextMessageAction: ActionHandler = async ({ profile, contact, node, tr
 };
 
 const sendMediaAction: ActionHandler = async ({ profile, contact, node, triggerData }) => {
+    if (!contact) {
+        throw new Error('Ação "Enviar Mídia" requer um contato. A automação foi iniciada por um gatilho que não fornece um contato.');
+    }
     const config = (node.data.config || {}) as any;
     if(config.media_url && config.media_type){
         const metaConfig = getMetaConfig(profile);
@@ -134,6 +145,9 @@ const sendMediaAction: ActionHandler = async ({ profile, contact, node, triggerD
 };
 
 const sendInteractiveMessageAction: ActionHandler = async ({ profile, contact, node, triggerData }) => {
+    if (!contact) {
+        throw new Error('Ação "Enviar Mensagem Interativa" requer um contato. A automação foi iniciada por um gatilho que não fornece um contato.');
+    }
     const config = (node.data.config || {}) as any;
     if(config.message_text && Array.isArray(config.buttons)){
          const metaConfig = getMetaConfig(profile);
@@ -145,6 +159,9 @@ const sendInteractiveMessageAction: ActionHandler = async ({ profile, contact, n
 };
 
 const addTag: ActionHandler = async ({ contact, node, triggerData }) => {
+    if (!contact) {
+        throw new Error('Ação "Adicionar Tag" requer um contato. A automação foi iniciada por um gatilho que não fornece um contato.');
+    }
     const config = (node.data.config || {}) as any;
     if (config.tag) {
         const tagToAdd = resolveVariables(config.tag, { contact, triggerData });
@@ -158,6 +175,9 @@ const addTag: ActionHandler = async ({ contact, node, triggerData }) => {
 };
 
 const removeTag: ActionHandler = async ({ contact, node, triggerData }) => {
+    if (!contact) {
+        throw new Error('Ação "Remover Tag" requer um contato. A automação foi iniciada por um gatilho que não fornece um contato.');
+    }
     const config = (node.data.config || {}) as any;
     if (config.tag) {
         const tagToRemove = resolveVariables(config.tag, { contact, triggerData });
@@ -171,6 +191,9 @@ const removeTag: ActionHandler = async ({ contact, node, triggerData }) => {
 };
 
 const setCustomField: ActionHandler = async ({ contact, node, triggerData }) => {
+    if (!contact) {
+        throw new Error('Ação "Definir Campo Personalizado" requer um contato. A automação foi iniciada por um gatilho que não fornece um contato.');
+    }
     const config = (node.data.config || {}) as any;
     if(config.field_name){
         const fieldName = resolveVariables(config.field_name, { contact, triggerData });

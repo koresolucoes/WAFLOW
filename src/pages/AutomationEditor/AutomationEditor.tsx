@@ -6,6 +6,8 @@
 
 
 
+
+
 import React, { useContext, useState, useEffect, useCallback, memo, FC } from 'react';
 import { ReactFlow, ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, type Node, type Edge, type NodeProps, useReactFlow, NodeTypes, NodeChange, applyNodeChanges, EdgeLabelRenderer, getBezierPath, type EdgeProps as XyEdgeProps } from '@xyflow/react';
 import { AppContext } from '../../contexts/AppContext';
@@ -99,7 +101,7 @@ const nodeStyles = {
     description: "text-xs text-slate-400"
 };
 
-const CustomNode: FC<NodeProps<NodeData>> = ({ id, data, selected }) => {
+const CustomNode: FC<NodeProps<AutomationNode>> = ({ id, data, selected }) => {
     const { deleteElements } = useReactFlow();
     const isTrigger = data.nodeType === 'trigger';
 
@@ -136,7 +138,7 @@ const CustomNode: FC<NodeProps<NodeData>> = ({ id, data, selected }) => {
     );
 };
 
-const ConditionNode: FC<NodeProps<NodeData>> = ({ id, data, selected }) => {
+const ConditionNode: FC<NodeProps<AutomationNode>> = ({ id, data, selected }) => {
     const { deleteElements } = useReactFlow();
     const config = (data.config as any) || {};
     const conditionText = `${config.field || ''} ${config.operator || ''} "${config.value || ''}"`;
@@ -176,7 +178,7 @@ const ConditionNode: FC<NodeProps<NodeData>> = ({ id, data, selected }) => {
     );
 };
 
-const SplitPathNode: FC<NodeProps<NodeData>> = ({ id, data, selected }) => {
+const SplitPathNode: FC<NodeProps<AutomationNode>> = ({ id, data, selected }) => {
     const { deleteElements } = useReactFlow();
     return (
       <div className={`${nodeStyles.base} ${nodeStyles.logic} relative`}>
@@ -212,7 +214,7 @@ const SplitPathNode: FC<NodeProps<NodeData>> = ({ id, data, selected }) => {
     );
 };
 
-const LogicNodeResolver: FC<NodeProps<NodeData>> = (props) => {
+const LogicNodeResolver: FC<NodeProps<AutomationNode>> = (props) => {
     const data = props.data;
     if (data.type === 'condition') return <ConditionNode {...props} />;
     if (data.type === 'split_path') return <SplitPathNode {...props} />;
