@@ -96,7 +96,7 @@ const nodeStyles = {
 };
 
 const CustomNode = memo(({ id, data, selected }: NodeProps<AutomationNode>) => {
-    const { setNodes, setEdges } = useReactFlow();
+    const { setNodes, setEdges } = useReactFlow<AutomationNode, Edge>();
     const { automationStats, pageParams, fetchNodeLogs } = useContext(AppContext);
     const [isLogsModalOpen, setIsLogsModalOpen] = useState(false);
     const [logs, setLogs] = useState<AutomationNodeLog[]>([]);
@@ -150,7 +150,7 @@ const CustomNode = memo(({ id, data, selected }: NodeProps<AutomationNode>) => {
 
 
 const ConditionNode = memo(({ id, data, selected }: NodeProps<AutomationNode>) => {
-    const { setNodes, setEdges } = useReactFlow();
+    const { setNodes, setEdges } = useReactFlow<AutomationNode, Edge>();
     const { automationStats, pageParams, fetchNodeLogs } = useContext(AppContext);
     const [isLogsModalOpen, setIsLogsModalOpen] = useState(false);
     const [logs, setLogs] = useState<AutomationNodeLog[]>([]);
@@ -210,7 +210,7 @@ const ConditionNode = memo(({ id, data, selected }: NodeProps<AutomationNode>) =
 });
 
 const SplitPathNode = memo(({ id, data, selected }: NodeProps<AutomationNode>) => {
-    const { setNodes, setEdges } = useReactFlow();
+    const { setNodes, setEdges } = useReactFlow<AutomationNode, Edge>();
     const { automationStats, pageParams, fetchNodeLogs } = useContext(AppContext);
     const [isLogsModalOpen, setIsLogsModalOpen] = useState(false);
     const [logs, setLogs] = useState<AutomationNodeLog[]>([]);
@@ -320,7 +320,7 @@ const Editor: React.FC = () => {
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
     const [selectedNode, setSelectedNode] = useState<AutomationNode | null>(null);
 
-    const { screenToFlowPosition } = useReactFlow();
+    const { screenToFlowPosition } = useReactFlow<AutomationNode, Edge>();
     const saveTimeoutRef = useRef<number>();
     const hasFetchedStats = useRef(false);
     const isMounted = useRef(false);

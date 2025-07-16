@@ -1,7 +1,8 @@
 
+
 import React, { createContext, useState, useCallback, ReactNode, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import { Page, Profile, MessageTemplate, Contact, Campaign, CampaignWithMetrics, EditableContact, Session, User, CampaignMessageInsert, CampaignWithDetails, CampaignMessageWithContact, Segment, MessageTemplateInsert, Automation, AutomationInsert, AutomationNode, Edge, AutomationNodeStats, AutomationNodeLog, CampaignStatus, MessageStatus, Pipeline, PipelineStage, Deal, DealInsert, ContactWithDetails, DealWithContact } from '../types';
+import { Page, Profile, MessageTemplate, Contact, Campaign, CampaignWithMetrics, EditableContact, Session, User, CampaignMessageInsert, CampaignWithDetails, CampaignMessageWithContact, Segment, MessageTemplateInsert, Automation, AutomationInsert, AutomationNode, Edge, AutomationNodeStats, AutomationNodeLog, CampaignStatus, MessageStatus, Pipeline, PipelineStage, Deal, DealInsert, ContactWithDetails, DealWithContact, AutomationStatus } from '../types';
 import { Json, TablesInsert, TablesUpdate } from '../types/database.types';
 
 interface AppContextType {
@@ -56,6 +57,7 @@ interface AppContextType {
   deals: DealWithContact[];
   addDeal: (dealData: DealInsert) => Promise<void>;
   updateDealStage: (dealId: string, newStageId: string) => Promise<void>;
+  createDefaultPipeline: () => Promise<void>;
 
 }
 
@@ -133,9 +135,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 return { ...campaign, recipient_count: campaign.recipient_count || 0, metrics: { sent: campaign.recipient_count || 0, delivered: 0, read: 0 } };
             }
             
-            const typedData = (data as { status: MessageStatus }[]) || [];
-            const delivered = typedData.filter(d => d.status === 'delivered' || d.status === 'read').length || 0;
-            const read = typedData.filter(d => d.status === 'read').length || 0;
+            const typedData = (data as { status: MessageStatus }[] | null) || [];
+            const delivered = typedData.filter(d => d.status === 'delivered' || d.status === 'read').length;
+            const read = typedData.filter(d => d.status === 'read').length;
 
             return {
                 ...campaign,
@@ -160,7 +162,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
           if (profileError) {
             console.error("Error fetching profile, user might not have one yet. Relying on DB trigger.", profileError);
-          } else {
+          } else if (profileData) {
             setProfile(profileData);
           }
 
@@ -176,10 +178,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           ]);
 
           if (templatesRes.error) console.error("Error fetching templates:", templatesRes.error);
-          else setTemplates(templatesRes.data as MessageTemplate[]);
+          else if (templatesRes.data) setTemplates(templatesRes.data as MessageTemplate[]);
 
           if (contactsRes.error) console.error("Error fetching contacts:", contactsRes.error);
-          else setContacts(contactsRes.data);
+          else if (contactsRes.data) setContacts(contactsRes.data);
 
           if (campaignsRes.error) {
             console.error("Error fetching campaigns:", campaignsRes.error);
@@ -188,7 +190,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           }
           
           if (segmentsRes.error) console.error("Error fetching segments:", segmentsRes.error);
-          else setSegments(segmentsRes.data);
+          else if (segmentsRes.data) setSegments(segmentsRes.data);
           
           if (automationsRes.error) {
             console.error("Error fetching automations:", automationsRes.error);
@@ -204,16 +206,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           }
           
           if (pipelinesRes.error) console.error("Error fetching pipelines:", pipelinesRes.error);
-          else setPipelines(pipelinesRes.data);
+          else if (pipelinesRes.data) setPipelines(pipelinesRes.data);
           
-          if (stagesRes.error) console.error("Error fetching stages:", stagesRes.error);
-          else {
-              const userStages = stagesRes.data?.filter((s: any) => s.pipelines.user_id === user.id)
+          if (stagesRes.error) {
+              console.error("Error fetching stages:", stagesRes.error);
+          } else if (stagesRes.data) {
+              const userStages = stagesRes.data.filter((s: any) => s.pipelines.user_id === user.id)
               setStages(userStages as PipelineStage[]);
           }
           
           if (dealsRes.error) console.error("Error fetching deals:", dealsRes.error);
-          else setDeals(dealsRes.data as DealWithContact[]);
+          else if (dealsRes.data) setDeals(dealsRes.data as DealWithContact[]);
 
       } catch (err) {
         console.error("A critical error occurred during initial data fetch:", (err as any).message || err);
@@ -255,9 +258,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         
       if (messagesError) throw messagesError;
 
-      const typedMessagesData = (messagesData as CampaignMessageWithContact[]) || [];
-      const delivered = typedMessagesData.filter(d => d.status === 'delivered' || d.status === 'read').length || 0;
-      const read = typedMessagesData.filter(d => d.status === 'read').length || 0;
+      const typedMessagesData = (messagesData as CampaignMessageWithContact[] | null) || [];
+      const delivered = typedMessagesData.filter(d => d.status === 'delivered' || d.status === 'read').length;
+      const read = typedMessagesData.filter(d => d.status === 'read').length;
 
       setCampaignDetails({
         ...typedCampaignData,
@@ -301,7 +304,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         
         setContactDetails({
             ...(contactData as Contact),
-            deals: (dealsData as Deal[]) || []
+            deals: (dealsData as Deal[] | null) || []
         });
 
     } catch (err) {
@@ -318,9 +321,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const updateProfile = async (profileData: Partial<Profile>) => {
     if (!user) throw new Error("Usuário não autenticado.");
-    const { data, error } = await supabase.from('profiles').update(profileData).eq('id', user.id).select().single();
+    const { data, error } = await supabase.from('profiles').update(profileData as TablesUpdate<'profiles'>).eq('id', user.id).select().single();
     if(error) throw error;
-    if (data) setProfile(data);
+    if (data) setProfile(data as Profile);
   };
   
   const metaConfig = useMemo(() => ({
@@ -432,7 +435,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
      const { id, created_at, user_id, ...updatePayload } = updatedContact;
      const { data, error } = await supabase
         .from('contacts')
-        .update(updatePayload)
+        .update(updatePayload as TablesUpdate<'contacts'>)
         .eq('id', updatedContact.id)
         .eq('user_id', user.id)
         .select()
@@ -507,8 +510,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         .single();
 
     if (campaignError) throw campaignError;
+    if (!newCampaign) throw new Error("Failed to create campaign.");
     const typedNewCampaign = newCampaign as Campaign;
-    if (!typedNewCampaign) throw new Error("Failed to create campaign.");
 
 
     const messagesToInsert: TablesInsert<'campaign_messages'>[] = messages.map(msg => ({ ...msg, campaign_id: typedNewCampaign.id }));
@@ -670,8 +673,59 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         console.error("Error fetching node logs:", error);
         return [];
     }
-    return (data as AutomationNodeLog[]) || [];
+    return (data as AutomationNodeLog[] | null) || [];
   }, [user]);
+
+  const createDefaultPipeline = async () => {
+    if (!user) throw new Error("Usuário não autenticado.");
+
+    // Create the pipeline
+    const { data: pipelineData, error: pipelineError } = await supabase
+        .from('pipelines')
+        .insert({ user_id: user.id, name: 'Funil de Vendas Padrão' })
+        .select()
+        .single();
+    
+    if (pipelineError || !pipelineData) {
+        console.error("Error creating default pipeline:", pipelineError);
+        throw pipelineError || new Error("Falha ao criar o funil.");
+    }
+
+    const newPipeline = pipelineData as Pipeline;
+    
+    // Create default stages for the new pipeline
+    const defaultStages = [
+        { name: 'Novo Lead', sort_order: 0 },
+        { name: 'Contato Feito', sort_order: 1 },
+        { name: 'Proposta Enviada', sort_order: 2 },
+        { name: 'Negociação', sort_order: 3 },
+        { name: 'Ganhos', sort_order: 4 },
+        { name: 'Perdidos', sort_order: 5 },
+    ];
+
+    const stagesToInsert: TablesInsert<'pipeline_stages'>[] = defaultStages.map(stage => ({
+        ...stage,
+        pipeline_id: newPipeline.id,
+    }));
+
+    const { data: stagesData, error: stagesError } = await supabase
+        .from('pipeline_stages')
+        .insert(stagesToInsert)
+        .select();
+
+    if (stagesError || !stagesData) {
+        console.error("Error creating default stages:", stagesError);
+        // Attempt to clean up the created pipeline if stages fail
+        await supabase.from('pipelines').delete().eq('id', newPipeline.id);
+        throw stagesError || new Error("Falha ao criar as etapas do funil.");
+    }
+    
+    const newStages = stagesData as PipelineStage[];
+    
+    // Update state at the end
+    setPipelines(prev => [...prev, newPipeline]);
+    setStages(prev => [...prev, ...newStages]);
+};
 
 
   const value: AppContextType = {
@@ -711,7 +765,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     stages,
     deals,
     addDeal,
-    updateDealStage
+    updateDealStage,
+    createDefaultPipeline
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

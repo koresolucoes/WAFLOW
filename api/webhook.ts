@@ -1,4 +1,5 @@
 
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from './_lib/supabaseAdmin.js';
 import { Contact, Profile } from './_lib/types.js';
@@ -69,7 +70,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     if (value.statuses) {
                         for (const status of value.statuses) {
                             const newStatus = status.status;
-                            const updateData: Partial<TablesUpdate<'campaign_messages'>> = { status: newStatus };
+                            const updateData: TablesUpdate<'campaign_messages'> = { status: newStatus };
                             if (newStatus === 'delivered') updateData.delivered_at = new Date(status.timestamp * 1000).toISOString();
                             if (newStatus === 'read') updateData.read_at = new Date(status.timestamp * 1000).toISOString();
                             

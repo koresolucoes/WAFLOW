@@ -1,7 +1,7 @@
 
 /**
  * =================================================================================================
- * ZAPFLOW AI - SUPABASE DATABASE SCHEMA (v7 - Node Stats & Logs)
+ * ZAPFLOW AI - SUPABASE DATABASE SCHEMA (v8 - CRM & Funil Kanban)
  * =================================================================================================
  * 
  * INSTRUÇÕES IMPORTANTES:
@@ -10,24 +10,25 @@
  * 3. Navegue até o "SQL Editor".
  * 4. Cole o script e clique em "RUN".
  *
- * Este script irá (re)criar todas as tabelas e adicionar as NOVAS tabelas para estatísticas
- * e logs de nós de automação. Também adiciona uma função RPC para incrementar os contadores
- * de forma atômica, garantindo a precisão dos dados.
+ * Este script irá (re)criar todas as tabelas, adicionando a funcionalidade de CRM com
+ * Funis (Pipelines), Etapas (Stages) e Negócios (Deals). Também expande a tabela de
+ * contatos com novos campos.
  *
  * É seguro executá-lo múltiplas vezes.
- * CUIDADO: A execução deste script apagará dados existentes nas tabelas antigas. FAÇA UM BACKUP PRIMEIRO.
- *
+ * CUIDADO: A execução deste script apagará dados existentes. FAÇA UM BACKUP PRIMEIRO.
  *
  * --- INÍCIO DO SCRIPT SQL ---
-*/
+ */
+
 /*
--- Garante que a extensão uuid-ossp está habilitada
+-- Garante que as extensões necessárias estão habilitadas
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA extensions;
--- Garante que a extensão pgcrypto está habilitada para gerar strings aleatórias
 CREATE EXTENSION IF NOT EXISTS "pgcrypto" WITH SCHEMA extensions;
 
-
 -- Remove tabelas existentes na ordem correta para evitar erros de dependência.
+DROP TABLE IF EXISTS public.deals CASCADE;
+DROP TABLE IF EXISTS public.pipeline_stages CASCADE;
+DROP TABLE IF EXISTS public.pipelines CASCADE;
 DROP TABLE IF EXISTS public.automation_node_logs CASCADE;
 DROP TABLE IF EXISTS public.automation_node_stats CASCADE;
 DROP TABLE IF EXISTS public.automation_runs CASCADE;
@@ -191,6 +192,39 @@ CREATE INDEX automation_node_logs_run_id_idx ON public.automation_node_logs(run_
 CREATE INDEX automation_node_logs_node_id_idx ON public.automation_node_logs(node_id);
 comment on table public.automation_node_logs is 'Registra um log detalhado para cada execução de nó.';
 
+-- Tabela de Funis de Venda (Pipelines)
+CREATE TABLE public.pipelines (
+    id uuid NOT NULL PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+    name text NOT NULL,
+    created_at timestamp with time zone NOT NULL DEFAULT now()
+);
+comment on table public.pipelines is 'Armazena os funis de venda do usuário.';
+
+-- Tabela de Etapas dos Funis (Stages)
+CREATE TABLE public.pipeline_stages (
+    id uuid NOT NULL PRIMARY KEY DEFAULT uuid_generate_v4(),
+    pipeline_id uuid NOT NULL REFERENCES public.pipelines(id) ON DELETE CASCADE,
+    name text NOT NULL,
+    sort_order integer NOT NULL,
+    created_at timestamp with time zone NOT NULL DEFAULT now()
+);
+comment on table public.pipeline_stages is 'Armazena as etapas (colunas) de um funil Kanban.';
+
+-- Tabela de Negócios (Deals)
+CREATE TABLE public.deals (
+    id uuid NOT NULL PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+    contact_id uuid NOT NULL REFERENCES public.contacts(id) ON DELETE CASCADE,
+    pipeline_id uuid NOT NULL REFERENCES public.pipelines(id) ON DELETE CASCADE,
+    stage_id uuid NOT NULL REFERENCES public.pipeline_stages(id) ON DELETE CASCADE,
+    name text NOT NULL,
+    value numeric(12, 2) DEFAULT 0.00,
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at timestamp with time zone NOT NULL DEFAULT now()
+);
+comment on table public.deals is 'Armazena os negócios (cards) dentro do funil de vendas.';
+
 
 -- Habilita a Segurança a Nível de Linha (RLS) para todas as tabelas
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
@@ -205,41 +239,86 @@ ALTER TABLE public.automations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.automation_runs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.automation_node_stats ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.automation_node_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.pipelines ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.pipeline_stages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.deals ENABLE ROW LEVEL SECURITY;
 
 -- Define as políticas de RLS
 CREATE POLICY "Users can manage their own profile." ON public.profiles FOR ALL USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
 CREATE POLICY "Users can manage their own contacts." ON public.contacts FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users can manage their own templates." ON public.message_templates FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users can manage their own segments." ON public.segments FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can manage rules for their own segments." ON public.segment_rules FOR ALL USING (auth.uid() = (SELECT user_id FROM public.segments WHERE id = segment_id)) WITH CHECK (auth.uid() = (SELECT user_id FROM public.segments WHERE id = segment_id));
+CREATE POLICY "Users can manage rules for their own segments." ON public.segment_rules FOR ALL USING (auth.uid() = (SELECT user_id FROM public.segments WHERE id = segment_id));
 CREATE POLICY "Users can manage their own campaigns." ON public.campaigns FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can manage messages from their own campaigns." ON public.campaign_messages FOR ALL USING (auth.uid() = (SELECT user_id FROM public.campaigns WHERE id = campaign_id)) WITH CHECK (auth.uid() = (SELECT user_id FROM public.campaigns WHERE id = campaign_id));
+CREATE POLICY "Users can manage messages from their own campaigns." ON public.campaign_messages FOR ALL USING (auth.uid() = (SELECT user_id FROM public.campaigns WHERE id = campaign_id));
 CREATE POLICY "Users can manage their own received messages." ON public.received_messages FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users can manage their own automations." ON public.automations FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users can view their own automation runs." ON public.automation_runs FOR ALL USING (auth.uid() = (SELECT user_id FROM public.automations WHERE id = automation_id));
 CREATE POLICY "Users can view stats for their own automations." ON public.automation_node_stats FOR ALL USING (auth.uid() = (SELECT user_id FROM public.automations WHERE id = automation_id));
 CREATE POLICY "Users can view logs for their own automations." ON public.automation_node_logs FOR ALL USING (auth.uid() = (SELECT a.user_id FROM public.automation_runs r JOIN public.automations a ON r.automation_id = a.id WHERE r.id = run_id));
+CREATE POLICY "Users can manage their own pipelines." ON public.pipelines FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can manage stages for their own pipelines." ON public.pipeline_stages FOR ALL USING (auth.uid() = (SELECT user_id FROM public.pipelines WHERE id = pipeline_id));
+CREATE POLICY "Users can manage their own deals." ON public.deals FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
 
--- Função para criar um perfil automaticamente quando um novo usuário se cadastra
+-- Função e Gatilho para criação de novo usuário
+-- Primeiro, remove o gatilho antigo, depois a função antiga, para evitar erro de dependência.
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+DROP FUNCTION IF EXISTS public.handle_new_user();
+
+-- Cria a função para criar um perfil e um funil padrão automaticamente
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
+DECLARE
+  new_pipeline_id uuid;
 BEGIN
+  -- Cria o perfil do usuário
   INSERT INTO public.profiles (id, company_name, webhook_path_prefix)
   VALUES (
       new.id, 
       'Minha Nova Empresa', 
       'user-' || encode(public.gen_random_bytes(6), 'hex') -- Gera um prefixo aleatório e único
   );
+
+  -- Cria o funil de vendas padrão para o novo usuário
+  INSERT INTO public.pipelines (user_id, name)
+  VALUES (new.id, 'Funil de Vendas Padrão')
+  RETURNING id INTO new_pipeline_id;
+  
+  -- Cria as etapas padrão para o novo funil
+  INSERT INTO public.pipeline_stages (pipeline_id, name, sort_order)
+  VALUES
+    (new_pipeline_id, 'Novo Lead', 0),
+    (new_pipeline_id, 'Contato Feito', 1),
+    (new_pipeline_id, 'Proposta Enviada', 2),
+    (new_pipeline_id, 'Negociação', 3),
+    (new_pipeline_id, 'Ganhos', 4),
+    (new_pipeline_id, 'Perdidos', 5);
+    
   RETURN new;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Gatilho (trigger) que executa a função acima após um novo usuário ser criado
-DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+-- Recria o gatilho (trigger) que executa a função acima após um novo usuário ser criado
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
+
+-- Função para atualizar o campo `updated_at` na tabela de negócios
+CREATE OR REPLACE FUNCTION public.update_deal_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+   NEW.updated_at = now(); 
+   RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+DROP TRIGGER IF EXISTS update_deals_updated_at ON public.deals;
+CREATE TRIGGER update_deals_updated_at
+BEFORE UPDATE ON public.deals
+FOR EACH ROW
+EXECUTE PROCEDURE public.update_deal_updated_at_column();
+
 
 -- Função RPC para incrementar contadores de estatísticas de forma atômica
 CREATE OR REPLACE FUNCTION public.increment_node_stat(p_automation_id uuid, p_node_id text, p_status text)
@@ -261,7 +340,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 */
- 
 
 export type Json =
   | string
@@ -561,6 +639,71 @@ export type Database = {
           },
         ]
       }
+      deals: {
+        Row: {
+          contact_id: string
+          created_at: string
+          id: string
+          name: string
+          pipeline_id: string
+          stage_id: string
+          updated_at: string
+          user_id: string
+          value: number | null
+        }
+        Insert: {
+          contact_id: string
+          created_at?: string
+          id?: string
+          name: string
+          pipeline_id: string
+          stage_id: string
+          updated_at?: string
+          user_id: string
+          value?: number | null
+        }
+        Update: {
+          contact_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+          pipeline_id?: string
+          stage_id?: string
+          updated_at?: string
+          user_id?: string
+          value?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deals_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deals_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "pipelines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deals_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deals_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       message_templates: {
         Row: {
           category: string
@@ -595,6 +738,67 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "message_templates_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pipeline_stages: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          pipeline_id: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          pipeline_id: string
+          sort_order: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          pipeline_id?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pipeline_stages_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "pipelines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pipelines: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pipelines_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
@@ -774,6 +978,10 @@ export type Database = {
           p_status: string
         }
         Returns: undefined
+      }
+      update_deal_updated_at_column: {
+        Args: Record<PropertyKey, never>
+        Returns: unknown
       }
     }
     Enums: {

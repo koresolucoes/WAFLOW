@@ -1,3 +1,4 @@
+
 /**
  * =================================================================================================
  * ZAPFLOW AI - SUPABASE DATABASE SCHEMA (v8 - CRM & Funil Kanban)
@@ -260,8 +261,12 @@ CREATE POLICY "Users can manage stages for their own pipelines." ON public.pipel
 CREATE POLICY "Users can manage their own deals." ON public.deals FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
 
--- Função para criar um perfil e um funil padrão automaticamente quando um novo usuário se cadastra
+-- Função e Gatilho para criação de novo usuário
+-- Primeiro, remove o gatilho antigo, depois a função antiga, para evitar erro de dependência.
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 DROP FUNCTION IF EXISTS public.handle_new_user();
+
+-- Cria a função para criar um perfil e um funil padrão automaticamente
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -294,8 +299,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Gatilho (trigger) que executa a função acima após um novo usuário ser criado
-DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+-- Recria o gatilho (trigger) que executa a função acima após um novo usuário ser criado
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();

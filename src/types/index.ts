@@ -1,4 +1,5 @@
 
+
 import { Session, User } from '@supabase/supabase-js';
 import { Json, Tables, TablesInsert, TablesUpdate } from './database.types';
 import { MetaTemplateComponent } from '../services/meta/types';
@@ -104,15 +105,83 @@ export type Automation = {
     user_id: string;
 };
 
-export type Deal = Tables<'deals'>;
-export type Pipeline = Tables<'pipelines'>;
-export type PipelineStage = Tables<'pipeline_stages'>;
-export type Segment = Tables<'segments'>;
-export type SegmentRule = Tables<'segment_rules'>;
-export type ReceivedMessage = Tables<'received_messages'>;
-export type AutomationRun = Tables<'automation_runs'>;
-export type AutomationNodeStats = Tables<'automation_node_stats'>;
-export type AutomationNodeLog = Tables<'automation_node_logs'>;
+export type Pipeline = {
+    created_at: string;
+    id: string;
+    name: string;
+    user_id: string;
+};
+
+export type PipelineStage = {
+    created_at: string;
+    id: string;
+    name: string;
+    pipeline_id: string;
+    sort_order: number;
+};
+
+export type Deal = {
+    contact_id: string;
+    created_at: string;
+    id: string;
+    name: string;
+    pipeline_id: string;
+    stage_id: string;
+    updated_at: string;
+    user_id: string;
+    value: number | null;
+};
+
+export type Segment = {
+    created_at: string;
+    id: string;
+    name: string;
+    user_id: string;
+};
+
+export type SegmentRule = {
+    field: string;
+    id: string;
+    operator: string;
+    segment_id: string;
+    value: string;
+};
+
+export type ReceivedMessage = {
+    contact_id: string;
+    id: string;
+    message_body: string | null;
+    meta_message_id: string;
+    received_at: string;
+    sentiment: string | null;
+    user_id: string;
+};
+
+export type AutomationRun = {
+    automation_id: string;
+    contact_id: string | null;
+    details: string | null;
+    id: string;
+    run_at: string;
+    status: string;
+};
+
+export type AutomationNodeStats = {
+    automation_id: string;
+    error_count: number;
+    last_run_at: string | null;
+    node_id: string;
+    success_count: number;
+};
+
+export type AutomationNodeLog = {
+    created_at: string;
+    details: string | null;
+    id: number;
+    node_id: string;
+    run_id: string;
+    status: string;
+};
 // --- END of Plain object types ---
 
 // --- CUSTOMIZED INTERFACES ---

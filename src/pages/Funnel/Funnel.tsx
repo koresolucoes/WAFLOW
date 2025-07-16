@@ -1,13 +1,16 @@
 
+
 import React, { useContext, useMemo, useState } from 'react';
 import { AppContext } from '../../contexts/AppContext';
 import { Pipeline, PipelineStage, DealWithContact } from '../../types';
 import StageColumn from './StageColumn';
 import { FUNNEL_ICON } from '../../components/icons';
+import Button from '../../components/common/Button';
 
 const Funnel: React.FC = () => {
-    const { pipelines, stages, deals, updateDealStage } = useContext(AppContext);
+    const { pipelines, stages, deals, updateDealStage, createDefaultPipeline } = useContext(AppContext);
     const [draggedDealId, setDraggedDealId] = useState<string | null>(null);
+    const [isCreating, setIsCreating] = useState(false);
 
     // For now, we'll just use the first pipeline. UI for multiple pipelines can be added later.
     const activePipeline = useMemo(() => pipelines[0], [pipelines]);
@@ -46,12 +49,26 @@ const Funnel: React.FC = () => {
         setDraggedDealId(null);
     };
 
+    const handleCreatePipeline = async () => {
+        setIsCreating(true);
+        try {
+            await createDefaultPipeline();
+        } catch (error: any) {
+            alert(`Falha ao criar funil: ${error.message}`);
+        } finally {
+            setIsCreating(false);
+        }
+    };
+
     if (!activePipeline) {
         return (
              <div className="flex flex-col items-center justify-center h-full text-center text-slate-400">
                 <FUNNEL_ICON className="w-16 h-16 mb-4 text-slate-500" />
                 <h2 className="text-2xl text-white font-bold">Nenhum funil de vendas encontrado.</h2>
-                <p className="mt-2">Parece que um funil padrão não foi criado para sua conta.</p>
+                <p className="mt-2 mb-6">Parece que um funil padrão não foi criado para sua conta.</p>
+                <Button onClick={handleCreatePipeline} isLoading={isCreating}>
+                    Criar Funil Padrão
+                </Button>
             </div>
         )
     }
