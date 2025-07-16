@@ -1,10 +1,12 @@
 
 
 
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from './_lib/supabaseAdmin.js';
 import { executeAutomation } from './_lib/engine.js';
-import { Automation, Contact, TablesInsert } from './_lib/types.js';
+import { Automation, Contact } from './_lib/types.js';
+import { TablesInsert, TablesUpdate } from './_lib/database.types.js';
 
 // Helper to find a contact by phone and create if not exists
 const findOrCreateContact = async (user_id: string, phone: string, name: string): Promise<Contact | null> => {
@@ -30,7 +32,7 @@ const findOrCreateContact = async (user_id: string, phone: string, name: string)
          console.error("Error finding contact:", error);
         return null;
     }
-    return contactData as unknown as Contact;
+    return contactData as Contact;
 };
 
 // Helper to find automations to trigger based on message content
@@ -45,7 +47,7 @@ const findAutomationsToTrigger = async (user_id: string, messageBody: string, bu
         console.error("Error fetching automations:", error);
         return [];
     }
-    const automations = data as unknown as Automation[] | null;
+    const automations = data as Automation[] | null;
     if (!automations) return [];
 
     const triggers: {automation: Automation, startNodeId: string}[] = [];
@@ -103,7 +105,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                         for (const status of value.statuses) {
                             const { recipient_id, ...statusUpdate } = status;
                             const newStatus = statusUpdate.status;
-                            const updateData: any = { status: newStatus };
+                            const updateData: Partial<TablesUpdate<'campaign_messages'>> = { status: newStatus };
                             if (newStatus === 'delivered') updateData.delivered_at = new Date(statusUpdate.timestamp * 1000).toISOString();
                             if (newStatus === 'read') updateData.read_at = new Date(statusUpdate.timestamp * 1000).toISOString();
                             

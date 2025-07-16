@@ -1,6 +1,8 @@
 
+
+
 import React, { useContext, useState, useEffect, useCallback, memo, FC } from 'react';
-import { ReactFlow, ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, type Node, type Edge, type NodeProps, useReactFlow, NodeTypes, type NodeChange } from '@xyflow/react';
+import { ReactFlow, ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, type Node, type Edge, type NodeProps, useReactFlow, NodeTypes, type NodeChange, applyNodeChanges } from '@xyflow/react';
 import { AppContext } from '../../contexts/AppContext';
 import { Automation, AutomationNode, NodeData } from '../../types';
 import Button from '../../components/common/Button';
@@ -9,6 +11,7 @@ import { supabase } from '../../lib/supabaseClient';
 import { AUTOMATION_ICON } from '../../components/icons';
 import NodeSettingsModal from './NodeSettingsModal';
 import { nodeConfigs } from '../../lib/automation/nodeConfigs';
+import { Json } from '../../types/database.types';
 
 const initialNodes: AutomationNode[] = [];
 const initialEdges: Edge[] = [];
@@ -31,8 +34,8 @@ const nodeStyles = {
     description: "text-xs text-slate-400"
 };
 
-const CustomNode: FC<NodeProps> = (props) => {
-    const data = props.data as NodeData;
+const CustomNode: FC<NodeProps<NodeData>> = (props) => {
+    const data = props.data;
     const isTrigger = data.nodeType === 'trigger';
 
     const nodeTypeStyle = data.nodeType;
@@ -55,8 +58,8 @@ const CustomNode: FC<NodeProps> = (props) => {
     );
 };
 
-const ConditionNode: FC<NodeProps> = (props) => {
-    const data = props.data as NodeData;
+const ConditionNode: FC<NodeProps<NodeData>> = (props) => {
+    const data = props.data;
     const config = (data.config as any) || {};
     const conditionText = `${config.field || ''} ${config.operator || ''} "${config.value || ''}"`;
     return (
@@ -82,8 +85,8 @@ const ConditionNode: FC<NodeProps> = (props) => {
     );
 };
 
-const SplitPathNode: FC<NodeProps> = (props) => {
-    const data = props.data as NodeData;
+const SplitPathNode: FC<NodeProps<NodeData>> = (props) => {
+    const data = props.data;
     return (
       <div className={`${nodeStyles.base} ${nodeStyles.logic}`}>
         <div className={`${nodeStyles.header} ${nodeStyles.logicHeader}`}>
@@ -105,17 +108,17 @@ const SplitPathNode: FC<NodeProps> = (props) => {
     );
 };
 
-const LogicNodeResolver: FC<NodeProps> = (props) => {
-    const data = props.data as NodeData;
+const LogicNodeResolver: FC<NodeProps<NodeData>> = (props) => {
+    const data = props.data;
     if (data.type === 'condition') return <ConditionNode {...props} />;
     if (data.type === 'split_path') return <SplitPathNode {...props} />;
     return <CustomNode {...props} />;
 };
 
 const nodeTypes: NodeTypes = {
-    trigger: CustomNode,
-    action: CustomNode,
-    logic: LogicNodeResolver,
+    trigger: CustomNode as FC<NodeProps>,
+    action: CustomNode as FC<NodeProps>,
+    logic: LogicNodeResolver as FC<NodeProps>,
 };
 
 
@@ -163,7 +166,7 @@ const NodeSidebar = memo(({ onDragStart }: { onDragStart: (event: React.DragEven
 const FlowCanvas = () => {
     const { pageParams, automations, templates, updateAutomation, setCurrentPage, profile } = useContext(AppContext);
     const { screenToFlowPosition } = useReactFlow();
-    const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+    const [nodes, setNodes, onNodesChangeOriginal] = useNodesState(initialNodes);
     const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
     const [selectedNode, setSelectedNode] = useState<AutomationNode | null>(null);
 
@@ -195,7 +198,7 @@ const FlowCanvas = () => {
                 }
             }
         }
-    }, [automationId, automations]);
+    }, [automationId, automations, setNodes, setEdges]);
 
     // This effect ensures that if the modal is open, it gets the latest node data.
     useEffect(() => {
@@ -231,20 +234,22 @@ const FlowCanvas = () => {
     }, [automationId, updateAutomation]);
     
     // Custom handler to prevent trigger node deletion
-    const handleNodesChange = useCallback(
+    const onNodesChange = useCallback(
         (changes: NodeChange[]) => {
-            const DONT_DELETE_TRIGGER_CHANGES = changes.filter(change => {
-                if (change.type === 'remove') {
-                    const nodeToRemove = nodes.find(n => n.id === change.id);
-                    if (nodeToRemove?.data.nodeType === 'trigger') {
-                        return false; 
+            setNodes((nds) => {
+                const filteredChanges = changes.filter(change => {
+                    if (change.type === 'remove') {
+                        const nodeToRemove = nds.find(n => n.id === change.id);
+                        if (nodeToRemove?.data.nodeType === 'trigger') {
+                            return false; 
+                        }
                     }
-                }
-                return true;
+                    return true;
+                });
+                return applyNodeChanges(filteredChanges, nds);
             });
-            onNodesChange(DONT_DELETE_TRIGGER_CHANGES);
         },
-        [nodes, onNodesChange]
+        [setNodes]
     );
 
     const onConnect = useCallback((params: any) => setEdges((eds) => addEdge(params, eds)), [setEdges]);
@@ -289,7 +294,7 @@ const FlowCanvas = () => {
             nodes: updatedNodes,
             edges,
         };
-        await updateAutomation(automationData as unknown as Automation);
+        await updateAutomation(automationData as Automation);
     };
 
     const onSave = async () => {
@@ -307,7 +312,7 @@ const FlowCanvas = () => {
             edges,
         };
         try {
-            await updateAutomation(automationData as unknown as Automation);
+            await updateAutomation(automationData as Automation);
             setCurrentPage('automations');
         } catch (err: any) {
              setError(err.message || 'Ocorreu um erro ao salvar.');
@@ -346,9 +351,9 @@ const FlowCanvas = () => {
 
                 <div className="flex-grow h-full">
                     <ReactFlow
-                        nodes={nodes as Node[]}
+                        nodes={nodes}
                         edges={edges}
-                        onNodesChange={handleNodesChange}
+                        onNodesChange={onNodesChange}
                         onEdgesChange={onEdgesChange}
                         onConnect={onConnect}
                         onDrop={onDrop}

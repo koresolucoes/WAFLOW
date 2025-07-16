@@ -1,8 +1,10 @@
 
 
+
 import { supabaseAdmin } from '../supabaseAdmin.js';
 import { sendTemplatedMessage, sendTextMessage, sendMediaMessage, sendInteractiveMessage } from '../meta/messages.js';
-import { AutomationNode, Contact, Json, MetaConfig, MessageTemplate, Profile, TablesUpdate } from '../types.js';
+import { AutomationNode, Contact, Json, MetaConfig, MessageTemplate, Profile } from '../types.js';
+import { TablesUpdate } from '../database.types.js';
 
 // ====================================================================================
 // Helper Functions
@@ -78,7 +80,7 @@ const sendTemplate: ActionHandler = async ({ profile, contact, node, triggerData
     if (templateError) throw templateError;
     if (template) {
          const metaConfig = getMetaConfig(profile);
-         const templateTyped = template as unknown as MessageTemplate;
+         const templateTyped = template as MessageTemplate;
          
          let allText = '';
          templateTyped.components.forEach(c => {
@@ -150,7 +152,7 @@ const addTag: ActionHandler = async ({ contact, node, triggerData }) => {
         const updatePayload: TablesUpdate<'contacts'> = { tags: newTags };
         const { data, error } = await supabaseAdmin.from('contacts').update(updatePayload).eq('id', contact.id).select().single();
         if (error) throw error;
-        if (data) return { updatedContact: data as unknown as Contact };
+        if (data) return { updatedContact: data as Contact };
     }
     return {};
 };
@@ -163,7 +165,7 @@ const removeTag: ActionHandler = async ({ contact, node, triggerData }) => {
         const updatePayload: TablesUpdate<'contacts'> = { tags: newTags };
         const { data, error } = await supabaseAdmin.from('contacts').update(updatePayload).eq('id', contact.id).select().single();
         if (error) throw error;
-        if (data) return { updatedContact: data as unknown as Contact };
+        if (data) return { updatedContact: data as Contact };
     }
     return {};
 };
@@ -177,7 +179,7 @@ const setCustomField: ActionHandler = async ({ contact, node, triggerData }) => 
         const updatePayload: TablesUpdate<'contacts'> = { custom_fields: newCustomFields };
         const { data, error } = await supabaseAdmin.from('contacts').update(updatePayload).eq('id', contact.id).select().single();
         if (error) throw error;
-        if (data) return { updatedContact: data as unknown as Contact };
+        if (data) return { updatedContact: data as Contact };
     }
     return {};
 };

@@ -1,7 +1,10 @@
 
 
+
+
 import { supabaseAdmin } from './supabaseAdmin.js';
-import { Automation, Contact, Json, TablesInsert } from './types.js';
+import { Automation, Contact, Json, Profile } from './types.js';
+import { TablesInsert, TablesUpdate } from './database.types.js';
 import { actionHandlers, ActionContext } from './automation/actionHandlers.js';
 
 // Main function to execute an automation flow
@@ -28,12 +31,13 @@ export const executeAutomation = async (
         status: 'running',
         details: `Started from node ${startNodeId}`
     };
-    const { data: run, error: runError } = await supabaseAdmin.from('automation_runs').insert(runPayload).select().single();
+    const { data: runResult, error: runError } = await supabaseAdmin.from('automation_runs').insert(runPayload).select().single();
 
-    if (runError || !run) {
+    if (runError || !runResult) {
         console.error(`Engine Error: Failed to create run log for automation ${automation.id}`, runError);
         return;
     }
+    const run = runResult;
 
     let currentContactState = { ...contact };
     const nodes = Array.isArray(automation.nodes) ? automation.nodes : [];
@@ -51,7 +55,7 @@ export const executeAutomation = async (
         processedNodes.add(nodeId); // Mark as processed for this run
 
         const context: ActionContext = {
-            profile: profileData,
+            profile: profileData as Profile,
             contact: currentContactState,
             triggerData,
             node,

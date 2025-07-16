@@ -1,6 +1,7 @@
 
 
 
+
 // This file contains types shared across serverless functions,
 // decoupled from frontend dependencies like React or @xyflow.
 

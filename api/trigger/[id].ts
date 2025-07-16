@@ -1,14 +1,10 @@
 
 
-
-
-
-
-
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
 import { executeAutomation } from '../_lib/engine.js';
-import { Contact, Automation, TablesInsert, TablesUpdate, Json } from '../_lib/types.js';
+import { Contact, Automation } from '../_lib/types.js';
+import { Json, TablesInsert, TablesUpdate } from '../_lib/database.types.js';
 
 const getValueFromPath = (obj: any, path: string): any => {
     if (!path || !obj) return undefined;
@@ -49,7 +45,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if(automationsError || !data) {
          return res.status(500).json({ error: 'Failed to retrieve automations.' });
     }
-    const automations = data as unknown as Automation[] | null;
+    const automations = data as Automation[] | null;
         
     const automation = automations?.find(a => a.nodes?.some(n => n.id === nodeId));
 
@@ -98,9 +94,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             automation_id: automation.id,
             contact_id: null,
             status: 'failed',
-            details: 'Trigger failed: Data mapping for the contact\'s phone number is not configured in the "Webhook Received" node.'
+            details: 'Trigger failed: Data mapping for the contact\'s phone number is not configured in the "Webhook Received" node. The automation did not run.'
         } as TablesInsert<'automation_runs'>);
-        return res.status(400).json({ error: 'Data mapping for contact phone number is not configured.' });
+        // We accept the request but log the failure, so the sending system doesn't see an error.
+        return res.status(202).json({ message: 'Automation trigger accepted, but not executed due to missing phone number mapping.' });
     }
 
     for (const eventBody of events) {
@@ -129,7 +126,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             .eq('phone', phone)
             .single();
         
-        let contact: Contact | null = contactData as unknown as Contact | null;
+        let contact: Contact | null = contactData as Contact | null;
         let isNewContact = false;
         
         if (contactError && contactError.code === 'PGRST116') { // not found
@@ -141,7 +138,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 console.error('Failed to create new contact for webhook trigger.', insertError);
                 continue;
             }
-            contact = newContact as unknown as Contact;
+            contact = newContact as Contact;
         } else if (contactError) {
             console.error('Failed to query contact.', contactError);
             continue;
@@ -172,7 +169,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             if(updateContactError) {
                 console.error("Failed to update contact with webhook data", updateContactError);
             } else if(updatedContact) {
-                 contact = updatedContact as unknown as Contact;
+                 contact = updatedContact as Contact;
             }
         }
         
@@ -184,7 +181,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (isNewContact) {
              const { data: newContactAutomationsData, error: newContactAutomationsError } = await supabaseAdmin.from('automations').select('*').eq('user_id', profile.id).eq('status', 'active');
              if (newContactAutomationsData && !newContactAutomationsError) {
-                const newContactAutomations = newContactAutomationsData as unknown as Automation[] | null;
+                const newContactAutomations = newContactAutomationsData as Automation[] | null;
                  if (newContactAutomations) {
                     for (const auto of newContactAutomations) {
                         const trigger = auto.nodes?.find(n => n.data.type === 'new_contact');

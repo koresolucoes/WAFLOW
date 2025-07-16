@@ -1,14 +1,16 @@
 
 
 
+
 import React, { useContext, useState, useMemo } from 'react';
-import { Json, MessageTemplate, Tables, TablesInsert, TemplateCategory, TemplateStatus } from '../../types';
+import { MessageTemplate, TemplateStatus } from '../../types';
 import { AppContext } from '../../contexts/AppContext';
 import { getMetaTemplates } from '../../services/meta/templates';
 import { supabase } from '../../lib/supabaseClient';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import { SPARKLES_ICON } from '../../components/icons';
+import { Json, TablesInsert } from '../../types/database.types';
 
 const StatusBadge: React.FC<{ status: MessageTemplate['status'] }> = ({ status }) => {
     const statusStyles: Record<TemplateStatus, string> = {
@@ -95,7 +97,7 @@ const Templates: React.FC = () => {
 
         if (refetchError) throw refetchError;
         
-        setTemplates((dbTemplates as unknown as MessageTemplate[]) || []);
+        setTemplates((dbTemplates as MessageTemplate[]) || []);
         setSyncMessage("Sincronização concluída! Os status dos templates foram atualizados.");
         setTimeout(() => setSyncMessage(null), 4000);
 
