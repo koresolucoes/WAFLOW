@@ -1,9 +1,4 @@
 
-
-
-
-
-
 import { supabaseAdmin } from './supabaseAdmin.js';
 import { Automation, Contact, Json, Profile } from './types.js';
 import { TablesInsert, TablesUpdate } from './database.types.js';
@@ -47,79 +42,99 @@ export const executeAutomation = async (
     startNodeId: string,
     triggerData: Json | null = null
 ) => {
-    const { data: profileData, error: profileError } = await supabaseAdmin
-        .from('profiles')
-        .select('*')
-        .eq('id', automation.user_id)
-        .single();
+    let runId: string | null = null;
+    try {
+        const { data: profileData, error: profileError } = await supabaseAdmin
+            .from('profiles')
+            .select('*')
+            .eq('id', automation.user_id)
+            .single();
 
-    if (profileError || !profileData) {
-        console.error(`Engine Error: Could not find profile for user ${automation.user_id}`, profileError);
-        return;
-    }
+        if (profileError || !profileData) {
+            throw new Error(`Engine Error: Could not find profile for user ${automation.user_id}. Details: ${profileError?.message}`);
+        }
+        const profile = profileData as Profile;
 
-    const runPayload: TablesInsert<'automation_runs'> = {
-        automation_id: automation.id,
-        contact_id: contact?.id || null,
-        status: 'running',
-        details: `Started from node ${startNodeId}`
-    };
-    const { data: runResult, error: runError } = await supabaseAdmin.from('automation_runs').insert(runPayload).select().single();
+        const { data: runResult, error: runError } = await supabaseAdmin
+            .from('automation_runs')
+            .insert({
+                automation_id: automation.id,
+                contact_id: contact?.id || null,
+                status: 'running',
+                details: `Started from trigger node ${startNodeId}`
+            })
+            .select('id')
+            .single();
 
-    if (runError || !runResult) {
-        console.error(`Engine Error: Failed to create run log for automation ${automation.id}`, runError);
-        return;
-    }
-    const run = runResult;
+        if (runError || !runResult) {
+            throw new Error(`Engine Error: Failed to create run log for automation ${automation.id}. Details: ${runError?.message}`);
+        }
+        runId = runResult.id;
 
-    let currentContactState: Contact | null = contact ? { ...contact } : null;
-    const nodes = Array.isArray(automation.nodes) ? automation.nodes : [];
-    const edges = Array.isArray(automation.edges) ? automation.edges : [];
-    const nodeQueue: { nodeId: string }[] = [{ nodeId: startNodeId }];
-    const processedNodes = new Set<string>();
+        // Log trigger success immediately
+        await logNodeExecution(runId, automation.id, startNodeId, 'success', 'Gatilho da automação disparado com sucesso.');
 
-    while (nodeQueue.length > 0) {
-        const { nodeId } = nodeQueue.shift()!;
-        if (processedNodes.has(nodeId)) continue; // Avoid infinite loops
-
-        const node = nodes.find(n => n.id === nodeId);
-        if (!node) continue;
+        const nodes = Array.isArray(automation.nodes) ? automation.nodes : [];
+        const edges = Array.isArray(automation.edges) ? automation.edges : [];
         
-        processedNodes.add(nodeId); // Mark as processed for this run
-
-        const context: ActionContext = {
-            profile: profileData as Profile,
-            contact: currentContactState,
-            triggerData,
-            node,
-        };
+        // Initialize the queue with nodes connected to the trigger
+        const initialEdges = edges.filter(e => e.source === startNodeId);
+        const nodeQueue = initialEdges.map(edge => ({ nodeId: edge.target }));
         
-        try {
-            const handler = actionHandlers[node.data.type];
-            let result: ActionResult = {};
+        const processedNodes = new Set<string>([startNodeId]); // Start with trigger node already processed
+        
+        let currentContactState: Contact | null = contact ? { ...contact } : null;
 
-            if (handler) {
-                result = await handler(context);
-                if(result.updatedContact) {
-                    currentContactState = result.updatedContact;
-                }
-            }
+        while (nodeQueue.length > 0) {
+            const { nodeId } = nodeQueue.shift()!;
+            if (processedNodes.has(nodeId)) continue;
+
+            const node = nodes.find(n => n.id === nodeId);
+            if (!node) continue;
             
-            await logNodeExecution(run.id, automation.id, nodeId, 'success', result.details || 'Executado com sucesso.');
+            processedNodes.add(nodeId);
 
-            // Find next node(s) in the flow
-            const outgoingEdges = edges.filter(e => e.source === nodeId && (!result.nextNodeHandle || e.sourceHandle === result.nextNodeHandle || !e.sourceHandle));
-            for (const edge of outgoingEdges) {
-                nodeQueue.push({ nodeId: edge.target });
+            const context: ActionContext = {
+                profile: profile,
+                contact: currentContactState,
+                triggerData,
+                node,
+            };
+            
+            try {
+                const handler = actionHandlers[node.data.type];
+                let result: ActionResult = {};
+
+                if (handler) {
+                    result = await handler(context);
+                    if(result.updatedContact) {
+                        currentContactState = result.updatedContact;
+                    }
+                } else {
+                     result.details = `Nenhuma ação definida para o tipo de nó '${node.data.type}'. Pulando para a próxima etapa.`;
+                }
+                
+                await logNodeExecution(runId, automation.id, nodeId, 'success', result.details || 'Executado com sucesso.');
+
+                const outgoingEdges = edges.filter(e => e.source === nodeId && (!result.nextNodeHandle || e.sourceHandle === result.nextNodeHandle || !e.sourceHandle));
+                for (const edge of outgoingEdges) {
+                    nodeQueue.push({ nodeId: edge.target });
+                }
+
+            } catch (err: any) {
+                console.error(`Engine Error on node ${nodeId} in automation ${automation.id}:`, err);
+                await logNodeExecution(runId, automation.id, nodeId, 'failed', err.message || 'Ocorreu um erro desconhecido.');
+                await supabaseAdmin.from('automation_runs').update({ status: 'failed', details: `Error on node ${node.data.label}: ${err.message}` }).eq('id', runId);
+                return; // Stop execution on error
             }
+        }
 
-        } catch (err: any) {
-            console.error(`Engine Error on node ${nodeId} in automation ${automation.id}:`, err);
-            await logNodeExecution(run.id, automation.id, nodeId, 'failed', err.message || 'Ocorreu um erro desconhecido.');
-            await supabaseAdmin.from('automation_runs').update({ status: 'failed', details: `Error on node ${node.data.label}: ${err.message}` }).eq('id', run.id);
-            return; // Stop execution on error
+        await supabaseAdmin.from('automation_runs').update({ status: 'success', details: 'Completed successfully.' }).eq('id', runId);
+
+    } catch (e: any) {
+        console.error("Catastrophic engine failure:", e.message);
+        if (runId) {
+             await supabaseAdmin.from('automation_runs').update({ status: 'failed', details: `Catastrophic engine failure: ${e.message}` }).eq('id', runId);
         }
     }
-
-    await supabaseAdmin.from('automation_runs').update({ status: 'success', details: 'Completed successfully.' }).eq('id', run.id);
 };
