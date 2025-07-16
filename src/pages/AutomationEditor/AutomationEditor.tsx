@@ -1,6 +1,7 @@
 
-import React, { useContext, useState, useEffect, useCallback, memo, FC } from 'react';
-import { ReactFlow, ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, type Node, type Edge, type NodeProps, useReactFlow, NodeTypes, NodeChange, applyNodeChanges, EdgeLabelRenderer, getBezierPath, type EdgeProps as XyEdgeProps } from '@xyflow/react';
+
+import React, { useContext, useState, useEffect, useCallback, memo, FC, useMemo, useRef } from 'react';
+import { ReactFlow, ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, type Node, type Edge, type Connection, type NodeProps, useReactFlow, NodeTypes, EdgeLabelRenderer, getBezierPath, type EdgeProps as XyEdgeProps, OnNodesChange, OnEdgesChange, EdgeChange } from '@xyflow/react';
 import { AppContext } from '../../contexts/AppContext';
 import { Automation, AutomationNode, NodeData, AutomationNodeStats, AutomationNodeLog, TriggerType, ActionType, LogicType } from '../../types';
 import Button from '../../components/common/Button';
@@ -118,7 +119,7 @@ const CustomNode: FC<NodeProps<AutomationNode>> = ({ id, data, selected }) => {
 
     return (
         <div className={`${borderStyle} relative group`}>
-            {!isTrigger && selected && (
+            {selected && !isTrigger && (
                 <button 
                     onClick={(event) => {
                         event.stopPropagation();
@@ -153,8 +154,6 @@ const ConditionNode: FC<NodeProps<AutomationNode>> = ({ id, data, selected }) =>
     const [logs, setLogs] = useState<AutomationNodeLog[]>([]);
     const [isLoadingLogs, setIsLoadingLogs] = useState(false);
     const stats = automationStats[id];
-
-    const isTrigger = data.nodeType === 'trigger';
 
     const handleViewLogs = async () => {
         setIsLoadingLogs(true);
@@ -227,6 +226,7 @@ const Sidebar: React.FC<{ onAddNode: (type: string) => void }> = memo(({ onAddNo
                                 key={type}
                                 onClick={() => onAddNode(config.data.type as string)}
                                 className="p-3 text-left bg-slate-700/50 hover:bg-slate-700 rounded-lg transition-colors text-white"
+                                disabled={groupName === 'Triggers'} // Apenas 1 gatilho por automação
                             >
                                 {config.label}
                             </button>
@@ -246,21 +246,21 @@ const Editor: React.FC = () => {
     const { automations, updateAutomation, pageParams, setCurrentPage, templates, profile, fetchAutomationStats, automationStats, fetchNodeLogs, setAutomationStats } = useContext(AppContext);
     
     const [automation, setAutomation] = useState<Automation | null>(null);
-    const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-    const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+    const [nodes, setNodes, onNodesChange] = useNodesState<AutomationNode>(initialNodes);
+    const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initialEdges);
     const [isSaving, setIsSaving] = useState(false);
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
     const [selectedNode, setSelectedNode] = useState<AutomationNode | null>(null);
 
-    const { setViewport, screenToFlowPosition, deleteElements } = useReactFlow();
-    const saveTimeoutRef = React.useRef<NodeJS.Timeout>();
-    const hasFetchedStats = React.useRef(false);
+    const { screenToFlowPosition } = useReactFlow();
+    const saveTimeoutRef = useRef<NodeJS.Timeout>();
+    const hasFetchedStats = useRef(false);
+    const isMounted = useRef(false);
 
     useEffect(() => {
         const currentAutomation = automations.find(a => a.id === pageParams.automationId);
         if (currentAutomation) {
             setAutomation(currentAutomation);
-            // Initialize stats for this automation if not present
             if (!hasFetchedStats.current) {
                 fetchAutomationStats(currentAutomation.id);
                 hasFetchedStats.current = true;
@@ -269,7 +269,6 @@ const Editor: React.FC = () => {
             console.error(`Automação com ID ${pageParams.automationId} não encontrada.`);
         }
 
-        // Real-time subscription for stats
         const channel = supabase
             .channel(`automation-stats-${pageParams.automationId}`)
             .on('postgres_changes', { 
@@ -297,16 +296,11 @@ const Editor: React.FC = () => {
         if (automation) {
             setNodes(automation.nodes || []);
             setEdges(automation.edges || []);
+            // Use a timeout to ensure the initial state is set before we start tracking changes for saving.
+            setTimeout(() => { isMounted.current = true; }, 100);
         }
     }, [automation, setNodes, setEdges]);
     
-    const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (!automation) return;
-        const newAutomation = { ...automation, name: e.target.value };
-        setAutomation(newAutomation);
-        saveChanges(newAutomation);
-    };
-
     const saveChanges = useCallback((dataToSave: Automation) => {
         setIsSaving(true);
         if (saveTimeoutRef.current) {
@@ -317,14 +311,23 @@ const Editor: React.FC = () => {
             setIsSaving(false);
         }, 1000);
     }, [updateAutomation]);
-    
-    const onConnect = useCallback((params: any) => {
+
+    useEffect(() => {
+        if (!isMounted.current || !automation) return;
+        saveChanges({ ...automation, nodes, edges });
+    }, [nodes, edges, automation, saveChanges]);
+
+
+    const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!automation) return;
-        const newEdge = { ...params, type: 'deletable' };
-        const newEdges = addEdge(newEdge, edges);
-        setEdges(newEdges);
-        saveChanges({ ...automation, nodes, edges: newEdges });
-    }, [automation, edges, nodes, saveChanges, setEdges]);
+        const newAutomation = { ...automation, name: e.target.value };
+        setAutomation(newAutomation); // Update local state immediately for responsiveness
+        // The useEffect on [nodes, edges, automation] will handle the debounced save
+    };
+    
+    const onConnect = useCallback((params: Edge | Connection) => {
+        setEdges((eds) => addEdge({ ...params, type: 'deletable' }, eds))
+    }, [setEdges]);
 
     const addNode = (type: string) => {
         if (!automation) return;
@@ -332,7 +335,7 @@ const Editor: React.FC = () => {
         const { label, nodeType, data: nodeData } = nodeConfigs[type];
 
         const position = screenToFlowPosition({
-            x: 350,
+            x: window.innerWidth / 2 - 200, // Center horizontally
             y: 150,
         });
 
@@ -348,16 +351,12 @@ const Editor: React.FC = () => {
             },
         };
         
-        const newNodes = [...nodes, newNode];
-        setNodes(newNodes);
-        saveChanges({ ...automation, nodes: newNodes, edges });
+        setNodes((nds) => nds.concat(newNode));
     };
 
-    const handleUpdateNodes = useCallback(async (updatedNodes: AutomationNode[]) => {
-        if (!automation) return;
+    const handleUpdateNodesFromModal = useCallback(async (updatedNodes: AutomationNode[]) => {
         setNodes(updatedNodes);
-        saveChanges({ ...automation, nodes: updatedNodes, edges });
-    }, [automation, edges, saveChanges, setNodes]);
+    }, [setNodes]);
 
     const onNodeClick = useCallback((event: React.MouseEvent, node: AutomationNode) => {
         setSelectedNode(node);
@@ -369,6 +368,7 @@ const Editor: React.FC = () => {
         setSelectedNode(null);
     };
     
+    // Memoize node types to prevent re-renders
     const nodeTypes: NodeTypes = React.useMemo(() => ({
         trigger: CustomNode,
         action: CustomNode,
@@ -378,6 +378,11 @@ const Editor: React.FC = () => {
     const edgeTypes = React.useMemo(() => ({
         deletable: CustomDeletableEdge,
     }), []);
+    
+    // This derived state ensures the modal always has the latest version of the node.
+    const currentNodeForModal = useMemo(() => {
+        return nodes.find(n => n.id === selectedNode?.id) || null;
+    }, [nodes, selectedNode]);
     
     if (!automation) {
         return <div className="text-center text-white">Carregando automação...</div>;
@@ -420,13 +425,13 @@ const Editor: React.FC = () => {
                 <Sidebar onAddNode={addNode} />
             </div>
              <NodeSettingsModal 
-                node={selectedNode}
+                node={currentNodeForModal}
                 isOpen={isSettingsModalOpen}
                 onClose={handleCloseModal}
                 nodes={nodes}
                 templates={templates}
                 profile={profile}
-                onUpdateNodes={handleUpdateNodes}
+                onUpdateNodes={handleUpdateNodesFromModal}
              />
         </div>
     );
