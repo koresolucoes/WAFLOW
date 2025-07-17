@@ -1,5 +1,6 @@
 
-import { Json as DbJson, Database, Tables, TablesInsert, TablesUpdate } from './database.types.js';
+
+import { Json as DbJson, Tables, TablesInsert, TablesUpdate } from './database.types.js';
 import { MetaTemplateComponent } from './meta/types.js';
 
 export type Json = DbJson;
@@ -48,51 +49,19 @@ export interface NodeData {
 }
 
 // --- Plain object types to avoid TS recursion from generated types ---
-export type Profile = {
-    id: string;
-    updated_at: string | null;
-    company_name: string | null;
-    company_description: string | null;
-    company_products: string | null;
-    company_audience: string | null;
-    company_tone: string | null;
-    meta_access_token: string | null;
-    meta_waba_id: string | null;
-    meta_phone_number_id: string | null;
-    webhook_path_prefix: string | null;
-};
+export type Profile = Tables<'profiles'>;
+export type Contact = Tables<'contacts'>;
 
-export type Contact = {
-    id: string;
-    user_id: string;
-    name: string;
-    phone: string;
-    email: string | null;
-    company: string | null;
-    tags: string[] | null;
-    custom_fields: Json | null;
-    created_at: string;
-};
-
-export type MessageTemplate = {
-    id: string;
-    user_id: string;
-    meta_id: string | null;
-    template_name: string;
+export type MessageTemplate = Omit<Tables<'message_templates'>, 'category' | 'status' | 'components'> & {
     category: TemplateCategory;
-    components: MetaTemplateComponent[];
     status: TemplateStatus;
-    created_at: string;
+    components: MetaTemplateComponent[];
 };
 
-export type Automation = {
-    created_at: string;
-    edges: BackendEdge[];
-    id: string;
-    name: string;
+export type Automation = Omit<Tables<'automations'>, 'nodes' | 'edges' | 'status'> & {
     nodes: AutomationNode[];
+    edges: BackendEdge[];
     status: AutomationStatus;
-    user_id: string;
 };
 // --- END of Plain object types ---
 

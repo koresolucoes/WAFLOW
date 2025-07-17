@@ -1,6 +1,10 @@
 
 
 
+
+
+
+
 import React, { useContext, useState, useEffect, useCallback, memo, FC, useMemo, useRef } from 'react';
 import { ReactFlow, ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, type Node, type Edge, type Connection, type NodeProps, useReactFlow, NodeTypes, EdgeLabelRenderer, getBezierPath, type EdgeProps as XyEdgeProps, OnNodesChange, OnEdgesChange, EdgeChange } from '@xyflow/react';
 import { AppContext } from '../../contexts/AppContext';
@@ -96,8 +100,8 @@ const nodeStyles = {
     description: "text-xs text-slate-400"
 };
 
-const CustomNode = memo(({ id, data, selected }: NodeProps<AutomationNode>) => {
-    const { setNodes, setEdges } = useReactFlow<AutomationNode, Edge>();
+const CustomNode = memo(({ id, data, selected }: NodeProps<NodeData>) => {
+    const { setNodes, setEdges } = useReactFlow();
     const { automationStats, pageParams, fetchNodeLogs } = useContext(AppContext);
     const [isLogsModalOpen, setIsLogsModalOpen] = useState(false);
     const [logs, setLogs] = useState<AutomationNodeLog[]>([]);
@@ -150,8 +154,8 @@ const CustomNode = memo(({ id, data, selected }: NodeProps<AutomationNode>) => {
 });
 
 
-const ConditionNode = memo(({ id, data, selected }: NodeProps<AutomationNode>) => {
-    const { setNodes, setEdges } = useReactFlow<AutomationNode, Edge>();
+const ConditionNode = memo(({ id, data, selected }: NodeProps<NodeData>) => {
+    const { setNodes, setEdges } = useReactFlow();
     const { automationStats, pageParams, fetchNodeLogs } = useContext(AppContext);
     const [isLogsModalOpen, setIsLogsModalOpen] = useState(false);
     const [logs, setLogs] = useState<AutomationNodeLog[]>([]);
@@ -210,8 +214,8 @@ const ConditionNode = memo(({ id, data, selected }: NodeProps<AutomationNode>) =
     );
 });
 
-const SplitPathNode = memo(({ id, data, selected }: NodeProps<AutomationNode>) => {
-    const { setNodes, setEdges } = useReactFlow<AutomationNode, Edge>();
+const SplitPathNode = memo(({ id, data, selected }: NodeProps<NodeData>) => {
+    const { setNodes, setEdges } = useReactFlow();
     const { automationStats, pageParams, fetchNodeLogs } = useContext(AppContext);
     const [isLogsModalOpen, setIsLogsModalOpen] = useState(false);
     const [logs, setLogs] = useState<AutomationNodeLog[]>([]);
@@ -273,7 +277,7 @@ const SplitPathNode = memo(({ id, data, selected }: NodeProps<AutomationNode>) =
 // ====================================================================================
 // Editor Sidebar
 // ====================================================================================
-const Sidebar = memo(({ onAddNode, nodes }: { onAddNode: (type: string) => void; nodes: AutomationNode[] }) => {
+const Sidebar = memo(({ onAddNode, nodes }: { onAddNode: (type: string) => void; nodes: Node<NodeData>[] }) => {
     const nodeGroups = {
         Triggers: Object.entries(nodeConfigs).filter(([, c]) => c.nodeType === 'trigger'),
         Actions: Object.entries(nodeConfigs).filter(([, c]) => c.nodeType === 'action'),
@@ -315,13 +319,13 @@ const Editor: React.FC = () => {
     const { automations, updateAutomation, pageParams, setCurrentPage, templates, profile, fetchAutomationStats, automationStats, fetchNodeLogs, setAutomationStats } = useContext(AppContext);
     
     const [automation, setAutomation] = useState<Automation | null>(null);
-    const [nodes, setNodes, onNodesChange] = useNodesState<AutomationNode>(initialNodes);
-    const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initialEdges);
+    const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+    const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
     const [isSaving, setIsSaving] = useState(false);
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-    const [selectedNode, setSelectedNode] = useState<AutomationNode | null>(null);
+    const [selectedNode, setSelectedNode] = useState<Node<NodeData> | null>(null);
 
-    const { screenToFlowPosition } = useReactFlow<AutomationNode, Edge>();
+    const { screenToFlowPosition } = useReactFlow();
     const saveTimeoutRef = useRef<number | undefined>();
     const hasFetchedStats = useRef(false);
     const isMounted = useRef(false);
@@ -383,7 +387,7 @@ const Editor: React.FC = () => {
 
     useEffect(() => {
         if (!isMounted.current || !automation) return;
-        saveChanges({ ...automation, nodes, edges });
+        saveChanges({ ...automation, nodes: nodes as AutomationNode[], edges });
     }, [nodes, edges, automation, saveChanges]);
 
 
@@ -408,7 +412,7 @@ const Editor: React.FC = () => {
             y: 150,
         });
 
-        const newNode: AutomationNode = {
+        const newNode: Node<NodeData> = {
             id: `${type}_${Date.now()}`,
             type: nodeType === 'logic' ? type : nodeType,
             position,
@@ -423,20 +427,20 @@ const Editor: React.FC = () => {
         setNodes((nds) => nds.concat(newNode));
     };
 
-    const handleUpdateNodesFromModal = useCallback(async (updatedNodes: AutomationNode[], options?: { immediate?: boolean }) => {
+    const handleUpdateNodesFromModal = useCallback(async (updatedNodes: Node<NodeData>[], options?: { immediate?: boolean }) => {
         setNodes(updatedNodes);
         if (options?.immediate && automation) {
             if (saveTimeoutRef.current) {
                 clearTimeout(saveTimeoutRef.current);
             }
             setIsSaving(true);
-            await updateAutomation({ ...automation, nodes: updatedNodes, edges });
+            await updateAutomation({ ...automation, nodes: updatedNodes as AutomationNode[], edges });
             setIsSaving(false);
         }
     }, [setNodes, automation, edges, updateAutomation]);
 
 
-    const onNodeClick = useCallback((event: React.MouseEvent, node: AutomationNode) => {
+    const onNodeClick = useCallback((event: React.MouseEvent, node: Node<NodeData>) => {
         setSelectedNode(node);
         setIsSettingsModalOpen(true);
     }, []);
@@ -504,10 +508,10 @@ const Editor: React.FC = () => {
                 <Sidebar onAddNode={addNode} nodes={nodes} />
             </div>
              <NodeSettingsModal 
-                node={currentNodeForModal}
+                node={currentNodeForModal as AutomationNode | null}
                 isOpen={isSettingsModalOpen}
                 onClose={handleCloseModal}
-                nodes={nodes}
+                nodes={nodes as AutomationNode[]}
                 templates={templates}
                 profile={profile}
                 onUpdateNodes={handleUpdateNodesFromModal}

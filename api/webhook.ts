@@ -1,9 +1,13 @@
 
 
 
+
+
+
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from './_lib/supabaseAdmin.js';
-import { Contact, Profile } from './_lib/types.js';
+import { Contact, Profile, Tables } from './_lib/types.js';
 import { TablesInsert, TablesUpdate } from './_lib/database.types.js';
 import { handleMetaMessageEvent, handleNewContactEvent } from './_lib/automation/trigger-handler.js';
 
@@ -14,7 +18,6 @@ const findOrCreateContact = async (user_id: string, phone: string, name: string)
         .select('*')
         .eq('user_id', user_id)
         .eq('phone', phone)
-        .returns<Contact>()
         .single();
 
     if (error && error.code === 'PGRST116') { // Not found
@@ -23,18 +26,17 @@ const findOrCreateContact = async (user_id: string, phone: string, name: string)
             .from('contacts')
             .insert(newContactPayload as any)
             .select()
-            .returns<Contact>()
             .single();
         if (insertError || !newContact) {
              console.error("Error creating new contact:", insertError);
              return { contact: null, isNew: false };
         }
-        return { contact: newContact, isNew: true };
+        return { contact: newContact as Contact, isNew: true };
     } else if (error) {
          console.error("Error finding contact:", error);
         return { contact: null, isNew: false };
     }
-    return { contact: contactData, isNew: false };
+    return { contact: contactData as Contact, isNew: false };
 };
 
 
@@ -88,10 +90,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     if (value.messages) {
                         for (const message of value.messages) {
                             const wabaId = value.metadata.phone_number_id;
-                            const { data: profileData, error: profileError } = await supabaseAdmin.from('profiles').select('id').eq('meta_phone_number_id', wabaId).returns<{ id: string }>().single();
+                            const { data: profileData, error: profileError } = await supabaseAdmin.from('profiles').select('id').eq('meta_phone_number_id', wabaId).single();
                             
                             if (profileError || !profileData) continue;
-                            const userId = profileData.id;
+                            const userId = (profileData as Tables<'profiles'>).id;
 
                             const { contact, isNew } = await findOrCreateContact(userId, message.from, value.contacts[0].profile.name);
                             if (!contact) continue;
