@@ -82,7 +82,8 @@ CREATE TABLE public.message_templates (
     category text NOT NULL,
     components jsonb NOT NULL,
     status text NOT NULL DEFAULT 'LOCAL',
-    created_at timestamp with time zone NOT NULL DEFAULT now()
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    UNIQUE(user_id, meta_id)
 );
 CREATE INDEX message_templates_meta_id_idx ON public.message_templates USING btree (meta_id);
 comment on table public.message_templates is 'Armazena templates de mensagem criados ou sincronizados pelo usuário.';
