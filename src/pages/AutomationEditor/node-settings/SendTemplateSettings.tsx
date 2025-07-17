@@ -2,6 +2,7 @@
 import React, { useMemo } from 'react';
 import { NodeSettingsProps, InputWithVariables } from './common';
 import { getTemplatePlaceholders } from './utils';
+import { PlaceholderInfo } from './utils';
 
 const baseInputClass = "w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white placeholder-slate-400 focus:ring-2 focus:ring-sky-500 focus:border-sky-500";
 
@@ -12,9 +13,9 @@ const SendTemplateSettings: React.FC<NodeSettingsProps> = ({ node, onConfigChang
         onConfigChange({ ...config, [key]: value });
     };
 
-    const approvedTemplates = templates.filter(t => t.status === 'APPROVED');
-    const selectedTemplate = templates.find(t => t.id === config.template_id);
-    const placeholders = useMemo(() => getTemplatePlaceholders(selectedTemplate), [selectedTemplate]);
+    const approvedTemplates = useMemo(() => templates.filter(t => t.status === 'APPROVED'), [templates]);
+    const selectedTemplate = useMemo(() => templates.find(t => t.id === config.template_id), [templates, config.template_id]);
+    const placeholders: PlaceholderInfo[] = useMemo(() => getTemplatePlaceholders(selectedTemplate), [selectedTemplate]);
 
     return (
         <div className="space-y-4">
@@ -35,15 +36,16 @@ const SendTemplateSettings: React.FC<NodeSettingsProps> = ({ node, onConfigChang
                 <div className="border-t border-slate-700 pt-4 space-y-3">
                     <h5 className="text-md font-semibold text-white">Preencher Variáveis</h5>
                     {placeholders.map(p => (
-                        <div key={p}>
+                        <div key={p.placeholder}>
                             <label className="block text-sm font-medium text-slate-300 mb-1">
-                                Variável {p}
+                                Variável {p.placeholder}
+                                <span className="text-xs text-slate-400 ml-2">({p.location})</span>
                             </label>
                             <InputWithVariables
-                                onValueChange={val => handleConfigChange(p, val)}
-                                value={config[p] || ''}
+                                onValueChange={val => handleConfigChange(p.placeholder, val)}
+                                value={config[p.placeholder] || ''}
                                 type="text"
-                                placeholder={`Valor para ${p}`}
+                                placeholder={`Valor para ${p.placeholder}`}
                                 className={baseInputClass}
                                 variables={availableVariables}
                             />

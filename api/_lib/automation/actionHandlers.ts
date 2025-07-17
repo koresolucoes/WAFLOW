@@ -1,4 +1,5 @@
 
+
 import { supabaseAdmin } from '../supabaseAdmin.js';
 import { sendTemplatedMessage, sendTextMessage, sendMediaMessage, sendInteractiveMessage } from '../meta/messages.js';
 import { AutomationNode, Contact, Json, MetaConfig, MessageTemplate, Profile, Tables } from '../types.js';
@@ -86,38 +87,76 @@ const sendTemplate: ActionHandler = async ({ profile, contact, node, trigger }) 
         throw new Error('Ação "Enviar Template" requer um contato. A automação foi iniciada por um gatilho que não fornece um contato.');
     }
     const config = (node.data.config || {}) as any;
+    if (!config.template_id) {
+        throw new Error('Nenhum template foi selecionado nas configurações do nó.');
+    }
+
     const { data: template, error: templateError } = await supabaseAdmin.from('message_templates').select('*').eq('id', config.template_id).single();
     if (templateError || !template) throw new Error(`Erro ao buscar template: ${templateError?.message || 'Template não encontrado.'}`);
     
     const metaConfig = getMetaConfig(profile);
     const templateTyped = template as unknown as MessageTemplate;
     
-    let allText = '';
-    templateTyped.components.forEach(c => {
-        if(c.text) allText += c.text + ' ';
-        if(c.type === 'BUTTONS' && c.buttons) {
-            c.buttons.forEach(b => {
-                if(b.type === 'URL' && b.url) allText += b.url + ' ';
-            });
-        }
-    });
-    const placeholders = allText.match(/\{\{\d+\}\}/g) || [];
-    const uniquePlaceholders = [...new Set(placeholders)];
-    
-    const bodyParameters = uniquePlaceholders.map(p => {
-       const rawValue = p === '{{1}}' ? '{{contact.name}}' : (config[p] || '');
-       const resolvedValue = resolveVariables(rawValue, { contact, trigger });
-       return { type: 'text', text: resolvedValue };
-    });
+    const finalComponents: any[] = [];
+    const context = { contact, trigger };
 
-    const components = [{ type: 'body', parameters: bodyParameters }];
+    const resolvePlaceholder = (placeholder: string) => {
+        const rawValue = placeholder === '{{1}}' ? '{{contact.name}}' : (config[placeholder] || '');
+        return resolveVariables(rawValue, context);
+    };
+
+    // Process HEADER component
+    const headerComponent = templateTyped.components.find(c => c.type === 'HEADER');
+    if (headerComponent && headerComponent.text) {
+        const placeholders = headerComponent.text.match(/\{\{\d+\}\}/g) || [];
+        if (placeholders.length > 0) {
+            const parameters = placeholders.map(p => ({ type: 'text', text: resolvePlaceholder(p) }));
+            finalComponents.push({ type: 'header', parameters });
+        }
+    }
+
+    // Process BODY component
+    const bodyComponent = templateTyped.components.find(c => c.type === 'BODY');
+    if (bodyComponent && bodyComponent.text) {
+        const placeholders = bodyComponent.text.match(/\{\{\d+\}\}/g) || [];
+        if (placeholders.length > 0) {
+            const parameters = placeholders.map(p => ({ type: 'text', text: resolvePlaceholder(p) }));
+            finalComponents.push({ type: 'body', parameters });
+        }
+    }
+
+    // Process BUTTONS component
+    const buttonsComponent = templateTyped.components.find(c => c.type === 'BUTTONS');
+    if (buttonsComponent && buttonsComponent.buttons) {
+        buttonsComponent.buttons.forEach((button, index) => {
+            if (button.type === 'URL' && button.url) {
+                // The API expects a parameter for the dynamic part of the URL.
+                // Example: URL is "https://acme.com/{{1}}". The placeholder is "{{1}}".
+                // We resolve "{{1}}" to get the dynamic part, e.g., "product/1234".
+                const placeholders = button.url.match(/\{\{\d+\}\}/g) || [];
+                if (placeholders.length > 0) {
+                    // Meta expects one parameter per variable in the URL button.
+                    const parameters = placeholders.map(p => ({ type: 'text', text: resolvePlaceholder(p) }));
+                    
+                    // Each button with variables needs its own component object.
+                    finalComponents.push({
+                        type: 'button',
+                        sub_type: 'url',
+                        index: String(index),
+                        parameters: parameters
+                    });
+                }
+            }
+        });
+    }
 
     await sendTemplatedMessage(
        metaConfig, 
        contact.phone, 
        templateTyped.template_name, 
-       components
+       finalComponents.length > 0 ? finalComponents : undefined
     );
+
     return { details: `Template '${templateTyped.template_name}' enviado para ${contact.name}.` };
 };
 
@@ -182,14 +221,14 @@ const addTag: ActionHandler = async ({ contact, node, trigger }) => {
         const updatePayload: TablesUpdate<'contacts'> = { tags: newTags };
         const { data: updatedContact, error } = await supabaseAdmin
             .from('contacts')
-            .update(updatePayload)
+            .update(updatePayload as any)
             .eq('id', contact.id)
             .select()
             .single();
 
         if (error) throw error;
         if (!updatedContact) throw new Error('Failed to update contact after adding tag.');
-        const finalContact = updatedContact as unknown as Contact;
+        const finalContact = updatedContact as Contact;
 
         // Non-blocking call to handle triggers for the newly added tag
         handleTagAddedEvent(contact.user_id, finalContact, tagToAdd);
@@ -208,10 +247,10 @@ const removeTag: ActionHandler = async ({ contact, node, trigger }) => {
         const tagToRemove = resolveVariables(config.tag, { contact, trigger });
         const newTags = (contact.tags || []).filter(t => t !== tagToRemove);
         const updatePayload: TablesUpdate<'contacts'> = { tags: newTags };
-        const { data, error } = await supabaseAdmin.from('contacts').update(updatePayload).eq('id', contact.id).select().single();
+        const { data, error } = await supabaseAdmin.from('contacts').update(updatePayload as any).eq('id', contact.id).select().single();
         if (error) throw error;
         if (!data) throw new Error('Failed to update contact after removing tag.');
-        return { updatedContact: data as unknown as Contact, details: `Tag '${tagToRemove}' removida do contato.` };
+        return { updatedContact: data as Contact, details: `Tag '${tagToRemove}' removida do contato.` };
     }
     throw new Error('Tag a ser removida não está configurada.');
 };
@@ -226,10 +265,10 @@ const setCustomField: ActionHandler = async ({ contact, node, trigger }) => {
         const fieldValue = resolveVariables(config.field_value || '', { contact, trigger });
         const newCustomFields = { ...(contact.custom_fields as object || {}), [fieldName]: fieldValue };
         const updatePayload: TablesUpdate<'contacts'> = { custom_fields: newCustomFields };
-        const { data, error } = await supabaseAdmin.from('contacts').update(updatePayload).eq('id', contact.id).select().single();
+        const { data, error } = await supabaseAdmin.from('contacts').update(updatePayload as any).eq('id', contact.id).select().single();
         if (error) throw error;
         if (!data) throw new Error('Failed to update contact after setting custom field.');
-        return { updatedContact: data as unknown as Contact, details: `Campo '${fieldName}' atualizado para '${fieldValue}'.` };
+        return { updatedContact: data as Contact, details: `Campo '${fieldName}' atualizado para '${fieldValue}'.` };
     }
     throw new Error('Nome do campo personalizado não está configurado.');
 };

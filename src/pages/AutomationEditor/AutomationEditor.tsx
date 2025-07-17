@@ -1,4 +1,5 @@
 
+
 import React, { useContext, useState, useEffect, useCallback, memo, FC, useMemo, useRef } from 'react';
 import { ReactFlow, ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, type Node, type Edge, type Connection, type NodeProps, useReactFlow, NodeTypes, EdgeLabelRenderer, getBezierPath, type EdgeProps as XyEdgeProps, MarkerType, BackgroundVariant } from '@xyflow/react';
 import { AppContext } from '../../contexts/AppContext';
@@ -313,9 +314,7 @@ const Editor: React.FC = () => {
         setAutomation(newAutomation);
     };
     
-    const onConnect = useCallback((params: Edge | Connection) => {
-        setEdges((eds) => addEdge({ ...params, type: 'deletable', style: { strokeWidth: 2, stroke: '#0ea5e9' }, markerEnd: { type: MarkerType.ArrowClosed, color: '#0ea5e9' } }, eds))
-    }, [setEdges]);
+    const onConnect = useCallback((params: Connection) => setEdges((eds) => addEdge(params, eds)), [setEdges]);
 
     const addNode = (type: string) => {
         if (!automation) return;
