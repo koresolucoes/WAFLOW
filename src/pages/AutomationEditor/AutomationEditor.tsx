@@ -1,23 +1,18 @@
 
-
-
-
-
-
-
 import React, { useContext, useState, useEffect, useCallback, memo, FC, useMemo, useRef } from 'react';
-import { ReactFlow, ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, type Node, type Edge, type Connection, type NodeProps, useReactFlow, NodeTypes, EdgeLabelRenderer, getBezierPath, type EdgeProps as XyEdgeProps, OnNodesChange, OnEdgesChange, EdgeChange } from '@xyflow/react';
+import { ReactFlow, ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, type Node, type Edge, type Connection, type NodeProps, useReactFlow, NodeTypes, EdgeLabelRenderer, getBezierPath, type EdgeProps as XyEdgeProps, MarkerType, BackgroundVariant } from '@xyflow/react';
 import { AppContext } from '../../contexts/AppContext';
 import { Automation, AutomationNode, NodeData, AutomationNodeStats, AutomationNodeLog, TriggerType, ActionType, LogicType } from '../../types';
 import Button from '../../components/common/Button';
 import Card from '../../components/common/Card';
 import { supabase } from '../../lib/supabaseClient';
-import { AUTOMATION_ICON } from '../../components/icons';
-import NodeSettingsModal from './NodeSettingsModal';
 import { nodeConfigs } from '../../lib/automation/nodeConfigs';
 import { Json } from '../../types/database.types';
+import NodeSettingsModal from './NodeSettingsModal';
 import NodeStats from './NodeStats';
 import NodeLogsModal from './NodeLogsModal';
+import { nodeIcons } from '../../lib/automation/nodeIcons';
+
 
 const initialNodes: AutomationNode[] = [];
 const initialEdges: Edge[] = [];
@@ -83,21 +78,22 @@ const CustomDeletableEdge: FC<XyEdgeProps> = ({
 };
 
 // ====================================================================================
-// Custom Node Components
+// NEW Unified Custom Node Component
 // ====================================================================================
 
 const nodeStyles = {
-    base: "bg-slate-800 border-2 rounded-lg shadow-xl text-white w-72",
-    body: "p-4",
-    header: "px-4 py-2 rounded-t-lg font-bold text-sm flex items-center gap-2",
+    base: "bg-slate-800 border-t-4 rounded-xl shadow-2xl text-white w-72 group",
+    body: "p-4 space-y-2",
+    header: "flex items-center gap-3",
+    iconContainer: "flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-lg",
     trigger: "border-sky-500",
     action: "border-pink-500",
     logic: "border-purple-500",
-    triggerHeader: "bg-sky-500/20",
-    actionHeader: "bg-pink-500/20",
-    logicHeader: "bg-purple-500/20",
-    label: "text-base font-semibold",
-    description: "text-xs text-slate-400"
+    triggerIconBg: "bg-sky-500/20",
+    actionIconBg: "bg-pink-500/20",
+    logicIconBg: "bg-purple-500/20",
+    label: "text-base font-semibold text-slate-100",
+    description: "text-xs text-slate-400 min-h-[16px]", // min-h to prevent layout shift
 };
 
 const CustomNode = memo(({ id, data, selected }: NodeProps<NodeData>) => {
@@ -108,10 +104,13 @@ const CustomNode = memo(({ id, data, selected }: NodeProps<NodeData>) => {
     const [isLoadingLogs, setIsLoadingLogs] = useState(false);
 
     const stats = automationStats[id];
+    const nodeConfig = nodeConfigs[data.type];
+    const description = nodeConfig?.description ? nodeConfig.description(data) : 'Clique para configurar.';
 
     const nodeTypeStyle = data.nodeType;
-    const headerStyle = `${nodeStyles.header} ${nodeStyles[`${nodeTypeStyle}Header`]}`;
     const borderStyle = `${nodeStyles.base} ${nodeStyles[nodeTypeStyle]}`;
+    const iconBgStyle = nodeStyles[`${nodeTypeStyle}IconBg`];
+    const IconComponent = nodeIcons[data.type] || nodeIcons.default;
     
     const handleViewLogs = async () => {
         setIsLoadingLogs(true);
@@ -126,153 +125,71 @@ const CustomNode = memo(({ id, data, selected }: NodeProps<NodeData>) => {
         setEdges((eds) => eds.filter((edge) => edge.source !== id && edge.target !== id));
         setNodes((nds) => nds.filter((node) => node.id !== id));
     };
+    
+    const isLogicNode = data.nodeType === 'logic';
 
     return (
-        <div className={`${borderStyle} relative group`}>
-            {selected && (
+        <div className={borderStyle}>
+             {selected && (
                 <button 
                     onClick={handleDelete} 
-                    className="absolute top-[-10px] right-[-10px] bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold shadow-lg hover:bg-red-600 z-10"
+                    className="absolute top-[-10px] right-[-10px] bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold shadow-lg hover:bg-red-600 z-10 opacity-0 group-hover:opacity-100 transition-opacity"
                     aria-label="Deletar Nó"
                 >
                     &times;
                 </button>
             )}
-            <Handle type="target" position={Position.Left} className="!bg-slate-500" isConnectable={data.nodeType !== 'trigger'} />
-            <div className={headerStyle}>
-                <AUTOMATION_ICON className="w-4 h-4" />
-                <span>{data.label}</span>
-            </div>
+
+            {isLogicNode ? (
+                 <Handle type="target" position={Position.Top} className="!bg-slate-500" />
+            ) : (
+                <Handle type="target" position={Position.Left} className="!bg-slate-500" isConnectable={data.nodeType !== 'trigger'} />
+            )}
+           
             <div className={nodeStyles.body}>
-                <p className={nodeStyles.description}>Clique para configurar este nó.</p>
+                <div className={nodeStyles.header}>
+                    <div className={`${nodeStyles.iconContainer} ${iconBgStyle}`}>
+                        <IconComponent className="w-5 h-5" />
+                    </div>
+                    <div>
+                         <h3 className={nodeStyles.label}>{data.label}</h3>
+                    </div>
+                </div>
+                <p className={nodeStyles.description}>{description}</p>
                 <NodeStats stats={stats} onViewLogs={handleViewLogs}/>
             </div>
-            <Handle type="source" position={Position.Right} className="!bg-slate-500" />
+
+            {data.type === 'condition' ? (
+                <div className="flex justify-between relative px-5 py-2 bg-slate-900/30 rounded-b-xl">
+                    <div className="text-center">
+                        <Handle type="source" position={Position.Bottom} id="yes" className="!bg-green-500 !bottom-[-5px]" />
+                        <span className="text-xs font-semibold text-green-400">SIM</span>
+                    </div>
+                    <div className="text-center">
+                        <Handle type="source" position={Position.Bottom} id="no" className="!bg-red-500 !bottom-[-5px]" />
+                        <span className="text-xs font-semibold text-red-400">NÃO</span>
+                    </div>
+                </div>
+            ) : data.type === 'split_path' ? (
+                <div className="flex justify-between relative px-5 py-2 bg-slate-900/30 rounded-b-xl">
+                    <div className="text-center">
+                        <Handle type="source" position={Position.Bottom} id="a" className="!bg-cyan-500 !bottom-[-5px]" />
+                        <span className="text-xs font-semibold text-cyan-400">Via A</span>
+                    </div>
+                    <div className="text-center">
+                        <Handle type="source" position={Position.Bottom} id="b" className="!bg-indigo-500 !bottom-[-5px]" />
+                        <span className="text-xs font-semibold text-indigo-400">Via B</span>
+                    </div>
+                </div>
+            ) : (
+                 <Handle type="source" position={Position.Right} className="!bg-slate-500" />
+            )}
+            
             <NodeLogsModal isOpen={isLogsModalOpen} onClose={() => setIsLogsModalOpen(false)} nodeLabel={data.label} logs={logs} isLoading={isLoadingLogs} />
         </div>
     );
 });
 
-
-const ConditionNode = memo(({ id, data, selected }: NodeProps<NodeData>) => {
-    const { setNodes, setEdges } = useReactFlow();
-    const { automationStats, pageParams, fetchNodeLogs } = useContext(AppContext);
-    const [isLogsModalOpen, setIsLogsModalOpen] = useState(false);
-    const [logs, setLogs] = useState<AutomationNodeLog[]>([]);
-    const [isLoadingLogs, setIsLoadingLogs] = useState(false);
-    const stats = automationStats[id];
-
-    const handleViewLogs = async () => {
-        setIsLoadingLogs(true);
-        setIsLogsModalOpen(true);
-        const fetchedLogs = await fetchNodeLogs(pageParams.automationId, id);
-        setLogs(fetchedLogs);
-        setIsLoadingLogs(false);
-    };
-
-    const handleDelete = (event: React.MouseEvent) => {
-        event.stopPropagation();
-        setEdges((eds) => eds.filter((edge) => edge.source !== id && edge.target !== id));
-        setNodes((nds) => nds.filter((node) => node.id !== id));
-    };
-
-    return (
-        <div className={`${nodeStyles.base} ${nodeStyles.logic} relative group`}>
-            {selected && (
-                 <button 
-                    onClick={handleDelete} 
-                    className="absolute top-[-10px] right-[-10px] bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold shadow-lg hover:bg-red-600 z-10"
-                    aria-label="Deletar Nó"
-                >
-                    &times;
-                </button>
-            )}
-            <Handle type="target" position={Position.Top} className="!bg-slate-500" />
-            
-            <div className={`${nodeStyles.header} ${nodeStyles.logicHeader}`}>
-                <AUTOMATION_ICON className="w-4 h-4" />
-                <span>{data.label}</span>
-            </div>
-            
-            <div className={`${nodeStyles.body} text-center`}>
-                <p className={nodeStyles.description}>Clique para configurar as regras de condição.</p>
-                <NodeStats stats={stats} onViewLogs={handleViewLogs}/>
-            </div>
-
-            <div className="flex justify-between relative px-5 py-2">
-                <div className="text-center">
-                    <Handle type="source" position={Position.Bottom} id="yes" className="!bg-green-500 !bottom-[-5px]" />
-                    <span className="text-xs font-semibold text-green-400">SIM</span>
-                </div>
-                <div className="text-center">
-                    <Handle type="source" position={Position.Bottom} id="no" className="!bg-red-500 !bottom-[-5px]" />
-                    <span className="text-xs font-semibold text-red-400">NÃO</span>
-                </div>
-            </div>
-             <NodeLogsModal isOpen={isLogsModalOpen} onClose={() => setIsLogsModalOpen(false)} nodeLabel={data.label} logs={logs} isLoading={isLoadingLogs} />
-        </div>
-    );
-});
-
-const SplitPathNode = memo(({ id, data, selected }: NodeProps<NodeData>) => {
-    const { setNodes, setEdges } = useReactFlow();
-    const { automationStats, pageParams, fetchNodeLogs } = useContext(AppContext);
-    const [isLogsModalOpen, setIsLogsModalOpen] = useState(false);
-    const [logs, setLogs] = useState<AutomationNodeLog[]>([]);
-    const [isLoadingLogs, setIsLoadingLogs] = useState(false);
-    const stats = automationStats[id];
-
-    const handleViewLogs = async () => {
-        setIsLoadingLogs(true);
-        setIsLogsModalOpen(true);
-        const fetchedLogs = await fetchNodeLogs(pageParams.automationId, id);
-        setLogs(fetchedLogs);
-        setIsLoadingLogs(false);
-    };
-
-    const handleDelete = (event: React.MouseEvent) => {
-        event.stopPropagation();
-        setEdges((eds) => eds.filter((edge) => edge.source !== id && edge.target !== id));
-        setNodes((nds) => nds.filter((node) => node.id !== id));
-    };
-
-    return (
-        <div className={`${nodeStyles.base} ${nodeStyles.logic} relative group`}>
-            {selected && (
-                 <button 
-                    onClick={handleDelete} 
-                    className="absolute top-[-10px] right-[-10px] bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold shadow-lg hover:bg-red-600 z-10"
-                    aria-label="Deletar Nó"
-                >
-                    &times;
-                </button>
-            )}
-            <Handle type="target" position={Position.Top} className="!bg-slate-500" />
-            
-            <div className={`${nodeStyles.header} ${nodeStyles.logicHeader}`}>
-                <AUTOMATION_ICON className="w-4 h-4" />
-                <span>{data.label}</span>
-            </div>
-            
-            <div className={`${nodeStyles.body} text-center`}>
-                <p className={nodeStyles.description}>Divide o fluxo em dois caminhos (50/50).</p>
-                <NodeStats stats={stats} onViewLogs={handleViewLogs}/>
-            </div>
-
-            <div className="flex justify-between relative px-5 py-2">
-                <div className="text-center">
-                    <Handle type="source" position={Position.Bottom} id="a" className="!bg-cyan-500 !bottom-[-5px]" />
-                    <span className="text-xs font-semibold text-cyan-400">Via A</span>
-                </div>
-                <div className="text-center">
-                    <Handle type="source" position={Position.Bottom} id="b" className="!bg-indigo-500 !bottom-[-5px]" />
-                    <span className="text-xs font-semibold text-indigo-400">Via B</span>
-                </div>
-            </div>
-             <NodeLogsModal isOpen={isLogsModalOpen} onClose={() => setIsLogsModalOpen(false)} nodeLabel={data.label} logs={logs} isLoading={isLoadingLogs} />
-        </div>
-    );
-});
 
 // ====================================================================================
 // Editor Sidebar
@@ -316,7 +233,7 @@ const Sidebar = memo(({ onAddNode, nodes }: { onAddNode: (type: string) => void;
 // ====================================================================================
 
 const Editor: React.FC = () => {
-    const { automations, updateAutomation, pageParams, setCurrentPage, templates, profile, fetchAutomationStats, automationStats, fetchNodeLogs, setAutomationStats } = useContext(AppContext);
+    const { automations, updateAutomation, pageParams, setCurrentPage, templates, profile, fetchAutomationStats, setAutomationStats } = useContext(AppContext);
     
     const [automation, setAutomation] = useState<Automation | null>(null);
     const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
@@ -369,7 +286,6 @@ const Editor: React.FC = () => {
         if (automation) {
             setNodes(automation.nodes || []);
             setEdges(automation.edges || []);
-            // Use a timeout to ensure the initial state is set before we start tracking changes for saving.
             setTimeout(() => { isMounted.current = true; }, 100);
         }
     }, [automation, setNodes, setEdges]);
@@ -394,27 +310,21 @@ const Editor: React.FC = () => {
     const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!automation) return;
         const newAutomation = { ...automation, name: e.target.value };
-        setAutomation(newAutomation); // Update local state immediately for responsiveness
-        // The useEffect on [nodes, edges, automation] will handle the debounced save
+        setAutomation(newAutomation);
     };
     
     const onConnect = useCallback((params: Edge | Connection) => {
-        setEdges((eds) => addEdge({ ...params, type: 'deletable' }, eds))
+        setEdges((eds) => addEdge({ ...params, type: 'deletable', style: { strokeWidth: 2, stroke: '#0ea5e9' }, markerEnd: { type: MarkerType.ArrowClosed, color: '#0ea5e9' } }, eds))
     }, [setEdges]);
 
     const addNode = (type: string) => {
         if (!automation) return;
-
         const { label, nodeType, data: nodeData } = nodeConfigs[type];
-
-        const position = screenToFlowPosition({
-            x: window.innerWidth / 2 - 200, // Center horizontally
-            y: 150,
-        });
+        const position = screenToFlowPosition({ x: window.innerWidth / 2 - 200, y: 150 });
 
         const newNode: Node<NodeData> = {
             id: `${type}_${Date.now()}`,
-            type: nodeType === 'logic' ? type : nodeType,
+            type: 'custom', // Use a single custom type
             position,
             data: {
                 nodeType: nodeType,
@@ -430,9 +340,7 @@ const Editor: React.FC = () => {
     const handleUpdateNodesFromModal = useCallback(async (updatedNodes: Node<NodeData>[], options?: { immediate?: boolean }) => {
         setNodes(updatedNodes);
         if (options?.immediate && automation) {
-            if (saveTimeoutRef.current) {
-                clearTimeout(saveTimeoutRef.current);
-            }
+            if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
             setIsSaving(true);
             await updateAutomation({ ...automation, nodes: updatedNodes as AutomationNode[], edges });
             setIsSaving(false);
@@ -450,19 +358,14 @@ const Editor: React.FC = () => {
         setSelectedNode(null);
     };
     
-    // Memoize node types to prevent re-renders
     const nodeTypes: NodeTypes = React.useMemo(() => ({
-        trigger: CustomNode,
-        action: CustomNode,
-        condition: ConditionNode,
-        split_path: SplitPathNode,
+        custom: CustomNode,
     }), []);
 
     const edgeTypes = React.useMemo(() => ({
         deletable: CustomDeletableEdge,
     }), []);
     
-    // This derived state ensures the modal always has the latest version of the node.
     const currentNodeForModal = useMemo(() => {
         return nodes.find(n => n.id === selectedNode?.id) || null;
     }, [nodes, selectedNode]);
@@ -470,6 +373,12 @@ const Editor: React.FC = () => {
     if (!automation) {
         return <div className="text-center text-white">Carregando automação...</div>;
     }
+
+    const defaultEdgeOptions = {
+      style: { strokeWidth: 2, stroke: '#0ea5e9' },
+      markerEnd: { type: MarkerType.ArrowClosed, color: '#0ea5e9' },
+      type: 'deletable',
+    };
 
     return (
         <div className="flex flex-col h-full">
@@ -500,8 +409,9 @@ const Editor: React.FC = () => {
                         onNodeClick={onNodeClick}
                         fitView
                         className="bg-slate-900"
+                        defaultEdgeOptions={defaultEdgeOptions}
                     >
-                        <Background color="#475569" gap={16} />
+                        <Background variant={BackgroundVariant.Dots} color="#334155" gap={24} size={1} style={{ background: 'radial-gradient(circle, rgba(14, 165, 233, 0.1) 0%, transparent 50%)' }} />
                         <Controls showInteractive={false} />
                     </ReactFlow>
                 </main>

@@ -1,10 +1,4 @@
 
-
-
-
-
-
-
 import { supabaseAdmin } from './supabaseAdmin.js';
 import { Automation, Contact, Json, Profile } from './types.js';
 import { TablesInsert, TablesUpdate } from './database.types.js';
@@ -36,7 +30,7 @@ async function logNodeExecution(
         status,
         details
     };
-    const { error: logError } = await supabaseAdmin.from('automation_node_logs').insert(logEntry as any);
+    const { error: logError } = await supabaseAdmin.from('automation_node_logs').insert(logEntry);
 
     if (logError) {
         console.error(`Engine Log Error (Insert): Failed to insert log for node ${nodeId}`, logError);
@@ -58,8 +52,7 @@ export const executeAutomation = async (
             .from('profiles')
             .select('*')
             .eq('id', automation.user_id)
-            .returns<Profile>()
-            .single();
+            .single<Profile>();
 
         if (profileError || !profileData) {
             throw new Error(`Engine Error: Could not find profile for user ${automation.user_id}. Details: ${profileError?.message}`);
@@ -74,10 +67,9 @@ export const executeAutomation = async (
         };
         const { data: runResult, error: runError } = await supabaseAdmin
             .from('automation_runs')
-            .insert(runEntry as any)
+            .insert(runEntry)
             .select('id')
-            .returns<{ id: string }>()
-            .single();
+            .single<{ id: string }>();
 
         if (runError || !runResult) {
             throw new Error(`Engine Error: Failed to create run log for automation ${automation.id}. Details: ${runError?.message}`);
@@ -158,21 +150,21 @@ export const executeAutomation = async (
                 console.error(`Engine Error on node ${nodeId} in automation ${automation.id}:`, err);
                 await logNodeExecution(runId, automation.id, nodeId, 'failed', err.message || 'Ocorreu um erro desconhecido.');
                 const updatePayload: TablesUpdate<'automation_runs'> = { status: 'failed', details: `Error on node ${node.data.label}: ${err.message}` };
-                await supabaseAdmin.from('automation_runs').update(updatePayload as any).eq('id', runId);
+                await supabaseAdmin.from('automation_runs').update(updatePayload).eq('id', runId);
                 // Stop the entire flow on first error
                 throw err;
             }
         }
 
         const successUpdatePayload: TablesUpdate<'automation_runs'> = { status: 'success', details: 'Completed successfully.' };
-        await supabaseAdmin.from('automation_runs').update(successUpdatePayload as any).eq('id', runId);
+        await supabaseAdmin.from('automation_runs').update(successUpdatePayload).eq('id', runId);
          console.log(`[Engine End] Automation ${automation.id} finished successfully.`);
 
     } catch (e: any) {
         console.error(`[Engine Failure] Automation ${automation.id} failed. Error:`, e.message);
         if (runId) {
              const failureUpdatePayload: TablesUpdate<'automation_runs'> = { status: 'failed', details: `Catastrophic engine failure: ${e.message}` };
-             await supabaseAdmin.from('automation_runs').update(failureUpdatePayload as any).eq('id', runId);
+             await supabaseAdmin.from('automation_runs').update(failureUpdatePayload).eq('id', runId);
         }
     }
 };

@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { NodeData } from '../../types';
 import MetaTriggerSettings from '../../pages/AutomationEditor/node-settings/MetaTriggerSettings';
@@ -13,7 +14,10 @@ interface NodeConfig {
     nodeType: 'trigger' | 'action' | 'logic';
     data: Partial<NodeData>;
     SettingsComponent: React.FC<any>;
+    description: (data: NodeData) => string;
 }
+
+const truncate = (str: string, length: number) => str.length > length ? `${str.substring(0, length)}...` : str;
 
 export const nodeConfigs: Record<string, NodeConfig> = {
     // Triggers
@@ -27,6 +31,7 @@ export const nodeConfigs: Record<string, NodeConfig> = {
             config: { keyword: '' }
         },
         SettingsComponent: MetaTriggerSettings,
+        description: data => (data.config as any)?.keyword ? `Quando a mensagem contém "${truncate((data.config as any).keyword, 20)}"` : 'Configurar palavra-chave.',
     },
     'button_clicked': {
         label: 'Botão Clicado',
@@ -38,6 +43,7 @@ export const nodeConfigs: Record<string, NodeConfig> = {
             config: { button_payload: '' }
         },
         SettingsComponent: MetaTriggerSettings,
+        description: data => (data.config as any)?.button_payload ? `Quando o botão "${truncate((data.config as any).button_payload, 20)}" é clicado` : 'Configurar ID do botão.',
     },
     'new_contact': {
         label: 'Novo Contato Criado',
@@ -49,6 +55,7 @@ export const nodeConfigs: Record<string, NodeConfig> = {
             config: {}
         },
         SettingsComponent: MetaTriggerSettings,
+        description: () => 'Quando um novo contato é criado.',
     },
     'new_contact_with_tag': {
         label: 'Tag Adicionada a Contato',
@@ -60,6 +67,7 @@ export const nodeConfigs: Record<string, NodeConfig> = {
             config: { tag: '' }
         },
         SettingsComponent: MetaTriggerSettings,
+        description: data => (data.config as any)?.tag ? `Quando a tag "${truncate((data.config as any).tag, 25)}" é adicionada` : 'Configurar tag.',
     },
     'webhook_received': {
         label: 'Webhook Recebido',
@@ -71,6 +79,7 @@ export const nodeConfigs: Record<string, NodeConfig> = {
             config: { last_captured_data: null, data_mapping: [] }
         },
         SettingsComponent: TriggerSettings,
+        description: () => 'Quando dados são recebidos na URL de gatilho.',
     },
     // Actions
     'send_template': {
@@ -83,6 +92,7 @@ export const nodeConfigs: Record<string, NodeConfig> = {
             config: { template_id: '' }
         },
         SettingsComponent: SendTemplateSettings,
+        description: data => (data.config as any)?.template_id ? 'Envia uma mensagem de template.' : 'Selecionar um template.',
     },
      'send_text_message': {
         label: 'Enviar Texto Simples',
@@ -94,6 +104,7 @@ export const nodeConfigs: Record<string, NodeConfig> = {
             config: { message_text: '' }
         },
         SettingsComponent: ActionSettings,
+        description: data => (data.config as any)?.message_text ? `Envia: "${truncate((data.config as any).message_text, 30)}"` : 'Configurar texto da mensagem.',
     },
     'add_tag': {
         label: 'Adicionar Tag',
@@ -105,6 +116,7 @@ export const nodeConfigs: Record<string, NodeConfig> = {
             config: { tag: '' }
         },
         SettingsComponent: ActionSettings,
+        description: data => (data.config as any)?.tag ? `Adiciona a tag: "${truncate((data.config as any).tag, 25)}"` : 'Configurar tag.',
     },
     'remove_tag': {
         label: 'Remover Tag',
@@ -116,6 +128,7 @@ export const nodeConfigs: Record<string, NodeConfig> = {
             config: { tag: '' }
         },
         SettingsComponent: ActionSettings,
+        description: data => (data.config as any)?.tag ? `Remove a tag: "${truncate((data.config as any).tag, 25)}"` : 'Configurar tag a remover.',
     },
      'set_custom_field': {
         label: 'Definir Campo Personalizado',
@@ -127,6 +140,7 @@ export const nodeConfigs: Record<string, NodeConfig> = {
             config: { field_name: '', field_value: '' }
         },
         SettingsComponent: ActionSettings,
+        description: data => (data.config as any)?.field_name ? `Define o campo "${truncate((data.config as any).field_name, 20)}"` : 'Configurar campo e valor.',
     },
      'send_media': {
         label: 'Enviar Mídia',
@@ -138,6 +152,7 @@ export const nodeConfigs: Record<string, NodeConfig> = {
             config: { media_type: 'image', media_url: '', caption: '' }
         },
         SettingsComponent: ActionSettings,
+        description: data => (data.config as any)?.media_url ? `Envia ${(data.config as any).media_type} de uma URL.` : 'Configurar URL da mídia.',
     },
     'send_interactive_message': {
         label: 'Enviar Msg Interativa',
@@ -149,6 +164,7 @@ export const nodeConfigs: Record<string, NodeConfig> = {
             config: { message_text: '', buttons: [] }
         },
         SettingsComponent: ActionSettings,
+        description: data => (data.config as any)?.message_text ? `Envia "${truncate((data.config as any).message_text, 25)}" com botões` : 'Configurar mensagem interativa.',
     },
     'send_webhook': {
         label: 'HTTP Request',
@@ -172,6 +188,7 @@ export const nodeConfigs: Record<string, NodeConfig> = {
             }
         },
         SettingsComponent: SendWebhookSettings,
+        description: data => (data.config as any)?.url ? `${(data.config as any).method} para ${truncate((data.config as any).url, 30)}` : 'Configurar URL do webhook.',
     },
     // Logic
     'condition': {
@@ -184,6 +201,7 @@ export const nodeConfigs: Record<string, NodeConfig> = {
             config: { field: '', operator: 'contains', value: '' }
         },
         SettingsComponent: LogicSettings,
+        description: data => (data.config as any)?.field ? `Se ${truncate((data.config as any).field, 15)} ${(data.config as any).operator}...` : 'Configurar condição.',
     },
     'split_path': {
         label: 'Dividir Caminho (A/B)',
@@ -195,5 +213,6 @@ export const nodeConfigs: Record<string, NodeConfig> = {
             config: {}
         },
         SettingsComponent: LogicSettings,
+        description: () => 'Divide aleatoriamente o fluxo em dois caminhos.',
     },
 };
