@@ -1,6 +1,5 @@
 
 
-
 import React, { createContext, useState, useCallback, ReactNode, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { Page, Profile, MessageTemplate, Contact, Campaign, CampaignWithMetrics, EditableContact, Session, User, CampaignMessageInsert, CampaignWithDetails, CampaignMessageWithContact, Segment, MessageTemplateInsert, Automation, AutomationInsert, AutomationNode, Edge, AutomationNodeStats, AutomationNodeLog, CampaignStatus, MessageStatus, Pipeline, PipelineStage, Deal, DealInsert, ContactWithDetails, DealWithContact, AutomationStatus } from '../types';
@@ -59,7 +58,15 @@ interface AppContextType {
   addDeal: (dealData: DealInsert) => Promise<void>;
   updateDealStage: (dealId: string, newStageId: string) => Promise<void>;
   createDefaultPipeline: () => Promise<void>;
-
+  
+  activePipelineId: string | null;
+  setActivePipelineId: (id: string | null) => void;
+  addPipeline: (name: string) => Promise<void>;
+  updatePipeline: (id: string, name: string) => Promise<void>;
+  deletePipeline: (id: string) => Promise<void>;
+  addStage: (pipelineId: string) => Promise<void>;
+  updateStage: (id: string, name: string) => Promise<void>;
+  deleteStage: (id: string) => Promise<void>;
 }
 
 export const AppContext = createContext<AppContextType>(null!);
@@ -86,6 +93,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
   const [stages, setStages] = useState<PipelineStage[]>([]);
   const [deals, setDeals] = useState<DealWithContact[]>([]);
+  const [activePipelineId, setActivePipelineId] = useState<string | null>(null);
 
 
   useEffect(() => {
@@ -101,7 +109,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       const newUser = session?.user ?? null;
       if (user?.id !== newUser?.id) {
-          // Reset all data for new user to prevent stale data flashing
           setProfile(null);
           setTemplates([]);
           setContacts([]);
@@ -114,7 +121,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           setPipelines([]);
           setStages([]);
           setDeals([]);
-          setInitialDataLoaded(false); // Allow data to be fetched for the new user
+          setActivePipelineId(null);
+          setInitialDataLoaded(false);
       }
       setSession(session);
       setUser(newUser);
@@ -123,7 +131,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return () => subscription.unsubscribe();
   }, [user]);
 
-  const fetchCampaignsWithMetrics = async (campaignsData: Campaign[]) => {
+  const fetchCampaignsWithMetrics = useCallback(async (campaignsData: Campaign[]) => {
     const campaignsWithMetrics: CampaignWithMetrics[] = await Promise.all(
         campaignsData.map(async (campaign) => {
             const { data, error, count } = await supabase
@@ -149,7 +157,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         })
     );
     setCampaigns(campaignsWithMetrics);
-  }
+  }, []);
   
   const fetchInitialData = useCallback(async () => {
       if (!user) return;
@@ -208,8 +216,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             setAutomations(sanitizedAutomations);
           }
           
-          if (pipelinesRes.error) console.error("Error fetching pipelines:", pipelinesRes.error);
-          else if (pipelinesRes.data) setPipelines(pipelinesRes.data);
+          if (pipelinesRes.error) {
+            console.error("Error fetching pipelines:", pipelinesRes.error);
+          } else if (pipelinesRes.data) {
+            setPipelines(pipelinesRes.data);
+            if (pipelinesRes.data.length > 0 && !activePipelineId) {
+                setActivePipelineId(pipelinesRes.data[0].id);
+            }
+          }
           
           if (stagesRes.error) {
               console.error("Error fetching stages:", stagesRes.error);
@@ -226,7 +240,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       } finally {
         setLoading(false);
       }
-  }, [user]);
+  }, [user, activePipelineId, fetchCampaignsWithMetrics]);
 
   useEffect(() => {
     if (user && session && !initialDataLoaded) {
@@ -280,7 +294,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     } catch (err) {
       console.error("Error fetching campaign details:", (err as any).message || err);
-      // O erro será tratado no componente que chama a função.
       throw err;
     }
   }, [user]);
@@ -326,12 +339,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setPageParams(params);
   }, []);
 
-  const updateProfile = async (profileData: Partial<Profile>) => {
+  const updateProfile = useCallback(async (profileData: Partial<Profile>) => {
     if (!user) throw new Error("Usuário não autenticado.");
     const { data, error } = await supabase.from('profiles').update(profileData as any).eq('id', user.id).select().returns<Profile>().single();
     if(error) throw error;
     if (data) setProfile(data);
-  };
+  }, [user]);
   
   const metaConfig = useMemo(() => ({
     accessToken: profile?.meta_access_token || '',
@@ -340,7 +353,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }), [profile]);
 
 
-  const addTemplate = async (template: MessageTemplateInsert) => {
+  const addTemplate = useCallback(async (template: MessageTemplateInsert) => {
     if (!user) throw new Error("Usuário não autenticado.");
     
     const dbTemplate: TablesInsert<'message_templates'> = {
@@ -358,124 +371,75 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (data) {
         setTemplates(prev => [data, ...prev]);
     }
-  };
+  }, [user]);
   
   const checkAndRunContactAutomations = useCallback(async (contact: Contact, previousContactState?: Contact) => {
     if (!user) return;
-
-    // A. Handle 'new_contact' trigger
-    // This is fired when a contact is created and there's no previous state.
     if (!previousContactState) {
-        console.log(`Frontend: Firing 'new_contact' trigger for ${contact.name}`);
         fetch('/api/run-trigger', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                triggerType: 'new_contact',
-                userId: user.id,
-                contactId: contact.id,
-            })
+            body: JSON.stringify({ triggerType: 'new_contact', userId: user.id, contactId: contact.id })
         }).catch(err => console.error("Failed to call new_contact trigger API", err));
         
-        // When a new contact is created, all its initial tags are considered "added".
         const initialTags = contact.tags || [];
         for (const tag of initialTags) {
-            console.log(`Frontend: Firing 'new_contact_with_tag' for new contact's tag: ${tag}`);
              fetch('/api/run-trigger', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    triggerType: 'new_contact_with_tag',
-                    userId: user.id,
-                    contactId: contact.id,
-                    data: { addedTag: tag }
-                })
+                body: JSON.stringify({ triggerType: 'new_contact_with_tag', userId: user.id, contactId: contact.id, data: { addedTag: tag } })
             }).catch(err => console.error("Failed to call new_contact_with_tag trigger API", err));
         }
-
-        return; // Exit after handling new contact case
+        return;
     }
-    
-    // B. Handle 'new_contact_with_tag' for existing contacts
     const oldTags = new Set(previousContactState?.tags || []);
     const newTags = contact.tags || [];
-    
     for (const tag of newTags) {
         if (!oldTags.has(tag)) {
-            console.log(`Frontend: Firing 'new_contact_with_tag' for existing contact's new tag: ${tag}`);
-            // Fire and forget
             fetch('/api/run-trigger', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    triggerType: 'new_contact_with_tag',
-                    userId: user.id,
-                    contactId: contact.id,
-                    data: { addedTag: tag }
-                })
+                body: JSON.stringify({ triggerType: 'new_contact_with_tag', userId: user.id, contactId: contact.id, data: { addedTag: tag } })
             }).catch(err => console.error("Failed to call new_contact_with_tag trigger API", err));
         }
     }
-
   }, [user]);
 
 
-  const addContact = async (contact: EditableContact) => {
+  const addContact = useCallback(async (contact: EditableContact) => {
     if (!user) throw new Error("Usuário não autenticado.");
     const payload: TablesInsert<'contacts'> = { ...contact, user_id: user.id };
-    const { data, error } = await supabase
-      .from('contacts')
-      .insert(payload as any)
-      .select()
-      .returns<Contact>()
-      .single();
+    const { data, error } = await supabase.from('contacts').insert(payload as any).select().returns<Contact>().single();
     if (error) throw error;
     if(data) {
-      const newContact = data;
-      setContacts(prev => [newContact, ...prev]);
-      await checkAndRunContactAutomations(newContact);
+      setContacts(prev => [data, ...prev]);
+      await checkAndRunContactAutomations(data);
     }
-  };
+  }, [user, checkAndRunContactAutomations]);
   
-  const updateContact = async (updatedContact: Contact) => {
+  const updateContact = useCallback(async (updatedContact: Contact) => {
      if (!user) throw new Error("Usuário não autenticado.");
      const oldContact = contacts.find(c => c.id === updatedContact.id);
-     
      const { id, created_at, user_id, ...updatePayload } = updatedContact;
-     const { data, error } = await supabase
-        .from('contacts')
-        .update(updatePayload as any)
-        .eq('id', updatedContact.id)
-        .eq('user_id', user.id)
-        .select()
-        .returns<Contact>()
-        .single();
+     const { data, error } = await supabase.from('contacts').update(updatePayload as any).eq('id', updatedContact.id).eq('user_id', user.id).select().returns<Contact>().single();
     if (error) throw error;
     if(data) {
-      const newContact = data;
-      setContacts(prev => prev.map(c => c.id === newContact.id ? newContact : c));
-      
-      // Update details page if it's the current contact being viewed
-      if(contactDetails?.id === newContact.id) {
-          setContactDetails(prev => prev ? {...prev, ...newContact} : null)
+      setContacts(prev => prev.map(c => c.id === data.id ? data : c));
+      if(contactDetails?.id === data.id) {
+          setContactDetails(prev => prev ? {...prev, ...data} : null)
       }
-
-      await checkAndRunContactAutomations(newContact, oldContact);
+      await checkAndRunContactAutomations(data, oldContact);
     }
-  };
+  }, [user, contacts, contactDetails, checkAndRunContactAutomations]);
 
-  const deleteContact = async (contactId: string) => {
+  const deleteContact = useCallback(async (contactId: string) => {
     if (!user) throw new Error("Usuário não autenticado.");
-    const { error } = await supabase
-      .from('contacts')
-      .delete()
-      .eq('id', contactId)
-      .eq('user_id', user.id);
+    const { error } = await supabase.from('contacts').delete().eq('id', contactId).eq('user_id', user.id);
     if (error) throw error;
     setContacts(prev => prev.filter(c => c.id !== contactId));
-  };
+  }, [user]);
   
-  const importContacts = async (newContacts: EditableContact[]): Promise<{ importedCount: number; skippedCount: number }> => {
+  const importContacts = useCallback(async (newContacts: EditableContact[]): Promise<{ importedCount: number; skippedCount: number }> => {
     if (!user) throw new Error("Usuário não autenticado.");
     
     const existingPhones = new Set(contacts.map(c => c.phone.replace(/\D/g, '')));
@@ -496,165 +460,98 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         const { data, error } = await supabase.from('contacts').insert(contactsToInsert as any).select().returns<Contact[]>();
         if (error) throw error;
         if(data) {
-          const newContactsData = data;
-          setContacts(prev => [...newContactsData, ...prev].sort((a,b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()));
-          for(const contact of newContactsData) {
+          setContacts(prev => [...data, ...prev].sort((a,b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()));
+          for(const contact of data) {
               await checkAndRunContactAutomations(contact);
           }
         }
     }
-
     return { importedCount: contactsToInsert.length, skippedCount };
-  };
+  }, [user, contacts, checkAndRunContactAutomations]);
 
-  const addCampaign = async (campaign: Omit<Campaign, 'id' | 'user_id' | 'sent_at' | 'created_at' | 'recipient_count' | 'status'> & {status: CampaignStatus}, messages: Omit<CampaignMessageInsert, 'campaign_id'>[]) => {
+  const addCampaign = useCallback(async (campaign: Omit<Campaign, 'id' | 'user_id' | 'sent_at' | 'created_at' | 'recipient_count' | 'status'> & {status: CampaignStatus}, messages: Omit<CampaignMessageInsert, 'campaign_id'>[]) => {
     if (!user) throw new Error("Usuário não autenticado.");
     
     const sent_at = new Date().toISOString();
     const campaignPayload: TablesInsert<'campaigns'> = { ...campaign, user_id: user.id, sent_at, recipient_count: messages.length, status: campaign.status };
-
-    const { data: newCampaign, error: campaignError } = await supabase
-        .from('campaigns')
-        .insert(campaignPayload as any)
-        .select()
-        .returns<Campaign>()
-        .single();
+    const { data: newCampaign, error: campaignError } = await supabase.from('campaigns').insert(campaignPayload as any).select().returns<Campaign>().single();
 
     if (campaignError) throw campaignError;
     if (!newCampaign) throw new Error("Failed to create campaign.");
-    const typedNewCampaign = newCampaign;
 
-
-    const messagesToInsert: TablesInsert<'campaign_messages'>[] = messages.map(msg => ({ ...msg, campaign_id: typedNewCampaign.id }));
+    const messagesToInsert: TablesInsert<'campaign_messages'>[] = messages.map(msg => ({ ...msg, campaign_id: newCampaign.id }));
     const { error: messagesError } = await supabase.from('campaign_messages').insert(messagesToInsert as any);
 
     if (messagesError) {
-        await supabase.from('campaigns').delete().eq('id', typedNewCampaign.id);
+        await supabase.from('campaigns').delete().eq('id', newCampaign.id);
         throw messagesError;
     }
     
     const sentCount = messages.filter(m => m.status !== 'failed').length;
 
     const newCampaignWithMetrics: CampaignWithMetrics = {
-        ...typedNewCampaign,
-        metrics: {
-            sent: sentCount,
-            delivered: 0,
-            read: 0
-        }
+        ...newCampaign,
+        metrics: { sent: sentCount, delivered: 0, read: 0 }
     };
     setCampaigns(prev => [newCampaignWithMetrics, ...prev]);
-  };
+  }, [user]);
   
-  const addDeal = async (dealData: DealInsert) => {
+  const addDeal = useCallback(async (dealData: DealInsert) => {
     if (!user) throw new Error("Usuário não autenticado.");
     const { data, error } = await supabase.from('deals').insert(dealData as any).select('*, contacts(id, name)').returns<DealWithContact>().single();
     if(error) throw error;
     if (data) {
         setDeals(prev => [data, ...prev]);
     }
-  };
+  }, [user]);
 
-  const updateDealStage = async (dealId: string, newStageId: string) => {
+  const updateDealStage = useCallback(async (dealId: string, newStageId: string) => {
     if (!user) throw new Error("Usuário não autenticado.");
     const { data, error } = await supabase.from('deals').update({ stage_id: newStageId } as any).eq('id', dealId).select('*, contacts(id, name)').returns<DealWithContact>().single();
     if(error) throw error;
     if (data) {
         setDeals(prev => prev.map(d => d.id === dealId ? data : d));
     }
-  };
+  }, [user]);
 
-
-  const createAndNavigateToAutomation = async () => {
+  const createAndNavigateToAutomation = useCallback(async () => {
     if (!user) throw new Error("Usuário não autenticado.");
 
-    const dbAutomation: TablesInsert<'automations'> = {
-        user_id: user.id,
-        name: 'Nova Automação (Rascunho)',
-        status: 'paused',
-        nodes: [] as unknown as Json,
-        edges: [] as unknown as Json,
-    };
+    const dbAutomation: TablesInsert<'automations'> = { user_id: user.id, name: 'Nova Automação (Rascunho)', status: 'paused', nodes: [] as unknown as Json, edges: [] as unknown as Json };
+    const { data, error } = await supabase.from('automations').insert(dbAutomation as any).select().returns<Automation>().single();
 
-    const { data, error } = await supabase
-        .from('automations')
-        .insert(dbAutomation as any)
-        .select()
-        .returns<Automation>()
-        .single();
-
-    if (error) {
-        console.error("Erro ao criar rascunho de automação:", error);
-        throw error;
-    }
+    if (error) throw error;
     if (data) {
-        const newAutomation: Automation = {
-          ...data,
-          nodes: Array.isArray(data.nodes) ? data.nodes : [],
-          edges: Array.isArray(data.edges) ? data.edges : [],
-          status: data.status as AutomationStatus,
-        };
+        const newAutomation: Automation = { ...data, nodes: [], edges: [], status: data.status as AutomationStatus };
         setAutomations(prev => [newAutomation, ...prev]);
         setCurrentPage('automation-editor', { automationId: newAutomation.id });
     }
-  };
+  }, [user, setCurrentPage]);
 
-  const updateAutomation = async (automation: Automation) => {
+  const updateAutomation = useCallback(async (automation: Automation) => {
     if (!user) throw new Error("Usuário não autenticado.");
-    
-    const updatePayload: TablesUpdate<'automations'> = {
-        name: automation.name,
-        status: automation.status,
-        nodes: automation.nodes as unknown as Json,
-        edges: automation.edges as unknown as Json
-    };
-
-    const { data, error } = await supabase
-        .from('automations')
-        .update(updatePayload as any)
-        .eq('id', automation.id)
-        .eq('user_id', user.id)
-        .select()
-        .returns<Automation>()
-        .single();
-
+    const updatePayload: TablesUpdate<'automations'> = { name: automation.name, status: automation.status, nodes: automation.nodes as unknown as Json, edges: automation.edges as unknown as Json };
+    const { data, error } = await supabase.from('automations').update(updatePayload as any).eq('id', automation.id).eq('user_id', user.id).select().returns<Automation>().single();
     if(error) throw error;
     if(data) {
-      const updatedAutomation: Automation = {
-          ...data,
-          nodes: Array.isArray(data.nodes) ? data.nodes : [],
-          edges: Array.isArray(data.edges) ? data.edges : [],
-          status: data.status as AutomationStatus,
-      };
+      const updatedAutomation: Automation = { ...data, nodes: Array.isArray(data.nodes) ? data.nodes : [], edges: Array.isArray(data.edges) ? data.edges : [], status: data.status as AutomationStatus };
       setAutomations(prev => prev.map(a => a.id === updatedAutomation.id ? updatedAutomation : a));
     }
-  };
+  }, [user]);
   
-  const deleteAutomation = async (automationId: string) => {
+  const deleteAutomation = useCallback(async (automationId: string) => {
     if (!user) throw new Error("Usuário não autenticado.");
     const { error } = await supabase.from('automations').delete().eq('id', automationId);
     if (error) throw error;
     setAutomations(prev => prev.filter(a => a.id !== automationId));
-  };
+  }, [user]);
   
   const fetchAutomationStats = useCallback(async (automationId: string) => {
     if (!user) return;
-    const { data, error } = await supabase
-        .from('automation_node_stats')
-        .select('*')
-        .eq('automation_id', automationId)
-        .returns<AutomationNodeStats[]>();
-    
-    if (error) {
-        console.error("Error fetching automation stats:", error);
-        return;
-    }
-    
+    const { data, error } = await supabase.from('automation_node_stats').select('*').eq('automation_id', automationId).returns<AutomationNodeStats[]>();
+    if (error) { console.error("Error fetching automation stats:", error); return; }
     if (data) {
-        const statsMap = data.reduce((acc, stat) => {
-            acc[stat.node_id] = stat;
-            return acc;
-        }, {} as Record<string, AutomationNodeStats>);
+        const statsMap = data.reduce((acc, stat) => { acc[stat.node_id] = stat; return acc; }, {} as Record<string, AutomationNodeStats>);
         setAutomationStats(prev => ({...prev, ...statsMap}));
     }
   }, [user]);
@@ -662,160 +559,122 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const fetchNodeLogs = useCallback(async (automationId: string, nodeId: string): Promise<AutomationNodeLog[]> => {
     if (!user) return [];
     
-    const { data: runIdsData, error: runIdsError } = await supabase
-        .from('automation_runs')
-        .select('id')
-        .eq('automation_id', automationId)
-        .returns<{ id: string }[]>();
-
-    if (runIdsError || !runIdsData) {
-        console.error('Error fetching run IDs for logs:', runIdsError);
-        return [];
-    }
-
+    const { data: runIdsData, error: runIdsError } = await supabase.from('automation_runs').select('id').eq('automation_id', automationId).returns<{ id: string }[]>();
+    if (runIdsError || !runIdsData) { console.error('Error fetching run IDs for logs:', runIdsError); return []; }
     const runIds = runIdsData.map(r => r.id);
     if (runIds.length === 0) return [];
-
-    const { data, error } = await supabase
-        .from('automation_node_logs')
-        .select('*')
-        .in('run_id', runIds)
-        .eq('node_id', nodeId)
-        .order('created_at', { ascending: false })
-        .limit(100)
-        .returns<AutomationNodeLog[]>();
-
-    if (error) {
-        console.error("Error fetching node logs:", error);
-        return [];
-    }
+    const { data, error } = await supabase.from('automation_node_logs').select('*').in('run_id', runIds).eq('node_id', nodeId).order('created_at', { ascending: false }).limit(100).returns<AutomationNodeLog[]>();
+    if (error) { console.error("Error fetching node logs:", error); return []; }
     return data || [];
   }, [user]);
 
-  const createDefaultPipeline = async () => {
+  const createDefaultPipeline = useCallback(async () => {
     if (!user) throw new Error("Usuário não autenticado.");
 
-    // Garante que um perfil de usuário exista antes de criar o funil.
-    // Isso previne erros de chave estrangeira para usuários antigos.
-    const { data: existingProfile, error: fetchError } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('id', user.id)
-        .maybeSingle();
-
-    if (fetchError) {
-        console.error("Erro ao verificar o perfil do usuário:", fetchError);
-        throw new Error("Erro ao verificar o perfil do usuário.");
-    }
-
+    const { data: existingProfile } = await supabase.from('profiles').select('id').eq('id', user.id).maybeSingle();
     if (!existingProfile) {
-        console.log(`Perfil não encontrado para o usuário ${user.id}, criando um novo.`);
-        const { data: newProfile, error: createProfileError } = await supabase
-            .from('profiles')
-            .insert({
-                id: user.id,
-                company_name: 'Minha Empresa', // Valor padrão
-                webhook_path_prefix: `user-${Math.random().toString(36).substring(2, 8)}`
-            } as any)
-            .select()
-            .returns<Profile>()
-            .single();
-
-        if (createProfileError || !newProfile) {
-            console.error("Erro ao criar perfil de usuário durante a criação do funil:", createProfileError);
-            throw createProfileError || new Error("Falha ao criar o perfil do usuário antes do funil.");
-        }
+        const { data: newProfile, error: createProfileError } = await supabase.from('profiles').insert({ id: user.id, company_name: 'Minha Empresa', webhook_path_prefix: `user-${Math.random().toString(36).substring(2, 8)}` } as any).select().returns<Profile>().single();
+        if (createProfileError || !newProfile) throw createProfileError || new Error("Falha ao criar perfil.");
         setProfile(newProfile);
     }
-
-    // Agora, prossiga com a criação do funil.
-    const { data: pipelineData, error: pipelineError } = await supabase
-        .from('pipelines')
-        .insert({ user_id: user.id, name: 'Funil de Vendas Padrão' } as any)
-        .select()
-        .returns<Pipeline>()
-        .single();
     
-    if (pipelineError || !pipelineData) {
-        console.error("Erro ao criar funil padrão:", pipelineError);
-        throw pipelineError || new Error("Falha ao criar o funil.");
-    }
-
-    const newPipeline = pipelineData;
+    const { data: pipelineData, error: pipelineError } = await supabase.from('pipelines').insert({ user_id: user.id, name: 'Funil de Vendas Padrão' } as any).select().returns<Pipeline>().single();
+    if (pipelineError || !pipelineData) throw pipelineError || new Error("Falha ao criar funil.");
     
-    const defaultStages = [
-        { name: 'Novo Lead', sort_order: 0 },
-        { name: 'Contato Feito', sort_order: 1 },
-        { name: 'Proposta Enviada', sort_order: 2 },
-        { name: 'Negociação', sort_order: 3 },
-        { name: 'Ganhos', sort_order: 4 },
-        { name: 'Perdidos', sort_order: 5 },
-    ];
-
-    const stagesToInsert: TablesInsert<'pipeline_stages'>[] = defaultStages.map(stage => ({
-        ...stage,
-        pipeline_id: newPipeline.id,
-    }));
-
-    const { data: stagesData, error: stagesError } = await supabase
-        .from('pipeline_stages')
-        .insert(stagesToInsert as any)
-        .select()
-        .returns<PipelineStage[]>();
+    const defaultStages = [ { name: 'Novo Lead', sort_order: 0 }, { name: 'Contato Feito', sort_order: 1 }, { name: 'Proposta Enviada', sort_order: 2 }, { name: 'Negociação', sort_order: 3 }, { name: 'Ganhos', sort_order: 4 }, { name: 'Perdidos', sort_order: 5 } ];
+    const stagesToInsert: TablesInsert<'pipeline_stages'>[] = defaultStages.map(stage => ({ ...stage, pipeline_id: pipelineData.id }));
+    const { data: stagesData, error: stagesError } = await supabase.from('pipeline_stages').insert(stagesToInsert as any).select().returns<PipelineStage[]>();
 
     if (stagesError || !stagesData) {
-        console.error("Erro ao criar etapas padrão:", stagesError);
-        await supabase.from('pipelines').delete().eq('id', newPipeline.id);
-        throw stagesError || new Error("Falha ao criar as etapas do funil.");
+        await supabase.from('pipelines').delete().eq('id', pipelineData.id);
+        throw stagesError || new Error("Falha ao criar etapas.");
     }
     
-    const newStages = stagesData;
-    
-    setPipelines(prev => [...prev, newPipeline]);
-    setStages(prev => [...prev, ...newStages]);
-  };
+    setPipelines(prev => [...prev, pipelineData]);
+    setStages(prev => [...prev, ...stagesData]);
+    setActivePipelineId(pipelineData.id);
+  }, [user]);
 
+  const addPipeline = useCallback(async (name: string) => {
+    if (!user) throw new Error("Usuário não autenticado.");
+    const { data: pipelineData, error } = await supabase.from('pipelines').insert({ user_id: user.id, name }).select().returns<Pipeline>().single();
+    if (error || !pipelineData) throw error || new Error("Falha ao criar funil.");
 
-  const value: AppContextType = {
-    session,
-    user,
-    profile,
-    loading,
-    currentPage,
-    setCurrentPage,
-    pageParams,
-    metaConfig,
-    updateProfile,
-    templates,
-    setTemplates,
-    addTemplate,
-    contacts,
-    addContact,
-    updateContact,
-    deleteContact,
-    importContacts,
-    contactDetails,
-    fetchContactDetails,
-    campaigns,
-    addCampaign,
-    campaignDetails,
-    fetchCampaignDetails,
-    segments,
-    automations,
-    createAndNavigateToAutomation,
-    updateAutomation,
-    deleteAutomation,
-    automationStats,
-    fetchAutomationStats,
-    fetchNodeLogs,
-    setAutomationStats,
-    pipelines,
-    stages,
-    deals,
-    addDeal,
-    updateDealStage,
-    createDefaultPipeline
-  };
+    const defaultStages = [ { name: 'Nova Etapa', sort_order: 0 } ];
+    const stagesToInsert = defaultStages.map(s => ({ ...s, pipeline_id: pipelineData.id }));
+    const { data: stagesData, error: stagesError } = await supabase.from('pipeline_stages').insert(stagesToInsert).select().returns<PipelineStage[]>();
+
+    if (stagesError || !stagesData) throw stagesError || new Error("Falha ao criar etapa inicial.");
+
+    setPipelines(p => [...p, pipelineData]);
+    setStages(s => [...s, ...stagesData]);
+    setActivePipelineId(pipelineData.id);
+  }, [user]);
+
+  const updatePipeline = useCallback(async (id: string, name: string) => {
+    if (!user) throw new Error("Usuário não autenticado.");
+    const { data, error } = await supabase.from('pipelines').update({ name }).eq('id', id).select().returns<Pipeline>().single();
+    if (error || !data) throw error || new Error("Falha ao renomear funil.");
+    setPipelines(p => p.map(pl => pl.id === id ? data : pl));
+  }, [user]);
+
+  const deletePipeline = useCallback(async (id: string) => {
+    if (!user) throw new Error("Usuário não autenticado.");
+    const { error } = await supabase.from('pipelines').delete().eq('id', id);
+    if (error) throw error;
+
+    setStages(s => s.filter(stage => stage.pipeline_id !== id));
+    setDeals(d => d.filter(deal => deal.pipeline_id !== id));
+    setPipelines(p => p.filter(pl => pl.id !== id));
+    if (activePipelineId === id) {
+        const remainingPipelines = pipelines.filter(p => p.id !== id);
+        setActivePipelineId(remainingPipelines.length > 0 ? remainingPipelines[0].id : null);
+    }
+  }, [user, pipelines, activePipelineId]);
+
+  const addStage = useCallback(async (pipelineId: string) => {
+    if (!user) throw new Error("Usuário não autenticado.");
+    const maxSortOrder = stages.filter(s => s.pipeline_id === pipelineId).reduce((max, s) => Math.max(max, s.sort_order), -1);
+    const { data, error } = await supabase.from('pipeline_stages').insert({ pipeline_id: pipelineId, name: 'Nova Etapa', sort_order: maxSortOrder + 1 }).select().returns<PipelineStage>().single();
+    if (error || !data) throw error || new Error("Falha ao adicionar etapa.");
+    setStages(s => [...s, data]);
+  }, [user, stages]);
+
+  const updateStage = useCallback(async (id: string, name: string) => {
+    if (!user) throw new Error("Usuário não autenticado.");
+    const { data, error } = await supabase.from('pipeline_stages').update({ name }).eq('id', id).select().returns<PipelineStage>().single();
+    if (error || !data) throw error || new Error("Falha ao renomear etapa.");
+    setStages(s => s.map(stage => stage.id === id ? data : stage));
+  }, [user]);
+
+  const deleteStage = useCallback(async (id: string) => {
+    if (!user) throw new Error("Usuário não autenticado.");
+    const { error } = await supabase.from('pipeline_stages').delete().eq('id', id);
+    if (error) throw error;
+    setStages(s => s.filter(stage => stage.id !== id));
+  }, [user]);
+
+  const value = useMemo(() => ({
+    session, user, profile, loading, currentPage, pageParams, metaConfig,
+    templates, contacts, contactDetails, campaigns, campaignDetails, segments, 
+    automations, automationStats, pipelines, stages, deals, activePipelineId, 
+    setTemplates, setAutomationStats, setActivePipelineId,
+    // Functions
+    setCurrentPage, updateProfile, addTemplate, addContact, updateContact,
+    deleteContact, importContacts, fetchContactDetails, addCampaign,
+    fetchCampaignDetails, createAndNavigateToAutomation,
+    updateAutomation, deleteAutomation, fetchAutomationStats, fetchNodeLogs,
+    addDeal, updateDealStage, createDefaultPipeline, addPipeline, updatePipeline, 
+    deletePipeline, addStage, updateStage, deleteStage,
+  }), [
+    session, user, profile, loading, currentPage, pageParams, metaConfig, templates, contacts,
+    contactDetails, campaigns, campaignDetails, segments, automations, automationStats, pipelines,
+    stages, deals, activePipelineId, setCurrentPage, updateProfile, addTemplate, addContact,
+    updateContact, deleteContact, importContacts, fetchContactDetails, addCampaign,
+    fetchCampaignDetails, createAndNavigateToAutomation, updateAutomation, deleteAutomation,
+    fetchAutomationStats, fetchNodeLogs, addDeal, updateDealStage, createDefaultPipeline,
+    addPipeline, updatePipeline, deletePipeline, addStage, updateStage, deleteStage
+  ]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 };

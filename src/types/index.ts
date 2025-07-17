@@ -1,5 +1,6 @@
 
 
+
 import { Session, User } from '@supabase/supabase-js';
 import { Json, Tables, TablesInsert, TablesUpdate } from './database.types';
 import { MetaTemplateComponent } from '../services/meta/types';
@@ -185,7 +186,12 @@ export type AutomationNodeLog = {
 // --- END of Plain object types ---
 
 // --- CUSTOMIZED INTERFACES ---
-export type DealWithContact = Deal & { contacts: Pick<Contact, 'name' | 'id'> | null };
+export type DealWithContact = Deal & {
+    contacts: {
+        id: string;
+        name: string;
+    } | null;
+};
 
 // --- INSERT TYPES ---
 export type MessageTemplateInsert = Omit<TablesInsert<'message_templates'>, 'category' | 'status' | 'components'> & {
@@ -227,7 +233,10 @@ export interface CampaignWithMetrics extends Campaign {
 
 // Tipo para a nova página de detalhes da campanha
 export interface CampaignMessageWithContact extends CampaignMessage {
-  contacts: Pick<Contact, 'name' | 'phone'> | null;
+  contacts: {
+    name: string;
+    phone: string;
+  } | null;
 }
 
 export interface CampaignWithDetails extends Campaign {
