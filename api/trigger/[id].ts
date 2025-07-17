@@ -1,5 +1,3 @@
-
-
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
 import { executeAutomation } from '../_lib/engine.js';
@@ -20,12 +18,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ error: 'Invalid trigger ID format.' });
     }
 
-    const firstUnderscoreIndex = rawId.indexOf('_');
-    if (firstUnderscoreIndex === -1) {
-        return res.status(400).json({ error: 'Invalid trigger ID format: separator not found.' });
+    // Use a more robust separator to avoid conflicts with node types that contain underscores.
+    const separator = '__';
+    const separatorIndex = rawId.indexOf(separator);
+    if (separatorIndex === -1) {
+        return res.status(400).json({ error: `Invalid trigger ID format. Expected separator "${separator}" not found.` });
     }
-    const webhookPrefix = rawId.substring(0, firstUnderscoreIndex);
-    const nodeId = rawId.substring(firstUnderscoreIndex + 1);
+
+    const webhookPrefix = rawId.substring(0, separatorIndex);
+    const nodeId = rawId.substring(separatorIndex + separator.length);
 
     const { data: profileData, error: profileError } = await supabaseAdmin
         .from('profiles')
@@ -35,9 +36,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .single();
 
     if (profileError || !profileData) {
-        return res.status(404).json({ error: 'Profile not found for this webhook prefix or ID.' });
+        return res.status(404).json({ error: `Profile not found for webhook prefix or ID: "${webhookPrefix}"` });
     }
-    const profile = profileData as Profile;
+    const profile = profileData as unknown as Profile;
 
     const { data: automationsData, error: automationsError } = await supabaseAdmin
         .from('automations')
@@ -49,7 +50,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
          return res.status(500).json({ error: 'Failed to retrieve automations.' });
     }
     
-    const automations = (automationsData as Automation[]) || [];
+    const automations = (automationsData as unknown as Automation[]) || [];
     const automation = automations.find(a => a.nodes?.some(n => n.id === nodeId));
 
     if (!automation) {
@@ -74,7 +75,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         )
         const { error: updateError } = await supabaseAdmin
             .from('automations')
-            .update({ nodes: updatedNodes as unknown as Json } as any)
+            .update({ nodes: updatedNodes as unknown as Json })
             .eq('id', automation.id);
         
         if (updateError) {
@@ -104,16 +105,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                         const nameRule = mappingRules.find((m: any) => m.destination === 'name');
                         const name = nameRule ? getValueFromPath(fullPayloadForEvent, nameRule.source) : 'New Webhook Lead';
                         const newContactPayload: TablesInsert<'contacts'> = { user_id: profile.id, name, phone, tags: ['new-webhook-lead'], custom_fields: null };
-                        const { data: newContact, error: insertError } = await supabaseAdmin.from('contacts').insert(newContactPayload as any).select().single();
+                        const { data: newContact, error: insertError } = await supabaseAdmin.from('contacts').insert(newContactPayload).select().single();
                         if (insertError) {
                             console.error('Webhook trigger: Failed to create new contact.', insertError);
                         } else if (newContact) {
-                            contact = newContact as Contact;
+                            contact = newContact as unknown as Contact;
                         }
                     } else if (contactError) {
                         console.error('Webhook trigger: Failed to query contact.', contactError);
                     } else if (contactData) {
-                        contact = contactData as Contact;
+                        contact = contactData as unknown as Contact;
                         if(contact) originalTags = new Set(contact.tags || []);
                     }
                 }
@@ -160,11 +161,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
                 if (needsUpdate) {
                     const { id, user_id, created_at, ...updatePayload} = contact;
-                    const { data: updatedContact, error: updateContactError } = await supabaseAdmin.from('contacts').update(updatePayload as any).eq('id', contact.id).select().single();
+                    const { data: updatedContact, error: updateContactError } = await supabaseAdmin.from('contacts').update(updatePayload).eq('id', contact.id).select().single();
                     if(updateContactError) {
                         console.error("Webhook trigger: Failed to update contact with data", updateContactError)
                     } else if(updatedContact) {
-                        contact = updatedContact as Contact;
+                        contact = updatedContact as unknown as Contact;
                     }
                 }
             }

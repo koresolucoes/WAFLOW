@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { NodeSettingsProps, InputWithVariables } from './common';
 import { supabase } from '../../../lib/supabaseClient';
@@ -105,7 +104,7 @@ const TriggerSettings: React.FC<NodeSettingsProps> = ({ node, onConfigChange, pr
     const additionalMappings = useMemo(() => (config.data_mapping || []).filter((m: any) => m.destination !== 'name' && m.destination !== 'phone'), [config.data_mapping]);
 
 
-    const webhookUrl = `${window.location.origin}/api/trigger/${profile?.webhook_path_prefix || profile?.id}_${node.id}`;
+    const webhookUrl = `${window.location.origin}/api/trigger/${profile?.webhook_path_prefix || profile?.id}__${node.id}`;
     const hasCapturedData = config.last_captured_data && typeof config.last_captured_data === 'object';
 
     return (

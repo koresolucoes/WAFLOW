@@ -1,5 +1,6 @@
 
 
+
 import React, { useContext, useState, useEffect, useCallback, memo, FC, useMemo, useRef } from 'react';
 import { ReactFlow, ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, type Node, type Edge, type Connection, type NodeProps, useReactFlow, NodeTypes, EdgeLabelRenderer, getBezierPath, type EdgeProps as XyEdgeProps, MarkerType, BackgroundVariant } from '@xyflow/react';
 import { AppContext } from '../../contexts/AppContext';
@@ -110,14 +111,16 @@ const CustomNode = memo(({ id, data, selected }: NodeProps<NodeData>) => {
 
     const nodeTypeStyle = data.nodeType;
     const borderStyle = `${nodeStyles.base} ${nodeStyles[nodeTypeStyle]}`;
-    const iconBgStyle = nodeStyles[`${nodeTypeStyle}IconBg`];
+    const iconBgStyle = nodeStyles[`${nodeTypeStyle}IconBg` as keyof typeof nodeStyles];
     const IconComponent = nodeIcons[data.type] || nodeIcons.default;
     
     const handleViewLogs = async () => {
         setIsLoadingLogs(true);
         setIsLogsModalOpen(true);
-        const fetchedLogs = await fetchNodeLogs(pageParams.automationId, id);
-        setLogs(fetchedLogs);
+        if(pageParams.automationId){
+            const fetchedLogs = await fetchNodeLogs(pageParams.automationId, id);
+            setLogs(fetchedLogs);
+        }
         setIsLoadingLogs(false);
     };
 
@@ -237,7 +240,7 @@ const Editor: React.FC = () => {
     const { automations, updateAutomation, pageParams, setCurrentPage, templates, profile, fetchAutomationStats, setAutomationStats } = useContext(AppContext);
     
     const [automation, setAutomation] = useState<Automation | null>(null);
-    const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+    const [nodes, setNodes, onNodesChange] = useNodesState<NodeData>(initialNodes);
     const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
     const [isSaving, setIsSaving] = useState(false);
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
@@ -252,13 +255,15 @@ const Editor: React.FC = () => {
         const currentAutomation = automations.find(a => a.id === pageParams.automationId);
         if (currentAutomation) {
             setAutomation(currentAutomation);
-            if (!hasFetchedStats.current) {
-                fetchAutomationStats(currentAutomation.id);
+            if (!hasFetchedStats.current && pageParams.automationId) {
+                fetchAutomationStats(pageParams.automationId);
                 hasFetchedStats.current = true;
             }
         } else if (pageParams.automationId) {
             console.error(`Automação com ID ${pageParams.automationId} não encontrada.`);
         }
+
+        if(!pageParams.automationId) return;
 
         const channel = supabase
             .channel(`automation-stats-${pageParams.automationId}`)
@@ -347,8 +352,8 @@ const Editor: React.FC = () => {
     }, [setNodes, automation, edges, updateAutomation]);
 
 
-    const onNodeClick = useCallback((event: React.MouseEvent, node: Node<NodeData>) => {
-        setSelectedNode(node);
+    const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
+        setSelectedNode(node as Node<NodeData>);
         setIsSettingsModalOpen(true);
     }, []);
 
@@ -417,10 +422,10 @@ const Editor: React.FC = () => {
                 <Sidebar onAddNode={addNode} nodes={nodes} />
             </div>
              <NodeSettingsModal 
-                node={currentNodeForModal as AutomationNode | null}
+                node={currentNodeForModal}
                 isOpen={isSettingsModalOpen}
                 onClose={handleCloseModal}
-                nodes={nodes as AutomationNode[]}
+                nodes={nodes}
                 templates={templates}
                 profile={profile}
                 onUpdateNodes={handleUpdateNodesFromModal}
