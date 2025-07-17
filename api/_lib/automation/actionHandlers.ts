@@ -1,5 +1,6 @@
 
 
+
 import { supabaseAdmin } from '../supabaseAdmin.js';
 import { sendTemplatedMessage, sendTextMessage, sendMediaMessage, sendInteractiveMessage } from '../meta/messages.js';
 import { AutomationNode, Contact, Json, MetaConfig, MessageTemplate, Profile } from '../types.js';
@@ -87,11 +88,11 @@ const sendTemplate: ActionHandler = async ({ profile, contact, node, trigger }) 
         throw new Error('Ação "Enviar Template" requer um contato. A automação foi iniciada por um gatilho que não fornece um contato.');
     }
     const config = (node.data.config || {}) as any;
-    const { data: template, error: templateError } = await supabaseAdmin.from('message_templates').select('*').eq('id', config.template_id).single();
+    const { data: template, error: templateError } = await supabaseAdmin.from('message_templates').select('*').eq('id', config.template_id).returns<MessageTemplate>().single();
     if (templateError || !template) throw new Error(`Erro ao buscar template: ${templateError?.message || 'Template não encontrado.'}`);
     
     const metaConfig = getMetaConfig(profile);
-    const templateTyped = template as MessageTemplate;
+    const templateTyped = template;
     
     let allText = '';
     templateTyped.components.forEach(c => {
@@ -183,14 +184,15 @@ const addTag: ActionHandler = async ({ contact, node, trigger }) => {
         const updatePayload: TablesUpdate<'contacts'> = { tags: newTags };
         const { data: updatedContact, error } = await supabaseAdmin
             .from('contacts')
-            .update(updatePayload)
+            .update(updatePayload as any)
             .eq('id', contact.id)
             .select()
+            .returns<Contact>()
             .single();
 
         if (error) throw error;
         if (!updatedContact) throw new Error('Failed to update contact after adding tag.');
-        const finalContact = updatedContact as Contact;
+        const finalContact = updatedContact;
 
         // Non-blocking call to handle triggers for the newly added tag
         handleTagAddedEvent(contact.user_id, finalContact, tagToAdd);
@@ -209,10 +211,10 @@ const removeTag: ActionHandler = async ({ contact, node, trigger }) => {
         const tagToRemove = resolveVariables(config.tag, { contact, trigger });
         const newTags = (contact.tags || []).filter(t => t !== tagToRemove);
         const updatePayload: TablesUpdate<'contacts'> = { tags: newTags };
-        const { data, error } = await supabaseAdmin.from('contacts').update(updatePayload).eq('id', contact.id).select().single();
+        const { data, error } = await supabaseAdmin.from('contacts').update(updatePayload as any).eq('id', contact.id).select().returns<Contact>().single();
         if (error) throw error;
         if (!data) throw new Error('Failed to update contact after removing tag.');
-        return { updatedContact: data as Contact, details: `Tag '${tagToRemove}' removida do contato.` };
+        return { updatedContact: data, details: `Tag '${tagToRemove}' removida do contato.` };
     }
     throw new Error('Tag a ser removida não está configurada.');
 };
@@ -227,10 +229,10 @@ const setCustomField: ActionHandler = async ({ contact, node, trigger }) => {
         const fieldValue = resolveVariables(config.field_value || '', { contact, trigger });
         const newCustomFields = { ...(contact.custom_fields as object || {}), [fieldName]: fieldValue };
         const updatePayload: TablesUpdate<'contacts'> = { custom_fields: newCustomFields };
-        const { data, error } = await supabaseAdmin.from('contacts').update(updatePayload).eq('id', contact.id).select().single();
+        const { data, error } = await supabaseAdmin.from('contacts').update(updatePayload as any).eq('id', contact.id).select().returns<Contact>().single();
         if (error) throw error;
         if (!data) throw new Error('Failed to update contact after setting custom field.');
-        return { updatedContact: data as Contact, details: `Campo '${fieldName}' atualizado para '${fieldValue}'.` };
+        return { updatedContact: data, details: `Campo '${fieldName}' atualizado para '${fieldValue}'.` };
     }
     throw new Error('Nome do campo personalizado não está configurado.');
 };
