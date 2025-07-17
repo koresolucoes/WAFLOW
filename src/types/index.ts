@@ -32,7 +32,6 @@ export interface NodeData {
   type: TriggerType | ActionType | LogicType;
   label: string;
   config: Json;
-  [key: string]: any;
 }
 
 export type AutomationNode = XyNode<NodeData>;

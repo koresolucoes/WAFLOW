@@ -1,10 +1,6 @@
-
-
-
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from './_lib/supabaseAdmin.js';
-import { Contact, Profile, Tables } from './_lib/types.js';
-import { TablesInsert, TablesUpdate } from './_lib/database.types.js';
+import { Contact, Tables, TablesInsert, TablesUpdate } from './_lib/types.js';
 import { handleMetaMessageEvent, handleNewContactEvent } from './_lib/automation/trigger-handler.js';
 
 // Helper to find a contact by phone and create if not exists
@@ -20,19 +16,19 @@ const findOrCreateContact = async (user_id: string, phone: string, name: string)
         const newContactPayload: TablesInsert<'contacts'> = { user_id, phone, name, tags: ['new-lead'], custom_fields: null };
         const { data: newContact, error: insertError } = await supabaseAdmin
             .from('contacts')
-            .insert(newContactPayload)
+            .insert(newContactPayload as any)
             .select()
             .single();
         if (insertError || !newContact) {
              console.error("Error creating new contact:", insertError);
              return { contact: null, isNew: false };
         }
-        return { contact: newContact as unknown as Contact, isNew: true };
+        return { contact: newContact as Contact, isNew: true };
     } else if (error) {
          console.error("Error finding contact:", error);
         return { contact: null, isNew: false };
     }
-    return { contact: contactData as unknown as Contact, isNew: false };
+    return { contact: contactData as Contact, isNew: false };
 };
 
 
@@ -77,7 +73,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                             
                             await supabaseAdmin
                                 .from('campaign_messages')
-                                .update(updateData)
+                                .update(updateData as any)
                                 .eq('meta_message_id', status.id);
                         }
                     }
@@ -89,7 +85,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                             const { data: profileData, error: profileError } = await supabaseAdmin.from('profiles').select('id').eq('meta_phone_number_id', wabaId).single();
                             
                             if (profileError || !profileData) continue;
-                            const userId = (profileData as unknown as Tables<'profiles'>).id;
+                            const userId = (profileData as Tables<'profiles'>).id;
 
                             const { contact, isNew } = await findOrCreateContact(userId, message.from, value.contacts[0].profile.name);
                             if (!contact) continue;
@@ -110,7 +106,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                                message_body: messageBody
                             };
                             // Store received message
-                            await supabaseAdmin.from('received_messages').insert(receivedMessagePayload);
+                            await supabaseAdmin.from('received_messages').insert(receivedMessagePayload as any);
                             
                             // ---- NEW: Use centralized trigger handler ----
                             // Don't await these, let them run in the background

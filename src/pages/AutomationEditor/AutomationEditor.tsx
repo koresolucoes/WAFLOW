@@ -1,6 +1,7 @@
 
 
 
+
 import React, { useContext, useState, useEffect, useCallback, memo, FC, useMemo, useRef } from 'react';
 import { ReactFlow, ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, type Node, type Edge, type Connection, type NodeProps, useReactFlow, NodeTypes, EdgeLabelRenderer, getBezierPath, type EdgeProps as XyEdgeProps, MarkerType, BackgroundVariant } from '@xyflow/react';
 import { AppContext } from '../../contexts/AppContext';
@@ -240,7 +241,7 @@ const Editor: React.FC = () => {
     const { automations, updateAutomation, pageParams, setCurrentPage, templates, profile, fetchAutomationStats, setAutomationStats } = useContext(AppContext);
     
     const [automation, setAutomation] = useState<Automation | null>(null);
-    const [nodes, setNodes, onNodesChange] = useNodesState<NodeData>(initialNodes);
+    const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
     const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
     const [isSaving, setIsSaving] = useState(false);
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
@@ -309,7 +310,7 @@ const Editor: React.FC = () => {
 
     useEffect(() => {
         if (!isMounted.current || !automation) return;
-        saveChanges({ ...automation, nodes: nodes as AutomationNode[], edges });
+        saveChanges({ ...automation, nodes: nodes, edges });
     }, [nodes, edges, automation, saveChanges]);
 
 
@@ -346,7 +347,7 @@ const Editor: React.FC = () => {
         if (options?.immediate && automation) {
             if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
             setIsSaving(true);
-            await updateAutomation({ ...automation, nodes: updatedNodes as AutomationNode[], edges });
+            await updateAutomation({ ...automation, nodes: updatedNodes, edges });
             setIsSaving(false);
         }
     }, [setNodes, automation, edges, updateAutomation]);
