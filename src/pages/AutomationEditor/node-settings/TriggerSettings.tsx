@@ -15,7 +15,7 @@ const TabButton: React.FC<{ label: string; active: boolean; onClick: () => void;
 
 const TriggerSettings: React.FC<NodeSettingsProps> = ({ node, onConfigChange, profile, automationId }) => {
     const config = (node.data.config as any) || {};
-    const [isListening, setIsListening] = useState(config.is_listening || false);
+    const isListening = config.is_listening || false;
     const [activeTab, setActiveTab] = useState('Parameters');
     const [copied, setCopied] = useState(false);
     const [selectedPath, setSelectedPath] = useState('');
@@ -36,7 +36,6 @@ const TriggerSettings: React.FC<NodeSettingsProps> = ({ node, onConfigChange, pr
                     const newConfig = updatedNode?.data?.config as any;
 
                     if (newConfig && newConfig.last_captured_data && !newConfig.is_listening) {
-                        setIsListening(false);
                         onConfigChange(newConfig);
                         setActiveTab('Mapping');
                     }
@@ -45,9 +44,16 @@ const TriggerSettings: React.FC<NodeSettingsProps> = ({ node, onConfigChange, pr
 
         return () => { supabase.removeChannel(channel); };
     }, [node, automationId, onConfigChange]);
+    
+    // Switch to mapping tab automatically if data is already present on load
+    useEffect(() => {
+        if (hasCapturedData) {
+            setActiveTab('Mapping');
+        }
+    }, [hasCapturedData]);
+
 
     const handleListen = () => {
-        setIsListening(true);
         onConfigChange({ ...config, last_captured_data: null, data_mapping: [], is_listening: true }, { immediate: true });
         setActiveTab('Parameters');
     };
