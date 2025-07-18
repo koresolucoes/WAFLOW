@@ -1,5 +1,4 @@
 
-
 import React from 'react';
 import { NodeSettingsProps, InputWithVariables } from './common';
 

@@ -1,5 +1,4 @@
 
-
 import React, { useMemo } from 'react';
 import { Node } from '@xyflow/react';
 import { AutomationNode, MessageTemplate, Profile, NodeData } from '../../types';

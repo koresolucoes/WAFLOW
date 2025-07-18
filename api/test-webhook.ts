@@ -1,6 +1,4 @@
 
-
-
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 // Helper to resolve nested values from an object path (e.g., 'contact.custom_fields.order_id')

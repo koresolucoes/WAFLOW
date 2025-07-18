@@ -1,5 +1,4 @@
 
-
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
 import { executeAutomation } from '../_lib/engine.js';
@@ -19,7 +18,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ error: 'Invalid trigger ID format.' });
     }
 
-    // Use a more robust separator to avoid conflicts with node types that contain underscores.
     const separator = '__';
     const separatorIndex = rawId.indexOf(separator);
     if (separatorIndex === -1) {

@@ -1,8 +1,4 @@
 
-
-
-
-
 import React, { useContext, useState, useEffect, useCallback, memo, FC, useMemo, useRef } from 'react';
 import { ReactFlow, ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, type Node, type Edge, type Connection, type NodeProps, useReactFlow, NodeTypes, EdgeLabelRenderer, getBezierPath, type EdgeProps as XyEdgeProps, MarkerType, BackgroundVariant } from '@xyflow/react';
 import { AppContext } from '../../contexts/AppContext';
@@ -133,6 +129,53 @@ const CustomNode = memo(({ id, data, selected }: NodeProps<NodeData>) => {
     };
     
     const isLogicNode = data.nodeType === 'logic';
+    const isTriggerNode = data.nodeType === 'trigger';
+
+    const renderSourceHandle = () => {
+        if (data.type === 'condition') {
+            return (
+                <>
+                    <Handle type="source" position={Position.Bottom} id="yes" style={{ left: '25%', background: '#22c55e' }} />
+                    <Handle type="source" position={Position.Bottom} id="no" style={{ left: '75%', background: '#ef4444' }}/>
+                </>
+            );
+        }
+        if (data.type === 'split_path') {
+            return (
+                 <>
+                    <Handle type="source" position={Position.Bottom} id="a" style={{ left: '25%', background: '#06b6d4' }} />
+                    <Handle type="source" position={Position.Bottom} id="b" style={{ left: '75%', background: '#6366f1' }} />
+                </>
+            );
+        }
+        return <Handle type="source" position={Position.Right} className="!bg-slate-500" />;
+    };
+    
+    const renderTargetHandle = () => {
+        if(isTriggerNode) return null;
+        if(isLogicNode) return <Handle type="target" position={Position.Top} className="!bg-slate-500" />
+        return <Handle type="target" position={Position.Left} className="!bg-slate-500" />
+    };
+
+    const getBranchLabel = (id: 'yes' | 'no' | 'a' | 'b') => {
+        const labels = {
+            yes: 'SIM',
+            no: 'NÃO',
+            a: 'Via A',
+            b: 'Via B',
+        };
+        return labels[id];
+    };
+     const getBranchColor = (id: 'yes' | 'no' | 'a' | 'b') => {
+        const colors = {
+            yes: 'text-green-400',
+            no: 'text-red-400',
+            a: 'text-cyan-400',
+            b: 'text-indigo-400',
+        };
+        return colors[id];
+    };
+
 
     return (
         <div className={borderStyle}>
@@ -146,11 +189,7 @@ const CustomNode = memo(({ id, data, selected }: NodeProps<NodeData>) => {
                 </button>
             )}
 
-            {isLogicNode ? (
-                 <Handle type="target" position={Position.Top} className="!bg-slate-500" />
-            ) : (
-                <Handle type="target" position={Position.Left} className="!bg-slate-500" isConnectable={data.nodeType !== 'trigger'} />
-            )}
+            {renderTargetHandle()}
            
             <div className={nodeStyles.body}>
                 <div className={nodeStyles.header}>
@@ -164,31 +203,18 @@ const CustomNode = memo(({ id, data, selected }: NodeProps<NodeData>) => {
                 <p className={nodeStyles.description}>{description}</p>
                 <NodeStats stats={stats} onViewLogs={handleViewLogs}/>
             </div>
+            
+             {renderSourceHandle()}
 
-            {data.type === 'condition' ? (
-                <div className="flex justify-between relative px-5 py-2 bg-slate-900/30 rounded-b-xl">
-                    <div className="text-center">
-                        <Handle type="source" position={Position.Bottom} id="yes" className="!bg-green-500 !bottom-[-5px]" />
-                        <span className="text-xs font-semibold text-green-400">SIM</span>
-                    </div>
-                    <div className="text-center">
-                        <Handle type="source" position={Position.Bottom} id="no" className="!bg-red-500 !bottom-[-5px]" />
-                        <span className="text-xs font-semibold text-red-400">NÃO</span>
-                    </div>
+            {(data.type === 'condition' || data.type === 'split_path') && (
+                <div className="flex justify-around absolute bottom-[-25px] w-full text-center">
+                    {(['yes', 'no'] as const).map(id => data.type === 'condition' && (
+                        <span key={id} className={`text-xs font-semibold ${getBranchColor(id)}`}>{getBranchLabel(id)}</span>
+                    ))}
+                    {(['a', 'b'] as const).map(id => data.type === 'split_path' && (
+                        <span key={id} className={`text-xs font-semibold ${getBranchColor(id)}`}>{getBranchLabel(id)}</span>
+                    ))}
                 </div>
-            ) : data.type === 'split_path' ? (
-                <div className="flex justify-between relative px-5 py-2 bg-slate-900/30 rounded-b-xl">
-                    <div className="text-center">
-                        <Handle type="source" position={Position.Bottom} id="a" className="!bg-cyan-500 !bottom-[-5px]" />
-                        <span className="text-xs font-semibold text-cyan-400">Via A</span>
-                    </div>
-                    <div className="text-center">
-                        <Handle type="source" position={Position.Bottom} id="b" className="!bg-indigo-500 !bottom-[-5px]" />
-                        <span className="text-xs font-semibold text-indigo-400">Via B</span>
-                    </div>
-                </div>
-            ) : (
-                 <Handle type="source" position={Position.Right} className="!bg-slate-500" />
             )}
             
             <NodeLogsModal isOpen={isLogsModalOpen} onClose={() => setIsLogsModalOpen(false)} nodeLabel={data.label} logs={logs} isLoading={isLoadingLogs} />
@@ -246,7 +272,7 @@ const Editor: React.FC = () => {
     const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
     const [isSaving, setIsSaving] = useState(false);
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-    const [selectedNode, setSelectedNode] = useState<Node | null>(null);
+    const [selectedNode, setSelectedNode] = useState<AutomationNode | null>(null);
 
     const { screenToFlowPosition } = useReactFlow();
     const saveTimeoutRef = useRef<number | undefined>();
@@ -292,7 +318,8 @@ const Editor: React.FC = () => {
 
     useEffect(() => {
         if (automation) {
-            setNodes(automation.nodes || []);
+            const flowNodes = (automation.nodes || []).map(n => ({...n, type: 'custom'}));
+            setNodes(flowNodes);
             setEdges(automation.edges || []);
             setTimeout(() => { isMounted.current = true; }, 100);
         }
@@ -355,7 +382,7 @@ const Editor: React.FC = () => {
 
 
     const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
-        setSelectedNode(node);
+        setSelectedNode(node as AutomationNode);
         setIsSettingsModalOpen(true);
     }, []);
 
@@ -381,9 +408,11 @@ const Editor: React.FC = () => {
     }
 
     const defaultEdgeOptions = {
-      style: { strokeWidth: 2, stroke: '#0ea5e9' },
-      markerEnd: { type: MarkerType.ArrowClosed, color: '#0ea5e9' },
+      style: { strokeWidth: 2, stroke: '#94a3b8' }, // slate-400
+      markerEnd: { type: MarkerType.ArrowClosed, color: '#94a3b8' },
       type: 'deletable',
+      // Custom edge options for conditional branches
+      animated: false,
     };
 
     return (
@@ -417,7 +446,7 @@ const Editor: React.FC = () => {
                         className="bg-slate-900"
                         defaultEdgeOptions={defaultEdgeOptions}
                     >
-                        <Background variant={BackgroundVariant.Dots} color="#334155" gap={24} size={1} style={{ background: 'radial-gradient(circle, rgba(14, 165, 233, 0.1) 0%, transparent 50%)' }} />
+                        <Background variant={BackgroundVariant.Dots} color="#334155" gap={24} size={1} />
                         <Controls showInteractive={false} />
                     </ReactFlow>
                 </main>
