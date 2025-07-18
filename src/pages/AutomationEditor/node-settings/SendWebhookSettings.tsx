@@ -43,9 +43,8 @@ const SendWebhookSettings: React.FC<NodeSettingsProps> = ({ node, onConfigChange
     const [isTesting, setIsTesting] = useState(false);
     const [testResponse, setTestResponse] = useState<any>(null);
 
-    // Helper to create a deep copy and apply changes before calling onConfigChange
     const updateConfig = (updater: (draft: any) => void) => {
-        const newConfig = JSON.parse(JSON.stringify(config)); // Deep copy to prevent mutation issues
+        const newConfig = JSON.parse(JSON.stringify(config));
         updater(newConfig);
         onConfigChange(newConfig);
     };
@@ -88,7 +87,7 @@ const SendWebhookSettings: React.FC<NodeSettingsProps> = ({ node, onConfigChange
                 if (!draft.body) draft.body = {};
                 if (!draft.body.params) draft.body.params = [];
                 draft.body.params.push({ key: '', value: '' });
-            } else { // headers
+            } else {
                 if (!draft.headers) draft.headers = [];
                 draft.headers.push({ key: '', value: '' });
             }
@@ -101,7 +100,7 @@ const SendWebhookSettings: React.FC<NodeSettingsProps> = ({ node, onConfigChange
                 if (draft.body?.params) {
                     draft.body.params.splice(index, 1);
                 }
-            } else { // headers
+            } else {
                  if (draft.headers) {
                     draft.headers.splice(index, 1);
                  }
@@ -113,8 +112,16 @@ const SendWebhookSettings: React.FC<NodeSettingsProps> = ({ node, onConfigChange
         setIsTesting(true);
         setTestResponse(null);
 
-        const triggerNode = availableVariables.find(group => group.group === 'Gatilho (Webhook)');
-        const triggerData = triggerNode ? triggerNode.vars.reduce((acc, v) => ({ ...acc, [v.label]: `[${v.label}]` }), {}) : {};
+        const triggerNode = availableVariables.find(group => group.group === 'Gatilho (Webhook Body)');
+        const triggerData = triggerNode ? triggerNode.vars.reduce((acc: any, v) => {
+            const keys = v.path.split('.').slice(2); // remove trigger.body
+            let current = acc;
+            for (let i = 0; i < keys.length - 1; i++) {
+                current = current[keys[i]] = current[keys[i]] || {};
+            }
+            current[keys[keys.length - 1]] = `[${v.label}]`;
+            return acc;
+        }, {}) : {};
 
         try {
             const res = await fetch('/api/test-webhook', {
@@ -123,7 +130,7 @@ const SendWebhookSettings: React.FC<NodeSettingsProps> = ({ node, onConfigChange
                 body: JSON.stringify({
                     webhookConfig: config,
                     context: {
-                        trigger: triggerData,
+                        trigger: { body: triggerData },
                         contact: {
                             id: 'contact_test_id',
                             name: 'Contato de Teste',
@@ -152,7 +159,6 @@ const SendWebhookSettings: React.FC<NodeSettingsProps> = ({ node, onConfigChange
 
     return (
         <div className="space-y-4">
-            {/* --- BASIC CONFIG --- */}
             <div className="flex gap-2">
                 <div className="w-1/3">
                     <label className="block text-sm font-medium text-slate-300 mb-1">Método</label>
@@ -166,7 +172,6 @@ const SendWebhookSettings: React.FC<NodeSettingsProps> = ({ node, onConfigChange
                 </div>
             </div>
 
-            {/* --- HEADERS --- */}
             <div className="p-3 bg-slate-800/50 rounded-lg">
                 <Switch checked={config.sendHeaders || false} onChange={val => handleConfigChange('sendHeaders', val)} label="Enviar Cabeçalhos" />
                 {config.sendHeaders && (
@@ -188,7 +193,6 @@ const SendWebhookSettings: React.FC<NodeSettingsProps> = ({ node, onConfigChange
                 )}
             </div>
 
-            {/* --- BODY --- */}
             {showBody && (
                  <div className="p-3 bg-slate-800/50 rounded-lg">
                     <Switch checked={config.sendBody || false} onChange={val => handleConfigChange('sendBody', val)} label="Enviar Corpo (Body)" />
@@ -245,7 +249,6 @@ const SendWebhookSettings: React.FC<NodeSettingsProps> = ({ node, onConfigChange
                 </div>
             )}
             
-            {/* --- TESTING --- */}
             <div className="mt-2 pt-4 border-t border-slate-700 space-y-3">
                 <Button variant="secondary" onClick={handleTestWebhook} isLoading={isTesting} disabled={!config.url}>
                     Testar Requisição

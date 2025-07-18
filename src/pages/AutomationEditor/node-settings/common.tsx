@@ -1,5 +1,4 @@
 
-
 import React, { useState, useRef, memo } from 'react';
 import { AutomationNode, MessageTemplate, Profile, AutomationNodeData } from '../../../types';
 
@@ -46,6 +45,8 @@ export const getContextVariables = (nodes: AutomationNode[]) => {
             vars: [
                 { path: 'contact.name', label: 'Nome do Contato' },
                 { path: 'contact.phone', label: 'Telefone do Contato' },
+                { path: 'contact.email', label: 'Email do Contato' },
+                { path: 'contact.company', label: 'Empresa do Contato' },
                 { path: 'contact.tags', label: 'Tags do Contato (array)' },
                 { path: 'contact.id', label: 'ID do Contato' },
             ],
@@ -139,7 +140,7 @@ export const InputWithVariables: React.FC<InputWithVariablesProps> = ({ onValueC
     const inputRef = useRef<HTMLInputElement>(null);
 
     const handleSelectVariable = (variablePath: string) => {
-        const newValue = variablePath;
+        const newValue = (value ? value + ' ' : '') + variablePath;
         onValueChange(newValue);
         inputRef.current?.focus();
     };

@@ -20,7 +20,6 @@ const TriggerSettings: React.FC<NodeSettingsProps> = ({ node, onConfigChange, pr
 
     const hasCapturedData = useMemo(() => config.last_captured_data && typeof config.last_captured_data === 'object', [config.last_captured_data]);
     
-    // Switch to mapping tab automatically if data is already present on load or when props update
     useEffect(() => {
         if (hasCapturedData) {
             setActiveTab('Mapping');
@@ -54,7 +53,7 @@ const TriggerSettings: React.FC<NodeSettingsProps> = ({ node, onConfigChange, pr
         if (!selectedPath) return;
         updateMapping(draft => {
             const existingIndex = draft.findIndex((m: any) => m.destination === destination && (destination === 'custom_field' ? m.destination_key === destinationKey : true));
-            const newRule = { source: selectedPath, destination, destination_key: destinationKey };
+            const newRule = { source: `{{${selectedPath}}}`, destination, destination_key: destinationKey };
             if (existingIndex > -1) {
                 draft[existingIndex] = newRule;
             } else {
@@ -68,7 +67,7 @@ const TriggerSettings: React.FC<NodeSettingsProps> = ({ node, onConfigChange, pr
     const handleAddTagMapping = () => {
         if (!selectedPath) return;
         updateMapping(draft => {
-            draft.push({ source: selectedPath, destination: 'tag' });
+            draft.push({ source: `{{${selectedPath}}}`, destination: 'tag' });
             return draft;
         });
         setSelectedPath('');
@@ -176,7 +175,7 @@ const TriggerSettings: React.FC<NodeSettingsProps> = ({ node, onConfigChange, pr
                                             <input type="text" value={mapping.destination_key} onChange={e => handleCustomFieldMappingChange(mapping.originalIndex, 'destination_key', e.target.value)} placeholder="Nome do Campo" className="w-full bg-slate-700 p-2 rounded-md text-slate-300 text-xs"/>
                                              <button onClick={() => handleRemoveMapping(mapping.originalIndex)} className="text-slate-400 hover:text-red-400"><TRASH_ICON className="w-4 h-4"/></button>
                                         </div>
-                                        <input type="text" value={mapping.source} onChange={e => handleCustomFieldMappingChange(mapping.originalIndex, 'source', e.target.value)} placeholder="Fonte do Valor (Ex: body.product.id)" className="w-full bg-slate-700 p-2 rounded-md text-slate-300 font-mono text-xs"/>
+                                        <input type="text" value={mapping.source} onChange={e => handleCustomFieldMappingChange(mapping.originalIndex, 'source', e.target.value)} placeholder="Fonte do Valor (Ex: {{body.product.id}})" className="w-full bg-slate-700 p-2 rounded-md text-slate-300 font-mono text-xs"/>
                                      </div>
                                 ))}
                                 <Button size="sm" variant="ghost" onClick={handleAddCustomFieldMapping}><PLUS_ICON className="w-4 h-4 mr-1"/> Adicionar Campo</Button>

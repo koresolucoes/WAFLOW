@@ -1,7 +1,4 @@
 
-
-
-
 import React, { useContext, useState, useEffect, useCallback, memo, FC, useMemo, useRef } from 'react';
 import { ReactFlow, ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, type Node, type Edge, type Connection, type NodeProps, useReactFlow, NodeTypes, EdgeLabelRenderer, getBezierPath, type EdgeProps as XyEdgeProps, MarkerType, BackgroundVariant } from '@xyflow/react';
 import { AppContext } from '../../contexts/AppContext';
@@ -131,7 +128,6 @@ const CustomNode = memo(({ id, data, selected }: NodeProps<AutomationNodeData>) 
         setNodes((nds) => nds.filter((node) => node.id !== id));
     };
     
-    const isLogicNode = data.nodeType === 'logic';
     const isTriggerNode = data.nodeType === 'trigger';
 
     const renderSourceHandle = () => {
@@ -156,7 +152,6 @@ const CustomNode = memo(({ id, data, selected }: NodeProps<AutomationNodeData>) 
     
     const renderTargetHandle = () => {
         if(isTriggerNode) return null;
-        if(isLogicNode) return <Handle type="target" position={Position.Top} className="!bg-slate-500" />
         return <Handle type="target" position={Position.Left} className="!bg-slate-500" />
     };
 
@@ -182,7 +177,7 @@ const CustomNode = memo(({ id, data, selected }: NodeProps<AutomationNodeData>) 
 
     return (
         <div className={borderStyle}>
-             {selected && (
+             {selected && !isTriggerNode && (
                 <button 
                     onClick={handleDelete} 
                     className="absolute top-[-10px] right-[-10px] bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold shadow-lg hover:bg-red-600 z-10 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -462,12 +457,11 @@ const Editor: React.FC = () => {
       style: { strokeWidth: 2, stroke: '#94a3b8' }, // slate-400
       markerEnd: { type: MarkerType.ArrowClosed, color: '#94a3b8' },
       type: 'deletable',
-      // Custom edge options for conditional branches
       animated: false,
     };
 
     return (
-        <div className="flex flex-col h-full">
+        <div className="flex flex-col h-full bg-slate-900">
             <header className="flex-shrink-0 p-4 border-b border-slate-700/50 flex items-center justify-between">
                 <input
                     type="text"
@@ -476,13 +470,13 @@ const Editor: React.FC = () => {
                     className="bg-transparent text-2xl font-bold text-white focus:outline-none focus:ring-2 focus:ring-sky-500 rounded-md px-2 py-1"
                 />
                 <div className="flex items-center gap-4">
-                    <span className={`text-sm ${isSaving ? 'text-yellow-400' : 'text-green-400'}`}>
+                    <span className={`text-sm ${isSaving ? 'text-yellow-400 animate-pulse' : 'text-green-400'}`}>
                         {isSaving ? 'Salvando...' : 'Salvo'}
                     </span>
                     <Button variant="secondary" onClick={() => setCurrentPage('automations')}>Voltar</Button>
                 </div>
             </header>
-            <div className="flex-grow flex">
+            <div className="flex-grow flex min-h-0">
                 <main className="flex-grow h-full relative">
                     <ReactFlow
                         nodes={nodes}

@@ -1,5 +1,4 @@
 
-
 import React from 'react';
 import { AutomationNodeData } from '../../types';
 import MetaTriggerSettings from '../../pages/AutomationEditor/node-settings/MetaTriggerSettings';
@@ -18,7 +17,7 @@ interface NodeConfig {
     description: (data: AutomationNodeData) => string;
 }
 
-const truncate = (str: string, length: number) => str.length > length ? `${str.substring(0, length)}...` : str;
+const truncate = (str: string, length: number) => (str && str.length > length) ? `${str.substring(0, length)}...` : str;
 
 export const nodeConfigs: Record<string, NodeConfig> = {
     // Triggers
@@ -173,7 +172,7 @@ export const nodeConfigs: Record<string, NodeConfig> = {
         data: {
             nodeType: 'action',
             type: 'send_webhook',
-            label: 'Enviar Webhook',
+            label: 'HTTP Request',
             config: {
                 method: 'POST',
                 url: '',

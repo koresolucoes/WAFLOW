@@ -86,8 +86,8 @@ const JsonTreeViewNode: React.FC<{
 const JsonTreeView: React.FC<{ data: any; onSelect: (path: string) => void, selectedPath: string }> = ({ data, onSelect, selectedPath }) => {
     return (
         <div className="p-2 bg-slate-900/70 rounded-md">
-            {Object.entries(data).map(([key, value]) => (
-                <JsonTreeViewNode key={key} jsonKey={key} value={value} path={key} onSelect={onSelect} selectedPath={selectedPath} isLast={false}/>
+            {Object.entries(data).map(([key, value], index, arr) => (
+                <JsonTreeViewNode key={key} jsonKey={key} value={value} path={key} onSelect={onSelect} selectedPath={selectedPath} isLast={index === arr.length -1}/>
             ))}
         </div>
     );
