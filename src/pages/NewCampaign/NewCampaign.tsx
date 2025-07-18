@@ -134,32 +134,77 @@ const NewCampaign: React.FC = () => {
       
       const promises = recipients.map(contact => (async () => {
         try {
-          // Simplificação: Trata todas as variáveis como pertencentes ao BODY.
-          // Para uma implementação completa, seria necessário mapear cada variável ao seu componente (HEADER, BODY, BUTTON).
-          const parameters = placeholders.map(p => ({
-              type: 'text',
-              text: p === '{{1}}' ? (contact.name || '') : (templateVariables[p] || '')
-            }));
-          
-          // Correção: Sempre envia o objeto 'components', mesmo que o array de parâmetros esteja vazio.
-          // Isso resolve o erro (#131008) da API da Meta que espera este parâmetro.
-          const components = [{ type: 'body', parameters }];
+            const resolvePlaceholder = (placeholder: string) => {
+                if (placeholder === '{{1}}') {
+                    return contact.name || '';
+                }
+                return templateVariables[placeholder] || '';
+            };
 
-          const response = await sendTemplatedMessage(metaConfig, contact.phone, template.template_name, components);
-          messagesToInsert.push({
-            contact_id: contact.id,
-            meta_message_id: response.messages[0].id,
-            status: 'sent'
-          });
-          results.push({ success: true, contact });
+            const finalComponents: any[] = [];
+            const templateComponents = template.components || [];
+
+            // Process HEADER
+            const headerComponent = templateComponents.find(c => c.type === 'HEADER');
+            if (headerComponent?.text) {
+                const headerPlaceholders = headerComponent.text.match(/\{\{\d+\}\}/g) || [];
+                if (headerPlaceholders.length > 0) {
+                    const parameters = headerPlaceholders.map(p => ({ type: 'text', text: resolvePlaceholder(p) }));
+                    finalComponents.push({ type: 'header', parameters });
+                }
+            }
+
+            // Process BODY
+            const bodyComponent = templateComponents.find(c => c.type === 'BODY');
+            if (bodyComponent?.text) {
+                const bodyPlaceholders = bodyComponent.text.match(/\{\{\d+\}\}/g) || [];
+                if (bodyPlaceholders.length > 0) {
+                    const parameters = bodyPlaceholders.map(p => ({ type: 'text', text: resolvePlaceholder(p) }));
+                    finalComponents.push({ type: 'body', parameters });
+                }
+            }
+
+            // Process BUTTONS
+            const buttonsComponent = templateComponents.find(c => c.type === 'BUTTONS');
+            if (buttonsComponent?.buttons) {
+                buttonsComponent.buttons.forEach((button, index) => {
+                    if (button.type === 'URL' && button.url) {
+                        const buttonPlaceholders = button.url.match(/\{\{\d+\}\}/g) || [];
+                        if (buttonPlaceholders.length > 0) {
+                            const parameters = buttonPlaceholders.map(p => ({ type: 'text', text: resolvePlaceholder(p) }));
+                            finalComponents.push({
+                                type: 'button',
+                                sub_type: 'url',
+                                index: String(index),
+                                parameters: parameters,
+                            });
+                        }
+                    }
+                });
+            }
+            
+            const response = await sendTemplatedMessage(
+                metaConfig,
+                contact.phone,
+                template.template_name,
+                finalComponents.length > 0 ? finalComponents : undefined
+            );
+          
+            messagesToInsert.push({
+                contact_id: contact.id,
+                meta_message_id: response.messages[0].id,
+                status: 'sent'
+            });
+            results.push({ success: true, contact });
+
         } catch (err: any) {
-          console.error(`Falha ao enviar para ${contact.name} (${contact.phone}): ${err.message}`);
-          messagesToInsert.push({
-            contact_id: contact.id,
-            status: 'failed',
-            error_message: err.message
-          });
-          results.push({ success: false, contact, error: err.message });
+            console.error(`Falha ao enviar para ${contact.name} (${contact.phone}): ${err.message}`);
+            messagesToInsert.push({
+                contact_id: contact.id,
+                status: 'failed',
+                error_message: err.message
+            });
+            results.push({ success: false, contact, error: err.message });
         }
       })());
 

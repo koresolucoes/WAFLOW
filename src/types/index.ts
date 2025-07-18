@@ -28,6 +28,7 @@ export type LogicType = 'condition' | 'split_path';
 
 
 export interface NodeData {
+  [key: string]: any;
   nodeType: NodeType;
   type: TriggerType | ActionType | LogicType;
   label: string;
