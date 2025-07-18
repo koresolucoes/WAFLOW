@@ -71,25 +71,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const config = (triggerNode.data.config || {}) as any;
 
-    // "Listen" mode: Capture data and stop
+    // "Listen" mode: Capture data and broadcast to the client editor.
     if (config.is_listening === true) {
-        const updatedConfig = {
-            ...config,
-            last_captured_data: structuredPayload,
-            is_listening: false,
-        };
-        const updatedNodes = automation.nodes.map(n => 
-            n.id === nodeId ? { ...n, data: { ...n.data, config: updatedConfig } } : n
-        );
-        const { error: updateError } = await supabaseAdmin
-            .from('automations')
-            .update({ nodes: updatedNodes as Json })
-            .eq('id', automation.id);
-        
-        if (updateError) {
-             return res.status(500).json({ error: 'Failed to save captured data.', details: updateError.message });
+        try {
+            const channel = supabaseAdmin.channel(`automation-editor-${automation.id}`);
+            await channel.send({
+                type: 'broadcast',
+                event: 'webhook_captured',
+                payload: { nodeId: nodeId, data: structuredPayload }
+            });
+            // We don't need to keep the channel open on the server
+            await supabaseAdmin.removeChannel(channel);
+
+            return res.status(200).json({ message: 'Webhook data captured successfully. You can now configure mapping in the editor.' });
+
+        } catch(broadcastError: any) {
+            console.error('Webhook trigger: Failed to broadcast captured data.', broadcastError);
+            return res.status(500).json({ error: 'Failed to broadcast captured data to the editor.', details: broadcastError.message });
         }
-        return res.status(200).json({ message: 'Webhook data captured successfully. You can now configure mapping in the editor.' });
     }
 
     // "Production" mode: Process data and run automation

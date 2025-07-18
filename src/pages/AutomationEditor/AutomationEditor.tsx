@@ -1,6 +1,7 @@
 
 
 
+
 import React, { useContext, useState, useEffect, useCallback, memo, FC, useMemo, useRef } from 'react';
 import { ReactFlow, ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, type Node, type Edge, type Connection, type NodeProps, useReactFlow, NodeTypes, EdgeLabelRenderer, getBezierPath, type EdgeProps as XyEdgeProps, MarkerType, BackgroundVariant } from '@xyflow/react';
 import { AppContext } from '../../contexts/AppContext';
@@ -280,6 +281,52 @@ const Editor: React.FC = () => {
     const saveTimeoutRef = useRef<number | undefined>();
     const hasFetchedStats = useRef(false);
     const isMounted = useRef(false);
+
+    // Listens for webhook data broadcasted from the API
+    useEffect(() => {
+        if (!automation?.id) return;
+
+        const channel = supabase.channel(`automation-editor-${automation.id}`);
+        
+        const handleWebhookCapture = (message: { payload: { nodeId: string; data: any } }) => {
+            const { nodeId, data } = message.payload;
+            console.log('Webhook data captured via broadcast!', message.payload);
+
+            setNodes(prevNodes => 
+                prevNodes.map(n => {
+                    if (n.id === nodeId) {
+                        return {
+                            ...n,
+                            data: {
+                                ...n.data,
+                                config: {
+                                    ...(n.data.config || {}),
+                                    last_captured_data: data,
+                                    is_listening: false,
+                                }
+                            }
+                        };
+                    }
+                    return n;
+                })
+            );
+        };
+
+        channel
+            .on('broadcast', { event: 'webhook_captured' }, handleWebhookCapture)
+            .subscribe((status, err) => {
+                 if (status === 'SUBSCRIBED') {
+                    console.log(`Subscribed to broadcast channel: automation-editor-${automation.id}`);
+                }
+                if (err) {
+                    console.error('Error subscribing to broadcast channel', err);
+                }
+            });
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [automation?.id, setNodes]);
 
     useEffect(() => {
         const currentAutomation = automations.find(a => a.id === pageParams.automationId);
