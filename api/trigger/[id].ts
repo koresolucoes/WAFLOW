@@ -4,6 +4,39 @@ import { executeAutomation } from '../_lib/engine.js';
 import { handleNewContactEvent, handleTagAddedEvent } from '../_lib/automation/trigger-handler.js';
 import { Contact, Automation, Profile, Json, TablesInsert, TablesUpdate } from '../_lib/types.js';
 
+// Function to read the raw body from the request, as Vercel's body parser
+// might not handle all content types or might have already consumed the stream.
+const getRawBody = (req: VercelRequest): Promise<Buffer> => {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    req.on('data', (chunk) => chunks.push(chunk));
+    req.on('end', () => resolve(Buffer.concat(chunks)));
+    req.on('error', (err) => reject(err));
+  });
+};
+
+// A very basic multipart/form-data parser.
+// This is simplified and only handles non-file fields.
+const parseMultipartFormData = (body: Buffer, boundary: string): Record<string, string> => {
+  const bodyString = body.toString();
+  const parts = bodyString.split(`--${boundary}`).slice(1, -1);
+  const result: Record<string, string> = {};
+
+  for (const part of parts) {
+    const headerMatch = part.match(/Content-Disposition: form-data; name="([^"]+)"/);
+    if (headerMatch) {
+      const name = headerMatch[1];
+      const content = part.split('\r\n\r\n')[1];
+      if (content) {
+        // Remove the final carriage return and newline
+        result[name] = content.trimEnd();
+      }
+    }
+  }
+  return result;
+};
+
+
 const getValueFromPath = (obj: any, path: string): any => {
     if (!path || !obj) return undefined;
     const cleanPath = path.replace(/\{\{|\}\}/g, '').trim();
@@ -63,8 +96,43 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ error: 'Invalid trigger node.' });
     }
 
+    const contentType = req.headers['content-type'] || '';
+    let body: any = {};
+
+    // Manually parse body if not JSON, as Vercel's default parser might not handle it.
+    if (req.method === 'POST' || req.method === 'PUT' || req.method === 'PATCH') {
+        try {
+            const rawBodyBuffer = await getRawBody(req);
+            const rawBody = rawBodyBuffer.toString('utf-8');
+
+            if (contentType.includes('application/json') && rawBody) {
+                body = JSON.parse(rawBody);
+            } else if (contentType.includes('application/x-www-form-urlencoded') && rawBody) {
+                body = Object.fromEntries(new URLSearchParams(rawBody));
+            } else if (contentType.includes('multipart/form-data')) {
+                const boundaryMatch = contentType.match(/boundary=(.+)/);
+                if (boundaryMatch) {
+                    const boundary = boundaryMatch[1];
+                    body = parseMultipartFormData(rawBodyBuffer, boundary);
+                }
+            } else if (rawBody) {
+                // Fallback for plain text or other types
+                 try {
+                   body = JSON.parse(rawBody)
+                 } catch (e) {
+                   body = { raw: rawBody };
+                 }
+            }
+        } catch(e: any) {
+            console.error('Error parsing request body:', e.message);
+            // Don't fail the request, proceed with an empty body
+            body = {};
+        }
+    }
+
+
     const structuredPayload = {
-        body: req.body || {},
+        body: body,
         query: req.query || {},
         headers: req.headers || {},
     };
