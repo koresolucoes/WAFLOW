@@ -177,7 +177,7 @@ const CustomNode = memo(({ id, data, selected }: NodeProps<AutomationNodeData>) 
 
     return (
         <div className={borderStyle}>
-             {selected && !isTriggerNode && (
+             {selected && (
                 <button 
                     onClick={handleDelete} 
                     className="absolute top-[-10px] right-[-10px] bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold shadow-lg hover:bg-red-600 z-10 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -449,6 +449,8 @@ const Editor: React.FC = () => {
         return nodes.find(n => n.id === selectedNode?.id) || null;
     }, [nodes, selectedNode]);
     
+    const hasTrigger = useMemo(() => nodes.some(n => n.data.nodeType === 'trigger'), [nodes]);
+
     if (!automation) {
         return <div className="text-center text-white">Carregando automação...</div>;
     }
@@ -494,6 +496,11 @@ const Editor: React.FC = () => {
                         <Background variant={BackgroundVariant.Dots} color="#334155" gap={24} size={1} />
                         <Controls showInteractive={false} />
                     </ReactFlow>
+                    {!hasTrigger && isMounted.current && (
+                        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-lg px-4 py-2 text-sm font-semibold shadow-lg">
+                            Atenção: A automação precisa de um nó de Gatilho para iniciar.
+                        </div>
+                    )}
                 </main>
                 <Sidebar onAddNode={addNode} nodes={nodes} />
             </div>
