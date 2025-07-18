@@ -12,6 +12,7 @@ import NodeSettingsModal from './NodeSettingsModal';
 import NodeStats from './NodeStats';
 import NodeLogsModal from './NodeLogsModal';
 import { nodeIcons } from '../../lib/automation/nodeIcons';
+import Switch from '../../components/common/Switch';
 
 
 const initialNodes: AutomationNode[] = [];
@@ -124,13 +125,19 @@ const CustomNode = memo(({ id, data, selected }: NodeProps<AutomationNodeData>) 
 
     const handleDelete = (event: React.MouseEvent) => {
         event.stopPropagation();
+        const hasOtherTriggers = getNodes().some(n => n.data.nodeType === 'trigger' && n.id !== id);
+        if (data.nodeType === 'trigger' && !hasOtherTriggers) {
+             // Don't delete if it's the last trigger. The canDeleteTrigger logic handles this.
+             return;
+        }
+
         setEdges((eds) => eds.filter((edge) => edge.source !== id && edge.target !== id));
         setNodes((nds) => nds.filter((node) => node.id !== id));
     };
     
     const isTriggerNode = data.nodeType === 'trigger';
-    // Check if there's more than one trigger node currently in the graph
-    const canDeleteTrigger = getNodes().filter(n => n.data.nodeType === 'trigger').length > 1;
+    const canDeleteTrigger = isTriggerNode && getNodes().filter(n => n.data.nodeType === 'trigger').length > 1;
+
 
     const renderSourceHandle = () => {
         if (data.type === 'condition') {
@@ -182,7 +189,7 @@ const CustomNode = memo(({ id, data, selected }: NodeProps<AutomationNodeData>) 
              {selected && (
                 <button 
                     onClick={handleDelete} 
-                    className="absolute top-[-10px] right-[-10px] bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold shadow-lg hover:bg-red-600 z-10 opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="absolute top-[-10px] right-[-10px] bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold shadow-lg hover:bg-red-600 z-10 opacity-0 group-hover:opacity-100 transition-opacity disabled:bg-red-800 disabled:cursor-not-allowed"
                     aria-label="Deletar Nó"
                     title={isTriggerNode && !canDeleteTrigger ? "Não é possível excluir o único gatilho" : "Deletar nó"}
                     disabled={isTriggerNode && !canDeleteTrigger}
@@ -388,6 +395,11 @@ const Editor: React.FC = () => {
                 console.error("Failed to save automation:", err);
                 setSaveError(`Falha ao salvar: ${err.message}`);
                 setStatus('error');
+            } finally {
+                if (status === 'saving') {
+                   // only update if it was saving, to avoid overriding an error state
+                   setStatus('saved');
+                }
             }
         }, 1000);
     }, [updateAutomation]);
@@ -401,6 +413,13 @@ const Editor: React.FC = () => {
     const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!automation) return;
         const newAutomation = { ...automation, name: e.target.value };
+        setAutomation(newAutomation);
+    };
+
+    const handleStatusChange = (isActive: boolean) => {
+        if (!automation) return;
+        const newStatus = isActive ? 'active' : 'paused';
+        const newAutomation = { ...automation, status: newStatus };
         setAutomation(newAutomation);
     };
     
@@ -494,7 +513,12 @@ const Editor: React.FC = () => {
                     className="bg-transparent text-2xl font-bold text-white focus:outline-none focus:ring-2 focus:ring-sky-500 rounded-md px-2 py-1"
                 />
                 <div className="flex items-center gap-4">
-                     {saveStatusIndicator}
+                    <Switch
+                        checked={automation.status === 'active'}
+                        onChange={handleStatusChange}
+                        label={automation.status === 'active' ? 'Ativa' : 'Pausada'}
+                    />
+                    {saveStatusIndicator}
                     <Button variant="secondary" onClick={() => setCurrentPage('automations')}>Voltar</Button>
                 </div>
             </header>
