@@ -1,4 +1,6 @@
 
+
+
 import React, { createContext, useState, useCallback, ReactNode, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { Page, Profile, MessageTemplate, Contact, Campaign, CampaignWithMetrics, EditableContact, Session, User, CampaignMessageInsert, CampaignWithDetails, CampaignMessageWithContact, Segment, MessageTemplateInsert, Automation, AutomationInsert, AutomationNode, Edge, AutomationNodeStats, AutomationNodeLog, CampaignStatus, MessageStatus, Pipeline, PipelineStage, Deal, DealInsert, ContactWithDetails, DealWithContact, AutomationStatus, EditableProfile, CampaignMessage, TemplateCategory, TemplateStatus, Json } from '../types';
@@ -133,7 +135,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     };
   }, []); // Empty dependency array ensures this runs only once.
 
-  // Real-time subscription for automations. This is the key fix.
+  // Real-time subscription for automations
   useEffect(() => {
     if (!user) return;
 
@@ -148,8 +150,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               const updatedAutomation = payload.new as Tables<'automations'>;
               const sanitized: Automation = {
                 ...updatedAutomation,
-                nodes: (Array.isArray(updatedAutomation.nodes) ? updatedAutomation.nodes : []) as AutomationNode[],
-                edges: (Array.isArray(updatedAutomation.edges) ? updatedAutomation.edges : []) as Edge[],
+                nodes: (Array.isArray(updatedAutomation.nodes) ? updatedAutomation.nodes : []) as unknown as AutomationNode[],
+                edges: (Array.isArray(updatedAutomation.edges) ? updatedAutomation.edges : []) as unknown as Edge[],
                 status: updatedAutomation.status as AutomationStatus,
               };
               setAutomations(prev => prev.map(a => a.id === sanitized.id ? sanitized : a));
@@ -238,7 +240,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 ...t,
                 category: t.category as TemplateCategory,
                 status: t.status as TemplateStatus,
-                components: (t.components as MetaTemplateComponent[]) || [],
+                components: (t.components as unknown as MetaTemplateComponent[]) || [],
             })));
           }
 
@@ -260,8 +262,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             const automationsData = (automationsRes.data || []);
             const sanitizedAutomations: Automation[] = automationsData.map((a) => ({
               ...a,
-              nodes: (Array.isArray(a.nodes) ? a.nodes : []) as AutomationNode[],
-              edges: (Array.isArray(a.edges) ? a.edges : []) as Edge[],
+              nodes: (Array.isArray(a.nodes) ? a.nodes : []) as unknown as AutomationNode[],
+              edges: (Array.isArray(a.edges) ? a.edges : []) as unknown as Edge[],
               status: a.status as AutomationStatus,
             }));
             setAutomations(sanitizedAutomations);
@@ -340,7 +342,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             ...(message_template_data as Tables<'message_templates'>),
             category: message_template_data.category as TemplateCategory,
             status: message_template_data.status as TemplateStatus,
-            components: (message_template_data.components as MetaTemplateComponent[]) || []
+            components: (message_template_data.components as unknown as MetaTemplateComponent[]) || []
         } : null,
         metrics: {
           sent: campaignDataTyped.recipient_count || 0,
@@ -413,7 +415,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     
     const dbTemplate: TablesInsert<'message_templates'> = {
         ...template,
-        components: template.components as Json,
+        components: template.components as unknown as Json,
     };
     
     const { data, error } = await supabase
@@ -427,7 +429,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             ...(data as Tables<'message_templates'>),
             category: data.category as TemplateCategory,
             status: data.status as TemplateStatus,
-            components: (data.components as MetaTemplateComponent[]) || []
+            components: (data.components as unknown as MetaTemplateComponent[]) || []
         };
         setTemplates(prev => [newTemplate, ...prev]);
     }
@@ -579,7 +581,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const createAndNavigateToAutomation = useCallback(async () => {
     if (!user) throw new Error("Usuário não autenticado.");
 
-    const dbAutomation: TablesInsert<'automations'> = { user_id: user.id, name: 'Nova Automação (Rascunho)', status: 'paused', nodes: [] as Json, edges: [] as Json };
+    const dbAutomation: TablesInsert<'automations'> = { user_id: user.id, name: 'Nova Automação (Rascunho)', status: 'paused', nodes: [] as unknown as Json, edges: [] as unknown as Json };
     const { data, error } = await supabase.from('automations').insert(dbAutomation).select().single();
 
     if (error) throw error;
@@ -592,12 +594,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const updateAutomation = useCallback(async (automation: Automation) => {
     if (!user) throw new Error("Usuário não autenticado.");
-    const updatePayload: TablesUpdate<'automations'> = { name: automation.name, status: automation.status, nodes: automation.nodes as Json, edges: automation.edges as Json };
+    const updatePayload: TablesUpdate<'automations'> = { name: automation.name, status: automation.status, nodes: automation.nodes as unknown as Json, edges: automation.edges as unknown as Json };
     const { data, error } = await supabase.from('automations').update(updatePayload).eq('id', automation.id).eq('user_id', user.id).select().single();
     if(error) throw error;
     if(data) {
       const updatedAutomationData = data;
-      const updatedAutomation: Automation = { ...(updatedAutomationData as Tables<'automations'>), nodes: (Array.isArray(updatedAutomationData.nodes) ? updatedAutomationData.nodes : []) as AutomationNode[], edges: (Array.isArray(updatedAutomationData.edges) ? updatedAutomationData.edges : []) as Edge[], status: updatedAutomationData.status as AutomationStatus };
+      const updatedAutomation: Automation = { ...(updatedAutomationData as Tables<'automations'>), nodes: (Array.isArray(updatedAutomationData.nodes) ? updatedAutomationData.nodes : []) as unknown as AutomationNode[], edges: (Array.isArray(updatedAutomationData.edges) ? updatedAutomationData.edges : []) as unknown as Edge[], status: updatedAutomationData.status as AutomationStatus };
       setAutomations(prev => prev.map(a => a.id === updatedAutomation.id ? updatedAutomation : a));
     }
   }, [user]);

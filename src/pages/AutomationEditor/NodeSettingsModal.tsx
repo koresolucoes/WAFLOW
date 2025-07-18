@@ -1,7 +1,8 @@
 
+
 import React, { useMemo } from 'react';
 import { Node } from '@xyflow/react';
-import { AutomationNode, MessageTemplate, Profile, NodeData } from '../../types';
+import { AutomationNode, MessageTemplate, Profile, AutomationNodeData } from '../../types';
 import Button from '../../components/common/Button';
 import { getContextVariables } from './node-settings/common';
 import { nodeConfigs } from '../../lib/automation/nodeConfigs';
@@ -33,7 +34,7 @@ const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
 
     if (!isOpen || !node) return null;
 
-    const data = node.data as NodeData;
+    const data = node.data as AutomationNodeData;
     const nodeConfig = nodeConfigs[data.type];
 
     if (!nodeConfig) {

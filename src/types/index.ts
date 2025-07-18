@@ -1,5 +1,6 @@
 
 
+
 import { Session, User } from '@supabase/supabase-js';
 import { Json, Tables, TablesInsert, TablesUpdate } from './database.types';
 import { MetaTemplateComponent } from '../services/meta/types';
@@ -39,25 +40,25 @@ export type AutomationNode = XyNode<AutomationNodeData>;
 export type Profile = Tables<'profiles'>;
 export type Contact = Tables<'contacts'>;
 
-export interface MessageTemplate extends Tables<'message_templates'> {
+export type MessageTemplate = Omit<Tables<'message_templates'>, 'category' | 'status' | 'components'> & {
     category: TemplateCategory;
     status: TemplateStatus;
     components: MetaTemplateComponent[];
-}
+};
 
-export interface Campaign extends Tables<'campaigns'> {
+export type Campaign = Tables<'campaigns'> & {
     status: CampaignStatus;
-}
+};
 
-export interface CampaignMessage extends Tables<'campaign_messages'> {
+export type CampaignMessage = Tables<'campaign_messages'> & {
     status: MessageStatus;
-}
+};
 
-export interface Automation extends Tables<'automations'> {
+export type Automation = Omit<Tables<'automations'>, 'nodes' | 'edges' | 'status'> & {
     nodes: AutomationNode[];
     edges: Edge[];
     status: AutomationStatus;
-}
+};
 
 export type Pipeline = Tables<'pipelines'>;
 export type PipelineStage = Tables<'pipeline_stages'>;
