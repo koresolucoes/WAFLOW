@@ -1,19 +1,21 @@
 
+
 import React, { useMemo } from 'react';
-import { AutomationNode, MessageTemplate, Profile } from '../../types';
+import { Node } from '@xyflow/react';
+import { AutomationNode, MessageTemplate, Profile, NodeData } from '../../types';
 import Button from '../../components/common/Button';
 import { getContextVariables } from './node-settings/common';
 import { nodeConfigs } from '../../lib/automation/nodeConfigs';
 
 
 interface NodeSettingsModalProps {
-    node: AutomationNode | null;
+    node: Node | null;
     isOpen: boolean;
     onClose: () => void;
     nodes: AutomationNode[];
     templates: MessageTemplate[];
     profile: Profile | null;
-    onUpdateNodes: (nodes: AutomationNode[], options?: { immediate?: boolean }) => Promise<void>;
+    onUpdateNodes: (nodes: Node[], options?: { immediate?: boolean }) => Promise<void>;
     automationId?: string;
 }
 
@@ -32,7 +34,7 @@ const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
 
     if (!isOpen || !node) return null;
 
-    const { data } = node;
+    const data = node.data as NodeData;
     const nodeConfig = nodeConfigs[data.type];
 
     if (!nodeConfig) {

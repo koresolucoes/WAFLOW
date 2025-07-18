@@ -1,3 +1,4 @@
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from './_lib/supabaseAdmin.js';
 import { Contact, Tables, TablesInsert, TablesUpdate } from './_lib/types.js';
@@ -23,12 +24,12 @@ const findOrCreateContact = async (user_id: string, phone: string, name: string)
              console.error("Error creating new contact:", insertError);
              return { contact: null, isNew: false };
         }
-        return { contact: newContact as Contact, isNew: true };
+        return { contact: newContact as any as Contact, isNew: true };
     } else if (error) {
          console.error("Error finding contact:", error);
         return { contact: null, isNew: false };
     }
-    return { contact: contactData as Contact, isNew: false };
+    return { contact: contactData as any as Contact, isNew: false };
 };
 
 

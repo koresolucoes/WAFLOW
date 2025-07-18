@@ -2,6 +2,7 @@
 
 
 
+
 import React, { useContext, useState, useEffect, useCallback, memo, FC, useMemo, useRef } from 'react';
 import { ReactFlow, ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, type Node, type Edge, type Connection, type NodeProps, useReactFlow, NodeTypes, EdgeLabelRenderer, getBezierPath, type EdgeProps as XyEdgeProps, MarkerType, BackgroundVariant } from '@xyflow/react';
 import { AppContext } from '../../contexts/AppContext';
@@ -245,7 +246,7 @@ const Editor: React.FC = () => {
     const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
     const [isSaving, setIsSaving] = useState(false);
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-    const [selectedNode, setSelectedNode] = useState<Node<NodeData> | null>(null);
+    const [selectedNode, setSelectedNode] = useState<Node | null>(null);
 
     const { screenToFlowPosition } = useReactFlow();
     const saveTimeoutRef = useRef<number | undefined>();
@@ -310,7 +311,7 @@ const Editor: React.FC = () => {
 
     useEffect(() => {
         if (!isMounted.current || !automation) return;
-        saveChanges({ ...automation, nodes: nodes, edges });
+        saveChanges({ ...automation, nodes: nodes as AutomationNode[], edges });
     }, [nodes, edges, automation, saveChanges]);
 
 
@@ -342,19 +343,19 @@ const Editor: React.FC = () => {
         setNodes((nds) => nds.concat(newNode));
     };
 
-    const handleUpdateNodesFromModal = useCallback(async (updatedNodes: Node<NodeData>[], options?: { immediate?: boolean }) => {
+    const handleUpdateNodesFromModal = useCallback(async (updatedNodes: Node[], options?: { immediate?: boolean }) => {
         setNodes(updatedNodes);
         if (options?.immediate && automation) {
             if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
             setIsSaving(true);
-            await updateAutomation({ ...automation, nodes: updatedNodes, edges });
+            await updateAutomation({ ...automation, nodes: updatedNodes as AutomationNode[], edges });
             setIsSaving(false);
         }
     }, [setNodes, automation, edges, updateAutomation]);
 
 
     const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
-        setSelectedNode(node as Node<NodeData>);
+        setSelectedNode(node);
         setIsSettingsModalOpen(true);
     }, []);
 
@@ -420,13 +421,13 @@ const Editor: React.FC = () => {
                         <Controls showInteractive={false} />
                     </ReactFlow>
                 </main>
-                <Sidebar onAddNode={addNode} nodes={nodes} />
+                <Sidebar onAddNode={addNode} nodes={nodes as Node<NodeData>[]} />
             </div>
              <NodeSettingsModal 
                 node={currentNodeForModal}
                 isOpen={isSettingsModalOpen}
                 onClose={handleCloseModal}
-                nodes={nodes}
+                nodes={nodes as AutomationNode[]}
                 templates={templates}
                 profile={profile}
                 onUpdateNodes={handleUpdateNodesFromModal}

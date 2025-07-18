@@ -1,3 +1,5 @@
+
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
 import { executeAutomation } from '../_lib/engine.js';
@@ -27,17 +29,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const webhookPrefix = rawId.substring(0, separatorIndex);
     const nodeId = rawId.substring(separatorIndex + separator.length);
 
-    const { data: profileData, error: profileError } = await supabaseAdmin
-        .from('profiles')
-        .select('id, webhook_path_prefix')
-        .or(`webhook_path_prefix.eq.${webhookPrefix},id.eq.${webhookPrefix}`)
-        .limit(1)
-        .single();
+    let profileData: Profile | null = null;
 
-    if (profileError || !profileData) {
+    // First, try to find the profile by webhook_path_prefix
+    const { data: profileByPrefix } = await supabaseAdmin
+        .from('profiles')
+        .select('*')
+        .eq('webhook_path_prefix', webhookPrefix)
+        .maybeSingle();
+
+    if (profileByPrefix) {
+        profileData = profileByPrefix as any as Profile;
+    } else {
+        // If not found, try to find by ID (UUID), which is the fallback
+        const { data: profileById } = await supabaseAdmin
+            .from('profiles')
+            .select('*')
+            .eq('id', webhookPrefix)
+            .maybeSingle();
+        
+        if (profileById) {
+            profileData = profileById as any as Profile;
+        }
+    }
+    
+    if (!profileData) {
         return res.status(404).json({ error: `Profile not found for webhook prefix or ID: "${webhookPrefix}"` });
     }
-    const profile = profileData as Profile;
+    const profile = profileData;
 
     const { data: automationsData, error: automationsError } = await supabaseAdmin
         .from('automations')
@@ -49,7 +68,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
          return res.status(500).json({ error: 'Failed to retrieve automations.' });
     }
     
-    const automations = (automationsData as Automation[]) || [];
+    const automations = (automationsData as any as Automation[]) || [];
     const automation = automations.find(a => a.nodes?.some(n => n.id === nodeId));
 
     if (!automation) {
@@ -108,12 +127,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                         if (insertError) {
                             console.error('Webhook trigger: Failed to create new contact.', insertError);
                         } else if (newContact) {
-                            contact = newContact as Contact;
+                            contact = newContact as any as Contact;
                         }
                     } else if (contactError) {
                         console.error('Webhook trigger: Failed to query contact.', contactError);
                     } else if (contactData) {
-                        contact = contactData as Contact;
+                        contact = contactData as any as Contact;
                         if(contact) originalTags = new Set(contact.tags || []);
                     }
                 }
@@ -164,7 +183,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     if(updateContactError) {
                         console.error("Webhook trigger: Failed to update contact with data", updateContactError)
                     } else if(updatedContact) {
-                        contact = updatedContact as Contact;
+                        contact = updatedContact as any as Contact;
                     }
                 }
             }
