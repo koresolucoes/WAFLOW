@@ -1,9 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { NodeSettingsProps } from './common';
-import { supabase } from '../../../lib/supabaseClient';
 import Button from '../../../components/common/Button';
-import { AutomationNode } from '../../../types';
 import { COPY_ICON, PLUS_ICON, TRASH_ICON } from '../../../components/icons';
 import JsonTreeView from './JsonTreeView';
 
@@ -13,7 +11,7 @@ const TabButton: React.FC<{ label: string; active: boolean; onClick: () => void;
     </button>
 );
 
-const TriggerSettings: React.FC<NodeSettingsProps> = ({ node, onConfigChange, profile, automationId }) => {
+const TriggerSettings: React.FC<NodeSettingsProps> = ({ node, onConfigChange, profile }) => {
     const config = (node.data.config as any) || {};
     const isListening = config.is_listening || false;
     const [activeTab, setActiveTab] = useState('Parameters');
@@ -21,34 +19,13 @@ const TriggerSettings: React.FC<NodeSettingsProps> = ({ node, onConfigChange, pr
     const [selectedPath, setSelectedPath] = useState('');
 
     const hasCapturedData = useMemo(() => config.last_captured_data && typeof config.last_captured_data === 'object', [config.last_captured_data]);
-
-    useEffect(() => {
-        if (!node || !automationId) return;
-
-        const channel = supabase
-            .channel(`automation-node-update-${node.id}`)
-            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'automations', filter: `id=eq.${automationId}` },
-                (payload) => {
-                    const updatedAutomation = payload.new as any;
-                    if (!updatedAutomation || !Array.isArray(updatedAutomation.nodes)) return;
-                    
-                    const updatedNode = (updatedAutomation.nodes as AutomationNode[]).find(n => n.id === node.id);
-                    const newConfig = updatedNode?.data?.config as any;
-
-                    if (newConfig && newConfig.last_captured_data && !newConfig.is_listening) {
-                        onConfigChange(newConfig);
-                        setActiveTab('Mapping');
-                    }
-                }
-            ).subscribe();
-
-        return () => { supabase.removeChannel(channel); };
-    }, [node, automationId, onConfigChange]);
     
-    // Switch to mapping tab automatically if data is already present on load
+    // Switch to mapping tab automatically if data is already present on load or when props update
     useEffect(() => {
         if (hasCapturedData) {
             setActiveTab('Mapping');
+        } else {
+            setActiveTab('Parameters');
         }
     }, [hasCapturedData]);
 

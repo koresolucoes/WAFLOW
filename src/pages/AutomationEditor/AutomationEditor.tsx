@@ -1,4 +1,5 @@
 
+
 import React, { useContext, useState, useEffect, useCallback, memo, FC, useMemo, useRef } from 'react';
 import { ReactFlow, ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, type Node, type Edge, type Connection, type NodeProps, useReactFlow, NodeTypes, EdgeLabelRenderer, getBezierPath, type EdgeProps as XyEdgeProps, MarkerType, BackgroundVariant } from '@xyflow/react';
 import { AppContext } from '../../contexts/AppContext';
@@ -226,7 +227,7 @@ const CustomNode = memo(({ id, data, selected }: NodeProps<NodeData>) => {
 // ====================================================================================
 // Editor Sidebar
 // ====================================================================================
-const Sidebar = memo(({ onAddNode, nodes }: { onAddNode: (type: string) => void; nodes: Node<NodeData>[] }) => {
+const Sidebar = memo(({ onAddNode, nodes }: { onAddNode: (type: string) => void; nodes: AutomationNode[] }) => {
     const nodeGroups = {
         Triggers: Object.entries(nodeConfigs).filter(([, c]) => c.nodeType === 'trigger'),
         Actions: Object.entries(nodeConfigs).filter(([, c]) => c.nodeType === 'action'),
@@ -355,7 +356,7 @@ const Editor: React.FC = () => {
         const { label, nodeType, data: nodeData } = nodeConfigs[type];
         const position = screenToFlowPosition({ x: window.innerWidth / 2 - 200, y: 150 });
 
-        const newNode: Node<NodeData> = {
+        const newNode: AutomationNode = {
             id: `${type}_${Date.now()}`,
             type: 'custom', // Use a single custom type
             position,
@@ -370,12 +371,12 @@ const Editor: React.FC = () => {
         setNodes((nds) => nds.concat(newNode));
     };
 
-    const handleUpdateNodesFromModal = useCallback(async (updatedNodes: Node[], options?: { immediate?: boolean }) => {
+    const handleUpdateNodesFromModal = useCallback(async (updatedNodes: AutomationNode[], options?: { immediate?: boolean }) => {
         setNodes(updatedNodes);
         if (options?.immediate && automation) {
             if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
             setIsSaving(true);
-            await updateAutomation({ ...automation, nodes: updatedNodes as AutomationNode[], edges });
+            await updateAutomation({ ...automation, nodes: updatedNodes, edges });
             setIsSaving(false);
         }
     }, [setNodes, automation, edges, updateAutomation]);
@@ -450,13 +451,13 @@ const Editor: React.FC = () => {
                         <Controls showInteractive={false} />
                     </ReactFlow>
                 </main>
-                <Sidebar onAddNode={addNode} nodes={nodes as Node<NodeData>[]} />
+                <Sidebar onAddNode={addNode} nodes={nodes} />
             </div>
              <NodeSettingsModal 
                 node={currentNodeForModal}
                 isOpen={isSettingsModalOpen}
                 onClose={handleCloseModal}
-                nodes={nodes as AutomationNode[]}
+                nodes={nodes}
                 templates={templates}
                 profile={profile}
                 onUpdateNodes={handleUpdateNodesFromModal}

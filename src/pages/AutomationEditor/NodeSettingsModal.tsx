@@ -1,4 +1,5 @@
 
+
 import React, { useMemo } from 'react';
 import { Node } from '@xyflow/react';
 import { AutomationNode, MessageTemplate, Profile, NodeData } from '../../types';
@@ -8,13 +9,13 @@ import { nodeConfigs } from '../../lib/automation/nodeConfigs';
 
 
 interface NodeSettingsModalProps {
-    node: Node | null;
+    node: AutomationNode | null;
     isOpen: boolean;
     onClose: () => void;
     nodes: AutomationNode[];
     templates: MessageTemplate[];
     profile: Profile | null;
-    onUpdateNodes: (nodes: Node[], options?: { immediate?: boolean }) => Promise<void>;
+    onUpdateNodes: (nodes: AutomationNode[], options?: { immediate?: boolean }) => Promise<void>;
     automationId?: string;
 }
 

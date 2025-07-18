@@ -1,5 +1,6 @@
 
 
+
 import React, { createContext, useState, useCallback, ReactNode, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { Page, Profile, MessageTemplate, Contact, Campaign, CampaignWithMetrics, EditableContact, Session, User, CampaignMessageInsert, CampaignWithDetails, CampaignMessageWithContact, Segment, MessageTemplateInsert, Automation, AutomationInsert, AutomationNode, Edge, AutomationNodeStats, AutomationNodeLog, CampaignStatus, MessageStatus, Pipeline, PipelineStage, Deal, DealInsert, ContactWithDetails, DealWithContact, AutomationStatus, EditableProfile, CampaignMessage, TemplateCategory, TemplateStatus, Json } from '../types';
@@ -191,7 +192,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 return { ...campaign, recipient_count: campaign.recipient_count || 0, metrics: { sent: campaign.recipient_count || 0, delivered: 0, read: 0 } };
             }
             
-            const typedData = (data as Pick<CampaignMessage, 'status'>[]) || [];
+            const typedData = (data as any as Pick<CampaignMessage, 'status'>[]) || [];
             const delivered = typedData.filter(d => d.status === 'delivered' || d.status === 'read').length;
             const read = typedData.filter(d => d.status === 'read').length;
 
@@ -219,7 +220,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           if (profileError) {
             console.error("Error fetching profile, user might not have one yet. Relying on DB trigger.", profileError);
           } else if (profileData) {
-            setProfile(profileData as Profile);
+            setProfile(profileData as any as Profile);
           }
 
           const [templatesRes, contactsRes, campaignsRes, segmentsRes, automationsRes, pipelinesRes, stagesRes, dealsRes] = await Promise.all([
@@ -235,7 +236,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
           if (templatesRes.error) console.error("Error fetching templates:", templatesRes.error);
           else if (templatesRes.data) {
-             setTemplates((templatesRes.data || []).map(t => ({
+             setTemplates(((templatesRes.data as any[]) || []).map(t => ({
                 ...t,
                 category: t.category as TemplateCategory,
                 status: t.status as TemplateStatus,
@@ -244,21 +245,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           }
 
           if (contactsRes.error) console.error("Error fetching contacts:", contactsRes.error);
-          else if (contactsRes.data) setContacts(contactsRes.data as Contact[]);
+          else if (contactsRes.data) setContacts(contactsRes.data as any as Contact[]);
 
           if (campaignsRes.error) {
             console.error("Error fetching campaigns:", campaignsRes.error);
           } else if (campaignsRes.data) {
-            await fetchCampaignsWithMetrics(campaignsRes.data as Campaign[]);
+            await fetchCampaignsWithMetrics(campaignsRes.data as any as Campaign[]);
           }
           
           if (segmentsRes.error) console.error("Error fetching segments:", segmentsRes.error);
-          else if (segmentsRes.data) setSegments(segmentsRes.data as Segment[]);
+          else if (segmentsRes.data) setSegments(segmentsRes.data as any as Segment[]);
           
           if (automationsRes.error) {
             console.error("Error fetching automations:", automationsRes.error);
           } else if (automationsRes.data){
-            const automationsData = automationsRes.data || [];
+            const automationsData = (automationsRes.data as any[]) || [];
             const sanitizedAutomations: Automation[] = automationsData.map((a: any) => ({
               ...a,
               nodes: (Array.isArray(a.nodes) ? a.nodes : []) as unknown as AutomationNode[],
@@ -271,7 +272,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           if (pipelinesRes.error) {
             console.error("Error fetching pipelines:", pipelinesRes.error);
           } else if (pipelinesRes.data) {
-            const typedPipelines = pipelinesRes.data as Pipeline[];
+            const typedPipelines = pipelinesRes.data as any as Pipeline[];
             setPipelines(typedPipelines);
             if (typedPipelines.length > 0 && !activePipelineId) {
                 setActivePipelineId(typedPipelines[0].id);
@@ -281,11 +282,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           if (stagesRes.error) {
               console.error("Error fetching stages:", stagesRes.error);
           } else if (stagesRes.data) {
-              setStages(stagesRes.data as PipelineStage[]);
+              setStages(stagesRes.data as any as PipelineStage[]);
           }
           
           if (dealsRes.error) console.error("Error fetching deals:", dealsRes.error);
-          else if (dealsRes.data) setDeals(dealsRes.data as DealWithContact[]);
+          else if (dealsRes.data) setDeals(dealsRes.data as any as DealWithContact[]);
 
       } catch (err) {
         console.error("A critical error occurred during initial data fetch:", (err as any).message || err);
@@ -325,7 +326,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         
       if (messagesError) throw messagesError;
 
-      const typedMessagesData = (messagesData as CampaignMessageWithContact[]) || [];
+      const typedMessagesData = (messagesData as any as CampaignMessageWithContact[]) || [];
       const delivered = typedMessagesData.filter(d => d.status === 'delivered' || d.status === 'read').length;
       const read = typedMessagesData.filter(d => d.status === 'read').length;
       
@@ -379,8 +380,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         if (dealsError) throw dealsError;
         
         setContactDetails({
-            ...(contactData as Contact),
-            deals: (dealsData as Deal[]) || []
+            ...(contactData as any as Contact),
+            deals: (dealsData as any as Deal[]) || []
         });
 
     } catch (err) {
@@ -399,7 +400,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (!user) throw new Error("Usuário não autenticado.");
     const { data, error } = await supabase.from('profiles').update(profileData as any).eq('id', user.id).select().single();
     if(error) throw error;
-    if (data) setProfile(data as Profile);
+    if (data) setProfile(data as any as Profile);
   }, [user]);
   
   const metaConfig = useMemo(() => ({
@@ -619,7 +620,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const { data, error } = await supabase.from('automation_node_stats').select('*').eq('automation_id', automationId);
     if (error) { console.error("Error fetching automation stats:", error); return; }
     if (data) {
-        const statsMap = (data as AutomationNodeStats[]).reduce((acc, stat) => { acc[stat.node_id] = stat; return acc; }, {} as Record<string, AutomationNodeStats>);
+        const statsMap = (data as any as AutomationNodeStats[]).reduce((acc, stat) => { acc[stat.node_id] = stat; return acc; }, {} as Record<string, AutomationNodeStats>);
         setAutomationStats(prev => ({...prev, ...statsMap}));
     }
   }, [user]);
@@ -629,11 +630,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     
     const { data: runIdsData, error: runIdsError } = await supabase.from('automation_runs').select('id').eq('automation_id', automationId);
     if (runIdsError || !runIdsData) { console.error('Error fetching run IDs for logs:', runIdsError); return []; }
-    const runIds = (runIdsData as { id: string }[]).map(r => r.id);
+    const runIds = (runIdsData as any as { id: string }[]).map(r => r.id);
     if (runIds.length === 0) return [];
     const { data, error } = await supabase.from('automation_node_logs').select('*').in('run_id', runIds).eq('node_id', nodeId).order('created_at', { ascending: false }).limit(100);
     if (error) { console.error("Error fetching node logs:", error); return []; }
-    return (data as AutomationNodeLog[]) || [];
+    return (data as any as AutomationNodeLog[]) || [];
   }, [user]);
 
   const createDefaultPipeline = useCallback(async () => {
