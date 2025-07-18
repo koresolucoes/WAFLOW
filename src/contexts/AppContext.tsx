@@ -134,6 +134,49 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     };
   }, []); // Empty dependency array ensures this runs only once.
 
+  // Real-time subscription for automations. This is the key fix.
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel('automations-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'automations', filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          console.log('Realtime automation change received!', payload);
+          if (payload.eventType === 'UPDATE') {
+              const updatedAutomation = payload.new as any;
+              const sanitized: Automation = {
+                ...updatedAutomation,
+                nodes: (Array.isArray(updatedAutomation.nodes) ? updatedAutomation.nodes : []) as AutomationNode[],
+                edges: (Array.isArray(updatedAutomation.edges) ? updatedAutomation.edges : []) as Edge[],
+                status: updatedAutomation.status as AutomationStatus,
+              };
+              setAutomations(prev => prev.map(a => a.id === sanitized.id ? sanitized : a));
+          } else if (payload.eventType === 'DELETE') {
+              const deletedAutomation = payload.old as any;
+              if (deletedAutomation && deletedAutomation.id) {
+                  setAutomations(prev => prev.filter(a => a.id !== deletedAutomation.id));
+              }
+          }
+        }
+      )
+      .subscribe((status, err) => {
+          if (status === 'SUBSCRIBED') {
+              console.log('Successfully subscribed to automations channel.');
+          }
+          if (err) {
+              console.error('Error subscribing to automations channel:', err);
+          }
+      });
+      
+      return () => {
+        supabase.removeChannel(channel);
+      }
+
+  }, [user]);
+
 
   const fetchCampaignsWithMetrics = useCallback(async (campaignsData: Campaign[]) => {
     const campaignsWithMetrics: CampaignWithMetrics[] = await Promise.all(
