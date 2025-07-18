@@ -161,7 +161,7 @@ const TriggerSettings: React.FC<NodeSettingsProps> = ({ node, onConfigChange, pr
                  {activeTab === 'Docs' && (
                     <div className="text-slate-400 text-sm space-y-2">
                         <p>Para usar este gatilho, envie uma requisição <code className="bg-slate-700 px-1 rounded">POST</code> para a URL de teste ou produção.</p>
-                        <p>O corpo (body) da requisição será capturado e disponibilizado como <code className="bg-slate-700 px-1 rounded">{{trigger.body}}</code> para os próximos nós.</p>
+                        <p>O corpo (body) da requisição será capturado e disponibilizado como <code className="bg-slate-700 px-1 rounded">{`{{trigger.body}}`}</code> para os próximos nós.</p>
                     </div>
                 )}
             </div>
