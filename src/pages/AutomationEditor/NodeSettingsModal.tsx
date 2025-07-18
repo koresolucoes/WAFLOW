@@ -49,48 +49,9 @@ const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
         onUpdateNodes(updatedNodes, options);
     };
     
-    const hasCapturedWebhookData = node.data.type === 'webhook_received' && !!(node.data.config as any)?.last_captured_data;
-    const showVariablesPanel = ['action', 'logic'].includes(node.data.nodeType) || hasCapturedWebhookData;
-
-    const gridColsClass = showVariablesPanel ? 'md:grid-cols-2' : 'md:grid-cols-1';
-    const modalWidthClass = showVariablesPanel ? 'max-w-4xl' : 'max-w-lg';
-
-    const renderVariablesPanel = () => {
-       if (!showVariablesPanel) return null;
-
-       return (
-           <div className="max-h-[70vh] overflow-y-auto">
-               <h4 className="text-lg font-semibold text-white">Variáveis Disponíveis</h4>
-                {node.data.nodeType !== 'trigger' && (
-                    <p className="text-sm text-slate-400 mb-3">
-                        Clique em um campo de texto e use o seletor para inserir uma variável.
-                    </p>
-                )}
-                 {(node.data.type === 'webhook_received' && hasCapturedWebhookData) && (
-                     <p className="text-sm text-slate-400 mb-3">
-                        Estas são as variáveis que foram capturadas e que podem ser usadas em outros nós.
-                    </p>
-                 )}
-
-               <div className="space-y-2 pr-2">
-                   {availableVariables.length > 0 ? availableVariables.map(group => (
-                        <div key={group.group}>
-                            <h5 className="text-sm font-bold text-slate-300 px-2 pt-2">{group.group}</h5>
-                            <ul className="pl-2">
-                                {group.vars.map(v => (
-                                    <li key={v.path} className="text-sm text-slate-400 font-mono py-0.5" title={v.path}>
-                                        {`{{${v.path}}}`}
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-                   )) : (
-                       <p className="text-slate-400 text-sm">Nenhuma variável disponível. Configure um gatilho de Webhook e capture dados para ver as variáveis.</p>
-                   )}
-               </div>
-           </div>
-       )
-    }
+    const isWebhookNode = node.data.type === 'webhook_received';
+    const modalWidthClass = isWebhookNode ? 'max-w-7xl' : 'max-w-lg';
+    const mainPaddingClass = isWebhookNode ? 'p-0' : 'p-6';
 
 
     return (
@@ -111,24 +72,15 @@ const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
                     </Button>
                 </header>
                 
-                <main className={`flex-grow p-6 overflow-y-auto grid grid-cols-1 ${gridColsClass} gap-8`}>
-                    <div className="space-y-4">
-                        <h4 className="text-lg font-semibold text-white">Configurações</h4>
-                        <SettingsComponent 
-                           node={node}
-                           onConfigChange={handleConfigChange}
-                           availableVariables={availableVariables}
-                           templates={templates}
-                           profile={profile}
-                           automationId={automationId}
-                        />
-                    </div>
-                    
-                    {showVariablesPanel && (
-                        <div className="space-y-4">
-                            {renderVariablesPanel()}
-                        </div>
-                    )}
+                <main className={`flex-grow overflow-y-auto ${mainPaddingClass}`}>
+                    <SettingsComponent 
+                       node={node}
+                       onConfigChange={handleConfigChange}
+                       availableVariables={availableVariables}
+                       templates={templates}
+                       profile={profile}
+                       automationId={automationId}
+                    />
                 </main>
 
                 <footer className="flex-shrink-0 p-4 border-t border-slate-700 flex justify-end">
