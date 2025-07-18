@@ -29,7 +29,7 @@ const NodeStats: React.FC<NodeStatsProps> = ({ stats, onViewLogs }) => {
                 <Button 
                     variant="ghost" 
                     size="sm"
-                    onClick={onViewLogs}
+                    onClick={(e) => { e.stopPropagation(); onViewLogs(); }}
                     disabled={!hasRuns}
                     title={hasRuns ? "Ver logs de execução" : "Nenhum log disponível"}
                 >

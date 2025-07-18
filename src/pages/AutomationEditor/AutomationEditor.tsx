@@ -97,7 +97,7 @@ const nodeStyles = {
 };
 
 const CustomNode = memo(({ id, data, selected }: NodeProps<AutomationNodeData>) => {
-    const { setNodes, setEdges } = useReactFlow();
+    const { setNodes, setEdges, getNodes } = useReactFlow();
     const { automationStats, pageParams, fetchNodeLogs } = useContext(AppContext);
     const [isLogsModalOpen, setIsLogsModalOpen] = useState(false);
     const [logs, setLogs] = useState<AutomationNodeLog[]>([]);
@@ -129,6 +129,8 @@ const CustomNode = memo(({ id, data, selected }: NodeProps<AutomationNodeData>) 
     };
     
     const isTriggerNode = data.nodeType === 'trigger';
+    // Check if there's more than one trigger node currently in the graph
+    const canDeleteTrigger = getNodes().filter(n => n.data.nodeType === 'trigger').length > 1;
 
     const renderSourceHandle = () => {
         if (data.type === 'condition') {
@@ -182,6 +184,8 @@ const CustomNode = memo(({ id, data, selected }: NodeProps<AutomationNodeData>) 
                     onClick={handleDelete} 
                     className="absolute top-[-10px] right-[-10px] bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold shadow-lg hover:bg-red-600 z-10 opacity-0 group-hover:opacity-100 transition-opacity"
                     aria-label="Deletar Nó"
+                    title={isTriggerNode && !canDeleteTrigger ? "Não é possível excluir o único gatilho" : "Deletar nó"}
+                    disabled={isTriggerNode && !canDeleteTrigger}
                 >
                     &times;
                 </button>
@@ -268,7 +272,8 @@ const Editor: React.FC = () => {
     const [automation, setAutomation] = useState<Automation | null>(null);
     const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
     const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
-    const [isSaving, setIsSaving] = useState(false);
+    const [status, setStatus] = useState<'saved' | 'saving' | 'error'>('saved');
+    const [saveError, setSaveError] = useState<string | null>(null);
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
     const [selectedNode, setSelectedNode] = useState<AutomationNode | null>(null);
 
@@ -370,13 +375,20 @@ const Editor: React.FC = () => {
     }, [automation, setNodes, setEdges]);
     
     const saveChanges = useCallback((dataToSave: Automation) => {
-        setIsSaving(true);
+        setStatus('saving');
+        setSaveError(null);
         if (saveTimeoutRef.current) {
             clearTimeout(saveTimeoutRef.current);
         }
         saveTimeoutRef.current = window.setTimeout(async () => {
-            await updateAutomation(dataToSave);
-            setIsSaving(false);
+            try {
+                await updateAutomation(dataToSave);
+                setStatus('saved');
+            } catch (err: any) {
+                console.error("Failed to save automation:", err);
+                setSaveError(`Falha ao salvar: ${err.message}`);
+                setStatus('error');
+            }
         }, 1000);
     }, [updateAutomation]);
 
@@ -420,9 +432,9 @@ const Editor: React.FC = () => {
         setNodes(updatedNodes);
         if (options?.immediate && automation) {
             if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-            setIsSaving(true);
+            setStatus('saving');
             await updateAutomation({ ...automation, nodes: updatedNodes, edges });
-            setIsSaving(false);
+            setStatus('saved');
         }
     }, [setNodes, automation, edges, updateAutomation]);
 
@@ -450,6 +462,15 @@ const Editor: React.FC = () => {
     }, [nodes, selectedNode]);
     
     const hasTrigger = useMemo(() => nodes.some(n => n.data.nodeType === 'trigger'), [nodes]);
+    
+    const saveStatusIndicator = useMemo(() => {
+        switch (status) {
+            case 'saving': return <span className="text-sm text-yellow-400 animate-pulse">Salvando...</span>;
+            case 'error': return <span className="text-sm text-red-400" title={saveError || ''}>Falha ao salvar</span>;
+            case 'saved': return <span className="text-sm text-green-400">Salvo</span>;
+            default: return null;
+        }
+    }, [status, saveError]);
 
     if (!automation) {
         return <div className="text-center text-white">Carregando automação...</div>;
@@ -469,12 +490,11 @@ const Editor: React.FC = () => {
                     type="text"
                     value={automation.name}
                     onChange={handleNameChange}
+                    onBlur={() => saveChanges({ ...automation, nodes: nodes as AutomationNode[], edges })}
                     className="bg-transparent text-2xl font-bold text-white focus:outline-none focus:ring-2 focus:ring-sky-500 rounded-md px-2 py-1"
                 />
                 <div className="flex items-center gap-4">
-                    <span className={`text-sm ${isSaving ? 'text-yellow-400 animate-pulse' : 'text-green-400'}`}>
-                        {isSaving ? 'Salvando...' : 'Salvo'}
-                    </span>
+                     {saveStatusIndicator}
                     <Button variant="secondary" onClick={() => setCurrentPage('automations')}>Voltar</Button>
                 </div>
             </header>
