@@ -30,7 +30,7 @@ const flattenObject = (obj: any, parentKey = '', result: { path: string, label: 
             if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
                 flattenObject(obj[key], propName, result);
             } else {
-                result.push({ path: propName, label: propName });
+                result.push({ path: propName, label: key });
             }
         }
     }
@@ -45,7 +45,7 @@ export const getContextVariables = (nodes: AutomationNode[]) => {
             vars: [
                 { path: 'contact.name', label: 'Nome do Contato' },
                 { path: 'contact.phone', label: 'Telefone do Contato' },
-                { path: 'contact.tags', label: 'Tags do Contato' },
+                { path: 'contact.tags', label: 'Tags do Contato (array)' },
                 { path: 'contact.id', label: 'ID do Contato' },
             ],
         }
@@ -61,7 +61,6 @@ export const getContextVariables = (nodes: AutomationNode[]) => {
         ]
     });
     
-    // Find webhook trigger and add its variables
     const webhookNode = nodes.find(n => n.data.type === 'webhook_received');
     if (webhookNode && (webhookNode.data.config as any)?.last_captured_data) {
         const capturedData = (webhookNode.data.config as any).last_captured_data;

@@ -29,23 +29,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     let profileData: Profile | null = null;
 
-    // First, try to find the profile by webhook_path_prefix
-    const { data: profileByPrefix } = await supabaseAdmin
-        .from('profiles')
-        .select('*')
-        .eq('webhook_path_prefix', webhookPrefix)
-        .maybeSingle();
-
+    const { data: profileByPrefix } = await supabaseAdmin.from('profiles').select('*').eq('webhook_path_prefix', webhookPrefix).maybeSingle();
     if (profileByPrefix) {
         profileData = profileByPrefix as any as Profile;
     } else {
-        // If not found, try to find by ID (UUID), which is the fallback
-        const { data: profileById } = await supabaseAdmin
-            .from('profiles')
-            .select('*')
-            .eq('id', webhookPrefix)
-            .maybeSingle();
-        
+        const { data: profileById } = await supabaseAdmin.from('profiles').select('*').eq('id', webhookPrefix).maybeSingle();
         if (profileById) {
             profileData = profileById as any as Profile;
         }
@@ -56,11 +44,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     const profile = profileData;
 
-    const { data: automationsData, error: automationsError } = await supabaseAdmin
-        .from('automations')
-        .select('*')
-        .eq('user_id', profile.id)
-        .eq('status', 'active');
+    const { data: automationsData, error: automationsError } = await supabaseAdmin.from('automations').select('*').eq('user_id', profile.id).eq('status', 'active');
     
     if(automationsError || !automationsData) {
          return res.status(500).json({ error: 'Failed to retrieve automations.' });
@@ -85,10 +69,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     };
 
     const config = (triggerNode.data.config || {}) as any;
+
+    // "Listen" mode: Capture data and stop
     if (config.last_captured_data === null) {
         const updatedNodes = automation.nodes.map(n => 
-            n.id === nodeId ? { ...n, data: { ...n.data, config: { ...config, last_captured_data: structuredPayload } } } : n
-        )
+            n.id === nodeId ? { ...n, data: { ...n.data, config: { ...n.data.config, last_captured_data: structuredPayload } } } : n
+        );
         const { error: updateError } = await supabaseAdmin
             .from('automations')
             .update({ nodes: updatedNodes as Json } as any)
@@ -100,6 +86,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json({ message: 'Webhook data captured successfully. You can now configure mapping in the editor.' });
     }
 
+    // "Production" mode: Process data and run automation
     const events = Array.isArray(structuredPayload.body) ? structuredPayload.body : [structuredPayload.body];
     const mappingRules = config.data_mapping || [];
     const phoneRule = mappingRules.find((m: any) => m.destination === 'phone');
@@ -112,7 +99,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             let originalTags = new Set<string>();
 
             if (phoneRule && phoneRule.source) {
-                const phone = String(getValueFromPath(fullPayloadForEvent, phoneRule.source)).replace(/\D/g, '');
+                const phoneValue = getValueFromPath(fullPayloadForEvent, phoneRule.source);
+                const phone = phoneValue ? String(phoneValue).replace(/\D/g, '') : null;
+
                 if (phone) {
                     let { data: contactData, error: contactError } = await supabaseAdmin.from('contacts').select('*').eq('user_id', profile.id).eq('phone', phone).single();
                     
@@ -143,9 +132,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 let needsUpdate = false;
 
                 mappingRules.forEach((rule: any) => {
-                    if (!rule.source) return;
+                    if (!rule.source || rule.destination === 'phone') return;
                     const value = getValueFromPath(fullPayloadForEvent, rule.source);
-                    if (value === undefined || rule.destination === 'phone') return;
+                    if (value === undefined) return;
                     
                     if (rule.destination === 'name' && contact?.name !== value) {
                         (contact as any).name = value;
@@ -161,6 +150,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     } else if (rule.destination === 'custom_field' && rule.destination_key) {
                         if ((newCustomFields as any)[rule.destination_key] !== value) {
                             (newCustomFields as any)[rule.destination_key] = value;
+                             needsUpdate = true;
                         }
                     }
                 });
