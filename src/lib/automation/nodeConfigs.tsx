@@ -1,6 +1,7 @@
 
+
 import React from 'react';
-import { NodeData } from '../../types';
+import { AutomationNodeData } from '../../types';
 import MetaTriggerSettings from '../../pages/AutomationEditor/node-settings/MetaTriggerSettings';
 import SendTemplateSettings from '../../pages/AutomationEditor/node-settings/SendTemplateSettings';
 import SendWebhookSettings from '../../pages/AutomationEditor/node-settings/SendWebhookSettings';
@@ -12,9 +13,9 @@ import TriggerSettings from '../../pages/AutomationEditor/node-settings/TriggerS
 interface NodeConfig {
     label: string;
     nodeType: 'trigger' | 'action' | 'logic';
-    data: Partial<NodeData>;
+    data: Partial<AutomationNodeData>;
     SettingsComponent: React.FC<any>;
-    description: (data: NodeData) => string;
+    description: (data: AutomationNodeData) => string;
 }
 
 const truncate = (str: string, length: number) => str.length > length ? `${str.substring(0, length)}...` : str;

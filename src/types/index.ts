@@ -1,4 +1,5 @@
 
+
 import { Session, User } from '@supabase/supabase-js';
 import { Json, Tables, TablesInsert, TablesUpdate } from './database.types';
 import { MetaTemplateComponent } from '../services/meta/types';
@@ -24,7 +25,7 @@ export type ActionType = 'send_template' | 'add_tag' | 'remove_tag' | 'send_text
 export type LogicType = 'condition' | 'split_path';
 
 
-export interface NodeData {
+export interface AutomationNodeData {
   [key: string]: any;
   nodeType: NodeType;
   type: TriggerType | ActionType | LogicType;
@@ -32,31 +33,31 @@ export interface NodeData {
   config: Json;
 }
 
-export type AutomationNode = XyNode<NodeData>;
+export type AutomationNode = XyNode<AutomationNodeData>;
 
 // --- Plain object types to avoid TS recursion from generated types ---
 export type Profile = Tables<'profiles'>;
 export type Contact = Tables<'contacts'>;
 
-export type MessageTemplate = Omit<Tables<'message_templates'>, 'category' | 'status' | 'components'> & {
+export interface MessageTemplate extends Tables<'message_templates'> {
     category: TemplateCategory;
     status: TemplateStatus;
     components: MetaTemplateComponent[];
-};
+}
 
-export type Campaign = Omit<Tables<'campaigns'>, 'status'> & {
+export interface Campaign extends Tables<'campaigns'> {
     status: CampaignStatus;
-};
+}
 
-export type CampaignMessage = Omit<Tables<'campaign_messages'>, 'status'> & {
+export interface CampaignMessage extends Tables<'campaign_messages'> {
     status: MessageStatus;
-};
+}
 
-export type Automation = Omit<Tables<'automations'>, 'nodes' | 'edges' | 'status'> & {
+export interface Automation extends Tables<'automations'> {
     nodes: AutomationNode[];
     edges: Edge[];
     status: AutomationStatus;
-};
+}
 
 export type Pipeline = Tables<'pipelines'>;
 export type PipelineStage = Tables<'pipeline_stages'>;
@@ -76,26 +77,26 @@ export type DealWithContact = Deal & {
 };
 
 // --- INSERT TYPES ---
-export type MessageTemplateInsert = Omit<TablesInsert<'message_templates'>, 'category' | 'status' | 'components'> & {
+export interface MessageTemplateInsert extends Omit<TablesInsert<'message_templates'>, 'category' | 'status' | 'components'> {
     user_id: string;
     template_name: string;
     category: TemplateCategory;
     status?: TemplateStatus;
     components: MetaTemplateComponent[];
     meta_id?: string | null;
-};
+}
 
-export type CampaignMessageInsert = Omit<TablesInsert<'campaign_messages'>, 'status'> & {
+export interface CampaignMessageInsert extends Omit<TablesInsert<'campaign_messages'>, 'status'> {
   status: MessageStatus;
-};
+}
 
-export type AutomationInsert = Omit<TablesInsert<'automations'>, 'status' | 'nodes' | 'edges'> & {
+export interface AutomationInsert extends Omit<TablesInsert<'automations'>, 'status' | 'nodes' | 'edges'> {
   user_id: string;
   name: string;
   status: AutomationStatus;
   nodes: AutomationNode[];
   edges: Edge[];
-};
+}
 
 export type DealInsert = TablesInsert<'deals'>;
 

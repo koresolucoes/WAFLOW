@@ -1,9 +1,10 @@
 
 
+
 import React, { useContext, useState, useEffect, useCallback, memo, FC, useMemo, useRef } from 'react';
 import { ReactFlow, ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, type Node, type Edge, type Connection, type NodeProps, useReactFlow, NodeTypes, EdgeLabelRenderer, getBezierPath, type EdgeProps as XyEdgeProps, MarkerType, BackgroundVariant } from '@xyflow/react';
 import { AppContext } from '../../contexts/AppContext';
-import { Automation, AutomationNode, NodeData, AutomationNodeStats, AutomationNodeLog, TriggerType, ActionType, LogicType } from '../../types';
+import { Automation, AutomationNode, AutomationNodeData, AutomationNodeStats, AutomationNodeLog, TriggerType, ActionType, LogicType } from '../../types';
 import Button from '../../components/common/Button';
 import Card from '../../components/common/Card';
 import { supabase } from '../../lib/supabaseClient';
@@ -97,7 +98,7 @@ const nodeStyles = {
     description: "text-xs text-slate-400 min-h-[16px]", // min-h to prevent layout shift
 };
 
-const CustomNode = memo(({ id, data, selected }: NodeProps<NodeData>) => {
+const CustomNode = memo(({ id, data, selected }: NodeProps<AutomationNodeData>) => {
     const { setNodes, setEdges } = useReactFlow();
     const { automationStats, pageParams, fetchNodeLogs } = useContext(AppContext);
     const [isLogsModalOpen, setIsLogsModalOpen] = useState(false);
@@ -353,7 +354,9 @@ const Editor: React.FC = () => {
 
     const addNode = (type: string) => {
         if (!automation) return;
-        const { label, nodeType, data: nodeData } = nodeConfigs[type];
+        const config = nodeConfigs[type];
+        if (!config) return;
+        const { label, nodeType, data: nodeData } = config;
         const position = screenToFlowPosition({ x: window.innerWidth / 2 - 200, y: 150 });
 
         const newNode: AutomationNode = {
