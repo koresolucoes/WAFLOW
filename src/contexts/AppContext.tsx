@@ -1,7 +1,4 @@
 
-
-
-
 import React, { createContext, useState, useCallback, ReactNode, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { Page, Profile, MessageTemplate, Contact, Campaign, CampaignWithMetrics, EditableContact, Session, User, CampaignMessageInsert, CampaignWithDetails, CampaignMessageWithContact, Segment, MessageTemplateInsert, Automation, AutomationInsert, AutomationNode, Edge, AutomationNodeStats, AutomationNodeLog, CampaignStatus, MessageStatus, Pipeline, PipelineStage, Deal, DealInsert, ContactWithDetails, DealWithContact, AutomationStatus, EditableProfile, CampaignMessage, TemplateCategory, TemplateStatus, Json } from '../types';
@@ -436,25 +433,23 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   }, [user]);
   
-  const checkAndRunContactAutomations = useCallback(async (contact: Contact, previousContactState?: Contact) => {
+  const checkAndRunContactAutomations = useCallback((contact: Contact, previousContactState?: Contact) => {
     if (!user) return;
+    
+    // Logic for newly created contacts
     if (!previousContactState) {
+        // A single API call that tells the backend a new contact was created.
+        // The backend will then be responsible for firing all relevant triggers
+        // (e.g., 'new_contact' and 'new_contact_with_tag' for initial tags).
         fetch('/api/run-trigger', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ triggerType: 'new_contact', userId: user.id, contactId: contact.id })
-        }).catch(err => console.error("Failed to call new_contact trigger API", err));
-        
-        const initialTags = contact.tags || [];
-        for (const tag of initialTags) {
-             fetch('/api/run-trigger', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ triggerType: 'new_contact_with_tag', userId: user.id, contactId: contact.id, data: { addedTag: tag } })
-            }).catch(err => console.error("Failed to call new_contact_with_tag trigger API", err));
-        }
+        }).catch(err => console.error("Failed to call new_contact creation trigger API", err));
         return;
     }
+    
+    // Logic for updated contacts (detecting newly added tags)
     const oldTags = new Set(previousContactState?.tags || []);
     const newTags = contact.tags || [];
     for (const tag of newTags) {
@@ -462,8 +457,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             fetch('/api/run-trigger', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ triggerType: 'new_contact_with_tag', userId: user.id, contactId: contact.id, data: { addedTag: tag } })
-            }).catch(err => console.error("Failed to call new_contact_with_tag trigger API", err));
+                body: JSON.stringify({ triggerType: 'tag_added_to_existing_contact', userId: user.id, contactId: contact.id, data: { addedTag: tag } })
+            }).catch(err => console.error("Failed to call new_contact_with_tag trigger API for existing contact", err));
         }
     }
   }, [user]);
@@ -477,7 +472,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if(data) {
       const newContact = data as Contact;
       setContacts(prev => [newContact, ...prev]);
-      await checkAndRunContactAutomations(newContact);
+      checkAndRunContactAutomations(newContact);
     }
   }, [user, checkAndRunContactAutomations]);
   
@@ -493,7 +488,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       if(contactDetails?.id === newContact.id) {
           setContactDetails(prev => prev ? {...prev, ...newContact} : null)
       }
-      await checkAndRunContactAutomations(newContact, oldContact);
+      checkAndRunContactAutomations(newContact, oldContact);
     }
   }, [user, contacts, contactDetails, checkAndRunContactAutomations]);
 
@@ -528,7 +523,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           const newContactList = data as Contact[];
           setContacts(prev => [...newContactList, ...prev].sort((a,b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()));
           for(const contact of newContactList) {
-              await checkAndRunContactAutomations(contact);
+              checkAndRunContactAutomations(contact);
           }
         }
     }
