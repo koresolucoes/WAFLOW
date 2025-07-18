@@ -76,7 +76,7 @@ export const nodeConfigs: Record<string, NodeConfig> = {
             nodeType: 'trigger',
             type: 'webhook_received',
             label: 'Webhook Recebido',
-            config: { last_captured_data: null, data_mapping: [] }
+            config: { last_captured_data: null, data_mapping: [], is_listening: false }
         },
         SettingsComponent: TriggerSettings,
         description: () => 'Quando dados são recebidos na URL de gatilho.',

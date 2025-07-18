@@ -71,9 +71,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const config = (triggerNode.data.config || {}) as any;
 
     // "Listen" mode: Capture data and stop
-    if (config.last_captured_data === null) {
+    if (config.is_listening === true) {
+        const updatedConfig = {
+            ...config,
+            last_captured_data: structuredPayload,
+            is_listening: false,
+        };
         const updatedNodes = automation.nodes.map(n => 
-            n.id === nodeId ? { ...n, data: { ...n.data, config: { ...n.data.config, last_captured_data: structuredPayload } } } : n
+            n.id === nodeId ? { ...n, data: { ...n.data, config: updatedConfig } } : n
         );
         const { error: updateError } = await supabaseAdmin
             .from('automations')
