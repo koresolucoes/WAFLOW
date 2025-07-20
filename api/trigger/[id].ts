@@ -1,8 +1,12 @@
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
 import { executeAutomation } from '../_lib/engine.js';
 import { handleNewContactEvent, handleTagAddedEvent } from '../_lib/automation/trigger-handler.js';
 import { Contact, Automation, Profile, Json, TablesInsert, TablesUpdate } from '../_lib/types.js';
+
+// @ts-ignore
+declare const Buffer: any;
 
 // Function to read the raw body from the request, as Vercel's body parser
 // might not handle all content types or might have already consumed the stream.

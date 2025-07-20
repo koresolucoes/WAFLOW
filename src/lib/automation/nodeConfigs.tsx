@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import { AutomationNodeData } from '../../types';
 import MetaTriggerSettings from '../../pages/AutomationEditor/node-settings/MetaTriggerSettings';
@@ -15,6 +16,7 @@ interface NodeConfig {
     data: Partial<AutomationNodeData>;
     SettingsComponent: React.FC<any>;
     description: (data: AutomationNodeData) => string;
+    isConfigured: (data: AutomationNodeData) => boolean;
 }
 
 const truncate = (str: string, length: number) => (str && str.length > length) ? `${str.substring(0, length)}...` : str;
@@ -32,6 +34,7 @@ export const nodeConfigs: Record<string, NodeConfig> = {
         },
         SettingsComponent: MetaTriggerSettings,
         description: data => (data.config as any)?.keyword ? `Quando a mensagem contém "${truncate((data.config as any).keyword, 20)}"` : 'Configurar palavra-chave.',
+        isConfigured: data => !!(data.config as any)?.keyword,
     },
     'button_clicked': {
         label: 'Botão Clicado',
@@ -44,6 +47,7 @@ export const nodeConfigs: Record<string, NodeConfig> = {
         },
         SettingsComponent: MetaTriggerSettings,
         description: data => (data.config as any)?.button_payload ? `Quando o botão "${truncate((data.config as any).button_payload, 20)}" é clicado` : 'Configurar ID do botão.',
+        isConfigured: data => !!(data.config as any)?.button_payload,
     },
     'new_contact': {
         label: 'Novo Contato Criado',
@@ -56,6 +60,7 @@ export const nodeConfigs: Record<string, NodeConfig> = {
         },
         SettingsComponent: MetaTriggerSettings,
         description: () => 'Quando um novo contato é criado.',
+        isConfigured: () => true,
     },
     'new_contact_with_tag': {
         label: 'Tag Adicionada a Contato',
@@ -68,6 +73,7 @@ export const nodeConfigs: Record<string, NodeConfig> = {
         },
         SettingsComponent: MetaTriggerSettings,
         description: data => (data.config as any)?.tag ? `Quando a tag "${truncate((data.config as any).tag, 25)}" é adicionada` : 'Configurar tag.',
+        isConfigured: data => !!(data.config as any)?.tag,
     },
     'webhook_received': {
         label: 'Webhook Recebido',
@@ -80,6 +86,7 @@ export const nodeConfigs: Record<string, NodeConfig> = {
         },
         SettingsComponent: TriggerSettings,
         description: () => 'Quando dados são recebidos na URL de gatilho.',
+        isConfigured: () => true,
     },
     // Actions
     'send_template': {
@@ -93,6 +100,7 @@ export const nodeConfigs: Record<string, NodeConfig> = {
         },
         SettingsComponent: SendTemplateSettings,
         description: data => (data.config as any)?.template_id ? 'Envia uma mensagem de template.' : 'Selecionar um template.',
+        isConfigured: data => !!(data.config as any)?.template_id,
     },
      'send_text_message': {
         label: 'Enviar Texto Simples',
@@ -105,6 +113,7 @@ export const nodeConfigs: Record<string, NodeConfig> = {
         },
         SettingsComponent: ActionSettings,
         description: data => (data.config as any)?.message_text ? `Envia: "${truncate((data.config as any).message_text, 30)}"` : 'Configurar texto da mensagem.',
+        isConfigured: data => !!(data.config as any)?.message_text,
     },
     'add_tag': {
         label: 'Adicionar Tag',
@@ -117,6 +126,7 @@ export const nodeConfigs: Record<string, NodeConfig> = {
         },
         SettingsComponent: ActionSettings,
         description: data => (data.config as any)?.tag ? `Adiciona a tag: "${truncate((data.config as any).tag, 25)}"` : 'Configurar tag.',
+        isConfigured: data => !!(data.config as any)?.tag,
     },
     'remove_tag': {
         label: 'Remover Tag',
@@ -129,6 +139,7 @@ export const nodeConfigs: Record<string, NodeConfig> = {
         },
         SettingsComponent: ActionSettings,
         description: data => (data.config as any)?.tag ? `Remove a tag: "${truncate((data.config as any).tag, 25)}"` : 'Configurar tag a remover.',
+        isConfigured: data => !!(data.config as any)?.tag,
     },
      'set_custom_field': {
         label: 'Definir Campo Personalizado',
@@ -141,6 +152,7 @@ export const nodeConfigs: Record<string, NodeConfig> = {
         },
         SettingsComponent: ActionSettings,
         description: data => (data.config as any)?.field_name ? `Define o campo "${truncate((data.config as any).field_name, 20)}"` : 'Configurar campo e valor.',
+        isConfigured: data => !!(data.config as any)?.field_name,
     },
      'send_media': {
         label: 'Enviar Mídia',
@@ -153,6 +165,7 @@ export const nodeConfigs: Record<string, NodeConfig> = {
         },
         SettingsComponent: ActionSettings,
         description: data => (data.config as any)?.media_url ? `Envia ${(data.config as any).media_type} de uma URL.` : 'Configurar URL da mídia.',
+        isConfigured: data => !!(data.config as any)?.media_url,
     },
     'send_interactive_message': {
         label: 'Enviar Msg Interativa',
@@ -165,6 +178,10 @@ export const nodeConfigs: Record<string, NodeConfig> = {
         },
         SettingsComponent: ActionSettings,
         description: data => (data.config as any)?.message_text ? `Envia "${truncate((data.config as any).message_text, 25)}" com botões` : 'Configurar mensagem interativa.',
+        isConfigured: data => {
+            const config = data.config as any;
+            return !!config?.message_text && Array.isArray(config?.buttons) && config.buttons.length > 0 && config.buttons.every((b: any) => b.text);
+        }
     },
     'send_webhook': {
         label: 'HTTP Request',
@@ -189,6 +206,7 @@ export const nodeConfigs: Record<string, NodeConfig> = {
         },
         SettingsComponent: SendWebhookSettings,
         description: data => (data.config as any)?.url ? `${(data.config as any).method} para ${truncate((data.config as any).url, 30)}` : 'Configurar URL do webhook.',
+        isConfigured: data => !!(data.config as any)?.url,
     },
     // Logic
     'condition': {
@@ -202,6 +220,7 @@ export const nodeConfigs: Record<string, NodeConfig> = {
         },
         SettingsComponent: LogicSettings,
         description: data => (data.config as any)?.field ? `Se ${truncate((data.config as any).field, 15)} ${(data.config as any).operator}...` : 'Configurar condição.',
+        isConfigured: data => !!(data.config as any)?.field,
     },
     'split_path': {
         label: 'Dividir Caminho (A/B)',
@@ -214,5 +233,6 @@ export const nodeConfigs: Record<string, NodeConfig> = {
         },
         SettingsComponent: LogicSettings,
         description: () => 'Divide aleatoriamente o fluxo em dois caminhos.',
+        isConfigured: () => true,
     },
 };

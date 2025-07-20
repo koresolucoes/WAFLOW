@@ -1,8 +1,10 @@
 
+
+
 import React, { useContext, useState, useEffect, useCallback, memo, FC, useMemo, useRef } from 'react';
 import { ReactFlow, ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, type Node, type Edge, type Connection, type NodeProps, useReactFlow, NodeTypes, EdgeLabelRenderer, getBezierPath, type EdgeProps as XyEdgeProps, MarkerType, BackgroundVariant } from '@xyflow/react';
 import { AppContext } from '../../contexts/AppContext';
-import { Automation, AutomationNode, AutomationNodeData, AutomationNodeStats, AutomationNodeLog, TriggerType, ActionType, LogicType } from '../../types';
+import { Automation, AutomationNode, AutomationNodeData, AutomationNodeStats, AutomationNodeLog, TriggerType, ActionType, LogicType, AutomationStatus } from '../../types';
 import Button from '../../components/common/Button';
 import Card from '../../components/common/Card';
 import { supabase } from '../../lib/supabaseClient';
@@ -13,6 +15,7 @@ import NodeStats from './NodeStats';
 import NodeLogsModal from './NodeLogsModal';
 import { nodeIcons } from '../../lib/automation/nodeIcons';
 import Switch from '../../components/common/Switch';
+import { ALERT_TRIANGLE_ICON } from '../../components/icons';
 
 
 const initialNodes: AutomationNode[] = [];
@@ -97,8 +100,8 @@ const nodeStyles = {
     description: "text-xs text-slate-400 min-h-[16px]", // min-h to prevent layout shift
 };
 
-const CustomNode = memo(({ id, data, selected }: NodeProps<AutomationNodeData>) => {
-    const { setNodes, setEdges, getNodes } = useReactFlow();
+const CustomNode: FC<NodeProps<AutomationNodeData>> = memo(({ id, data, selected }) => {
+    const { setNodes, setEdges } = useReactFlow();
     const { automationStats, pageParams, fetchNodeLogs } = useContext(AppContext);
     const [isLogsModalOpen, setIsLogsModalOpen] = useState(false);
     const [logs, setLogs] = useState<AutomationNodeLog[]>([]);
@@ -106,6 +109,7 @@ const CustomNode = memo(({ id, data, selected }: NodeProps<AutomationNodeData>) 
 
     const stats = automationStats[id];
     const nodeConfig = nodeConfigs[data.type];
+    const isConfigured = nodeConfig?.isConfigured ? nodeConfig.isConfigured(data) : true;
     const description = nodeConfig?.description ? nodeConfig.description(data) : 'Clique para configurar.';
 
     const nodeTypeStyle = data.nodeType;
@@ -125,19 +129,9 @@ const CustomNode = memo(({ id, data, selected }: NodeProps<AutomationNodeData>) 
 
     const handleDelete = (event: React.MouseEvent) => {
         event.stopPropagation();
-        const hasOtherTriggers = getNodes().some(n => n.data.nodeType === 'trigger' && n.id !== id);
-        if (data.nodeType === 'trigger' && !hasOtherTriggers) {
-             // Don't delete if it's the last trigger. The canDeleteTrigger logic handles this.
-             return;
-        }
-
         setEdges((eds) => eds.filter((edge) => edge.source !== id && edge.target !== id));
         setNodes((nds) => nds.filter((node) => node.id !== id));
     };
-    
-    const isTriggerNode = data.nodeType === 'trigger';
-    const canDeleteTrigger = isTriggerNode && getNodes().filter(n => n.data.nodeType === 'trigger').length > 1;
-
 
     const renderSourceHandle = () => {
         if (data.type === 'condition') {
@@ -160,7 +154,7 @@ const CustomNode = memo(({ id, data, selected }: NodeProps<AutomationNodeData>) 
     };
     
     const renderTargetHandle = () => {
-        if(isTriggerNode) return null;
+        if(data.nodeType === 'trigger') return null;
         return <Handle type="target" position={Position.Left} className="!bg-slate-500" />
     };
 
@@ -189,10 +183,9 @@ const CustomNode = memo(({ id, data, selected }: NodeProps<AutomationNodeData>) 
              {selected && (
                 <button 
                     onClick={handleDelete} 
-                    className="absolute top-[-10px] right-[-10px] bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold shadow-lg hover:bg-red-600 z-10 opacity-0 group-hover:opacity-100 transition-opacity disabled:bg-red-800 disabled:cursor-not-allowed"
+                    className="absolute top-[-10px] right-[-10px] bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold shadow-lg hover:bg-red-600 z-10 opacity-0 group-hover:opacity-100 transition-opacity"
                     aria-label="Deletar Nó"
-                    title={isTriggerNode && !canDeleteTrigger ? "Não é possível excluir o único gatilho" : "Deletar nó"}
-                    disabled={isTriggerNode && !canDeleteTrigger}
+                    title="Deletar nó"
                 >
                     &times;
                 </button>
@@ -205,8 +198,13 @@ const CustomNode = memo(({ id, data, selected }: NodeProps<AutomationNodeData>) 
                     <div className={`${nodeStyles.iconContainer} ${iconBgStyle}`}>
                         <IconComponent className="w-5 h-5" />
                     </div>
-                    <div>
+                    <div className="flex items-center gap-2">
                          <h3 className={nodeStyles.label}>{data.label}</h3>
+                          {!isConfigured && (
+                            <div title="Este nó precisa de configuração">
+                                <ALERT_TRIANGLE_ICON className="w-4 h-4 text-amber-400" />
+                            </div>
+                         )}
                     </div>
                 </div>
                 <p className={nodeStyles.description}>{description}</p>
@@ -284,7 +282,7 @@ const Editor: React.FC = () => {
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
     const [selectedNode, setSelectedNode] = useState<AutomationNode | null>(null);
 
-    const { screenToFlowPosition } = useReactFlow();
+    const { screenToFlowPosition } = useReactFlow<AutomationNodeData, Edge>();
     const saveTimeoutRef = useRef<number | undefined>();
     const hasFetchedStats = useRef(false);
     const isMounted = useRef(false);
@@ -405,21 +403,22 @@ const Editor: React.FC = () => {
     }, [updateAutomation]);
 
     useEffect(() => {
-        if (!isMounted.current || !automation) return;
-        saveChanges({ ...automation, nodes: nodes as AutomationNode[], edges });
-    }, [nodes, edges, automation, saveChanges]);
+        if (isMounted.current && automation) {
+            saveChanges({ ...automation, nodes: nodes as AutomationNode[], edges });
+        }
+    }, [nodes, edges, saveChanges]);
 
 
     const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!automation) return;
-        const newAutomation = { ...automation, name: e.target.value };
+        const newAutomation: Automation = { ...automation, name: e.target.value };
         setAutomation(newAutomation);
     };
 
     const handleStatusChange = (isActive: boolean) => {
         if (!automation) return;
-        const newStatus = isActive ? 'active' : 'paused';
-        const newAutomation = { ...automation, status: newStatus };
+        const newStatus: AutomationStatus = isActive ? 'active' : 'paused';
+        const newAutomation: Automation = { ...automation, status: newStatus };
         setAutomation(newAutomation);
     };
     
@@ -481,6 +480,17 @@ const Editor: React.FC = () => {
     }, [nodes, selectedNode]);
     
     const hasTrigger = useMemo(() => nodes.some(n => n.data.nodeType === 'trigger'), [nodes]);
+
+    const isFlowValidForActivation = useMemo(() => {
+        if (!hasTrigger) return false;
+        for (const node of nodes) {
+            const config = nodeConfigs[node.data.type];
+            if (config && config.isConfigured && !config.isConfigured(node.data)) {
+                return false;
+            }
+        }
+        return true;
+    }, [nodes, hasTrigger]);
     
     const saveStatusIndicator = useMemo(() => {
         switch (status) {
@@ -509,15 +519,18 @@ const Editor: React.FC = () => {
                     type="text"
                     value={automation.name}
                     onChange={handleNameChange}
-                    onBlur={() => saveChanges({ ...automation, nodes: nodes as AutomationNode[], edges })}
+                    onBlur={() => automation && saveChanges({ ...automation, nodes: nodes as AutomationNode[], edges })}
                     className="bg-transparent text-2xl font-bold text-white focus:outline-none focus:ring-2 focus:ring-sky-500 rounded-md px-2 py-1"
                 />
                 <div className="flex items-center gap-4">
-                    <Switch
-                        checked={automation.status === 'active'}
-                        onChange={handleStatusChange}
-                        label={automation.status === 'active' ? 'Ativa' : 'Pausada'}
-                    />
+                    <div title={!isFlowValidForActivation ? "A automação deve ter um gatilho e todos os nós devem estar configurados para ser ativada." : ""}>
+                        <Switch
+                            checked={automation.status === 'active'}
+                            onChange={handleStatusChange}
+                            label={automation.status === 'active' ? 'Ativa' : 'Pausada'}
+                            disabled={!isFlowValidForActivation}
+                        />
+                    </div>
                     {saveStatusIndicator}
                     <Button variant="secondary" onClick={() => setCurrentPage('automations')}>Voltar</Button>
                 </div>
@@ -542,7 +555,10 @@ const Editor: React.FC = () => {
                     </ReactFlow>
                     {!hasTrigger && isMounted.current && (
                         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-lg px-4 py-2 text-sm font-semibold shadow-lg">
-                            Atenção: A automação precisa de um nó de Gatilho para iniciar.
+                             <div className="flex items-center gap-2">
+                                <ALERT_TRIANGLE_ICON className="w-5 h-5"/>
+                                <span>Atenção: A automação precisa de um nó de Gatilho para iniciar.</span>
+                            </div>
                         </div>
                     )}
                 </main>
