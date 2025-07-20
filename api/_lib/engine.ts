@@ -4,6 +4,7 @@
 
 
 
+
 import { supabaseAdmin } from './supabaseAdmin.js';
 import { Automation, Contact, Json, Profile, TablesInsert, TablesUpdate } from './types.js';
 import { actionHandlers, ActionContext, ActionResult } from './automation/actionHandlers.js';
@@ -34,7 +35,7 @@ async function logNodeExecution(
         status,
         details
     };
-    const { error: logError } = await supabaseAdmin.from('automation_node_logs').insert(logEntry as any);
+    const { error: logError } = await supabaseAdmin.from('automation_node_logs').insert(logEntry);
 
     if (logError) {
         console.error(`Engine Log Error (Insert): Failed to insert log for node ${nodeId}`, logError);
@@ -71,7 +72,7 @@ export const executeAutomation = async (
         };
         const { data: runResult, error: runError } = await supabaseAdmin
             .from('automation_runs')
-            .insert(runEntry as any)
+            .insert(runEntry)
             .select('id')
             .single();
 
@@ -162,7 +163,7 @@ export const executeAutomation = async (
         }
 
         const successUpdatePayload: TablesUpdate<'automation_runs'> = { status: 'success', details: 'Completed successfully.' };
-        await supabaseAdmin.from('automation_runs').update(successUpdatePayload as any).eq('id', runId);
+        await supabaseAdmin.from('automation_runs').update(successUpdatePayload).eq('id', runId);
          console.log(`[Engine End] Automation ${automation.id} finished successfully.`);
 
     } catch (e: any) {
@@ -170,7 +171,7 @@ export const executeAutomation = async (
         console.error(`[Engine Failure] Automation ${automation.id} failed. Error:`, errorMessage);
         if (runId) {
              const failureUpdatePayload: TablesUpdate<'automation_runs'> = { status: 'failed', details: errorMessage };
-             await supabaseAdmin.from('automation_runs').update(failureUpdatePayload as any).eq('id', runId);
+             await supabaseAdmin.from('automation_runs').update(failureUpdatePayload).eq('id', runId);
         }
     }
 };

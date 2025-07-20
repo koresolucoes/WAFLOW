@@ -1,9 +1,5 @@
 
 
-
-
-
-
 import React, { useContext, useState, useEffect, useCallback, memo, FC, useMemo, useRef } from 'react';
 import { ReactFlow, ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, type Node, type Edge, type Connection, type NodeProps, useReactFlow, NodeTypes, EdgeLabelRenderer, getBezierPath, type EdgeProps as XyEdgeProps, MarkerType, BackgroundVariant } from '@xyflow/react';
 import { AppContext } from '../../contexts/AppContext';
@@ -180,24 +176,7 @@ const edgeTypes = {
     deletable: CustomDeletableEdge,
 };
 
-
-const EditorSidebar: FC<{ onAddNode: (type: string) => void }> = ({ onAddNode }) => {
-    const triggers = Object.entries(nodeConfigs).filter(([_, v]) => v.nodeType === 'trigger');
-    const actions = Object.entries(nodeConfigs).filter(([_, v]) => v.nodeType === 'action');
-    const logic = Object.entries(nodeConfigs).filter(([_, v]) => v.nodeType === 'logic');
-
-    return (
-        <Card className="absolute left-4 top-4 z-10 w-64 max-h-[calc(100vh-4rem)] overflow-y-auto">
-            <div className="space-y-4">
-                <NodeList title="Gatilhos" items={triggers} onAddNode={onAddNode} />
-                <NodeList title="Ações" items={actions} onAddNode={onAddNode} />
-                <NodeList title="Lógica" items={logic} onAddNode={onAddNode} />
-            </div>
-        </Card>
-    );
-};
-
-const NodeList: FC<{ title: string, items: [string, any][], onAddNode: (type: string) => void }> = ({ title, items, onAddNode }) => (
+const NodeList: FC<{ title: string; items: [string, any][]; onAddNode: (type: string) => void; disabled?: boolean }> = ({ title, items, onAddNode, disabled = false }) => (
     <div>
         <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">{title}</h3>
         <div className="space-y-1">
@@ -205,7 +184,9 @@ const NodeList: FC<{ title: string, items: [string, any][], onAddNode: (type: st
                 <button
                     key={type}
                     onClick={() => onAddNode(type)}
-                    className="w-full text-left flex items-center gap-2 p-2 rounded-md text-slate-300 hover:bg-slate-700 transition-colors"
+                    className="w-full text-left flex items-center gap-2 p-2 rounded-md text-slate-300 hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={disabled}
+                    title={disabled ? "A automação já possui um gatilho. Remova o existente para adicionar um novo." : ""}
                 >
                     <IconForType type={type} nodeType={config.nodeType} />
                     <span className="text-sm">{config.label}</span>
@@ -214,6 +195,22 @@ const NodeList: FC<{ title: string, items: [string, any][], onAddNode: (type: st
         </div>
     </div>
 );
+
+const EditorSidebar: FC<{ onAddNode: (type: string) => void; hasTrigger: boolean; }> = ({ onAddNode, hasTrigger }) => {
+    const triggers = Object.entries(nodeConfigs).filter(([_, v]) => v.nodeType === 'trigger');
+    const actions = Object.entries(nodeConfigs).filter(([_, v]) => v.nodeType === 'action');
+    const logic = Object.entries(nodeConfigs).filter(([_, v]) => v.nodeType === 'logic');
+
+    return (
+        <Card className="absolute left-4 top-4 z-10 w-64 max-h-[calc(100vh-4rem)] overflow-y-auto">
+            <div className="space-y-4">
+                <NodeList title="Gatilhos" items={triggers} onAddNode={onAddNode} disabled={hasTrigger} />
+                <NodeList title="Ações" items={actions} onAddNode={onAddNode} />
+                <NodeList title="Lógica" items={logic} onAddNode={onAddNode} />
+            </div>
+        </Card>
+    );
+};
 
 const IconForType: FC<{ type: string, nodeType: string}> = ({ type, nodeType }) => {
     const Icon = nodeIcons[type] || nodeIcons.default;
@@ -226,9 +223,11 @@ const IconForType: FC<{ type: string, nodeType: string}> = ({ type, nodeType }) 
 
 // Main Component
 const AutomationEditor: FC = () => {
-    const { pageParams, automations, templates, profile, updateAutomation, fetchAutomationStats, fetchNodeLogs, setAutomationStats, setCurrentPage } = useContext(AppContext);
+    // --- Hooks ---
+    const { pageParams, automations, templates, profile, updateAutomation, fetchAutomationStats, fetchNodeLogs, setCurrentPage } = useContext(AppContext);
     const reactFlowWrapper = useRef<HTMLDivElement>(null);
-    const { screenToFlowPosition, fitView } = useReactFlow();
+    const reactFlowInstance = useReactFlow();
+    const { screenToFlowPosition } = reactFlowInstance;
 
     const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
     const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -240,38 +239,17 @@ const AutomationEditor: FC = () => {
     const [isLogsModalOpen, setIsLogsModalOpen] = useState(false);
     const [selectedNodeLogs, setSelectedNodeLogs] = useState<AutomationNodeLog[]>([]);
     const [isLogsLoading, setIsLogsLoading] = useState(false);
-
-    useEffect(() => {
-        const currentAutomation = automations.find(a => a.id === pageParams.automationId);
-        setAutomation(currentAutomation || null);
-        if (currentAutomation) {
-            setNodes(currentAutomation.nodes || []);
-            setEdges(currentAutomation.edges || []);
-            fetchAutomationStats(currentAutomation.id);
-
-            const channel = supabase.channel(`automation-editor-${currentAutomation.id}`);
-            channel.on('broadcast', { event: 'webhook_captured' }, ({ payload }) => {
-                console.log('Webhook data captured!', payload);
-                if (payload.nodeId) {
-                    setNodes(nds => nds.map(n => {
-                        if (n.id === payload.nodeId) {
-                            return { ...n, data: { ...n.data, config: { ...n.data.config, last_captured_data: payload.data, is_listening: false }}};
-                        }
-                        return n;
-                    }));
-                }
-            }).subscribe();
-
-            return () => { supabase.removeChannel(channel); };
-        }
-    }, [pageParams.automationId, automations, setNodes, setEdges, fetchAutomationStats]);
-
-    const handleSave = async (updatedNodes = nodes, updatedEdges = edges) => {
+    
+    // --- Handlers ---
+    const handleSave = useCallback(async (updatedNodes = nodes, updatedEdges = edges) => {
         if (!automation) return;
         setIsSaving(true);
         const automationToSave: Automation = {
             ...automation,
-            nodes: updatedNodes.map(({ ...n }) => { delete n.selected; delete n.dragging; delete n.positionAbsolute; return n; }),
+            nodes: updatedNodes.map(n => {
+                const { selected, dragging, positionAbsolute, ...rest } = n;
+                return rest;
+            }),
             edges: updatedEdges,
         };
         try {
@@ -281,20 +259,42 @@ const AutomationEditor: FC = () => {
         } finally {
             setIsSaving(false);
         }
-    };
-
+    }, [automation, nodes, edges, updateAutomation]);
+    
     const onConnect = useCallback((params: Connection) => setEdges((eds) => addEdge({ ...params, type: 'deletable', markerEnd: { type: MarkerType.ArrowClosed } }, eds)), [setEdges]);
 
+    const handleNodeClick = useCallback((nodeId: string) => {
+        const node = nodes.find(n => n.id === nodeId);
+        if (node) {
+            setSelectedNode(node);
+            setIsSettingsModalOpen(true);
+        }
+    }, [nodes]);
+    
+    const handleNodeLogsClick = useCallback(async (nodeId: string, nodeLabel: string) => {
+        if (!automation) return;
+        setSelectedNode({ id: nodeId, data: { label: nodeLabel } } as any);
+        setIsLogsModalOpen(true);
+        setIsLogsLoading(true);
+        try {
+            const logs = await fetchNodeLogs(automation.id, nodeId);
+            setSelectedNodeLogs(logs);
+        } finally {
+            setIsLogsLoading(false);
+        }
+    }, [automation, fetchNodeLogs]);
+
+    const onUpdateNodes = useCallback(async (updatedNodes: AutomationNode[], options?: { immediate?: boolean }) => {
+        setNodes(updatedNodes);
+        if(options?.immediate) {
+            await handleSave(updatedNodes, edges);
+        }
+    }, [setNodes, edges, handleSave]);
+    
     const onAddNode = useCallback((type: string) => {
         const config = nodeConfigs[type];
         if (!config || !reactFlowWrapper.current) return;
         
-        // Prevent multiple trigger nodes
-        if (config.nodeType === 'trigger' && nodes.some(n => n.data.nodeType === 'trigger')) {
-            alert("Uma automação pode ter apenas um gatilho.");
-            return;
-        }
-
         const reactFlowBounds = reactFlowWrapper.current.getBoundingClientRect();
         const position = screenToFlowPosition({
             x: reactFlowBounds.left + (reactFlowBounds.width / 2.5),
@@ -308,60 +308,77 @@ const AutomationEditor: FC = () => {
             data: { ...config.data, label: config.label } as AutomationNodeData,
         };
         setNodes((nds) => nds.concat(newNode));
-    }, [screenToFlowPosition, nodes, setNodes]);
+    }, [screenToFlowPosition, setNodes]);
 
-    const handleNodeClick = (nodeId: string) => {
-        const node = nodes.find(n => n.id === nodeId);
-        if (node) {
-            setSelectedNode(node);
-            setIsSettingsModalOpen(true);
+    // --- Effects ---
+    useEffect(() => {
+        const currentAutomation = automations.find(a => a.id === pageParams.automationId);
+        if (currentAutomation) {
+            setAutomation(currentAutomation);
+            setNodes(currentAutomation.nodes || []);
+            setEdges(currentAutomation.edges || []);
+            fetchAutomationStats(currentAutomation.id);
+
+            const channel = supabase.channel(`automation-editor-${currentAutomation.id}`);
+            channel.on('broadcast', { event: 'webhook_captured' }, ({ payload }) => {
+                if (payload.nodeId) {
+                    setNodes(nds => nds.map(n => {
+                        if (n.id === payload.nodeId) {
+                            return { ...n, data: { ...n.data, config: { ...n.data.config, last_captured_data: payload.data, is_listening: false }}};
+                        }
+                        return n;
+                    }));
+                }
+            }).subscribe();
+            return () => { supabase.removeChannel(channel); };
         }
-    };
+    }, [pageParams.automationId, automations, setNodes, setEdges, fetchAutomationStats]);
+
+    // Attach handlers to react flow instance (workaround for passing callbacks to custom nodes)
+    (reactFlowInstance as any).onNodeClick = handleNodeClick;
+    (reactFlowInstance as any).onNodeLogsClick = handleNodeLogsClick;
     
-    const handleNodeLogsClick = async (nodeId: string, nodeLabel: string) => {
-        if (!automation) return;
-        setSelectedNode({ id: nodeId, data: { label: nodeLabel } } as any);
-        setIsLogsModalOpen(true);
-        setIsLogsLoading(true);
-        try {
-            const logs = await fetchNodeLogs(automation.id, nodeId);
-            setSelectedNodeLogs(logs);
-        } finally {
-            setIsLogsLoading(false);
+    // --- Memos for derived state & validation ---
+    const hasTriggerNode = useMemo(() => nodes.some(n => n.data.nodeType === 'trigger'), [nodes]);
+
+    const validationState = useMemo(() => {
+        if (!hasTriggerNode) {
+            return { isValid: false, reason: 'A automação precisa de um nó de gatilho para ser ativada.' };
         }
-    };
-    
-    const onUpdateNodes = useCallback(async (updatedNodes: AutomationNode[], options?: { immediate?: boolean }) => {
-        setNodes(updatedNodes);
-        if(options?.immediate) {
-            await handleSave(updatedNodes);
+        const unconfiguredNode = nodes.find(n => {
+            const config = nodeConfigs[n.data.type];
+            return config && !config.isConfigured(n.data);
+        });
+        if (unconfiguredNode) {
+            return { isValid: false, reason: `O nó "${unconfiguredNode.data.label}" não está configurado corretamente.` };
         }
-    }, [setNodes, handleSave]);
+        return { isValid: true, reason: '' };
+    }, [nodes, hasTriggerNode]);
 
-
-    const handleAutomationNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (automation) setAutomation({ ...automation, name: e.target.value });
-    };
-
-    const handleAutomationStatusChange = (checked: boolean) => {
-        if (automation) setAutomation({ ...automation, status: checked ? 'active' : 'paused' });
-    };
-    
+    // --- Early return for loading state ---
     if (!automation) {
-        return <div className="text-center text-white">Carregando automação...</div>;
+        return <div className="flex items-center justify-center h-full w-full text-center text-white">Carregando automação...</div>;
     }
-    
-    (useReactFlow() as any).onNodeClick = handleNodeClick;
-    (useReactFlow() as any).onNodeLogsClick = handleNodeLogsClick;
 
-
+    // --- Render ---
     return (
         <div className="w-full h-full bg-slate-900" ref={reactFlowWrapper}>
-            <EditorSidebar onAddNode={onAddNode} />
+            <EditorSidebar onAddNode={onAddNode} hasTrigger={hasTriggerNode} />
 
             <div className="absolute top-4 right-4 z-10 flex items-center gap-4">
-                <input type="text" value={automation.name} onChange={handleAutomationNameChange} className="bg-slate-800/80 border border-slate-700 rounded-md p-2 text-white font-semibold"/>
-                <Switch checked={automation.status === 'active'} onChange={handleAutomationStatusChange} />
+                <input 
+                  type="text" 
+                  value={automation.name} 
+                  onChange={(e) => setAutomation({ ...automation, name: e.target.value })} 
+                  className="bg-slate-800/80 border border-slate-700 rounded-md p-2 text-white font-semibold"
+                />
+                <div title={!validationState.isValid ? validationState.reason : (automation.status === 'active' ? 'Desativar Automação' : 'Ativar Automação')}>
+                    <Switch 
+                        checked={automation.status === 'active'} 
+                        onChange={(checked) => setAutomation({ ...automation, status: checked ? 'active' : 'paused' })} 
+                        disabled={!validationState.isValid}
+                    />
+                </div>
                 <Button variant="secondary" onClick={() => setCurrentPage('automations')}><ARROW_LEFT_ICON className="w-4 h-4 mr-2"/> Voltar</Button>
                 <Button onClick={() => handleSave()} isLoading={isSaving}>Salvar Automação</Button>
             </div>
@@ -376,6 +393,7 @@ const AutomationEditor: FC = () => {
                 edgeTypes={edgeTypes}
                 fitView
                 className="bg-slate-900"
+                deleteKeyCode={['Backspace', 'Delete']}
             >
                 <Controls showInteractive={false} />
                 <Background variant={BackgroundVariant.Dots} gap={16} size={1} color="#475569" />
@@ -401,7 +419,6 @@ const AutomationEditor: FC = () => {
         </div>
     );
 };
-
 
 const AutomationEditorPage: FC = () => {
     return (

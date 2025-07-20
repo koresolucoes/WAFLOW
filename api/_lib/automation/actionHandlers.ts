@@ -2,6 +2,8 @@
 
 
 
+
+
 import { supabaseAdmin } from '../supabaseAdmin.js';
 import { sendTemplatedMessage, sendTextMessage, sendMediaMessage, sendInteractiveMessage } from '../meta/messages.js';
 import { AutomationNode, Contact, Json, MetaConfig, MessageTemplate, Profile, TablesUpdate } from '../types.js';
@@ -222,14 +224,14 @@ const addTag: ActionHandler = async ({ contact, node, trigger }) => {
         const updatePayload: TablesUpdate<'contacts'> = { tags: newTags };
         const { data: updatedContact, error } = await supabaseAdmin
             .from('contacts')
-            .update(updatePayload as any)
+            .update(updatePayload)
             .eq('id', contact.id)
             .select()
             .single();
 
         if (error) throw error;
         if (!updatedContact) throw new Error('Failed to update contact after adding tag.');
-        const finalContact = updatedContact as any as Contact;
+        const finalContact = updatedContact as Contact;
 
         // Non-blocking call to handle triggers for the newly added tag
         handleTagAddedEvent(contact.user_id, finalContact, tagToAdd);
@@ -248,10 +250,10 @@ const removeTag: ActionHandler = async ({ contact, node, trigger }) => {
         const tagToRemove = resolveVariables(config.tag, { contact, trigger });
         const newTags = (contact.tags || []).filter(t => t !== tagToRemove);
         const updatePayload: TablesUpdate<'contacts'> = { tags: newTags };
-        const { data, error } = await supabaseAdmin.from('contacts').update(updatePayload as any).eq('id', contact.id).select().single();
+        const { data, error } = await supabaseAdmin.from('contacts').update(updatePayload).eq('id', contact.id).select().single();
         if (error) throw error;
         if (!data) throw new Error('Failed to update contact after removing tag.');
-        return { updatedContact: data as unknown as Contact, details: `Tag '${tagToRemove}' removida do contato.` };
+        return { updatedContact: data as Contact, details: `Tag '${tagToRemove}' removida do contato.` };
     }
     throw new Error('Tag a ser removida não está configurada.');
 };
@@ -266,10 +268,10 @@ const setCustomField: ActionHandler = async ({ contact, node, trigger }) => {
         const fieldValue = resolveVariables(config.field_value || '', { contact, trigger });
         const newCustomFields = { ...(contact.custom_fields as object || {}), [fieldName]: fieldValue };
         const updatePayload: TablesUpdate<'contacts'> = { custom_fields: newCustomFields };
-        const { data, error } = await supabaseAdmin.from('contacts').update(updatePayload as any).eq('id', contact.id).select().single();
+        const { data, error } = await supabaseAdmin.from('contacts').update(updatePayload).eq('id', contact.id).select().single();
         if (error) throw error;
         if (!data) throw new Error('Failed to update contact after setting custom field.');
-        return { updatedContact: data as unknown as Contact, details: `Campo '${fieldName}' atualizado para '${fieldValue}'.` };
+        return { updatedContact: data as Contact, details: `Campo '${fieldName}' atualizado para '${fieldValue}'.` };
     }
     throw new Error('Nome do campo personalizado não está configurado.');
 };
