@@ -1,4 +1,6 @@
 
+
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
 import { executeAutomation } from '../_lib/engine.js';
@@ -68,12 +70,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Robust Profile Lookup: First try by the custom path prefix.
     const { data: profileByPrefix } = await supabaseAdmin.from('profiles').select('*').eq('webhook_path_prefix', webhookPrefix).maybeSingle();
     if (profileByPrefix) {
-        profileData = profileByPrefix;
+        profileData = profileByPrefix as unknown as Profile;
     } else {
         // As a fallback, check if the prefix was actually a user ID.
         const { data: profileById } = await supabaseAdmin.from('profiles').select('*').eq('id', webhookPrefix).maybeSingle();
         if (profileById) {
-            profileData = profileById;
+            profileData = profileById as unknown as Profile;
         }
     }
     
@@ -88,7 +90,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
          return res.status(500).json({ error: 'Failed to retrieve automations.' });
     }
     
-    const automations = (automationsData as Automation[]) || [];
+    const automations = (automationsData as unknown as Automation[]) || [];
     const automation = automations.find(a => a.nodes?.some(n => n.id === nodeId));
 
     if (!automation) {
@@ -187,16 +189,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                         const nameRule = mappingRules.find((m: any) => m.destination === 'name');
                         const name = nameRule ? getValueFromPath(fullPayloadForEvent, nameRule.source) : 'New Webhook Lead';
                         const newContactPayload: TablesInsert<'contacts'> = { user_id: profile.id, name, phone, tags: ['new-webhook-lead'], custom_fields: null };
-                        const { data: newContact, error: insertError } = await supabaseAdmin.from('contacts').insert(newContactPayload).select().single();
+                        const { data: newContact, error: insertError } = await supabaseAdmin.from('contacts').insert(newContactPayload as any).select().single();
                         if (insertError) {
                             console.error('Webhook trigger: Failed to create new contact.', insertError);
                         } else if (newContact) {
-                            contact = newContact as Contact;
+                            contact = newContact as unknown as Contact;
                         }
                     } else if (contactError) {
                         console.error('Webhook trigger: Failed to query contact.', contactError);
                     } else if (contactData) {
-                        contact = contactData as Contact;
+                        contact = contactData as unknown as Contact;
                         if(contact) originalTags = new Set(contact.tags || []);
                     }
                 }
@@ -244,11 +246,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
                 if (needsUpdate) {
                     const { id, user_id, created_at, ...updatePayload} = contact;
-                    const { data: updatedContact, error: updateContactError } = await supabaseAdmin.from('contacts').update(updatePayload as TablesUpdate<'contacts'>).eq('id', contact.id).select().single();
+                    const { data: updatedContact, error: updateContactError } = await supabaseAdmin.from('contacts').update(updatePayload as any).eq('id', contact.id).select().single();
                     if(updateContactError) {
                         console.error("Webhook trigger: Failed to update contact with data", updateContactError)
                     } else if(updatedContact) {
-                        contact = updatedContact as Contact;
+                        contact = updatedContact as unknown as Contact;
                     }
                 }
             }

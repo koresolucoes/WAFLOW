@@ -1,5 +1,6 @@
 
 
+
 import { Json as DbJson, Tables, TablesInsert, TablesUpdate } from './database.types.js';
 import { MetaTemplateComponent } from './meta/types.js';
 
@@ -33,6 +34,7 @@ export type AutomationNode = BackendNode<NodeData>;
 export type TemplateCategory = 'MARKETING' | 'UTILITY' | 'AUTHENTICATION';
 export type TemplateStatus = 'APPROVED' | 'PENDING' | 'REJECTED' | 'PAUSED' | 'LOCAL';
 export type AutomationStatus = 'active' | 'paused';
+export type AutomationRunStatus = 'running' | 'success' | 'failed';
 export type NodeType = 'trigger' | 'action' | 'logic';
 
 export type TriggerType = 'new_contact_with_tag' | 'message_received_with_keyword' | 'button_clicked' | 'new_contact' | 'webhook_received';

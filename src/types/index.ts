@@ -14,7 +14,7 @@ export type TemplateStatus = 'APPROVED' | 'PENDING' | 'REJECTED' | 'PAUSED' | 'L
 export type CampaignStatus = 'Sent' | 'Draft' | 'Failed';
 export type MessageStatus = 'sent' | 'delivered' | 'read' | 'failed';
 export type AutomationStatus = 'active' | 'paused';
-export type AutomationRunStatus = 'success' | 'failed';
+export type AutomationRunStatus = 'running' | 'success' | 'failed';
 export type AutomationLogStatus = 'success' | 'failed';
 
 // Tipos para os nós do editor de automação
