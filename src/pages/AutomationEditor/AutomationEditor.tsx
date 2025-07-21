@@ -1,4 +1,5 @@
 
+
 import React, { useContext, useState, useEffect, useCallback, memo, FC, useMemo, useRef, createContext } from 'react';
 import { ReactFlow, ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, type Node, type Edge, type Connection, type NodeProps, useReactFlow, NodeTypes, EdgeLabelRenderer, getBezierPath, type EdgeProps as XyEdgeProps, MarkerType, BackgroundVariant } from '@xyflow/react';
 import { AppContext } from '../../contexts/AppContext';
@@ -13,7 +14,7 @@ import NodeStats from './NodeStats';
 import NodeLogsModal from './NodeLogsModal';
 import { nodeIcons } from '../../lib/automation/nodeIcons';
 import Switch from '../../components/common/Switch';
-import { ALERT_TRIANGLE_ICON, ARROW_LEFT_ICON } from '../../components/icons';
+import { ALERT_TRIANGLE_ICON, ARROW_LEFT_ICON, TRASH_ICON } from '../../components/icons';
 
 
 const initialNodes: AutomationNode[] = [];
@@ -91,7 +92,7 @@ const CustomDeletableEdge: FC<XyEdgeProps> = ({
 // ====================================================================================
 
 const nodeStyles = {
-    base: "bg-slate-800 border-t-4 rounded-xl shadow-2xl text-white w-72 group cursor-pointer",
+    base: "relative bg-slate-800 border-t-4 rounded-xl shadow-2xl text-white w-72 group cursor-pointer",
     body: "p-4 space-y-2",
     header: "flex items-center gap-3",
     iconContainer: "flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-lg",
@@ -108,7 +109,8 @@ const nodeStyles = {
 const CustomNode: FC<NodeProps<AutomationNode>> = memo(({ data, id, isConnectable }) => {
     const { onNodeLogsClick } = useContext(EditorContext)!;
     const { automationStats } = useContext(AppContext);
-    const { nodeType, type, label, config } = data;
+    const { setNodes } = useReactFlow();
+    const { nodeType, type, label } = data;
     const Icon = nodeIcons[type] || nodeIcons.default;
     const nodeConfig = nodeConfigs[type];
     const isConfigured = nodeConfig ? nodeConfig.isConfigured(data) : true;
@@ -117,11 +119,24 @@ const CustomNode: FC<NodeProps<AutomationNode>> = memo(({ data, id, isConnectabl
     const handleViewLogs = () => {
         onNodeLogsClick(id, label);
     };
+    
+    const handleDeleteNode = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        setNodes((nds) => nds.filter((node) => node.id !== id));
+    };
+
 
     return (
         <div className={`${nodeStyles.base} ${nodeStyles[nodeType]}`}>
+             <button
+                onClick={handleDeleteNode}
+                className="absolute top-2 right-2 p-1 rounded-full text-slate-500 hover:bg-slate-700 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                title="Deletar nó"
+            >
+                <TRASH_ICON className="w-4 h-4" />
+            </button>
             <div className={nodeStyles.body}>
-                <div className={nodeStyles.header}>
+                <div className="relative flex items-center gap-3">
                     <div className={`${nodeStyles.iconContainer} ${nodeStyles[`${nodeType}IconBg`]}`}>
                         <Icon className="w-5 h-5" />
                     </div>
