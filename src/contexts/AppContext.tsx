@@ -616,8 +616,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const updateAutomation = useCallback(async (automation: Automation) => {
     if (!user) throw new Error("Usuário não autenticado.");
     const updatePayload: TablesUpdate<'automations'> = { name: automation.name, status: automation.status, nodes: automation.nodes as unknown as Json, edges: automation.edges as unknown as Json };
+    
+    // 1. Save the automation state
     const { data, error } = await supabase.from('automations').update(updatePayload).eq('id', automation.id).eq('user_id', user.id).select().single();
     if(error) throw error;
+
+    // 2. Sync triggers with the backend registry
+    const { error: rpcError } = await supabase.rpc('sync_automation_triggers', { automation_id_in: automation.id });
+    if (rpcError) {
+        // Log the error but don't throw, as the main save succeeded.
+        // The user can try saving again.
+        console.error("Falha ao sincronizar gatilhos de automação:", rpcError);
+        // Optionally, show a non-blocking warning to the user.
+    }
+
     if(data) {
       const updatedAutomationData = data as Tables<'automations'>;
       const updatedAutomation: Automation = { ...updatedAutomationData, nodes: (Array.isArray(updatedAutomationData.nodes) ? updatedAutomationData.nodes : []) as unknown as AutomationNode[], edges: (Array.isArray(updatedAutomationData.edges) ? updatedAutomationData.edges : []) as unknown as Edge[], status: updatedAutomationData.status as AutomationStatus };

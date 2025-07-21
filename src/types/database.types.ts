@@ -119,6 +119,51 @@ export type Database = {
           },
         ]
       }
+      automation_triggers: {
+        Row: {
+          id: string
+          user_id: string
+          automation_id: string
+          node_id: string
+          trigger_type: string
+          trigger_key: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          automation_id: string
+          node_id: string
+          trigger_type: string
+          trigger_key?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          automation_id?: string
+          node_id?: string
+          trigger_type?: string
+          trigger_key?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automation_triggers_automation_id_fkey"
+            columns: ["automation_id"]
+            isOneToOne: false
+            referencedRelation: "automations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_triggers_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       automations: {
         Row: {
           created_at: string
@@ -637,6 +682,12 @@ export type Database = {
           p_automation_id: string
           p_node_id: string
           p_status: string
+        }
+        Returns: undefined
+      }
+      sync_automation_triggers: {
+        Args: {
+          automation_id_in: string
         }
         Returns: undefined
       }

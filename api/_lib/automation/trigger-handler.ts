@@ -1,96 +1,124 @@
 
-
-
-
 import { supabaseAdmin } from '../supabaseAdmin.js';
 import { executeAutomation } from '../engine.js';
 import { Automation, Contact, Json } from '../types.js';
 
-// Fetches all active automations for a user
-const getActiveAutomations = async (userId: string): Promise<Automation[]> => {
-    const { data, error } = await supabaseAdmin
-        .from('automations')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('status', 'active');
-    
-    if (error) {
-        console.error(`TriggerHandler Error: Failed to fetch automations for user ${userId}`, error);
-        return [];
-    }
-    return (data as unknown as Automation[]) || [];
+type TriggerInfo = {
+    automation_id: string;
+    node_id: string;
 };
 
-// Dispatches an automation to the engine without waiting for it to complete.
-const dispatchAutomation = (automation: Automation, contact: Contact | null, startNodeId: string, trigger: Json | null) => {
-    console.log(`Dispatching automation '${automation.name}' (ID: ${automation.id}) starting from node ${startNodeId}`);
-    // Non-blocking call
-    executeAutomation(automation, contact, startNodeId, trigger);
+// Dispatches automations found by a trigger lookup.
+const dispatchAutomations = async (triggers: TriggerInfo[], contact: Contact | null, triggerPayload: Json | null) => {
+    if (triggers.length === 0) return;
+
+    // Deduplicate by automation ID to prevent running the same automation multiple times for the same event
+    const uniqueAutomationIds = [...new Set(triggers.map(t => t.automation_id))];
+
+    const { data: automations, error } = await supabaseAdmin
+        .from('automations')
+        .select('*')
+        .in('id', uniqueAutomationIds);
+
+    if (error) {
+        console.error(`Trigger Dispatcher Error: Failed to fetch automations by IDs`, error);
+        return;
+    }
+    
+    const automationsMap = new Map((automations as unknown as Automation[]).map(a => [a.id, a]));
+
+    for (const trigger of triggers) {
+        const automation = automationsMap.get(trigger.automation_id);
+        if (automation) {
+            console.log(`Dispatching automation '${automation.name}' (ID: ${automation.id}) starting from node ${trigger.node_id}`);
+            // Non-blocking call to the engine
+            executeAutomation(automation, contact, trigger.node_id, triggerPayload);
+        }
+    }
 };
+
 
 // Handles events related to incoming messages from Meta
 export const handleMetaMessageEvent = async (userId: string, contact: Contact, message: any) => {
-    const automations = await getActiveAutomations(userId);
     const messageBody = message.type === 'text' 
         ? message.text.body.toLowerCase() 
-        : (message.type === 'interactive' && message.interactive.type === 'button_reply' ? message.interactive.button_reply.title.toLowerCase() : '');
-    const buttonPayload = message.type === 'interactive' && message.interactive.type === 'button_reply' ? message.interactive.button_reply.id : undefined;
+        : '';
+    const buttonPayload = message.type === 'interactive' && message.interactive.type === 'button_reply' 
+        ? message.interactive.button_reply.id 
+        : undefined;
 
-    const triggerData = { type: 'meta_message', payload: message };
+    const triggerLookups = [];
 
-    for (const auto of automations) {
-        if (!auto.nodes) continue;
-        
-        for (const node of auto.nodes) {
-            if (node.data.nodeType !== 'trigger') continue;
+    // Lookup for keyword triggers
+    if (messageBody) {
+        triggerLookups.push(
+            supabaseAdmin
+                .from('automation_triggers')
+                .select('automation_id, node_id')
+                .eq('user_id', userId)
+                .eq('trigger_type', 'message_received_with_keyword')
+                .eq('trigger_key', messageBody)
+        );
+    }
+    
+    // Lookup for button click triggers
+    if (buttonPayload) {
+         triggerLookups.push(
+            supabaseAdmin
+                .from('automation_triggers')
+                .select('automation_id, node_id')
+                .eq('user_id', userId)
+                .eq('trigger_type', 'button_clicked')
+                .eq('trigger_key', buttonPayload)
+        );
+    }
 
-            const config = (node.data.config || {}) as any;
-            let shouldTrigger = false;
-
-            // Check for keyword trigger
-            if (node.data.type === 'message_received_with_keyword' && config.keyword && messageBody.includes(config.keyword.toLowerCase())) {
-                shouldTrigger = true;
-            }
-            // Check for button click trigger
-            else if (node.data.type === 'button_clicked' && config.button_payload && buttonPayload === config.button_payload) {
-                shouldTrigger = true;
-            }
-            
-            if (shouldTrigger) {
-                dispatchAutomation(auto, contact, node.id, triggerData);
-            }
-        }
+    if (triggerLookups.length === 0) return;
+    
+    const results = await Promise.all(triggerLookups);
+    const allTriggers: TriggerInfo[] = results.flatMap(res => res.data || []);
+    
+    if (allTriggers.length > 0) {
+       const triggerData = { type: 'meta_message', payload: message };
+       dispatchAutomations(allTriggers, contact, triggerData);
     }
 };
 
 // Handles events for newly created contacts
 export const handleNewContactEvent = async (userId: string, contact: Contact) => {
-    const automations = await getActiveAutomations(userId);
-    const triggerData = { type: 'new_contact', payload: { contact } };
-    for (const auto of automations) {
-        if (!auto.nodes) continue;
-        const triggerNode = auto.nodes.find(n => n.data.nodeType === 'trigger' && n.data.type === 'new_contact');
-        if (triggerNode) {
-            dispatchAutomation(auto, contact, triggerNode.id, triggerData);
-        }
+    const { data: triggers, error } = await supabaseAdmin
+        .from('automation_triggers')
+        .select('automation_id, node_id')
+        .eq('user_id', userId)
+        .eq('trigger_type', 'new_contact');
+        
+    if (error) {
+        console.error(`handleNewContactEvent Error:`, error);
+        return;
+    }
+
+    if (triggers && triggers.length > 0) {
+        const triggerData = { type: 'new_contact', payload: { contact } };
+        dispatchAutomations(triggers, contact, triggerData);
     }
 };
 
 // Handles events when a specific tag is added to a contact
 export const handleTagAddedEvent = async (userId: string, contact: Contact, addedTag: string) => {
-    const automations = await getActiveAutomations(userId);
-    const triggerData = { type: 'tag_added', payload: { contact, addedTag } };
-
-    for (const auto of automations) {
-        if (!auto.nodes) continue;
+    const { data: triggers, error } = await supabaseAdmin
+        .from('automation_triggers')
+        .select('automation_id, node_id')
+        .eq('user_id', userId)
+        .eq('trigger_type', 'new_contact_with_tag')
+        .eq('trigger_key', addedTag.toLowerCase());
         
-        for (const triggerNode of auto.nodes) {
-            if (triggerNode.data.nodeType !== 'trigger' || triggerNode.data.type !== 'new_contact_with_tag') continue;
-            
-            const config = (triggerNode.data.config || {}) as any;
-            if (config?.tag?.toLowerCase() === addedTag.toLowerCase()) {
-                dispatchAutomation(auto, contact, triggerNode.id, triggerData);
-            }
-        }
+    if (error) {
+        console.error(`handleTagAddedEvent Error:`, error);
+        return;
+    }
+    
+    if (triggers && triggers.length > 0) {
+        const triggerData = { type: 'tag_added', payload: { contact, addedTag } };
+        dispatchAutomations(triggers, contact, triggerData);
     }
 };
