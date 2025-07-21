@@ -485,14 +485,27 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const updateContact = useCallback(async (updatedContact: Contact) => {
      if (!user) throw new Error("Usuário não autenticado.");
      const oldContact = contacts.find(c => c.id === updatedContact.id);
-     const { id, created_at, user_id, ...updatePayload } = updatedContact;
-     const { data, error } = await supabase.from('contacts').update(updatePayload).eq('id', updatedContact.id).eq('user_id', user.id).select().single();
+
+     // Destructure `deals` out of the object to prevent it from being sent in the update payload.
+     // `updatedContact` might be a `ContactWithDetails` object, so we cast to `any` to access the property.
+     const { id, created_at, user_id, deals, ...updatePayload } = updatedContact as any;
+
+     const { data, error } = await supabase
+        .from('contacts')
+        .update(updatePayload)
+        .eq('id', updatedContact.id)
+        .eq('user_id', user.id)
+        .select()
+        .single();
+
     if (error) throw error;
     if(data) {
       const newContact = data as Contact;
       setContacts(prev => prev.map(c => c.id === newContact.id ? newContact : c));
+      
+      // When updating details view, preserve the existing `deals` array.
       if(contactDetails?.id === newContact.id) {
-          setContactDetails(prev => prev ? {...prev, ...newContact} : null)
+          setContactDetails(prev => prev ? { ...prev, ...(newContact as Contact) } : null)
       }
       checkAndRunContactAutomations(newContact, oldContact);
     }

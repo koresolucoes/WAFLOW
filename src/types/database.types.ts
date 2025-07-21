@@ -211,6 +211,7 @@ export type Database = {
       campaigns: {
         Row: {
           id: string
+          created_at: string
           name: string
           recipient_count: number
           sent_at: string
@@ -220,6 +221,7 @@ export type Database = {
         }
         Insert: {
           id?: string
+          created_at?: string
           name: string
           recipient_count?: number
           sent_at?: string
@@ -229,6 +231,7 @@ export type Database = {
         }
         Update: {
           id?: string
+          created_at?: string
           name?: string
           recipient_count?: number
           sent_at?: string
