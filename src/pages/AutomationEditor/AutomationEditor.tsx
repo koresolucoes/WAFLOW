@@ -1,6 +1,8 @@
 
 
-import React, { useContext, useState, useEffect, useCallback, memo, FC, useMemo, useRef } from 'react';
+
+
+import React, { useContext, useState, useEffect, useCallback, memo, FC, useMemo, useRef, createContext } from 'react';
 import { ReactFlow, ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, type Node, type Edge, type Connection, type NodeProps, useReactFlow, NodeTypes, EdgeLabelRenderer, getBezierPath, type EdgeProps as XyEdgeProps, MarkerType, BackgroundVariant } from '@xyflow/react';
 import { AppContext } from '../../contexts/AppContext';
 import { Automation, AutomationNode, AutomationNodeData, AutomationNodeStats, AutomationNodeLog, TriggerType, ActionType, LogicType, AutomationStatus } from '../../types';
@@ -19,6 +21,13 @@ import { ALERT_TRIANGLE_ICON, ARROW_LEFT_ICON } from '../../components/icons';
 
 const initialNodes: AutomationNode[] = [];
 const initialEdges: Edge[] = [];
+
+// Create a context to pass callbacks down to custom nodes without prop drilling
+// or unstable instance mutations.
+const EditorContext = createContext<{
+    onNodeLogsClick: (nodeId: string, nodeLabel: string) => void;
+} | null>(null);
+
 
 // ====================================================================================
 // Custom Edge Component
@@ -85,7 +94,7 @@ const CustomDeletableEdge: FC<XyEdgeProps> = ({
 // ====================================================================================
 
 const nodeStyles = {
-    base: "bg-slate-800 border-t-4 rounded-xl shadow-2xl text-white w-72 group",
+    base: "bg-slate-800 border-t-4 rounded-xl shadow-2xl text-white w-72 group cursor-pointer",
     body: "p-4 space-y-2",
     header: "flex items-center gap-3",
     iconContainer: "flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-lg",
@@ -100,7 +109,7 @@ const nodeStyles = {
 };
 
 const CustomNode: FC<NodeProps<AutomationNode>> = memo(({ data, id, isConnectable }) => {
-    const { onNodeClick, onNodeLogsClick } = useReactFlow() as any; // Using any to avoid creating a new type for this
+    const { onNodeLogsClick } = useContext(EditorContext)!;
     const { automationStats } = useContext(AppContext);
     const { nodeType, type, label, config } = data;
     const Icon = nodeIcons[type] || nodeIcons.default;
@@ -108,16 +117,12 @@ const CustomNode: FC<NodeProps<AutomationNode>> = memo(({ data, id, isConnectabl
     const isConfigured = nodeConfig ? nodeConfig.isConfigured(data) : true;
     const description = nodeConfig ? nodeConfig.description(data) : '';
 
-    const handleNodeClick = () => {
-        onNodeClick(id);
-    };
-
     const handleViewLogs = () => {
         onNodeLogsClick(id, label);
     };
 
     return (
-        <div className={`${nodeStyles.base} ${nodeStyles[nodeType]}`} onClick={handleNodeClick}>
+        <div className={`${nodeStyles.base} ${nodeStyles[nodeType]}`}>
             <div className={nodeStyles.body}>
                 <div className={nodeStyles.header}>
                     <div className={`${nodeStyles.iconContainer} ${nodeStyles[`${nodeType}IconBg`]}`}>
@@ -226,8 +231,7 @@ const AutomationEditor: FC = () => {
     // --- Hooks ---
     const { pageParams, automations, templates, profile, updateAutomation, fetchAutomationStats, fetchNodeLogs, setCurrentPage } = useContext(AppContext);
     const reactFlowWrapper = useRef<HTMLDivElement>(null);
-    const reactFlowInstance = useReactFlow();
-    const { screenToFlowPosition } = reactFlowInstance;
+    const { screenToFlowPosition } = useReactFlow();
 
     const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
     const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -239,6 +243,7 @@ const AutomationEditor: FC = () => {
     const [isLogsModalOpen, setIsLogsModalOpen] = useState(false);
     const [selectedNodeLogs, setSelectedNodeLogs] = useState<AutomationNodeLog[]>([]);
     const [isLogsLoading, setIsLogsLoading] = useState(false);
+    const loadedAutomationId = useRef<string | null>(null);
     
     // --- Handlers ---
     const handleSave = useCallback(async (updatedNodes = nodes, updatedEdges = edges) => {
@@ -247,7 +252,7 @@ const AutomationEditor: FC = () => {
         const automationToSave: Automation = {
             ...automation,
             nodes: updatedNodes.map(n => {
-                const { selected, dragging, positionAbsolute, ...rest } = n;
+                const { selected, dragging, positionAbsolute, ...rest } = n as any;
                 return rest;
             }),
             edges: updatedEdges,
@@ -263,13 +268,10 @@ const AutomationEditor: FC = () => {
     
     const onConnect = useCallback((params: Connection) => setEdges((eds) => addEdge({ ...params, type: 'deletable', markerEnd: { type: MarkerType.ArrowClosed } }, eds)), [setEdges]);
 
-    const handleNodeClick = useCallback((nodeId: string) => {
-        const node = nodes.find(n => n.id === nodeId);
-        if (node) {
-            setSelectedNode(node);
-            setIsSettingsModalOpen(true);
-        }
-    }, [nodes]);
+    const handleNodeClick = useCallback((_event: React.MouseEvent, node: Node) => {
+        setSelectedNode(node as AutomationNode);
+        setIsSettingsModalOpen(true);
+    }, []);
     
     const handleNodeLogsClick = useCallback(async (nodeId: string, nodeLabel: string) => {
         if (!automation) return;
@@ -283,6 +285,8 @@ const AutomationEditor: FC = () => {
             setIsLogsLoading(false);
         }
     }, [automation, fetchNodeLogs]);
+    
+    const contextValue = useMemo(() => ({ onNodeLogsClick: handleNodeLogsClick }), [handleNodeLogsClick]);
 
     const onUpdateNodes = useCallback(async (updatedNodes: AutomationNode[], options?: { immediate?: boolean }) => {
         setNodes(updatedNodes);
@@ -311,32 +315,39 @@ const AutomationEditor: FC = () => {
     }, [screenToFlowPosition, setNodes]);
 
     // --- Effects ---
+    // This effect loads the automation from context, but ONLY when the ID changes.
+    // This prevents remote updates from overwriting local, unsaved changes (like node deletion).
     useEffect(() => {
         const currentAutomation = automations.find(a => a.id === pageParams.automationId);
         if (currentAutomation) {
-            setAutomation(currentAutomation);
-            setNodes(currentAutomation.nodes || []);
-            setEdges(currentAutomation.edges || []);
-            fetchAutomationStats(currentAutomation.id);
-
-            const channel = supabase.channel(`automation-editor-${currentAutomation.id}`);
-            channel.on('broadcast', { event: 'webhook_captured' }, ({ payload }) => {
-                if (payload.nodeId) {
-                    setNodes(nds => nds.map(n => {
-                        if (n.id === payload.nodeId) {
-                            return { ...n, data: { ...n.data, config: { ...n.data.config, last_captured_data: payload.data, is_listening: false }}};
-                        }
-                        return n;
-                    }));
-                }
-            }).subscribe();
-            return () => { supabase.removeChannel(channel); };
+            if (loadedAutomationId.current !== pageParams.automationId) {
+                setAutomation(currentAutomation);
+                setNodes(currentAutomation.nodes || []);
+                setEdges(currentAutomation.edges || []);
+                fetchAutomationStats(currentAutomation.id);
+                loadedAutomationId.current = pageParams.automationId;
+            }
         }
     }, [pageParams.automationId, automations, setNodes, setEdges, fetchAutomationStats]);
 
-    // Attach handlers to react flow instance (workaround for passing callbacks to custom nodes)
-    (reactFlowInstance as any).onNodeClick = handleNodeClick;
-    (reactFlowInstance as any).onNodeLogsClick = handleNodeLogsClick;
+    // This effect handles the real-time subscription for webhook data capture.
+    useEffect(() => {
+        if (!automation) return;
+
+        const channel = supabase.channel(`automation-editor-${automation.id}`);
+        channel.on('broadcast', { event: 'webhook_captured' }, ({ payload }) => {
+            if (payload.nodeId) {
+                setNodes(nds => nds.map(n => {
+                    if (n.id === payload.nodeId) {
+                        const oldConfig = n.data.config && typeof n.data.config === 'object' ? n.data.config : {};
+                        return { ...n, data: { ...n.data, config: { ...oldConfig, last_captured_data: payload.data, is_listening: false }}};
+                    }
+                    return n;
+                }));
+            }
+        }).subscribe();
+        return () => { supabase.removeChannel(channel); };
+    }, [automation, setNodes]);
     
     // --- Memos for derived state & validation ---
     const hasTriggerNode = useMemo(() => nodes.some(n => n.data.nodeType === 'trigger'), [nodes]);
@@ -362,61 +373,64 @@ const AutomationEditor: FC = () => {
 
     // --- Render ---
     return (
-        <div className="w-full h-full bg-slate-900" ref={reactFlowWrapper}>
-            <EditorSidebar onAddNode={onAddNode} hasTrigger={hasTriggerNode} />
+        <EditorContext.Provider value={contextValue}>
+            <div className="w-full h-full bg-slate-900" ref={reactFlowWrapper}>
+                <EditorSidebar onAddNode={onAddNode} hasTrigger={hasTriggerNode} />
 
-            <div className="absolute top-4 right-4 z-10 flex items-center gap-4">
-                <input 
-                  type="text" 
-                  value={automation.name} 
-                  onChange={(e) => setAutomation({ ...automation, name: e.target.value })} 
-                  className="bg-slate-800/80 border border-slate-700 rounded-md p-2 text-white font-semibold"
-                />
-                <div title={!validationState.isValid ? validationState.reason : (automation.status === 'active' ? 'Desativar Automação' : 'Ativar Automação')}>
-                    <Switch 
-                        checked={automation.status === 'active'} 
-                        onChange={(checked) => setAutomation({ ...automation, status: checked ? 'active' : 'paused' })} 
-                        disabled={!validationState.isValid}
+                <div className="absolute top-4 right-4 z-10 flex items-center gap-4">
+                    <input 
+                    type="text" 
+                    value={automation.name} 
+                    onChange={(e) => setAutomation({ ...automation, name: e.target.value })} 
+                    className="bg-slate-800/80 border border-slate-700 rounded-md p-2 text-white font-semibold"
                     />
+                    <div title={!validationState.isValid ? validationState.reason : (automation.status === 'active' ? 'Desativar Automação' : 'Ativar Automação')}>
+                        <Switch 
+                            checked={automation.status === 'active'} 
+                            onChange={(checked) => setAutomation({ ...automation, status: checked ? 'active' : 'paused' })} 
+                            disabled={!validationState.isValid}
+                        />
+                    </div>
+                    <Button variant="secondary" onClick={() => setCurrentPage('automations')}><ARROW_LEFT_ICON className="w-4 h-4 mr-2"/> Voltar</Button>
+                    <Button onClick={() => handleSave()} isLoading={isSaving}>Salvar Automação</Button>
                 </div>
-                <Button variant="secondary" onClick={() => setCurrentPage('automations')}><ARROW_LEFT_ICON className="w-4 h-4 mr-2"/> Voltar</Button>
-                <Button onClick={() => handleSave()} isLoading={isSaving}>Salvar Automação</Button>
+
+                <ReactFlow
+                    nodes={nodes}
+                    edges={edges}
+                    onNodesChange={onNodesChange}
+                    onEdgesChange={onEdgesChange}
+                    onConnect={onConnect}
+                    onNodeClick={handleNodeClick}
+                    nodeTypes={nodeTypes}
+                    edgeTypes={edgeTypes}
+                    fitView
+                    className="bg-slate-900"
+                    deleteKeyCode={['Backspace', 'Delete']}
+                >
+                    <Controls showInteractive={false} />
+                    <Background variant={BackgroundVariant.Dots} gap={16} size={1} color="#475569" />
+                </ReactFlow>
+
+                <NodeSettingsModal 
+                    isOpen={isSettingsModalOpen}
+                    onClose={() => setIsSettingsModalOpen(false)}
+                    node={selectedNode}
+                    nodes={nodes}
+                    templates={templates}
+                    profile={profile}
+                    onUpdateNodes={onUpdateNodes}
+                    automationId={automation.id}
+                />
+                <NodeLogsModal
+                    isOpen={isLogsModalOpen}
+                    onClose={() => setIsLogsModalOpen(false)}
+                    nodeLabel={selectedNode?.data.label || ''}
+                    logs={selectedNodeLogs}
+                    isLoading={isLogsLoading}
+                />
             </div>
-
-            <ReactFlow
-                nodes={nodes}
-                edges={edges}
-                onNodesChange={onNodesChange}
-                onEdgesChange={onEdgesChange}
-                onConnect={onConnect}
-                nodeTypes={nodeTypes}
-                edgeTypes={edgeTypes}
-                fitView
-                className="bg-slate-900"
-                deleteKeyCode={['Backspace', 'Delete']}
-            >
-                <Controls showInteractive={false} />
-                <Background variant={BackgroundVariant.Dots} gap={16} size={1} color="#475569" />
-            </ReactFlow>
-
-             <NodeSettingsModal 
-                isOpen={isSettingsModalOpen}
-                onClose={() => setIsSettingsModalOpen(false)}
-                node={selectedNode}
-                nodes={nodes}
-                templates={templates}
-                profile={profile}
-                onUpdateNodes={onUpdateNodes}
-                automationId={automation.id}
-             />
-             <NodeLogsModal
-                isOpen={isLogsModalOpen}
-                onClose={() => setIsLogsModalOpen(false)}
-                nodeLabel={selectedNode?.data.label || ''}
-                logs={selectedNodeLogs}
-                isLoading={isLogsLoading}
-            />
-        </div>
+        </EditorContext.Provider>
     );
 };
 

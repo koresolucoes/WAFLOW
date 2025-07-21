@@ -1,8 +1,7 @@
 
-import type { VercelRequest } from '@vercel/node';
 
-// @ts-ignore
-declare const Buffer: any;
+import type { VercelRequest } from '@vercel/node';
+import { Buffer } from 'node:buffer';
 
 export const getRawBody = (req: VercelRequest): Promise<Buffer> => {
   return new Promise((resolve, reject) => {
