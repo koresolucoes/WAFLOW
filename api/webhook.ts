@@ -1,42 +1,9 @@
 
-
-
-
-
-
-
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from './_lib/supabaseAdmin.js';
 import { Contact, Tables, TablesInsert, TablesUpdate } from './_lib/types.js';
 import { handleMetaMessageEvent, handleNewContactEvent } from './_lib/automation/trigger-handler.js';
-
-// Helper to find a contact by phone and create if not exists
-const findOrCreateContact = async (user_id: string, phone: string, name: string): Promise<{ contact: Contact | null, isNew: boolean }> => {
-    let { data: contactData, error } = await supabaseAdmin
-        .from('contacts')
-        .select('*')
-        .eq('user_id', user_id)
-        .eq('phone', phone)
-        .single();
-
-    if (error && error.code === 'PGRST116') { // Not found
-        const newContactPayload: TablesInsert<'contacts'> = { user_id, phone, name, tags: ['new-lead'], custom_fields: null };
-        const { data: newContact, error: insertError } = await supabaseAdmin
-            .from('contacts')
-            .insert(newContactPayload)
-            .select()
-            .single();
-        if (insertError || !newContact) {
-             console.error("Error creating new contact:", insertError);
-             return { contact: null, isNew: false };
-        }
-        return { contact: newContact as Contact, isNew: true };
-    } else if (error) {
-         console.error("Error finding contact:", error);
-        return { contact: null, isNew: false };
-    }
-    return { contact: contactData as Contact, isNew: false };
-};
+import { findOrCreateContactByPhone } from './_lib/webhook/contact-mapper.js';
 
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -94,7 +61,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                             if (profileError || !profileData) continue;
                             const userId = (profileData as Tables<'profiles'>).id;
 
-                            const { contact, isNew } = await findOrCreateContact(userId, message.from, value.contacts[0].profile.name);
+                            const { contact, isNew } = await findOrCreateContactByPhone(userId, message.from, value.contacts[0].profile.name);
                             if (!contact) continue;
 
                             let messageBody = '';

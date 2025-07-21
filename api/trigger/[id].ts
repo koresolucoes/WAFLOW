@@ -1,55 +1,11 @@
 
-
-
-
-
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
 import { executeAutomation } from '../_lib/engine.js';
 import { handleNewContactEvent, handleTagAddedEvent } from '../_lib/automation/trigger-handler.js';
-import { Contact, Automation, Profile, Json, TablesInsert, TablesUpdate } from '../_lib/types.js';
-
-// @ts-ignore
-declare const Buffer: any;
-
-// Function to read the raw body from the request, as Vercel's body parser
-// might not handle all content types or might have already consumed the stream.
-const getRawBody = (req: VercelRequest): Promise<Buffer> => {
-  return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = [];
-    req.on('data', (chunk) => chunks.push(chunk));
-    req.on('end', () => resolve(Buffer.concat(chunks)));
-    req.on('error', (err) => reject(err));
-  });
-};
-
-// A very basic multipart/form-data parser.
-// This is simplified and only handles non-file fields.
-const parseMultipartFormData = (body: Buffer, boundary: string): Record<string, string> => {
-  const bodyString = body.toString();
-  const parts = bodyString.split(`--${boundary}`).slice(1, -1);
-  const result: Record<string, string> = {};
-
-  for (const part of parts) {
-    const headerMatch = part.match(/Content-Disposition: form-data; name="([^"]+)"/);
-    if (headerMatch) {
-      const name = headerMatch[1];
-      const content = part.split('\r\n\r\n')[1];
-      if (content) {
-        // Remove the final carriage return and newline
-        result[name] = content.trimEnd();
-      }
-    }
-  }
-  return result;
-};
-
-
-const getValueFromPath = (obj: any, path: string): any => {
-    if (!path || !obj) return undefined;
-    const cleanPath = path.replace(/\{\{|\}\}/g, '').trim();
-    return cleanPath.split('.').reduce((o, k) => (o && o[k] !== undefined ? o[k] : undefined), obj);
-};
+import { Automation, Profile } from '../_lib/types.js';
+import { getRawBody, parseMultipartFormData } from '../_lib/webhook/parser.js';
+import { processWebhookPayloadForContact } from '../_lib/webhook/contact-mapper.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { id: rawId } = req.query;
@@ -170,92 +126,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // "Production" mode: Process data and run automation
     const events = Array.isArray(structuredPayload.body) ? structuredPayload.body : [structuredPayload.body];
     const mappingRules = config.data_mapping || [];
-    const phoneRule = mappingRules.find((m: any) => m.destination === 'phone');
 
     for (const eventBody of events) {
         try {
             const fullPayloadForEvent = { ...structuredPayload, body: eventBody };
-            let contact: Contact | null = null;
-            let isNewContact = false;
-            let originalTags = new Set<string>();
-
-            if (phoneRule && phoneRule.source) {
-                const phoneValue = getValueFromPath(fullPayloadForEvent, phoneRule.source);
-                const phone = phoneValue ? String(phoneValue).replace(/\D/g, '') : null;
-
-                if (phone) {
-                    let { data: contactData, error: contactError } = await supabaseAdmin.from('contacts').select('*').eq('user_id', profile.id).eq('phone', phone).single();
-                    
-                    if (contactError && contactError.code === 'PGRST116') { // not found
-                        isNewContact = true;
-                        const nameRule = mappingRules.find((m: any) => m.destination === 'name');
-                        const name = nameRule ? getValueFromPath(fullPayloadForEvent, nameRule.source) : 'New Webhook Lead';
-                        const newContactPayload: TablesInsert<'contacts'> = { user_id: profile.id, name, phone, tags: ['new-webhook-lead'], custom_fields: null };
-                        const { data: newContact, error: insertError } = await supabaseAdmin.from('contacts').insert(newContactPayload).select().single();
-                        if (insertError) {
-                            console.error('Webhook trigger: Failed to create new contact.', insertError);
-                        } else if (newContact) {
-                            contact = newContact as Contact;
-                        }
-                    } else if (contactError) {
-                        console.error('Webhook trigger: Failed to query contact.', contactError);
-                    } else if (contactData) {
-                        contact = contactData as Contact;
-                        if(contact) originalTags = new Set(contact.tags || []);
-                    }
-                }
-            }
             
-            const newlyAddedTags = new Set<string>();
-            if (contact) {
-                const newTags = new Set(contact.tags || []);
-                const newCustomFields = { ...(contact.custom_fields as object || {}) };
-                let needsUpdate = false;
-
-                mappingRules.forEach((rule: any) => {
-                    if (!rule.source || rule.destination === 'phone') return;
-                    const value = getValueFromPath(fullPayloadForEvent, rule.source);
-                    if (value === undefined) return;
-                    
-                    if (rule.destination === 'name' && contact?.name !== value) {
-                        (contact as any).name = value;
-                        needsUpdate = true;
-                    } else if (rule.destination === 'tag') {
-                        const tagValue = String(value);
-                        if (!newTags.has(tagValue)) {
-                            newTags.add(tagValue);
-                            if (!originalTags.has(tagValue)) {
-                                newlyAddedTags.add(tagValue);
-                            }
-                        }
-                    } else if (rule.destination === 'custom_field' && rule.destination_key) {
-                        if ((newCustomFields as any)[rule.destination_key] !== value) {
-                            (newCustomFields as any)[rule.destination_key] = value;
-                             needsUpdate = true;
-                        }
-                    }
-                });
-                
-                const finalTags = Array.from(newTags);
-                if (JSON.stringify(finalTags) !== JSON.stringify(contact.tags || [])) {
-                    (contact as any).tags = finalTags;
-                    needsUpdate = true;
-                }
-                 if (JSON.stringify(newCustomFields) !== JSON.stringify(contact.custom_fields || {})) {
-                    (contact as any).custom_fields = newCustomFields as Json;
-                    needsUpdate = true;
-                 }
-
-                if (needsUpdate) {
-                    const { id, user_id, created_at, ...updatePayload} = contact;
-                    const { data: updatedContact, error: updateContactError } = await supabaseAdmin.from('contacts').update(updatePayload).eq('id', contact.id).select().single();
-                    if(updateContactError) {
-                        console.error("Webhook trigger: Failed to update contact with data", updateContactError)
-                    } else if(updatedContact) {
-                        contact = updatedContact as Contact;
-                    }
-                }
-            }
+            const { contact, isNewContact, newlyAddedTags } = await processWebhookPayloadForContact(profile, fullPayloadForEvent, mappingRules);
 
             // --- Execute automations (non-blocking) ---
             executeAutomation(automation, contact, nodeId, fullPayloadForEvent);
