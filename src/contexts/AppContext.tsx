@@ -1,9 +1,4 @@
 
-
-
-
-
-
 import React, { createContext, useState, useCallback, ReactNode, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { Page, Profile, MessageTemplate, Contact, Campaign, CampaignWithMetrics, EditableContact, Session, User, CampaignMessageInsert, CampaignWithDetails, CampaignMessageWithContact, Segment, MessageTemplateInsert, Automation, AutomationInsert, AutomationNode, Edge, AutomationNodeStats, AutomationNodeLog, CampaignStatus, MessageStatus, Pipeline, PipelineStage, Deal, DealInsert, ContactWithDetails, DealWithContact, AutomationStatus, EditableProfile, CampaignMessage, TemplateCategory, TemplateStatus, Json } from '../types';
@@ -486,9 +481,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
      if (!user) throw new Error("Usuário não autenticado.");
      const oldContact = contacts.find(c => c.id === updatedContact.id);
 
-     // Destructure `deals` out of the object to prevent it from being sent in the update payload.
-     // `updatedContact` might be a `ContactWithDetails` object, so we cast to `any` to access the property.
-     const { id, created_at, user_id, deals, ...updatePayload } = updatedContact as any;
+     // Construct a safe payload, explicitly listing only the columns
+     // that exist in the 'contacts' table. This prevents silent errors
+     // from trying to update non-existent columns (like 'deals').
+     const updatePayload: TablesUpdate<'contacts'> = {
+        name: updatedContact.name,
+        phone: updatedContact.phone,
+        email: updatedContact.email,
+        company: updatedContact.company,
+        tags: updatedContact.tags,
+        custom_fields: updatedContact.custom_fields,
+     };
 
      const { data, error } = await supabase
         .from('contacts')
@@ -505,7 +508,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       
       // When updating details view, preserve the existing `deals` array.
       if(contactDetails?.id === newContact.id) {
-          setContactDetails(prev => prev ? { ...prev, ...(newContact as Contact) } : null)
+          setContactDetails(prev => prev ? { ...prev, ...newContact } : null)
       }
       checkAndRunContactAutomations(newContact, oldContact);
     }
