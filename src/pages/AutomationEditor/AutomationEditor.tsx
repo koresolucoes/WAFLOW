@@ -1,7 +1,4 @@
 
-
-
-
 import React, { useContext, useState, useEffect, useCallback, memo, FC, useMemo, useRef, createContext } from 'react';
 import { ReactFlow, ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, type Node, type Edge, type Connection, type NodeProps, useReactFlow, NodeTypes, EdgeLabelRenderer, getBezierPath, type EdgeProps as XyEdgeProps, MarkerType, BackgroundVariant } from '@xyflow/react';
 import { AppContext } from '../../contexts/AppContext';
@@ -238,10 +235,12 @@ const AutomationEditor: FC = () => {
     
     const [automation, setAutomation] = useState<Automation | null>(null);
     const [isSaving, setIsSaving] = useState(false);
+    
+    // --- State for Modals ---
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-    const [selectedNode, setSelectedNode] = useState<AutomationNode | null>(null);
+    const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
     const [isLogsModalOpen, setIsLogsModalOpen] = useState(false);
-    const [selectedNodeLogs, setSelectedNodeLogs] = useState<AutomationNodeLog[]>([]);
+    const [logModalData, setLogModalData] = useState<{label: string, logs: AutomationNodeLog[]}>({label: '', logs: []});
     const [isLogsLoading, setIsLogsLoading] = useState(false);
     const loadedAutomationId = useRef<string | null>(null);
     
@@ -269,18 +268,18 @@ const AutomationEditor: FC = () => {
     const onConnect = useCallback((params: Connection) => setEdges((eds) => addEdge({ ...params, type: 'deletable', markerEnd: { type: MarkerType.ArrowClosed } }, eds)), [setEdges]);
 
     const handleNodeClick = useCallback((_event: React.MouseEvent, node: Node) => {
-        setSelectedNode(node as AutomationNode);
+        setSelectedNodeId(node.id);
         setIsSettingsModalOpen(true);
     }, []);
     
     const handleNodeLogsClick = useCallback(async (nodeId: string, nodeLabel: string) => {
         if (!automation) return;
-        setSelectedNode({ id: nodeId, data: { label: nodeLabel } } as any);
         setIsLogsModalOpen(true);
         setIsLogsLoading(true);
+        setLogModalData({ label: nodeLabel, logs: [] });
         try {
             const logs = await fetchNodeLogs(automation.id, nodeId);
-            setSelectedNodeLogs(logs);
+            setLogModalData({ label: nodeLabel, logs });
         } finally {
             setIsLogsLoading(false);
         }
@@ -350,6 +349,11 @@ const AutomationEditor: FC = () => {
     }, [automation, setNodes]);
     
     // --- Memos for derived state & validation ---
+    const selectedNode = useMemo(() => {
+        if (!selectedNodeId) return null;
+        return nodes.find(n => n.id === selectedNodeId) as AutomationNode || null;
+    }, [nodes, selectedNodeId]);
+
     const hasTriggerNode = useMemo(() => nodes.some(n => n.data.nodeType === 'trigger'), [nodes]);
 
     const validationState = useMemo(() => {
@@ -414,7 +418,10 @@ const AutomationEditor: FC = () => {
 
                 <NodeSettingsModal 
                     isOpen={isSettingsModalOpen}
-                    onClose={() => setIsSettingsModalOpen(false)}
+                    onClose={() => {
+                        setIsSettingsModalOpen(false);
+                        setSelectedNodeId(null);
+                    }}
                     node={selectedNode}
                     nodes={nodes}
                     templates={templates}
@@ -425,8 +432,8 @@ const AutomationEditor: FC = () => {
                 <NodeLogsModal
                     isOpen={isLogsModalOpen}
                     onClose={() => setIsLogsModalOpen(false)}
-                    nodeLabel={selectedNode?.data.label || ''}
-                    logs={selectedNodeLogs}
+                    nodeLabel={logModalData.label}
+                    logs={logModalData.logs}
                     isLoading={isLogsLoading}
                 />
             </div>
