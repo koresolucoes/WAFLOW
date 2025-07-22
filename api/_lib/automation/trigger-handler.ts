@@ -1,7 +1,8 @@
 
+
 import { supabaseAdmin } from '../supabaseAdmin.js';
 import { executeAutomation, createDefaultLoggingHooks } from './engine.js';
-import { Automation, Contact, Json } from '../types.js';
+import { Automation, Contact, Json, Profile } from '../types.js';
 
 type TriggerInfo = {
     automation_id: string;
@@ -9,8 +10,20 @@ type TriggerInfo = {
 };
 
 // Dispatches automations found by a trigger lookup.
-const dispatchAutomations = async (triggers: TriggerInfo[], contact: Contact | null, triggerPayload: Json | null) => {
+const dispatchAutomations = async (userId: string, triggers: TriggerInfo[], contact: Contact | null, triggerPayload: Json | null) => {
     if (triggers.length === 0) return;
+
+    // Fetch the user's profile which contains necessary configs (like Meta tokens)
+    const { data: profile, error: profileError } = await supabaseAdmin
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+    
+    if (profileError || !profile) {
+        console.error(`Trigger Dispatcher Error: Could not find profile for user ${userId}.`, profileError);
+        return;
+    }
 
     // Deduplicate by automation ID to prevent running the same automation multiple times for the same event
     const uniqueAutomationIds = [...new Set(triggers.map(t => t.automation_id))];
@@ -32,7 +45,8 @@ const dispatchAutomations = async (triggers: TriggerInfo[], contact: Contact | n
         if (automation) {
             console.log(`Dispatching automation '${automation.name}' (ID: ${automation.id}) starting from node ${trigger.node_id}`);
             const hooks = createDefaultLoggingHooks(automation.id, contact ? contact.id : null);
-            executeAutomation(automation, contact, trigger.node_id, triggerPayload, hooks);
+            // Pass the fetched profile to the execution engine
+            executeAutomation(automation, contact, trigger.node_id, triggerPayload, hooks, profile as Profile);
         }
     }
 };
@@ -79,7 +93,7 @@ const handleMetaMessageEvent = async (userId: string, contact: Contact, message:
     
     if (allTriggers.length > 0) {
        const triggerData = { type: 'meta_message', payload: message };
-       dispatchAutomations(allTriggers, contact, triggerData);
+       dispatchAutomations(userId, allTriggers, contact, triggerData);
     }
 };
 
@@ -98,7 +112,7 @@ const handleNewContactEvent = async (userId: string, contact: Contact) => {
 
     if (triggers && triggers.length > 0) {
         const triggerData = { type: 'new_contact', payload: { contact } };
-        dispatchAutomations(triggers, contact, triggerData);
+        dispatchAutomations(userId, triggers, contact, triggerData);
     }
 };
 
@@ -118,7 +132,7 @@ export const handleTagAddedEvent = async (userId: string, contact: Contact, adde
     
     if (triggers && triggers.length > 0) {
         const triggerData = { type: 'tag_added', payload: { contact, addedTag } };
-        dispatchAutomations(triggers, contact, triggerData);
+        dispatchAutomations(userId, triggers, contact, triggerData);
     }
 };
 

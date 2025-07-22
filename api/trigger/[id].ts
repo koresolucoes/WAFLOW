@@ -1,4 +1,5 @@
 
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
 import { executeAutomation, createDefaultLoggingHooks } from '../_lib/automation/engine.js';
@@ -135,7 +136,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             
             // --- Execute primary automation (non-blocking) ---
             const hooks = createDefaultLoggingHooks(automation.id, contact ? contact.id : null);
-            executeAutomation(automation, contact, nodeId, fullPayloadForEvent, hooks);
+            executeAutomation(automation, contact, nodeId, fullPayloadForEvent, hooks, profile);
             
             // --- Publish events for side-effects (non-blocking) ---
             if (contact) {

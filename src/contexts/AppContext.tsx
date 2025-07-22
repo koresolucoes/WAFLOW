@@ -1,4 +1,5 @@
 
+
 import React, { createContext, useState, useCallback, ReactNode, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { Page, Profile, MessageTemplate, Contact, Campaign, CampaignWithMetrics, EditableContact, Session, User, CampaignMessageInsert, CampaignWithDetails, CampaignMessageWithContact, Segment, MessageTemplateInsert, Automation, AutomationInsert, AutomationNode, Edge, AutomationNodeStats, AutomationNodeLog, CampaignStatus, MessageStatus, Pipeline, PipelineStage, Deal, DealInsert, ContactWithDetails, DealWithContact, AutomationStatus, EditableProfile, CampaignMessage, TemplateCategory, TemplateStatus, Json } from '../types';
@@ -543,7 +544,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (!user) throw new Error("Usuário não autenticado.");
     
     const now = new Date().toISOString();
-    const campaignPayload: TablesInsert<'campaigns'> = { ...campaign, user_id: user.id, created_at: now, sent_at: now, recipient_count: messages.length, status: campaign.status };
+    const campaignPayload: TablesInsert<'campaigns'> = {
+        ...campaign,
+        user_id: user.id,
+        created_at: now,
+        sent_at: campaign.status === 'Sent' ? now : null,
+        recipient_count: messages.length,
+        status: campaign.status
+    };
     const { data: newCampaignData, error: campaignError } = await supabase.from('campaigns').insert(campaignPayload).select().single();
 
     if (campaignError) throw campaignError;
