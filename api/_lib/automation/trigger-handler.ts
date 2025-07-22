@@ -1,3 +1,4 @@
+
 import { supabaseAdmin } from '../supabaseAdmin.js';
 import { executeAutomation, createDefaultLoggingHooks } from './engine.js';
 import { Automation, Contact, Json } from '../types.js';
@@ -30,17 +31,14 @@ const dispatchAutomations = async (triggers: TriggerInfo[], contact: Contact | n
         const automation = automationsMap.get(trigger.automation_id);
         if (automation) {
             console.log(`Dispatching automation '${automation.name}' (ID: ${automation.id}) starting from node ${trigger.node_id}`);
-            // NEW: Create logging hooks and pass them to the engine.
             const hooks = createDefaultLoggingHooks(automation.id, contact ? contact.id : null);
-            // Non-blocking call to the engine
             executeAutomation(automation, contact, trigger.node_id, triggerPayload, hooks);
         }
     }
 };
 
-
 // Handles events related to incoming messages from Meta
-export const handleMetaMessageEvent = async (userId: string, contact: Contact, message: any) => {
+const handleMetaMessageEvent = async (userId: string, contact: Contact, message: any) => {
     const messageBody = message.type === 'text' 
         ? message.text.body.toLowerCase() 
         : '';
@@ -86,7 +84,7 @@ export const handleMetaMessageEvent = async (userId: string, contact: Contact, m
 };
 
 // Handles events for newly created contacts
-export const handleNewContactEvent = async (userId: string, contact: Contact) => {
+const handleNewContactEvent = async (userId: string, contact: Contact) => {
     const { data: triggers, error } = await supabaseAdmin
         .from('automation_triggers')
         .select('automation_id, node_id')
@@ -111,7 +109,7 @@ export const handleTagAddedEvent = async (userId: string, contact: Contact, adde
         .select('automation_id, node_id')
         .eq('user_id', userId)
         .eq('trigger_type', 'new_contact_with_tag')
-        .ilike('trigger_key', addedTag); // Usar ilike para correspondência insensível a maiúsculas e minúsculas
+        .ilike('trigger_key', addedTag);
         
     if (error) {
         console.error(`handleTagAddedEvent Error:`, error);
@@ -121,5 +119,38 @@ export const handleTagAddedEvent = async (userId: string, contact: Contact, adde
     if (triggers && triggers.length > 0) {
         const triggerData = { type: 'tag_added', payload: { contact, addedTag } };
         dispatchAutomations(triggers, contact, triggerData);
+    }
+};
+
+/**
+ * The central event bus for the application. All business events that can trigger automations
+ * should be published through this function. It ensures a decoupled architecture where
+ * event sources (like webhooks or API calls) don't need to know about the automation engine.
+ * @param eventType A string identifying the business event (e.g., 'contact_created').
+ * @param userId The ID of the user who owns the event.
+ * @param data The payload associated with the event.
+ */
+export const publishEvent = async (eventType: string, userId: string, data: any) => {
+    console.log(`Publishing event: ${eventType} for user ${userId}`);
+    try {
+        switch (eventType) {
+            case 'message_received':
+                // data = { contact, message }
+                await handleMetaMessageEvent(userId, data.contact, data.message);
+                break;
+            case 'contact_created':
+                // data = { contact }
+                await handleNewContactEvent(userId, data.contact);
+                break;
+            case 'tag_added':
+                // data = { contact, tag }
+                await handleTagAddedEvent(userId, data.contact, data.tag);
+                break;
+            default:
+                console.warn(`Unknown event type published: ${eventType}`);
+        }
+    } catch (error) {
+        console.error(`Error processing event ${eventType}:`, error);
+        // Do not re-throw, to avoid crashing the caller (like a webhook response)
     }
 };

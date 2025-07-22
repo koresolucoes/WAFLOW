@@ -433,37 +433,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setTemplates(prev => [newTemplate, ...prev]);
     }
   }, [user]);
-  
-  const checkAndRunContactAutomations = useCallback((contact: Contact, previousContactState?: Contact) => {
-    if (!user) return;
-    
-    // Logic for newly created contacts
-    if (!previousContactState) {
-        // A single API call that tells the backend a new contact was created.
-        // The backend will then be responsible for firing all relevant triggers
-        // (e.g., 'new_contact' and 'new_contact_with_tag' for initial tags).
-        fetch('/api/run-trigger', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ triggerType: 'new_contact', userId: user.id, contactId: contact.id })
-        }).catch(err => console.error("Failed to call new_contact creation trigger API", err));
-        return;
-    }
-    
-    // Logic for updated contacts (detecting newly added tags)
-    const oldTags = new Set(previousContactState?.tags || []);
-    const newTags = contact.tags || [];
-    for (const tag of newTags) {
-        if (!oldTags.has(tag)) {
-            fetch('/api/run-trigger', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ triggerType: 'tag_added_to_existing_contact', userId: user.id, contactId: contact.id, data: { addedTag: tag } })
-            }).catch(err => console.error("Failed to call new_contact_with_tag trigger API for existing contact", err));
-        }
-    }
-  }, [user]);
-
 
   const addContact = useCallback(async (contact: EditableContact) => {
     if (!user) throw new Error("Usuário não autenticado.");
@@ -473,17 +442,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if(data) {
       const newContact = data as Contact;
       setContacts(prev => [newContact, ...prev]);
-      checkAndRunContactAutomations(newContact);
+      
+      // --- Dispara evento de criação de contato ---
+      fetch('/api/run-trigger', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eventType: 'contact_created', userId: user.id, contactId: newContact.id })
+      }).catch(err => console.error("Failed to call contact_created trigger API", err));
     }
-  }, [user, checkAndRunContactAutomations]);
+  }, [user]);
   
   const updateContact = useCallback(async (updatedContact: Contact) => {
      if (!user) throw new Error("Usuário não autenticado.");
      const oldContact = contacts.find(c => c.id === updatedContact.id);
 
-     // Construct a safe payload, explicitly listing only the columns
-     // that exist in the 'contacts' table. This prevents silent errors
-     // from trying to update non-existent columns (like 'deals').
      const updatePayload: TablesUpdate<'contacts'> = {
         name: updatedContact.name,
         phone: updatedContact.phone,
@@ -506,13 +478,24 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const newContact = data as Contact;
       setContacts(prev => prev.map(c => c.id === newContact.id ? newContact : c));
       
-      // When updating details view, preserve the existing `deals` array.
       if(contactDetails?.id === newContact.id) {
           setContactDetails(prev => prev ? { ...prev, ...newContact } : null)
       }
-      checkAndRunContactAutomations(newContact, oldContact);
+
+      // --- Dispara evento de adição de tags ---
+      const oldTags = new Set(oldContact?.tags || []);
+      const newTags = newContact.tags || [];
+      const addedTags = newTags.filter(tag => !oldTags.has(tag));
+
+      if (addedTags.length > 0) {
+        fetch('/api/run-trigger', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ eventType: 'tags_added', userId: user.id, contactId: newContact.id, data: { addedTags } })
+        }).catch(err => console.error("Failed to call tags_added trigger API", err));
+      }
     }
-  }, [user, contacts, contactDetails, checkAndRunContactAutomations]);
+  }, [user, contacts, contactDetails]);
 
   const deleteContact = useCallback(async (contactId: string) => {
     if (!user) throw new Error("Usuário não autenticado.");
@@ -545,12 +528,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           const newContactList = data as Contact[];
           setContacts(prev => [...newContactList, ...prev].sort((a,b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()));
           for(const contact of newContactList) {
-              checkAndRunContactAutomations(contact);
+              fetch('/api/run-trigger', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ eventType: 'contact_created', userId: user.id, contactId: contact.id })
+              }).catch(err => console.error("Failed to call contact_created trigger API for imported contact", err));
           }
         }
     }
     return { importedCount: contactsToInsert.length, skippedCount: skippedCount };
-  }, [user, contacts, checkAndRunContactAutomations]);
+  }, [user, contacts]);
 
   const addCampaign = useCallback(async (campaign: Omit<Campaign, 'id' | 'user_id' | 'sent_at' | 'created_at' | 'recipient_count' | 'status'> & {status: CampaignStatus}, messages: Omit<CampaignMessageInsert, 'campaign_id'>[]) => {
     if (!user) throw new Error("Usuário não autenticado.");

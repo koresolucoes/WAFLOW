@@ -1,7 +1,8 @@
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
 import { executeAutomation, createDefaultLoggingHooks } from '../_lib/automation/engine.js';
-import { handleNewContactEvent, handleTagAddedEvent } from '../_lib/automation/trigger-handler.js';
+import { publishEvent } from '../_lib/automation/trigger-handler.js';
 import { Automation, Profile } from '../_lib/types.js';
 import { getRawBody, parseMultipartFormData } from '../_lib/webhook/parser.js';
 import { processWebhookPayloadForContact } from '../_lib/webhook/contact-mapper.js';
@@ -132,16 +133,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             
             const { contact, isNewContact, newlyAddedTags } = await processWebhookPayloadForContact(profile, fullPayloadForEvent, mappingRules);
             
-            // --- Execute automations (non-blocking) ---
+            // --- Execute primary automation (non-blocking) ---
             const hooks = createDefaultLoggingHooks(automation.id, contact ? contact.id : null);
             executeAutomation(automation, contact, nodeId, fullPayloadForEvent, hooks);
             
+            // --- Publish events for side-effects (non-blocking) ---
             if (contact) {
                 if (isNewContact) {
-                    handleNewContactEvent(profile.id, contact);
+                    publishEvent('contact_created', profile.id, { contact });
                 }
                 newlyAddedTags.forEach(tag => {
-                    handleTagAddedEvent(profile.id, contact, tag);
+                    publishEvent('tag_added', profile.id, { contact, tag });
                 });
             }
         

@@ -1,8 +1,8 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from './_lib/supabaseAdmin.js';
-import { Contact, Tables, TablesInsert, TablesUpdate } from './_lib/types.js';
-import { handleMetaMessageEvent, handleNewContactEvent } from './_lib/automation/trigger-handler.js';
+import { Tables, TablesInsert, TablesUpdate } from './_lib/types.js';
+import { publishEvent } from './_lib/automation/trigger-handler.js';
 import { findOrCreateContactByPhone } from './_lib/webhook/contact-mapper.js';
 
 
@@ -82,11 +82,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                             // Store received message
                             await supabaseAdmin.from('received_messages').insert(receivedMessagePayload);
                             
-                            // ---- NEW: Use centralized trigger handler ----
-                            // Don't await these, let them run in the background
-                            handleMetaMessageEvent(userId, contact, message);
+                            // ---- NEW: Publish events to the event bus (non-blocking) ----
+                            publishEvent('message_received', userId, { contact, message });
                             if (isNew) {
-                                handleNewContactEvent(userId, contact);
+                                publishEvent('contact_created', userId, { contact });
+                                if (contact.tags && contact.tags.length > 0) {
+                                    contact.tags.forEach(tag => {
+                                        publishEvent('tag_added', userId, { contact, tag });
+                                    });
+                                }
                             }
                         }
                     }
