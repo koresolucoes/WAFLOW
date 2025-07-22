@@ -1,5 +1,3 @@
-
-
 import React, { useContext, useState, useEffect, useCallback, memo, FC, useMemo, useRef, createContext } from 'react';
 import { ReactFlow, ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, type Node, type Edge, type Connection, type NodeProps, useReactFlow, NodeTypes, EdgeLabelRenderer, getBezierPath, type EdgeProps as XyEdgeProps, MarkerType, BackgroundVariant } from '@xyflow/react';
 import { AppContext } from '../../contexts/AppContext';
@@ -193,14 +191,14 @@ const edgeTypes = {
     deletable: CustomDeletableEdge,
 };
 
-const NodeList: FC<{ title: string; items: [string, any][]; onAddNode: (type: string) => void; disabled?: boolean }> = ({ title, items, onAddNode, disabled = false }) => (
+const NodeList: FC<{ title: string; items: [string, any][]; onAddNode: (type: string, e: React.MouseEvent) => void; disabled?: boolean }> = ({ title, items, onAddNode, disabled = false }) => (
     <div>
-        <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">{title}</h3>
+        <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2 px-2">{title}</h3>
         <div className="space-y-1">
             {items.map(([type, config]) => (
                 <button
                     key={type}
-                    onClick={() => onAddNode(type)}
+                    onMouseDown={(e) => onAddNode(type, e)}
                     className="w-full text-left flex items-center gap-2 p-2 rounded-md text-slate-300 hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     disabled={disabled}
                     title={disabled ? "A automação já possui um gatilho. Remova o existente para adicionar um novo." : ""}
@@ -213,19 +211,22 @@ const NodeList: FC<{ title: string; items: [string, any][]; onAddNode: (type: st
     </div>
 );
 
-const EditorSidebar: FC<{ onAddNode: (type: string) => void; hasTrigger: boolean; }> = ({ onAddNode, hasTrigger }) => {
+const EditorSidebar: FC<{ onAddNode: (type: string, e: React.MouseEvent) => void; hasTrigger: boolean; }> = ({ onAddNode, hasTrigger }) => {
     const triggers = Object.entries(nodeConfigs).filter(([_, v]) => v.nodeType === 'trigger');
     const actions = Object.entries(nodeConfigs).filter(([_, v]) => v.nodeType === 'action');
     const logic = Object.entries(nodeConfigs).filter(([_, v]) => v.nodeType === 'logic');
 
     return (
-        <Card className="absolute left-4 top-4 z-10 w-64 max-h-[calc(100vh-4rem)] overflow-y-auto">
-            <div className="space-y-4">
+        <aside className="w-72 flex-shrink-0 bg-slate-800/50 p-4 flex flex-col border-r border-slate-700/50 overflow-y-auto">
+            <div className="space-y-6">
                 <NodeList title="Gatilhos" items={triggers} onAddNode={onAddNode} disabled={hasTrigger} />
                 <NodeList title="Ações" items={actions} onAddNode={onAddNode} />
                 <NodeList title="Lógica" items={logic} onAddNode={onAddNode} />
             </div>
-        </Card>
+            <div className="mt-auto pt-4 text-center text-xs text-slate-500">
+                © 2024 ZapFlow AI
+            </div>
+        </aside>
     );
 };
 
@@ -309,14 +310,14 @@ const AutomationEditor: FC = () => {
         }
     }, [setNodes, edges, handleSave]);
     
-    const onAddNode = useCallback((type: string) => {
+    const onAddNode = useCallback((type: string, event: React.MouseEvent) => {
         const config = nodeConfigs[type];
         if (!config || !reactFlowWrapper.current) return;
         
-        const reactFlowBounds = reactFlowWrapper.current.getBoundingClientRect();
+        // This calculates the position inside the flow pane, not the screen
         const position = screenToFlowPosition({
-            x: reactFlowBounds.left + (reactFlowBounds.width / 2.5),
-            y: reactFlowBounds.top + (reactFlowBounds.height / 3),
+            x: event.clientX,
+            y: event.clientY,
         });
 
         const newNode: AutomationNode = {
@@ -393,43 +394,49 @@ const AutomationEditor: FC = () => {
     // --- Render ---
     return (
         <EditorContext.Provider value={contextValue}>
-            <div className="w-full h-full bg-slate-900" ref={reactFlowWrapper}>
+            <div className="w-full h-full flex bg-slate-900 overflow-hidden">
                 <EditorSidebar onAddNode={onAddNode} hasTrigger={hasTriggerNode} />
 
-                <div className="absolute top-4 right-4 z-10 flex items-center gap-4">
-                    <input 
-                    type="text" 
-                    value={automation.name} 
-                    onChange={(e) => setAutomation({ ...automation, name: e.target.value })} 
-                    className="bg-slate-800/80 border border-slate-700 rounded-md p-2 text-white font-semibold"
-                    />
-                    <div title={!validationState.isValid ? validationState.reason : (automation.status === 'active' ? 'Desativar Automação' : 'Ativar Automação')}>
-                        <Switch 
-                            checked={automation.status === 'active'} 
-                            onChange={(checked) => setAutomation({ ...automation, status: checked ? 'active' : 'paused' })} 
-                            disabled={!validationState.isValid}
+                <div className="flex-1 flex flex-col">
+                    <header className="flex-shrink-0 flex items-center justify-between gap-4 p-4 border-b border-slate-700/50 bg-slate-900/80 backdrop-blur-sm z-10">
+                        <input 
+                            type="text" 
+                            value={automation.name} 
+                            onChange={(e) => setAutomation({ ...automation, name: e.target.value })} 
+                            className="bg-slate-800 border border-slate-700 rounded-md p-2 text-white font-semibold"
                         />
-                    </div>
-                    <Button variant="secondary" onClick={() => setCurrentPage('automations')}><ARROW_LEFT_ICON className="w-4 h-4 mr-2"/> Voltar</Button>
-                    <Button onClick={() => handleSave()} isLoading={isSaving}>Salvar Automação</Button>
-                </div>
+                        <div className="flex items-center gap-4">
+                            <div title={!validationState.isValid ? validationState.reason : (automation.status === 'active' ? 'Desativar Automação' : 'Ativar Automação')}>
+                                <Switch 
+                                    checked={automation.status === 'active'} 
+                                    onChange={(checked) => setAutomation({ ...automation, status: checked ? 'active' : 'paused' })} 
+                                    disabled={!validationState.isValid}
+                                />
+                            </div>
+                            <Button variant="secondary" onClick={() => setCurrentPage('automations')}><ARROW_LEFT_ICON className="w-4 h-4 mr-2"/> Voltar</Button>
+                            <Button onClick={() => handleSave()} isLoading={isSaving}>Salvar Automação</Button>
+                        </div>
+                    </header>
 
-                <ReactFlow
-                    nodes={nodes}
-                    edges={edges}
-                    onNodesChange={onNodesChange}
-                    onEdgesChange={onEdgesChange}
-                    onConnect={onConnect}
-                    onNodeClick={handleNodeClick}
-                    nodeTypes={nodeTypes}
-                    edgeTypes={edgeTypes}
-                    fitView
-                    className="bg-slate-900"
-                    deleteKeyCode={['Backspace', 'Delete']}
-                >
-                    <Controls showInteractive={false} />
-                    <Background variant={BackgroundVariant.Dots} gap={16} size={1} color="#475569" />
-                </ReactFlow>
+                    <main className="flex-1" ref={reactFlowWrapper}>
+                        <ReactFlow
+                            nodes={nodes}
+                            edges={edges}
+                            onNodesChange={onNodesChange}
+                            onEdgesChange={onEdgesChange}
+                            onConnect={onConnect}
+                            onNodeClick={handleNodeClick}
+                            nodeTypes={nodeTypes}
+                            edgeTypes={edgeTypes}
+                            fitView
+                            className="bg-slate-900"
+                            deleteKeyCode={['Backspace', 'Delete']}
+                        >
+                            <Controls showInteractive={false} />
+                            <Background variant={BackgroundVariant.Dots} gap={16} size={1} color="#475569" />
+                        </ReactFlow>
+                    </main>
+                </div>
 
                 <NodeSettingsModal 
                     isOpen={isSettingsModalOpen}

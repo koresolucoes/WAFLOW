@@ -1,6 +1,5 @@
-
 import { supabaseAdmin } from '../supabaseAdmin.js';
-import { executeAutomation } from '../engine.js';
+import { executeAutomation, createDefaultLoggingHooks } from './engine.js';
 import { Automation, Contact, Json } from '../types.js';
 
 type TriggerInfo = {
@@ -31,8 +30,10 @@ const dispatchAutomations = async (triggers: TriggerInfo[], contact: Contact | n
         const automation = automationsMap.get(trigger.automation_id);
         if (automation) {
             console.log(`Dispatching automation '${automation.name}' (ID: ${automation.id}) starting from node ${trigger.node_id}`);
+            // NEW: Create logging hooks and pass them to the engine.
+            const hooks = createDefaultLoggingHooks(automation.id, contact ? contact.id : null);
             // Non-blocking call to the engine
-            executeAutomation(automation, contact, trigger.node_id, triggerPayload);
+            executeAutomation(automation, contact, trigger.node_id, triggerPayload, hooks);
         }
     }
 };

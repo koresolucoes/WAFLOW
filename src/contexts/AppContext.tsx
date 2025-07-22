@@ -224,7 +224,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           const [templatesRes, contactsRes, campaignsRes, segmentsRes, automationsRes, pipelinesRes, stagesRes, dealsRes] = await Promise.all([
               supabase.from('message_templates').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
               supabase.from('contacts').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
-              supabase.from('campaigns').select('*').eq('user_id', user.id).order('sent_at', { ascending: false }),
+              supabase.from('campaigns').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
               supabase.from('segments').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
               supabase.from('automations').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
               supabase.from('pipelines').select('*').eq('user_id', user.id).order('created_at', { ascending: true }),
@@ -555,8 +555,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const addCampaign = useCallback(async (campaign: Omit<Campaign, 'id' | 'user_id' | 'sent_at' | 'created_at' | 'recipient_count' | 'status'> & {status: CampaignStatus}, messages: Omit<CampaignMessageInsert, 'campaign_id'>[]) => {
     if (!user) throw new Error("Usuário não autenticado.");
     
-    const sent_at = new Date().toISOString();
-    const campaignPayload: TablesInsert<'campaigns'> = { ...campaign, user_id: user.id, sent_at, recipient_count: messages.length, status: campaign.status };
+    const now = new Date().toISOString();
+    const campaignPayload: TablesInsert<'campaigns'> = { ...campaign, user_id: user.id, created_at: now, sent_at: now, recipient_count: messages.length, status: campaign.status };
     const { data: newCampaignData, error: campaignError } = await supabase.from('campaigns').insert(campaignPayload).select().single();
 
     if (campaignError) throw campaignError;
