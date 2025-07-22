@@ -111,7 +111,7 @@ export const handleTagAddedEvent = async (userId: string, contact: Contact, adde
         .select('automation_id, node_id')
         .eq('user_id', userId)
         .eq('trigger_type', 'new_contact_with_tag')
-        .eq('trigger_key', addedTag.toLowerCase());
+        .ilike('trigger_key', addedTag); // Usar ilike para correspondência insensível a maiúsculas e minúsculas
         
     if (error) {
         console.error(`handleTagAddedEvent Error:`, error);
