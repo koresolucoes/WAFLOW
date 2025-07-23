@@ -87,31 +87,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                                     const phoneNumberIdStr = String(phoneNumberId).trim();
                                     console.log(`[LOG] ID recebido da Meta: '${phoneNumberIdStr}'`);
                                     
-                                    // --- NOVA ABORDAGEM DE DEBUG ---
-                                    console.log('[DEBUG] Abordagem de depuração: buscando todos os perfis com ID de telefone e filtrando no código.');
+                                    console.log('[DEBUG] Abordagem final: buscando TODOS os perfis para contornar possível problema de conexão/query.');
 
                                     const { data: allProfiles, error: allProfilesError } = await supabaseAdmin
                                         .from('profiles')
-                                        .select('id, meta_phone_number_id')
-                                        .not('meta_phone_number_id', 'is', null);
+                                        .select('id, meta_phone_number_id');
 
                                     if (allProfilesError) {
                                         console.error(`[ERRO DB] Falha ao buscar a lista de todos os perfis:`, allProfilesError.message);
-                                        return;
+                                        return; // Early exit on DB error
                                     }
 
                                     if (!allProfiles || allProfiles.length === 0) {
-                                        console.warn('[AVISO] Nenhum perfil com um meta_phone_number_id configurado foi encontrado no banco de dados.');
+                                        console.warn('[AVISO] Nenhum perfil foi encontrado no banco de dados.');
                                         return;
                                     }
-                                    
-                                    console.log(`[DEBUG] Encontrados ${allProfiles.length} perfis com um ID de telefone. Verificando correspondências...`);
+
+                                    console.log(`[DEBUG] Encontrados ${allProfiles.length} perfis no total. Filtrando e verificando correspondências agora...`);
 
                                     let foundProfile = null;
                                     for (const profile of allProfiles) {
-                                        const dbPhoneNumberId = profile.meta_phone_number_id ? profile.meta_phone_number_id.trim() : null;
-                                        
-                                        console.log(`[DEBUG] Comparando: ID da Meta ('${phoneNumberIdStr}') com ID do DB ('${dbPhoneNumberId}') para o perfil ${profile.id}`);
+                                        // Filtro manual, já que a query não filtra mais
+                                        if (!profile.meta_phone_number_id) {
+                                            continue;
+                                        }
+                                        const dbPhoneNumberId = profile.meta_phone_number_id.trim();
                                         
                                         if (dbPhoneNumberId === phoneNumberIdStr) {
                                             console.log(`[DEBUG] *** CORRESPONDÊNCIA ENCONTRADA! *** Perfil ID: ${profile.id}`);
@@ -119,9 +119,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                                             break; 
                                         }
                                     }
-                                    // --- FIM DA NOVA ABORDAGEM ---
 
                                     if (!foundProfile) {
+                                        const profilesWithIds = allProfiles.filter(p => p.meta_phone_number_id);
                                         console.warn(`
 ===============================================================
 [AVISO DE CONFIGURAÇÃO] NENHUM PERFIL CORRESPONDENTE ENCONTRADO
@@ -131,14 +131,13 @@ A automação e a caixa de entrada não funcionarão até que isto seja corrigid
 ID do Número de Telefone recebido da Meta:
 '${phoneNumberIdStr}'
 
-O sistema verificou ${allProfiles.length} perfis no banco de dados, mas nenhum correspondeu.
+O sistema verificou ${profilesWithIds.length} perfis configurados no banco de dados, mas nenhum correspondeu.
 IDs verificados no banco de dados:
-${allProfiles.map(p => `- '${p.meta_phone_number_id}' (para o perfil ${p.id})`).join('\n')}
+${profilesWithIds.map(p => `- '${p.meta_phone_number_id}' (para o perfil ${p.id})`).join('\n') || 'Nenhum'}
 
 Causa Provável:
 O "ID do número de telefone" salvo nas Configurações da sua conta
-não corresponde exatamente ao ID que a Meta está enviando. Verifique
-se há espaços em branco ou caracteres invisíveis.
+não corresponde exatamente ao ID que a Meta está enviando.
 
 Como Corrigir:
 1. Copie o ID da Meta acima ('${phoneNumberIdStr}').
