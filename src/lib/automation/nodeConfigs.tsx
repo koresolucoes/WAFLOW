@@ -61,12 +61,12 @@ export const nodeConfigs: Record<string, NodeConfig> = {
         description: () => 'Quando um novo contato é criado.',
         isConfigured: () => true,
     },
-    'tag_added': {
+    'new_contact_with_tag': {
         label: 'Tag Adicionada a Contato',
         nodeType: 'trigger',
         data: {
             nodeType: 'trigger',
-            type: 'tag_added',
+            type: 'new_contact_with_tag',
             label: 'Tag Adicionada a Contato',
             config: { tag: '' }
         },

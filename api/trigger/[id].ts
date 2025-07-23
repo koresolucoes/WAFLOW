@@ -1,4 +1,5 @@
 
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
 import { executeAutomation, createDefaultLoggingHooks } from '../_lib/automation/engine.js';
@@ -29,12 +30,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Robust Profile Lookup: First try by the custom path prefix.
     const { data: profileByPrefix } = await supabaseAdmin.from('profiles').select('*').eq('webhook_path_prefix', webhookPrefix).maybeSingle();
     if (profileByPrefix) {
-        profileData = profileByPrefix as Profile;
+        profileData = profileByPrefix as unknown as Profile;
     } else {
         // As a fallback, check if the prefix was actually a user ID.
         const { data: profileById } = await supabaseAdmin.from('profiles').select('*').eq('id', webhookPrefix).maybeSingle();
         if (profileById) {
-            profileData = profileById as Profile;
+            profileData = profileById as unknown as Profile;
         }
     }
     
@@ -49,7 +50,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
          return res.status(500).json({ error: 'Failed to retrieve automations.' });
     }
     
-    const automations = (automationsData as Automation[]) || [];
+    const automations = (automationsData as unknown as Automation[]) || [];
     const rawAutomation = automations.find(a => (a.nodes || []).some(n => n.id === nodeId));
 
     if (!rawAutomation) {

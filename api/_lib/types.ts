@@ -36,7 +36,7 @@ export type AutomationStatus = 'active' | 'paused';
 export type AutomationRunStatus = 'running' | 'success' | 'failed';
 export type NodeType = 'trigger' | 'action' | 'logic';
 
-export type TriggerType = 'tag_added' | 'message_received_with_keyword' | 'button_clicked' | 'new_contact' | 'webhook_received';
+export type TriggerType = 'new_contact_with_tag' | 'message_received_with_keyword' | 'button_clicked' | 'new_contact' | 'webhook_received';
 export type ActionType = 'send_template' | 'add_tag' | 'remove_tag' | 'send_text_message' | 'send_media' | 'send_interactive_message' | 'set_custom_field' | 'send_webhook';
 export type LogicType = 'condition' | 'split_path';
 

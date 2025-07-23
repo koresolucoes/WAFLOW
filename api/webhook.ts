@@ -54,7 +54,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                             // This can run in the background
                             supabaseAdmin
                                 .from('campaign_messages')
-                                .update(updateData)
+                                .update(updateData as never)
                                 .eq('meta_message_id', status.id)
                                 .then(({ error }) => {
                                     if(error) console.error("Error updating message status:", error);
@@ -71,7 +71,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                                 const { data: profileData, error: profileError } = await supabaseAdmin.from('profiles').select('id').eq('meta_phone_number_id', wabaId).single();
                                 
                                 if (profileError || !profileData) return;
-                                const userId = (profileData as Tables<'profiles'>).id;
+                                const userId = (profileData as unknown as Tables<'profiles'>).id;
 
                                 const { contact, isNew } = await findOrCreateContactByPhone(userId, message.from, value.contacts[0].profile.name);
                                 if (!contact) return;
@@ -92,7 +92,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                                    message_body: messageBody
                                 };
                                 // Store received message
-                                await supabaseAdmin.from('received_messages').insert(receivedMessagePayload);
+                                await supabaseAdmin.from('received_messages').insert(receivedMessagePayload as never);
                                 
                                 // ---- Publish events and await them ----
                                 await publishEvent('message_received', userId, { contact, message });

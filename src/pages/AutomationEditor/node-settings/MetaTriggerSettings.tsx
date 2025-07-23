@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { NodeSettingsProps } from './common';
 import { InputWithVariables } from './common';
@@ -67,7 +68,7 @@ const MetaTriggerSettings: React.FC<NodeSettingsProps> = ({ node, onConfigChange
                 </div>
             );
         
-        case 'tag_added':
+        case 'new_contact_with_tag':
             const selectedValue = isManualEntry ? '__manual__' : config.tag || '';
             return (
                  <div>

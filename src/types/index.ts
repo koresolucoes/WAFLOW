@@ -1,5 +1,4 @@
 
-
 import { Session, User } from '@supabase/supabase-js';
 import { Database, Json } from './database.types';
 import { MetaTemplateComponent } from '../services/meta/types';
@@ -20,7 +19,7 @@ export type AutomationLogStatus = 'success' | 'failed';
 export type NodeType = 'trigger' | 'action' | 'logic';
 
 // Tipos expandidos para corresponderem ao backend
-export type TriggerType = 'tag_added' | 'message_received_with_keyword' | 'button_clicked' | 'new_contact' | 'webhook_received';
+export type TriggerType = 'new_contact_with_tag' | 'message_received_with_keyword' | 'button_clicked' | 'new_contact' | 'webhook_received';
 export type ActionType = 'send_template' | 'add_tag' | 'remove_tag' | 'send_text_message' | 'send_media' | 'send_interactive_message' | 'set_custom_field' | 'send_webhook';
 export type LogicType = 'condition' | 'split_path';
 
@@ -102,7 +101,7 @@ export type DealInsert = Database['public']['Tables']['deals']['Insert'];
 
 // Tipos para formulários e operações específicas
 export type EditableContact = Omit<Contact, 'id' | 'user_id' | 'created_at'> & { id?: string };
-export type EditableProfile = Partial<Omit<Profile, 'id' | 'updated_at'>>;
+export type EditableProfile = Database['public']['Tables']['profiles']['Update'];
 
 // Tipo combinado para o frontend, que inclui métricas calculadas
 export interface CampaignWithMetrics extends Campaign {
