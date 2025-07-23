@@ -15,6 +15,8 @@ const Auth: React.FC = () => {
   const [message, setMessage] = useState<string | null>(null);
   const [captchaToken, setCaptchaToken] = useState<string | undefined>();
   const captcha = useRef<HCaptcha>(null);
+  
+  const sitekey = (import.meta as any).env.VITE_HCAPTCHA_SITEKEY;
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,6 +29,11 @@ const Auth: React.FC = () => {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
       } else {
+        if (!sitekey) {
+            setError("A chave do site hCaptcha não está configurada (VITE_HCAPTCHA_SITEKEY).");
+            setLoading(false);
+            return;
+        }
         if (!captchaToken) {
             setError("Por favor, complete o CAPTCHA.");
             setLoading(false);
@@ -101,29 +108,32 @@ const Auth: React.FC = () => {
 
           {!isLoginView && (
             <div className="my-2">
-                <div className="flex justify-center">
-                    <HCaptcha
-                        ref={captcha}
-                        sitekey="ES_aa6cc0dc38b04afb954ecb05aba44c24" // Chave de teste hCaptcha
-                        theme="dark" // Adiciona o tema escuro para combinar com o design
-                        onVerify={(token) => {
-                            setCaptchaToken(token);
-                            setError(null);
-                        }}
-                        onExpire={() => {
-                            setCaptchaToken(undefined);
-                        }}
-                    />
-                </div>
-                 <p className="text-xs text-slate-500 text-center mt-2 px-2">
-                    O CAPTCHA pode não ser exibido corretamente em ambientes de desenvolvimento local (localhost).
-                </p>
+                 {sitekey ? (
+                  <div className="flex justify-center">
+                      <HCaptcha
+                          ref={captcha}
+                          sitekey={sitekey}
+                          theme="dark"
+                          onVerify={(token) => {
+                              setCaptchaToken(token);
+                              setError(null);
+                          }}
+                          onExpire={() => {
+                              setCaptchaToken(undefined);
+                          }}
+                      />
+                  </div>
+                ) : (
+                  <div className="text-center text-red-400 text-sm p-3 bg-red-500/10 rounded-md border border-red-500/30">
+                    A chave do site hCaptcha (VITE_HCAPTCHA_SITEKEY) não está configurada. O registro está desativado.
+                  </div>
+                )}
             </div>
           )}
 
           {error && <p className="text-red-400 text-sm">{error}</p>}
           {message && <p className="text-green-400 text-sm">{message}</p>}
-          <Button type="submit" className="w-full" isLoading={loading} size="lg">
+          <Button type="submit" className="w-full" isLoading={loading} size="lg" disabled={loading || (!isLoginView && !sitekey)}>
             {isLoginView ? 'Entrar' : 'Cadastrar'}
           </Button>
         </form>
