@@ -5,13 +5,18 @@ import { Conversation } from '../../types';
 
 const ConversationListItem: React.FC<{ conversation: Conversation; isActive: boolean; onClick: () => void; }> = ({ conversation, isActive, onClick }) => {
     
-    const truncate = (text: string | null, length: number) => {
+    const truncate = (text: string | null | undefined, length: number) => {
         if (!text) return '';
         return text.length > length ? text.substring(0, length) + '...' : text;
     };
 
-    const formatTime = (dateString: string) => {
+    const formatTime = (dateString: string | null | undefined) => {
+        if (!dateString) return '';
         const date = new Date(dateString);
+        if (isNaN(date.getTime())) {
+            return ''; // Retorna string vazia para datas inválidas
+        }
+
         const now = new Date();
         const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         
@@ -35,11 +40,15 @@ const ConversationListItem: React.FC<{ conversation: Conversation; isActive: boo
             <div className="flex-grow ml-3 overflow-hidden">
                 <div className="flex justify-between items-center">
                     <h3 className="font-semibold text-white truncate">{conversation.contact.name}</h3>
-                    <p className="text-xs text-slate-400 flex-shrink-0">{formatTime(conversation.last_message.created_at)}</p>
+                    {conversation.last_message && (
+                        <p className="text-xs text-slate-400 flex-shrink-0">
+                            {formatTime(conversation.last_message.created_at)}
+                        </p>
+                    )}
                 </div>
                 <p className="text-sm text-slate-400 truncate">
-                    {conversation.last_message.type === 'outbound' && 'Você: '}
-                    {truncate(conversation.last_message.content, 30)}
+                    {conversation.last_message?.type === 'outbound' && 'Você: '}
+                    {truncate(conversation.last_message?.content, 30)}
                 </p>
             </div>
         </li>

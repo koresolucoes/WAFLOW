@@ -80,13 +80,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                                     const wabaId = value.metadata.phone_number_id;
                                     console.log(`[LOG] Procurando perfil com meta_phone_number_id: ${wabaId}`);
 
-                                    const { data: profileData, error: profileError } = await supabaseAdmin.from('profiles').select('id').eq('meta_phone_number_id', wabaId).single();
+                                    // Usar .limit(1).single() é mais seguro contra retornos múltiplos
+                                    const { data: profileData, error: profileError } = await supabaseAdmin.from('profiles').select('id').eq('meta_phone_number_id', wabaId).limit(1).single();
                                     
-                                    // LOG DE DIAGNÓSTICO ADICIONADO
                                     console.log(`[DIAGNÓSTICO] Resultado da busca de perfil: profileData=${JSON.stringify(profileData)}, profileError=${JSON.stringify(profileError)}`);
                                     
                                     if (profileError || !profileData) {
-                                        // Lógica de erro aprimorada para garantir o log
                                         const errorMessage = `[ERRO CRÍTICO] Perfil não encontrado para o wabaId ${wabaId}. Verifique a página de Configurações. Erro do Supabase: ${JSON.stringify(profileError, null, 2)}`;
                                         console.error(errorMessage);
                                         return; // Interrompe o processamento desta mensagem específica
@@ -132,7 +131,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                                         }
                                     }
                                 } catch(e: any) {
-                                     console.error(`[ERRO] Falha ao processar a mensagem ${message.id}:`, e.message, e.stack);
+                                     console.error(`[ERRO GERAL NO PROCESSAMENTO DA MENSAGEM] ID da mensagem ${message.id}:`, e.message, e.stack);
                                 }
                             })();
                             processingPromises.push(promise);

@@ -1,5 +1,4 @@
 
-
 import React, { createContext, useState, useCallback, ReactNode, useContext, useEffect } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { AuthContext } from './AuthContext';
@@ -43,17 +42,11 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         }
 
         if (data) {
+            // CORREÇÃO: Mapeia corretamente a estrutura retornada pelo RPC.
+            // O objeto 'last_message' já vem completo e aninhado.
             const fetchedConversations: Conversation[] = (data as any[]).map(item => ({
                 contact: item.contact_details as Contact,
-                last_message: {
-                    id: item.id,
-                    content: item.content,
-                    created_at: item.created_at,
-                    type: item.type,
-                    status: item.status,
-                    sourceTable: item.source_table,
-                    contact_id: item.contact_id
-                } as UnifiedMessage,
+                last_message: item.last_message as UnifiedMessage,
                 unread_count: item.unread_count
             }));
             setConversations(fetchedConversations);
