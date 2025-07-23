@@ -13,7 +13,7 @@ const Auth: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [captchaToken, setCaptchaToken] = useState<string | undefined>();
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const captcha = useRef<HCaptcha>(null);
   
   const sitekey = (import.meta as any).env.VITE_HCAPTCHA_SITEKEY;
@@ -24,21 +24,29 @@ const Auth: React.FC = () => {
     setError(null);
     setMessage(null);
 
+    if (!sitekey) {
+        setError("A chave do site hCaptcha não está configurada. A autenticação está desativada.");
+        setLoading(false);
+        return;
+    }
+
+    if (!captchaToken) {
+        setError("Por favor, complete o CAPTCHA para continuar.");
+        setLoading(false);
+        return;
+    }
+
     try {
       if (isLoginView) {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+          options: {
+            captchaToken,
+          }
+        });
         if (error) throw error;
       } else {
-        if (!sitekey) {
-            setError("A chave do site hCaptcha não está configurada (VITE_HCAPTCHA_SITEKEY).");
-            setLoading(false);
-            return;
-        }
-        if (!captchaToken) {
-            setError("Por favor, complete o CAPTCHA.");
-            setLoading(false);
-            return;
-        }
         const { error } = await supabase.auth.signUp({
             email,
             password,
@@ -56,10 +64,8 @@ const Auth: React.FC = () => {
       setError(err.message || 'Ocorreu um erro.');
     } finally {
       setLoading(false);
-      if (!isLoginView && captcha.current) {
-          captcha.current.resetCaptcha();
-      }
-      setCaptchaToken(undefined);
+      captcha.current?.resetCaptcha();
+      setCaptchaToken(null);
     }
   };
 
@@ -106,34 +112,31 @@ const Auth: React.FC = () => {
             />
           </div>
 
-          {!isLoginView && (
-            <div className="my-2">
-                 {sitekey ? (
-                  <div className="flex justify-center">
-                      <HCaptcha
-                          ref={captcha}
-                          sitekey={sitekey}
-                          theme="dark"
-                          onVerify={(token) => {
-                              setCaptchaToken(token);
-                              setError(null);
-                          }}
-                          onExpire={() => {
-                              setCaptchaToken(undefined);
-                          }}
-                      />
-                  </div>
-                ) : (
-                  <div className="text-center text-red-400 text-sm p-3 bg-red-500/10 rounded-md border border-red-500/30">
-                    A chave do site hCaptcha (VITE_HCAPTCHA_SITEKEY) não está configurada. O registro está desativado.
-                  </div>
-                )}
-            </div>
-          )}
+          <div className="my-2 flex justify-center">
+             {sitekey ? (
+                  <HCaptcha
+                      ref={captcha}
+                      sitekey={sitekey}
+                      theme="dark"
+                      onVerify={(token) => {
+                          setCaptchaToken(token);
+                          setError(null);
+                      }}
+                      onExpire={() => {
+                          setCaptchaToken(null);
+                      }}
+                      onError={(err) => setError(`Erro no CAPTCHA: ${err}`)}
+                  />
+            ) : (
+              <div className="text-center text-red-400 text-sm p-3 bg-red-500/10 rounded-md border border-red-500/30">
+                O CAPTCHA não pôde ser carregado. A autenticação está desativada.
+              </div>
+            )}
+          </div>
 
-          {error && <p className="text-red-400 text-sm">{error}</p>}
-          {message && <p className="text-green-400 text-sm">{message}</p>}
-          <Button type="submit" className="w-full" isLoading={loading} size="lg" disabled={loading || (!isLoginView && !sitekey)}>
+          {error && <p className="text-red-400 text-sm text-center">{error}</p>}
+          {message && <p className="text-green-400 text-sm text-center">{message}</p>}
+          <Button type="submit" className="w-full" isLoading={loading} size="lg" disabled={loading || !sitekey}>
             {isLoginView ? 'Entrar' : 'Cadastrar'}
           </Button>
         </form>
@@ -144,6 +147,8 @@ const Auth: React.FC = () => {
                 setIsLoginView(!isLoginView)
                 setError(null)
                 setMessage(null)
+                captcha.current?.resetCaptcha();
+                setCaptchaToken(null);
             }}
             className="text-sm text-sky-400 hover:underline"
           >
