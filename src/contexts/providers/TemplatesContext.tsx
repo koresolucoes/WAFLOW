@@ -1,3 +1,4 @@
+
 import React, { createContext, useState, useCallback, ReactNode, useContext } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { MessageTemplate, MessageTemplateInsert, TemplateCategory, TemplateStatus, Json } from '../../types';
@@ -27,7 +28,7 @@ export const TemplatesProvider: React.FC<{ children: ReactNode }> = ({ children 
     
     const { data, error } = await supabase
       .from('message_templates')
-      .insert(dbTemplate as any)
+      .insert(dbTemplate)
       .select()
       .single();
     if (error) throw error;

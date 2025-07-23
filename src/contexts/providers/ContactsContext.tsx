@@ -1,3 +1,4 @@
+
 import React, { createContext, useState, useCallback, ReactNode, useContext, useMemo } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { Contact, EditableContact, ContactWithDetails, Deal } from '../../types';
@@ -47,8 +48,8 @@ export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }
             if (dealsError) throw dealsError;
             
             setContactDetails({
-                ...(contactData as Contact),
-                deals: (dealsData as Deal[]) || []
+                ...(contactData as unknown as Contact),
+                deals: (dealsData as unknown as Deal[]) || []
             });
 
         } catch (err) {
@@ -60,10 +61,10 @@ export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }
     const addContact = useCallback(async (contact: EditableContact) => {
         if (!user) throw new Error("User not authenticated.");
         const payload: TablesInsert<'contacts'> = { ...contact, user_id: user.id };
-        const { data, error } = await supabase.from('contacts').insert(payload as any).select().single();
+        const { data, error } = await supabase.from('contacts').insert(payload).select().single();
         if (error) throw error;
         if(data) {
-          const newContact = data as Contact;
+          const newContact = data as unknown as Contact;
           setContacts(prev => [newContact, ...prev]);
           
           fetch('/api/run-trigger', {
@@ -92,7 +93,7 @@ export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }
 
         const { data, error } = await supabase
             .from('contacts')
-            .update(updatePayload as any)
+            .update(updatePayload)
             .eq('id', updatedContact.id)
             .eq('user_id', user.id)
             .select()
@@ -100,7 +101,7 @@ export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }
 
         if (error) throw error;
         if(data) {
-            const newContact = data as Contact;
+            const newContact = data as unknown as Contact;
             setContacts(prev => prev.map(c => c.id === newContact.id ? newContact : c));
             
             if(contactDetails?.id === newContact.id) {
@@ -146,10 +147,10 @@ export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }
         });
 
         if (contactsToInsert.length > 0) {
-            const { data, error } = await supabase.from('contacts').insert(contactsToInsert as any).select();
+            const { data, error } = await supabase.from('contacts').insert(contactsToInsert).select();
             if (error) throw error;
             if(data) {
-                const newContactList = data as Contact[];
+                const newContactList = data as unknown as Contact[];
                 setContacts(prev => [...newContactList, ...prev].sort((a,b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()));
                 for(const contact of newContactList) {
                     fetch('/api/run-trigger', {

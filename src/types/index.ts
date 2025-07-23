@@ -1,11 +1,12 @@
 
 
+
 import { Session, User } from '@supabase/supabase-js';
 import { Database, Json, TablesInsert, TablesUpdate } from './database.types';
 import { MetaTemplateComponent } from '../services/meta/types';
 import type { Node as XyNode, Edge } from '@xyflow/react';
 
-export type Page = 'dashboard' | 'campaigns' | 'templates' | 'template-editor' | 'contacts' | 'new-campaign' | 'profile' | 'settings' | 'auth' | 'campaign-details' | 'automations' | 'automation-editor' | 'funnel' | 'contact-details';
+export type Page = 'dashboard' | 'campaigns' | 'templates' | 'template-editor' | 'contacts' | 'new-campaign' | 'profile' | 'settings' | 'auth' | 'campaign-details' | 'automations' | 'automation-editor' | 'funnel' | 'contact-details' | 'inbox';
 
 // String literal unions to replace DB enums for type safety in the app
 export type TemplateCategory = 'MARKETING' | 'UTILITY' | 'AUTHENTICATION';
@@ -53,6 +54,9 @@ export type CampaignMessage = Database['public']['Tables']['campaign_messages'][
     status: MessageStatus;
 };
 
+export type SentMessage = Database['public']['Tables']['sent_messages']['Row'];
+export type ReceivedMessage = Database['public']['Tables']['received_messages']['Row'];
+
 export type Automation = Omit<Database['public']['Tables']['automations']['Row'], 'nodes' | 'edges' | 'status'> & {
     nodes: AutomationNode[];
     edges: Edge[];
@@ -64,7 +68,6 @@ export type PipelineStage = Database['public']['Tables']['pipeline_stages']['Row
 export type Deal = Database['public']['Tables']['deals']['Row'];
 export type Segment = Database['public']['Tables']['segments']['Row'];
 export type SegmentRule = Database['public']['Tables']['segment_rules']['Row'];
-export type ReceivedMessage = Database['public']['Tables']['received_messages']['Row'];
 export type AutomationRun = Database['public']['Tables']['automation_runs']['Row'];
 export type AutomationNodeStats = Database['public']['Tables']['automation_node_stats']['Row'];
 export type AutomationNodeLog = Database['public']['Tables']['automation_node_logs']['Row'];
@@ -75,6 +78,24 @@ export type AutomationNodeLog = Database['public']['Tables']['automation_node_lo
 export type DealWithContact = Deal & {
     contacts: Pick<Contact, 'id' | 'name'> | null;
 };
+
+export interface UnifiedMessage {
+    id: string;
+    contact_id: string;
+    content: string;
+    created_at: string;
+    type: 'inbound' | 'outbound';
+    status?: MessageStatus;
+    sourceTable: 'received_messages' | 'campaign_messages' | 'sent_messages';
+    template?: MessageTemplate | null;
+}
+
+export interface Conversation {
+    contact: Contact;
+    last_message: UnifiedMessage;
+    unread_count: number;
+}
+
 
 // --- INSERT TYPES ---
 export interface MessageTemplateInsert extends Omit<Database['public']['Tables']['message_templates']['Insert'], 'category' | 'status' | 'components'> {
@@ -89,6 +110,8 @@ export interface MessageTemplateInsert extends Omit<Database['public']['Tables']
 export interface CampaignMessageInsert extends Omit<Database['public']['Tables']['campaign_messages']['Insert'], 'status'> {
   status: MessageStatus;
 }
+
+export type SentMessageInsert = Database['public']['Tables']['sent_messages']['Insert'];
 
 export interface AutomationInsert extends Omit<Database['public']['Tables']['automations']['Insert'], 'status' | 'nodes' | 'edges'> {
   user_id: string;

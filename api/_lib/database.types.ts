@@ -668,11 +668,81 @@ export type Database = {
           },
         ]
       }
+      sent_messages: {
+        Row: {
+          contact_id: string
+          content: string
+          created_at: string
+          delivered_at: string | null
+          error_message: string | null
+          id: string
+          meta_message_id: string | null
+          read_at: string | null
+          source: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          contact_id: string
+          content: string
+          created_at?: string
+          delivered_at?: string | null
+          error_message?: string | null
+          id?: string
+          meta_message_id?: string | null
+          read_at?: string | null
+          source?: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          contact_id?: string
+          content?: string
+          created_at?: string
+          delivered_at?: string | null
+          error_message?: string | null
+          id?: string
+          meta_message_id?: string | null
+          read_at?: string | null
+          source?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sent_messages_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sent_messages_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      get_conversations_with_contacts: {
+        Args: {
+          p_user_id: string
+        }
+        Returns: Json[]
+      }
+      get_unified_message_history: {
+        Args: {
+          p_user_id: string
+          p_contact_id: string
+        }
+        Returns: Json[]
+      }
       handle_new_user: {
         Args: Record<PropertyKey, never>
         Returns: unknown

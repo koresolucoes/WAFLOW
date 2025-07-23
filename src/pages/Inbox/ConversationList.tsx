@@ -1,0 +1,81 @@
+
+import React, { useContext } from 'react';
+import { InboxContext } from '../../contexts/providers/InboxContext';
+import { Conversation } from '../../types';
+
+const ConversationListItem: React.FC<{ conversation: Conversation; isActive: boolean; onClick: () => void; }> = ({ conversation, isActive, onClick }) => {
+    
+    const truncate = (text: string | null, length: number) => {
+        if (!text) return '';
+        return text.length > length ? text.substring(0, length) + '...' : text;
+    };
+
+    const formatTime = (dateString: string) => {
+        const date = new Date(dateString);
+        const now = new Date();
+        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        
+        if (date >= startOfToday) {
+            return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        } else {
+             return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+        }
+    }
+
+    return (
+        <li
+            onClick={onClick}
+            className={`flex items-center p-3 cursor-pointer transition-colors duration-150 ${isActive ? 'bg-slate-700/80' : 'hover:bg-slate-800'}`}
+        >
+            <img
+                className="h-11 w-11 rounded-full object-cover flex-shrink-0"
+                src={`https://api.dicebear.com/8.x/initials/svg?seed=${conversation.contact.name}`}
+                alt="Avatar"
+            />
+            <div className="flex-grow ml-3 overflow-hidden">
+                <div className="flex justify-between items-center">
+                    <h3 className="font-semibold text-white truncate">{conversation.contact.name}</h3>
+                    <p className="text-xs text-slate-400 flex-shrink-0">{formatTime(conversation.last_message.created_at)}</p>
+                </div>
+                <p className="text-sm text-slate-400 truncate">
+                    {conversation.last_message.type === 'outbound' && 'Você: '}
+                    {truncate(conversation.last_message.content, 30)}
+                </p>
+            </div>
+        </li>
+    );
+};
+
+const ConversationList: React.FC = () => {
+    const { conversations, activeContactId, setActiveContactId, isLoading } = useContext(InboxContext);
+    
+    return (
+        <aside className="w-96 flex-shrink-0 bg-slate-800/50 border-r border-slate-700/50 flex flex-col">
+            <div className="p-4 border-b border-slate-700/50">
+                <input
+                    type="search"
+                    placeholder="Pesquisar ou começar nova conversa..."
+                    className="w-full bg-slate-700 border-slate-600 rounded-md p-2 text-sm text-white placeholder-slate-400"
+                />
+            </div>
+            <ul className="flex-grow overflow-y-auto">
+                 {isLoading && conversations.length === 0 ? (
+                    <div className="p-4 text-center text-slate-400">Carregando conversas...</div>
+                ) : conversations.length === 0 ? (
+                    <div className="p-4 text-center text-slate-400">Nenhuma conversa encontrada.</div>
+                ) : (
+                    conversations.map(conv => (
+                        <ConversationListItem
+                            key={conv.contact.id}
+                            conversation={conv}
+                            isActive={activeContactId === conv.contact.id}
+                            onClick={() => setActiveContactId(conv.contact.id)}
+                        />
+                    ))
+                )}
+            </ul>
+        </aside>
+    );
+};
+
+export default ConversationList;

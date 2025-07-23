@@ -1,3 +1,4 @@
+
 import React, { ReactNode } from 'react';
 import { AuthProvider } from './providers/AuthContext';
 import { NavigationProvider } from './providers/NavigationContext';
@@ -7,6 +8,7 @@ import { ContactsProvider } from './providers/ContactsContext';
 import { CampaignsProvider } from './providers/CampaignsContext';
 import { AutomationsProvider } from './providers/AutomationsContext';
 import { FunnelProvider } from './providers/FunnelContext';
+import { InboxProvider } from './providers/InboxContext';
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     return (
@@ -17,9 +19,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                         <CampaignsProvider>
                             <AutomationsProvider>
                                 <FunnelProvider>
-                                    <DataProvider>
-                                        {children}
-                                    </DataProvider>
+                                    <InboxProvider>
+                                        <DataProvider>
+                                            {children}
+                                        </DataProvider>
+                                    </InboxProvider>
                                 </FunnelProvider>
                             </AutomationsProvider>
                         </CampaignsProvider>

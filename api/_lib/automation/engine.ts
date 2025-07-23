@@ -1,4 +1,5 @@
 
+
 import { supabaseAdmin } from '../supabaseAdmin.js';
 import { Automation, Contact, Json, AutomationNode, Profile, TablesInsert } from '../types.js';
 import { actionHandlers } from './handlers/index.js';
@@ -18,7 +19,7 @@ export const createDefaultLoggingHooks = (automationId: string, contactId: strin
             automation_id: automationId,
             contact_id: contactId,
             status: 'running'
-        } as any).select('id').single();
+        }).select('id').single();
 
         if (error) {
             console.error(`[Execution Logging] Failed to create automation_run record for automation ${automationId}`, error);
@@ -27,12 +28,12 @@ export const createDefaultLoggingHooks = (automationId: string, contactId: strin
         if (!data) {
             throw new Error('Failed to retrieve automation run ID after creation.');
         }
-        runId = data.id;
+        runId = (data as {id: string}).id;
     });
 
     hooks.addHandler('workflowExecuteAfter', async (status, details) => {
         if (!runId) return;
-        await supabaseAdmin.from('automation_runs').update({ status, details } as any).eq('id', runId);
+        await supabaseAdmin.from('automation_runs').update({ status, details }).eq('id', runId);
     });
 
     hooks.addHandler('nodeExecuteBefore', async (_node) => {
@@ -49,7 +50,7 @@ export const createDefaultLoggingHooks = (automationId: string, contactId: strin
             status,
             details,
         };
-        await supabaseAdmin.from('automation_node_logs').insert(logPayload as any);
+        await supabaseAdmin.from('automation_node_logs').insert(logPayload);
         
         // Increment the success/error counter for the node
         await supabaseAdmin.rpc('increment_node_stat', {

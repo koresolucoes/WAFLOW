@@ -1,3 +1,4 @@
+
 import React, { useContext, Suspense, lazy } from 'react';
 import { AuthContext } from './contexts/providers/AuthContext';
 import { NavigationContext } from './contexts/providers/NavigationContext';
@@ -17,6 +18,7 @@ const CompanyProfile = lazy(() => import('./pages/Profile/CompanyProfile'));
 const MetaSettings = lazy(() => import('./pages/Settings/MetaSettings'));
 const Automations = lazy(() => import('./pages/Automations/Automations'));
 const AutomationEditor = lazy(() => import('./pages/AutomationEditor/AutomationEditor'));
+const Inbox = lazy(() => import('./pages/Inbox/Inbox'));
 
 const PageSuspenseFallback = () => (
     <div className="flex items-center justify-center w-full h-full p-10">
@@ -41,6 +43,8 @@ const App: React.FC = () => {
     switch (currentPage) {
       case 'dashboard':
         return <Dashboard />;
+      case 'inbox':
+        return <Inbox />;
       case 'campaigns':
         return <Campaigns />;
       case 'campaign-details':

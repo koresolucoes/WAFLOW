@@ -1,3 +1,4 @@
+
 import React, { useContext, useEffect, useState, useCallback, ReactNode } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { AuthContext } from './AuthContext';
@@ -34,7 +35,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     return { ...campaign, recipient_count: campaign.recipient_count || 0, metrics: { sent: campaign.recipient_count || 0, delivered: 0, read: 0 } };
                 }
                 
-                const typedData = (data as { status: MessageStatus }[]) || [];
+                const typedData = (data as unknown as { status: MessageStatus }[]) || [];
                 const delivered = typedData.filter(d => d.status === 'delivered' || d.status === 'read').length;
                 const read = typedData.filter(d => d.status === 'read').length;
 
@@ -64,7 +65,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             ]);
 
             if (templatesRes.data) {
-                setTemplates(((templatesRes.data as Tables<'message_templates'>[]) || []).map(t => ({
+                setTemplates(((templatesRes.data as unknown as Tables<'message_templates'>[]) || []).map(t => ({
                     ...t,
                     category: t.category as TemplateCategory,
                     status: t.status as TemplateStatus,
@@ -76,7 +77,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             if (campaignsRes.data) await fetchCampaignsWithMetrics(campaignsRes.data as any);
             
             if (automationsRes.data){
-                const automationsData = automationsRes.data as Tables<'automations'>[];
+                const automationsData = automationsRes.data as unknown as Tables<'automations'>[];
                 const sanitizedAutomations = automationsData.map((a) => ({
                     ...a,
                     nodes: (Array.isArray(a.nodes) ? a.nodes : []) as unknown as AutomationNode[],

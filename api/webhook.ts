@@ -51,14 +51,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                             if (newStatus === 'delivered') updateData.delivered_at = new Date(status.timestamp * 1000).toISOString();
                             if (newStatus === 'read') updateData.read_at = new Date(status.timestamp * 1000).toISOString();
                             
-                            // This can run in the background
-                            supabaseAdmin
-                                .from('campaign_messages')
-                                .update(updateData as any)
-                                .eq('meta_message_id', status.id)
-                                .then(({ error }) => {
-                                    if(error) console.error("Error updating message status:", error);
-                                });
+                            // This can run in the background - try updating both tables
+                            const p1 = (async () => {
+                                const { error } = await supabaseAdmin
+                                    .from('campaign_messages')
+                                    .update(updateData)
+                                    .eq('meta_message_id', status.id);
+                                if(error && error.code !== 'PGRST116') console.error("Error updating campaign_messages status:", error);
+                            })();
+                            
+                            const sentMessagesUpdate: TablesUpdate<'sent_messages'> = { status: newStatus };
+                             if (newStatus === 'delivered') sentMessagesUpdate.delivered_at = new Date(status.timestamp * 1000).toISOString();
+                            if (newStatus === 'read') sentMessagesUpdate.read_at = new Date(status.timestamp * 1000).toISOString();
+
+                            const p2 = (async () => {
+                                const { error } = await supabaseAdmin
+                                    .from('sent_messages')
+                                    .update(sentMessagesUpdate)
+                                    .eq('meta_message_id', status.id)
+                                if(error && error.code !== 'PGRST116') console.error("Error updating sent_messages status:", error);
+                            })();
+
+                            processingPromises.push(p1, p2);
                         }
                     }
 
@@ -92,7 +106,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                                    message_body: messageBody
                                 };
                                 // Store received message
-                                await supabaseAdmin.from('received_messages').insert(receivedMessagePayload as any);
+                                await supabaseAdmin.from('received_messages').insert(receivedMessagePayload);
                                 
                                 // ---- Publish events and await them ----
                                 await publishEvent('message_received', userId, { contact, message });
