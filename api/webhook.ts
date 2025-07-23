@@ -83,55 +83,74 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                                         console.warn(`[AVISO] Webhook para ${value.contacts?.[0]?.wa_id} ignorado por não conter 'phone_number_id' nos metadados. Conteúdo de 'value':`, JSON.stringify(value));
                                         return;
                                     }
-
-                                    const phoneNumberIdStr = String(phoneNumberId);
-                                    console.log(`[LOG] Procurando perfil com meta_phone_number_id: ${phoneNumberIdStr}`);
-                                    console.log(`[DEBUG] Executando query no Supabase para encontrar o perfil...`);
-
-                                    const { data: profiles, error: profileError } = await supabaseAdmin
-                                        .from('profiles')
-                                        .select('id')
-                                        .eq('meta_phone_number_id', phoneNumberIdStr);
                                     
-                                    console.log(`[DEBUG] Query do Supabase concluída. Erro: ${profileError ? profileError.message : 'Nenhum'}, Perfis encontrados: ${profiles ? profiles.length : 0}`);
+                                    const phoneNumberIdStr = String(phoneNumberId).trim();
+                                    console.log(`[LOG] ID recebido da Meta: '${phoneNumberIdStr}'`);
+                                    
+                                    // --- NOVA ABORDAGEM DE DEBUG ---
+                                    console.log('[DEBUG] Abordagem de depuração: buscando todos os perfis com ID de telefone e filtrando no código.');
 
-                                    if (profileError) {
-                                        console.error(`[ERRO DB] Erro ao buscar perfil:`, profileError.message);
-                                        return; // Interrompe o processamento desta mensagem
+                                    const { data: allProfiles, error: allProfilesError } = await supabaseAdmin
+                                        .from('profiles')
+                                        .select('id, meta_phone_number_id')
+                                        .not('meta_phone_number_id', 'is', null);
+
+                                    if (allProfilesError) {
+                                        console.error(`[ERRO DB] Falha ao buscar a lista de todos os perfis:`, allProfilesError.message);
+                                        return;
                                     }
 
-                                    if (!profiles || profiles.length === 0) {
+                                    if (!allProfiles || allProfiles.length === 0) {
+                                        console.warn('[AVISO] Nenhum perfil com um meta_phone_number_id configurado foi encontrado no banco de dados.');
+                                        return;
+                                    }
+                                    
+                                    console.log(`[DEBUG] Encontrados ${allProfiles.length} perfis com um ID de telefone. Verificando correspondências...`);
+
+                                    let foundProfile = null;
+                                    for (const profile of allProfiles) {
+                                        const dbPhoneNumberId = profile.meta_phone_number_id ? profile.meta_phone_number_id.trim() : null;
+                                        
+                                        console.log(`[DEBUG] Comparando: ID da Meta ('${phoneNumberIdStr}') com ID do DB ('${dbPhoneNumberId}') para o perfil ${profile.id}`);
+                                        
+                                        if (dbPhoneNumberId === phoneNumberIdStr) {
+                                            console.log(`[DEBUG] *** CORRESPONDÊNCIA ENCONTRADA! *** Perfil ID: ${profile.id}`);
+                                            foundProfile = profile;
+                                            break; 
+                                        }
+                                    }
+                                    // --- FIM DA NOVA ABORDAGEM ---
+
+                                    if (!foundProfile) {
                                         console.warn(`
 ===============================================================
-[AVISO DE CONFIGURAÇÃO] NENHUM PERFIL ENCONTRADO
+[AVISO DE CONFIGURAÇÃO] NENHUM PERFIL CORRESPONDENTE ENCONTRADO
 ---------------------------------------------------------------
 A automação e a caixa de entrada não funcionarão até que isto seja corrigido.
 
 ID do Número de Telefone recebido da Meta:
-${phoneNumberIdStr}
+'${phoneNumberIdStr}'
 
-A mensagem de: ${message.from} foi ignorada.
+O sistema verificou ${allProfiles.length} perfis no banco de dados, mas nenhum correspondeu.
+IDs verificados no banco de dados:
+${allProfiles.map(p => `- '${p.meta_phone_number_id}' (para o perfil ${p.id})`).join('\n')}
 
 Causa Provável:
 O "ID do número de telefone" salvo nas Configurações da sua conta
-não corresponde ao ID que a Meta está enviando.
+não corresponde exatamente ao ID que a Meta está enviando. Verifique
+se há espaços em branco ou caracteres invisíveis.
 
 Como Corrigir:
-1. Copie o ID acima (${phoneNumberIdStr}).
+1. Copie o ID da Meta acima ('${phoneNumberIdStr}').
 2. Vá para a página de 'Configurações' no ZapFlow AI.
-3. Cole o valor no campo "ID do número de telefone".
+3. Cole o valor EXATAMENTE como está no campo "ID do número de telefone".
 4. Salve as alterações.
 ===============================================================
                                         `);
                                         return;
                                     }
                                     
-                                    if (profiles.length > 1) {
-                                        console.warn(`[AVISO] Múltiplos perfis (${profiles.length}) encontrados com o mesmo ID de número de telefone: ${phoneNumberIdStr}. Usando o primeiro encontrado.`);
-                                    }
-                                    
-                                    const profileData = profiles[0];
-                                    const userId = profileData.id;
+                                    const userId = foundProfile.id;
                                     console.log(`[LOG] Perfil encontrado com sucesso! user_id: ${userId}`);
 
                                     const contactName = value.contacts?.[0]?.profile?.name || 'Contato via WhatsApp';
