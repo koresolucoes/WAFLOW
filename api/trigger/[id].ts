@@ -1,6 +1,3 @@
-
-
-
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
 import { executeAutomation, createDefaultLoggingHooks } from '../_lib/automation/engine.js';
@@ -138,11 +135,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             
             const { contact, isNewContact, newlyAddedTags } = await processWebhookPayloadForContact(profile, fullPayloadForEvent, mappingRules);
             
-            // --- Execute primary automation (non-blocking) ---
             const hooks = createDefaultLoggingHooks(automation.id, contact ? contact.id : null);
-            executeAutomation(automation, contact, nodeId, fullPayloadForEvent, hooks, profile);
+            // CRITICAL FIX: Await the execution to ensure completion in the serverless environment.
+            await executeAutomation(automation, contact, nodeId, fullPayloadForEvent, hooks, profile);
             
-            // --- Publish events for side-effects (non-blocking) ---
+            // Publish events for side-effects (non-blocking is fine here)
             if (contact) {
                 if (isNewContact) {
                     publishEvent('contact_created', profile.id, { contact });
