@@ -1,3 +1,4 @@
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
 import { executeAutomation, createDefaultLoggingHooks } from '../_lib/automation/engine.js';
@@ -139,20 +140,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             // CRITICAL FIX: Await the execution to ensure completion in the serverless environment.
             await executeAutomation(automation, contact, nodeId, fullPayloadForEvent, hooks, profile);
             
-            // Publish events for side-effects (non-blocking is fine here)
+            // Await side-effect events as well for maximum reliability
+            const sideEffectPromises: Promise<void>[] = [];
             if (contact) {
                 if (isNewContact) {
-                    publishEvent('contact_created', profile.id, { contact });
+                    sideEffectPromises.push(publishEvent('contact_created', profile.id, { contact }));
                 }
                 newlyAddedTags.forEach(tag => {
-                    publishEvent('tag_added', profile.id, { contact, tag });
+                    sideEffectPromises.push(publishEvent('tag_added', profile.id, { contact, tag }));
                 });
             }
+            await Promise.all(sideEffectPromises);
         
         } catch (e: any) {
             console.error(`Webhook trigger: Error processing event in loop: ${e.message}`);
+             // If one event in a batch fails, log it and continue to the next
         }
     }
 
-    return res.status(202).json({ message: 'Automation triggered.' });
+    return res.status(200).json({ message: 'Automation executed successfully.' });
 }

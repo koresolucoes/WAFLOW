@@ -1,4 +1,5 @@
 
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from './_lib/supabaseAdmin.js';
 import { publishEvent } from './_lib/automation/trigger-handler.js';
@@ -25,13 +26,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         switch (eventType) {
             case 'contact_created':
                 // Publica um evento genérico de que um contato foi criado
-                publishEvent('contact_created', userId, { contact });
+                await publishEvent('contact_created', userId, { contact });
 
                 // Publica também eventos para cada uma das tags do novo contato
                 if (contact.tags && contact.tags.length > 0) {
-                    for (const tag of contact.tags) {
-                        publishEvent('tag_added', userId, { contact, tag });
-                    }
+                    // Use Promise.all to run tag triggers concurrently but wait for all
+                    await Promise.all(
+                        contact.tags.map(tag => publishEvent('tag_added', userId, { contact, tag }))
+                    );
                 }
                 break;
 
@@ -39,17 +41,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 if (!data || !Array.isArray(data.addedTags)) {
                     return res.status(400).json({ error: 'Missing data.addedTags for this event type' });
                 }
-                for (const tag of data.addedTags) {
-                    publishEvent('tag_added', userId, { contact, tag });
-                }
+                 // Use Promise.all to run tag triggers concurrently but wait for all
+                await Promise.all(
+                    data.addedTags.map((tag: string) => publishEvent('tag_added', userId, { contact, tag }))
+                );
                 break;
 
             default:
                 return res.status(400).json({ error: `Unsupported eventType: ${eventType}` });
         }
         
-        // Retorna 202 Accepted para indicar que o evento foi recebido e está sendo processado de forma assíncrona.
-        return res.status(202).json({ message: 'Event received and is being processed.' });
+        // Retorna 200 OK para indicar que o evento foi processado com sucesso.
+        return res.status(200).json({ message: 'Triggers executed successfully.' });
     } catch(err: any) {
         console.error('Error in run-trigger handler:', err);
         return res.status(500).json({ error: 'Internal server error' });
