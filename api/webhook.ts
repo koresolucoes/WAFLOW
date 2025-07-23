@@ -44,21 +44,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 for (const change of item.changes) {
                     const { field, value } = change;
 
-                    console.log(`Processando campo: '${field}'`);
-                    if (field !== 'messages') continue;
+                    console.log(`[LOG] Processando campo: '${field}'`);
+                    if (field !== 'messages') {
+                        console.log(`[LOG] Ignorando campo '${field}', pois não é 'messages'.`);
+                        continue;
+                    }
                     
                     // ---- ATUALIZAÇÕES DE STATUS ----
                     if (value.statuses) {
-                        console.log(`Processando ${value.statuses.length} atualização(ões) de status.`);
+                        console.log(`[LOG] Processando ${value.statuses.length} atualização(ões) de status.`);
                         for (const status of value.statuses) {
-                             console.log(`Atualizando status para a mensagem ${status.id} para: ${status.status}`);
+                             console.log(`[LOG] Atualizando status para a mensagem ${status.id} para: ${status.status}`);
                             const newStatus = status.status;
                             const updateData: TablesUpdate<'campaign_messages'> = { status: newStatus };
                             if (newStatus === 'delivered') updateData.delivered_at = new Date(status.timestamp * 1000).toISOString();
                             if (newStatus === 'read') updateData.read_at = new Date(status.timestamp * 1000).toISOString();
                             
                             const p1 = supabaseAdmin.from('campaign_messages').update(updateData).eq('meta_message_id', status.id).then(({ error }) => {
-                                if(error && error.code !== 'PGRST116') console.error("Erro ao atualizar status em campaign_messages:", error);
+                                if(error && error.code !== 'PGRST116') console.error("[ERRO] Erro ao atualizar status em campaign_messages:", error);
                             });
                             
                             const sentMessagesUpdate: TablesUpdate<'sent_messages'> = { status: newStatus };
@@ -66,7 +69,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                             if (newStatus === 'read') sentMessagesUpdate.read_at = new Date(status.timestamp * 1000).toISOString();
 
                             const p2 = supabaseAdmin.from('sent_messages').update(sentMessagesUpdate).eq('meta_message_id', status.id).then(({ error }) => {
-                                if(error && error.code !== 'PGRST116') console.error("Erro ao atualizar status em sent_messages:", error);
+                                if(error && error.code !== 'PGRST116') console.error("[ERRO] Erro ao atualizar status em sent_messages:", error);
                             });
 
                             processingPromises.push(p1, p2);
@@ -75,27 +78,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
                     // ---- MENSAGENS RECEBIDAS ----
                     if (value.messages) {
-                         console.log(`Processando ${value.messages.length} mensagem(ns) recebida(s).`);
+                         console.log(`[LOG] Processando ${value.messages.length} mensagem(ns) recebida(s).`);
                         for (const message of value.messages) {
                              const promise = (async () => {
                                 const wabaId = value.metadata.phone_number_id;
-                                console.log(`Procurando perfil com meta_phone_number_id: ${wabaId}`);
+                                console.log(`[LOG] Procurando perfil com meta_phone_number_id: ${wabaId}`);
 
                                 const { data: profileData, error: profileError } = await supabaseAdmin.from('profiles').select('id').eq('meta_phone_number_id', wabaId).single();
                                 
                                 if (profileError || !profileData) {
-                                    console.error(`ERRO CRÍTICO: Perfil não encontrado para o wabaId ${wabaId}. Verifique a página de Configurações.`, profileError);
+                                    console.error(`[ERRO CRÍTICO] Perfil não encontrado para o wabaId ${wabaId}. Verifique a página de Configurações.`, JSON.stringify(profileError, null, 2));
                                     return; // Para o processamento desta mensagem
                                 }
                                 const userId = (profileData as unknown as Tables<'profiles'>).id;
-                                console.log(`Perfil encontrado para o user_id: ${userId}`);
+                                console.log(`[LOG] Perfil encontrado com sucesso! user_id: ${userId}`);
 
                                 const { contact, isNew } = await findOrCreateContactByPhone(userId, message.from, value.contacts[0].profile.name);
                                 if (!contact) {
-                                    console.error(`Não foi possível encontrar ou criar o contato para o telefone ${message.from}.`);
+                                    console.error(`[ERRO] Não foi possível encontrar ou criar o contato para o telefone ${message.from}.`);
                                     return;
                                 }
-                                console.log(`Contato processado: ID ${contact.id}, É Novo: ${isNew}`);
+                                console.log(`[LOG] Contato processado: ID ${contact.id}, É Novo: ${isNew}`);
 
 
                                 let messageBody = `[${message.type}]`; // Padrão para mídias
@@ -104,6 +107,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                                 } else if (message.type === 'interactive' && message.interactive?.button_reply) {
                                     messageBody = `Botão Clicado: "${message.interactive.button_reply.title}"`;
                                 }
+                                console.log(`[LOG] Corpo da mensagem parseado: "${messageBody}"`);
                                 
                                 const receivedMessagePayload: TablesInsert<'received_messages'> = {
                                    user_id: userId,
@@ -112,19 +116,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                                    message_body: messageBody
                                 };
                                 
-                                console.log("Tentando inserir na tabela 'received_messages':", JSON.stringify(receivedMessagePayload));
+                                console.log("[LOG] Tentando inserir na tabela 'received_messages':", JSON.stringify(receivedMessagePayload));
                                 const { error: insertError } = await supabaseAdmin.from('received_messages').insert(receivedMessagePayload);
                                 if (insertError) {
-                                    console.error("ERRO ao inserir mensagem recebida:", insertError);
+                                    console.error("[ERRO] ERRO ao inserir mensagem recebida:", JSON.stringify(insertError, null, 2));
                                 } else {
-                                    console.log("Mensagem inserida com sucesso em 'received_messages'.");
+                                    console.log("[LOG] Mensagem inserida com sucesso em 'received_messages'.");
                                 }
                                 
                                 // ---- Publica eventos para automações ----
-                                console.log("Publicando eventos para a nova mensagem...");
+                                console.log("[LOG] Publicando eventos para a nova mensagem...");
                                 await publishEvent('message_received', userId, { contact, message });
                                 if (isNew) {
-                                    console.log("Publicando eventos para novo contato...");
+                                    console.log("[LOG] Publicando eventos para novo contato...");
                                     await publishEvent('contact_created', userId, { contact });
                                     if (contact.tags && contact.tags.length > 0) {
                                         await Promise.all(
@@ -132,6 +136,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                                         );
                                     }
                                 }
+                                console.log("[LOG] Processamento da mensagem individual concluído.");
                             })();
                             processingPromises.push(promise);
                         }
@@ -139,10 +144,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 }
             }
             await Promise.all(processingPromises);
-            console.log("Processamento completo do evento do webhook.");
+            console.log("[LOG] Processamento completo do evento do webhook.");
 
         } catch(error: any) {
-            console.error("Erro não tratado no processamento do webhook:", error.message, error.stack);
+            console.error("[ERRO GERAL] Erro não tratado no processamento do webhook:", error.message, error.stack);
         }
         
         return; // Resposta já enviada
