@@ -15,7 +15,8 @@
     "@supabase/supabase-js": "^2.52.0",
     "recharts": "^3.1.0",
     "@xyflow/react": "^12.8.2",
-    "@vercel/node": "^5.3.6"
+    "@vercel/node": "^5.3.6",
+    "@hcaptcha/react-hcaptcha": "^1.10.1"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

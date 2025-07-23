@@ -448,6 +448,9 @@ const AutomationEditor: FC = () => {
                     nodes={nodes}
                     onUpdateNodes={onUpdateNodes}
                     automationId={automation.id}
+                    templates={templates}
+                    allTags={allTags}
+                    profile={profile}
                 />
                 <NodeLogsModal
                     isOpen={isLogsModalOpen}
