@@ -77,7 +77,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                         for (const message of value.messages) {
                             const promise = (async () => {
                                 try {
-                                    // Acesso robusto ao phone_number_id e log aprimorado
                                     const phoneNumberId = value?.metadata?.phone_number_id;
 
                                     if (!phoneNumberId) {
@@ -86,18 +85,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                                     }
 
                                     const phoneNumberIdStr = String(phoneNumberId);
-
                                     console.log(`[LOG] Procurando perfil com meta_phone_number_id: ${phoneNumberIdStr}`);
+                                    console.log(`[DEBUG] Executando query no Supabase para encontrar o perfil...`);
 
-                                    const { data: profileData, error: profileError } = await supabaseAdmin
+                                    const { data: profiles, error: profileError } = await supabaseAdmin
                                         .from('profiles')
                                         .select('id')
-                                        .eq('meta_phone_number_id', phoneNumberIdStr)
-                                        .limit(1)
-                                        .single();
+                                        .eq('meta_phone_number_id', phoneNumberIdStr);
                                     
-                                    if (profileError || !profileData) {
-                                        // Torna o log de erro super claro e acionável para o usuário
+                                    console.log(`[DEBUG] Query do Supabase concluída. Erro: ${profileError ? profileError.message : 'Nenhum'}, Perfis encontrados: ${profiles ? profiles.length : 0}`);
+
+                                    if (profileError) {
+                                        console.error(`[ERRO DB] Erro ao buscar perfil:`, profileError.message);
+                                        return; // Interrompe o processamento desta mensagem
+                                    }
+
+                                    if (!profiles || profiles.length === 0) {
                                         console.warn(`
 ===============================================================
 [AVISO DE CONFIGURAÇÃO] NENHUM PERFIL ENCONTRADO
@@ -118,13 +121,16 @@ Como Corrigir:
 2. Vá para a página de 'Configurações' no ZapFlow AI.
 3. Cole o valor no campo "ID do número de telefone".
 4. Salve as alterações.
-
-Detalhes do erro do banco de dados: ${profileError ? profileError.message : 'Nenhum perfil corresponde.'}
 ===============================================================
                                         `);
                                         return;
                                     }
                                     
+                                    if (profiles.length > 1) {
+                                        console.warn(`[AVISO] Múltiplos perfis (${profiles.length}) encontrados com o mesmo ID de número de telefone: ${phoneNumberIdStr}. Usando o primeiro encontrado.`);
+                                    }
+                                    
+                                    const profileData = profiles[0];
                                     const userId = profileData.id;
                                     console.log(`[LOG] Perfil encontrado com sucesso! user_id: ${userId}`);
 
