@@ -33,31 +33,43 @@ const MetaSettings: React.FC = () => {
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
-        
-        if (name === 'webhook_path_prefix' && value.includes('_')) {
-            setError("O prefixo do webhook não pode conter underscores (_). Use hífens (-).");
-        } else {
-             setError(null);
-        }
-
         setLocalConfig(prev => ({ ...prev, [name]: value }));
         setIsSaved(false);
+        setError(null);
     };
 
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!localConfig.meta_access_token || !localConfig.meta_waba_id || !localConfig.meta_phone_number_id || !localConfig.webhook_path_prefix) {
-            setError("Todos os campos são obrigatórios.");
-            return;
-        }
-        if (localConfig.webhook_path_prefix.includes('_')) {
-            setError("O prefixo do webhook não pode conter underscores (_). Use hífens (-).");
-            return;
-        }
         setIsSaving(true);
         setError(null);
+
+        const trimmedConfig = {
+            meta_access_token: localConfig.meta_access_token.trim(),
+            meta_waba_id: localConfig.meta_waba_id.trim(),
+            meta_phone_number_id: localConfig.meta_phone_number_id.trim(),
+            webhook_path_prefix: localConfig.webhook_path_prefix.trim(),
+        };
+
+        if (!trimmedConfig.meta_access_token || !trimmedConfig.meta_waba_id || !trimmedConfig.meta_phone_number_id) {
+            setError("Os campos da API da Meta são obrigatórios.");
+            setIsSaving(false);
+            return;
+        }
+
+        if (!trimmedConfig.webhook_path_prefix) {
+            setError("O prefixo do Webhook é obrigatório.");
+            setIsSaving(false);
+            return;
+        }
+
+        if (trimmedConfig.webhook_path_prefix.includes('_')) {
+            setError("O prefixo do webhook não pode conter underscores (_). Use hífens (-).");
+            setIsSaving(false);
+            return;
+        }
+
         try {
-            await updateProfile(localConfig as Partial<Profile>);
+            await updateProfile(trimmedConfig as Partial<Profile>);
             setIsSaved(true);
             setTimeout(() => setIsSaved(false), 3000);
         } catch(err: any) {
