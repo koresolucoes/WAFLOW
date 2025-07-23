@@ -39,8 +39,8 @@ export const AutomationsProvider: React.FC<{ children: ReactNode }> = ({ childre
                 const newAutomation = payload.new as Tables<'automations'>;
                  const sanitized: Automation = {
                     ...newAutomation,
-                    nodes: (Array.isArray(newAutomation.nodes) ? newAutomation.nodes : []) as AutomationNode[],
-                    edges: (Array.isArray(newAutomation.edges) ? newAutomation.edges : []) as Edge[],
+                    nodes: (Array.isArray(newAutomation.nodes) ? newAutomation.nodes : []) as unknown as AutomationNode[],
+                    edges: (Array.isArray(newAutomation.edges) ? newAutomation.edges : []) as unknown as Edge[],
                     status: newAutomation.status as AutomationStatus,
                 };
                 setAutomations(prev => [...prev, sanitized]);
@@ -49,8 +49,8 @@ export const AutomationsProvider: React.FC<{ children: ReactNode }> = ({ childre
                 const updatedAutomation = payload.new as Tables<'automations'>;
                 const sanitized: Automation = {
                     ...updatedAutomation,
-                    nodes: (Array.isArray(updatedAutomation.nodes) ? updatedAutomation.nodes : []) as AutomationNode[],
-                    edges: (Array.isArray(updatedAutomation.edges) ? updatedAutomation.edges : []) as Edge[],
+                    nodes: (Array.isArray(updatedAutomation.nodes) ? updatedAutomation.nodes : []) as unknown as AutomationNode[],
+                    edges: (Array.isArray(updatedAutomation.edges) ? updatedAutomation.edges : []) as unknown as Edge[],
                     status: updatedAutomation.status as AutomationStatus,
                 };
                 setAutomations(prev => prev.map(a => a.id === sanitized.id ? sanitized : a));
@@ -101,7 +101,7 @@ export const AutomationsProvider: React.FC<{ children: ReactNode }> = ({ childre
 
         if(data) {
             const updatedAutomationData = data as Tables<'automations'>;
-            const updatedAutomation: Automation = { ...updatedAutomationData, nodes: (Array.isArray(updatedAutomationData.nodes) ? updatedAutomationData.nodes : []) as AutomationNode[], edges: (Array.isArray(updatedAutomationData.edges) ? updatedAutomationData.edges : []) as Edge[], status: updatedAutomationData.status as AutomationStatus };
+            const updatedAutomation: Automation = { ...updatedAutomationData, nodes: (Array.isArray(updatedAutomationData.nodes) ? updatedAutomationData.nodes : []) as unknown as AutomationNode[], edges: (Array.isArray(updatedAutomationData.edges) ? updatedAutomationData.edges : []) as unknown as Edge[], status: updatedAutomationData.status as AutomationStatus };
             setAutomations(prev => prev.map(a => a.id === updatedAutomation.id ? updatedAutomation : a));
         }
     }, [user]);

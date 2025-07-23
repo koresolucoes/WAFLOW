@@ -79,8 +79,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 const automationsData = automationsRes.data as Tables<'automations'>[];
                 const sanitizedAutomations = automationsData.map((a) => ({
                     ...a,
-                    nodes: (Array.isArray(a.nodes) ? a.nodes : []) as AutomationNode[],
-                    edges: (Array.isArray(a.edges) ? a.edges : []) as Edge[],
+                    nodes: (Array.isArray(a.nodes) ? a.nodes : []) as unknown as AutomationNode[],
+                    edges: (Array.isArray(a.edges) ? a.edges : []) as unknown as Edge[],
                     status: a.status as AutomationStatus,
                 }));
                 setAutomations(sanitizedAutomations as any);

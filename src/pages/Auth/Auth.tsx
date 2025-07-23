@@ -100,18 +100,24 @@ const Auth: React.FC = () => {
           </div>
 
           {!isLoginView && (
-            <div className="flex justify-center my-2">
-                <HCaptcha
-                    ref={captcha}
-                    sitekey="a5f74b19-9e17-4591-951c-c0c5874c7980" // Chave de teste hCaptcha
-                    onVerify={(token) => {
-                        setCaptchaToken(token);
-                        setError(null);
-                    }}
-                    onExpire={() => {
-                        setCaptchaToken(undefined);
-                    }}
-                />
+            <div className="my-2">
+                <div className="flex justify-center">
+                    <HCaptcha
+                        ref={captcha}
+                        sitekey="aES_aa6cc0dc38b04afb954ecb05aba44c24" // Chave de teste hCaptcha
+                        theme="dark" // Adiciona o tema escuro para combinar com o design
+                        onVerify={(token) => {
+                            setCaptchaToken(token);
+                            setError(null);
+                        }}
+                        onExpire={() => {
+                            setCaptchaToken(undefined);
+                        }}
+                    />
+                </div>
+                 <p className="text-xs text-slate-500 text-center mt-2 px-2">
+                    O CAPTCHA pode não ser exibido corretamente em ambientes de desenvolvimento local (localhost).
+                </p>
             </div>
           )}
 
