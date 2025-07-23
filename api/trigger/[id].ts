@@ -1,5 +1,6 @@
 
 
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
 import { executeAutomation, createDefaultLoggingHooks } from '../_lib/automation/engine.js';
@@ -7,6 +8,7 @@ import { publishEvent } from '../_lib/automation/trigger-handler.js';
 import { Automation, Profile } from '../_lib/types.js';
 import { getRawBody, parseMultipartFormData } from '../_lib/webhook/parser.js';
 import { processWebhookPayloadForContact } from '../_lib/webhook/contact-mapper.js';
+import { sanitizeAutomation } from '../_lib/automation/utils.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { id: rawId } = req.query;
@@ -50,11 +52,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     
     const automations = (automationsData as Automation[]) || [];
-    const automation = automations.find(a => a.nodes?.some(n => n.id === nodeId));
+    const rawAutomation = automations.find(a => (a.nodes || []).some(n => n.id === nodeId));
 
-    if (!automation) {
+    if (!rawAutomation) {
         return res.status(404).json({ error: 'Automation not found for this trigger ID.' });
     }
+    
+    const automation = sanitizeAutomation(rawAutomation);
 
     const triggerNode = automation.nodes.find(n => n.id === nodeId);
     if (!triggerNode || triggerNode.data.type !== 'webhook_received') {

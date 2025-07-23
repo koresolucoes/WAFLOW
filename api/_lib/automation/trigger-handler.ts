@@ -3,6 +3,7 @@
 import { supabaseAdmin } from '../supabaseAdmin.js';
 import { executeAutomation, createDefaultLoggingHooks } from './engine.js';
 import { Automation, Contact, Json, Profile } from '../types.js';
+import { sanitizeAutomation } from './utils.js';
 
 type TriggerInfo = {
     automation_id: string;
@@ -41,8 +42,9 @@ const dispatchAutomations = async (userId: string, triggers: TriggerInfo[], cont
     const automationsMap = new Map((automations as unknown as Automation[]).map(a => [a.id, a]));
 
     for (const trigger of triggers) {
-        const automation = automationsMap.get(trigger.automation_id);
-        if (automation) {
+        const rawAutomation = automationsMap.get(trigger.automation_id);
+        if (rawAutomation) {
+            const automation = sanitizeAutomation(rawAutomation);
             console.log(`Dispatching automation '${automation.name}' (ID: ${automation.id}) starting from node ${trigger.node_id}`);
             const hooks = createDefaultLoggingHooks(automation.id, contact ? contact.id : null);
             // Pass the fetched profile to the execution engine
