@@ -104,7 +104,7 @@ const Auth: React.FC = () => {
                 <div className="flex justify-center">
                     <HCaptcha
                         ref={captcha}
-                        sitekey="aES_aa6cc0dc38b04afb954ecb05aba44c24" // Chave de teste hCaptcha
+                        sitekey="ES_aa6cc0dc38b04afb954ecb05aba44c24" // Chave de teste hCaptcha
                         theme="dark" // Adiciona o tema escuro para combinar com o design
                         onVerify={(token) => {
                             setCaptchaToken(token);
