@@ -74,75 +74,72 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
                     // ---- MENSAGENS RECEBIDAS ----
                     if (value.messages) {
-                        for (const message of value.messages) {
-                            const promise = (async () => {
-                                try {
-                                    const phoneNumberId = value?.metadata?.phone_number_id;
+                        // **LÓGICA REATORADA**: Busca o perfil UMA VEZ para este lote inteiro de mensagens.
+                        const phoneNumberId = value?.metadata?.phone_number_id;
 
-                                    if (!phoneNumberId) {
-                                        console.warn(`[AVISO] Webhook para ${value.contacts?.[0]?.wa_id} ignorado por não conter 'phone_number_id' nos metadados. Conteúdo de 'value':`, JSON.stringify(value));
-                                        return;
-                                    }
-                                    
-                                    const phoneNumberIdStr = String(phoneNumberId).trim();
-                                    
-                                    const findProfile = async (attempt: number): Promise<Tables<'profiles'> | null> => {
-                                        console.log(`[LOG] Procurando perfil com meta_phone_number_id: ${phoneNumberIdStr} (Tentativa ${attempt})`);
-                                        const { data, error } = await supabaseAdmin
-                                            .from('profiles')
-                                            .select('id, meta_phone_number_id')
-                                            .eq('meta_phone_number_id', phoneNumberIdStr)
-                                            .limit(1);
+                        if (!phoneNumberId) {
+                            console.warn(`[AVISO] Webhook para ${value.contacts?.[0]?.wa_id} ignorado por não conter 'phone_number_id' nos metadados.`);
+                            continue; // Pula este objeto 'change' inteiro.
+                        }
 
-                                        if (error) {
-                                            console.error(`[ERRO DB] Falha na busca do perfil (Tentativa ${attempt}):`, error.message);
-                                            return null;
-                                        }
+                        const phoneNumberIdStr = String(phoneNumberId).trim();
+                        
+                        console.log(`[LOG] Lógica de verificação de perfil iniciada para o ID: ${phoneNumberIdStr}`);
+                        
+                        const findProfile = async (attempt: number): Promise<Tables<'profiles'> | null> => {
+                            console.log(`[LOG] Procurando perfil com meta_phone_number_id: ${phoneNumberIdStr} (Tentativa ${attempt})`);
+                            const { data, error } = await supabaseAdmin
+                                .from('profiles')
+                                .select('id, meta_phone_number_id')
+                                .eq('meta_phone_number_id', phoneNumberIdStr)
+                                .limit(1);
 
-                                        if (data && data.length > 0) {
-                                            console.log(`[LOG] Perfil encontrado com sucesso! user_id: ${data[0].id}`);
-                                            return data[0] as Tables<'profiles'>;
-                                        }
-                                        return null;
-                                    };
+                            if (error) {
+                                console.error(`[ERRO DB] Falha na busca do perfil (Tentativa ${attempt}):`, error.message);
+                                return null;
+                            }
 
-                                    let profile = await findProfile(1);
+                            if (data && data.length > 0) {
+                                console.log(`[LOG] Perfil encontrado com sucesso! user_id: ${data[0].id}`);
+                                return data[0] as Tables<'profiles'>;
+                            }
+                            return null;
+                        };
 
-                                    if (!profile) {
-                                        console.log('[DEBUG] Primeira tentativa falhou, aguardando 1 segundo para tentar novamente...');
-                                        await new Promise(resolve => setTimeout(resolve, 1000));
-                                        profile = await findProfile(2);
-                                    }
-                                    
+                        let profile = await findProfile(1);
 
-                                    if (!profile) {
-                                        // Apenas para fins de depuração, busca todos os IDs para ajudar o usuário a encontrar o problema
-                                        const { data: allProfilesWithIds } = await supabaseAdmin.from('profiles').select('id, meta_phone_number_id').not('meta_phone_number_id', 'is', null);
-                                        const profilesWithIds = allProfilesWithIds || [];
-                                        
-                                        console.warn(`
+                        if (!profile) {
+                            console.log('[DEBUG] Primeira tentativa falhou, aguardando 1 segundo para tentar novamente...');
+                            await new Promise(resolve => setTimeout(resolve, 1000));
+                            profile = await findProfile(2);
+                        }
+                        
+                        if (!profile) {
+                            const { data: allProfilesWithIds } = await supabaseAdmin.from('profiles').select('id, meta_phone_number_id').not('meta_phone_number_id', 'is', null);
+                            const profilesWithIds = allProfilesWithIds || [];
+                            
+                            console.warn(`
 ===============================================================
 [AVISO DE CONFIGURAÇÃO] NENHUM PERFIL CORRESPONDENTE ENCONTRADO
 ---------------------------------------------------------------
-A automação e a caixa de entrada não funcionarão até que isto seja corrigido.
-
-ID do Número de Telefone recebido da Meta:
-'${phoneNumberIdStr}'
-
-O sistema verificou ${profilesWithIds.length} perfis configurados no banco de dados, mas nenhum correspondeu.
+ID do Número de Telefone recebido da Meta: '${phoneNumberIdStr}'
 IDs verificados no banco de dados:
-${profilesWithIds.map(p => `- '${p.meta_phone_number_id}' (para o perfil ${p.id})`).join('\n') || 'Nenhum'}
+${profilesWithIds.map(p => `- '${p.meta_phone_number_id}'`).join('\n') || 'Nenhum'}
 
 Como Corrigir:
-1. Copie o ID da Meta acima ('${phoneNumberIdStr}').
-2. Vá para a página de 'Configurações' no ZapFlow AI.
-3. Cole o valor EXATAMENTE como está no campo "ID do número de telefone".
+1. Copie o ID da Meta ('${phoneNumberIdStr}').
+2. Vá para a página de 'Configurações'.
+3. Cole o valor no campo "ID do número de telefone".
 4. Salve as alterações.
 ===============================================================
-                                        `);
-                                        return;
-                                    }
-                                    
+                            `);
+                            continue; // Pula este lote de mensagens.
+                        }
+                        
+                        // Agora que temos um perfil válido, processa as mensagens em paralelo.
+                        for (const message of value.messages) {
+                            const promise = (async () => {
+                                try {
                                     const userId = profile.id;
                                     const contactName = value.contacts?.[0]?.profile?.name || 'Contato via WhatsApp';
                                     const { contact, isNew } = await findOrCreateContactByPhone(userId, message.from, contactName);
@@ -151,8 +148,7 @@ Como Corrigir:
                                         console.error(`[ERRO] Não foi possível encontrar ou criar o contato para o telefone ${message.from}.`);
                                         return;
                                     }
-                                    console.log(`[LOG] Contato processado: ID ${contact.id}, É Novo: ${isNew}`);
-
+                                    
                                     let messageBody = `[${message.type}]`;
                                     if (message.type === 'text' && message.text?.body) {
                                         messageBody = message.text.body;
@@ -160,19 +156,12 @@ Como Corrigir:
                                         messageBody = `Botão Clicado: "${message.interactive.button_reply.title}"`;
                                     }
                                     
-                                    const receivedMessagePayload: TablesInsert<'received_messages'> = {
+                                    await supabaseAdmin.from('received_messages').insert({
                                         user_id: userId,
                                         contact_id: contact.id,
                                         meta_message_id: message.id,
                                         message_body: messageBody
-                                    };
-                                    
-                                    const { error: insertError } = await supabaseAdmin.from('received_messages').insert(receivedMessagePayload);
-                                    if (insertError) {
-                                        console.error(`[ERRO] ERRO ao inserir mensagem recebida: ${JSON.stringify(insertError, null, 2)}`);
-                                        return;
-                                    }
-                                    console.log("[LOG] Mensagem inserida com sucesso em 'received_messages'.");
+                                    });
                                     
                                     await publishEvent('message_received', userId, { contact, message });
                                     if (isNew) {
