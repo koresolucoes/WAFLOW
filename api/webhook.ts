@@ -85,43 +85,41 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                                     }
                                     
                                     const phoneNumberIdStr = String(phoneNumberId).trim();
-                                    console.log(`[LOG] ID recebido da Meta: '${phoneNumberIdStr}'`);
                                     
-                                    console.log('[DEBUG] Abordagem final: buscando TODOS os perfis para contornar possível problema de conexão/query.');
+                                    const findProfile = async (attempt: number): Promise<Tables<'profiles'> | null> => {
+                                        console.log(`[LOG] Procurando perfil com meta_phone_number_id: ${phoneNumberIdStr} (Tentativa ${attempt})`);
+                                        const { data, error } = await supabaseAdmin
+                                            .from('profiles')
+                                            .select('id, meta_phone_number_id')
+                                            .eq('meta_phone_number_id', phoneNumberIdStr)
+                                            .limit(1);
 
-                                    const { data: allProfiles, error: allProfilesError } = await supabaseAdmin
-                                        .from('profiles')
-                                        .select('id, meta_phone_number_id');
-
-                                    if (allProfilesError) {
-                                        console.error(`[ERRO DB] Falha ao buscar a lista de todos os perfis:`, allProfilesError.message);
-                                        return; // Early exit on DB error
-                                    }
-
-                                    if (!allProfiles || allProfiles.length === 0) {
-                                        console.warn('[AVISO] Nenhum perfil foi encontrado no banco de dados.');
-                                        return;
-                                    }
-
-                                    console.log(`[DEBUG] Encontrados ${allProfiles.length} perfis no total. Filtrando e verificando correspondências agora...`);
-
-                                    let foundProfile = null;
-                                    for (const profile of allProfiles) {
-                                        // Filtro manual, já que a query não filtra mais
-                                        if (!profile.meta_phone_number_id) {
-                                            continue;
+                                        if (error) {
+                                            console.error(`[ERRO DB] Falha na busca do perfil (Tentativa ${attempt}):`, error.message);
+                                            return null;
                                         }
-                                        const dbPhoneNumberId = profile.meta_phone_number_id.trim();
+
+                                        if (data && data.length > 0) {
+                                            console.log(`[LOG] Perfil encontrado com sucesso! user_id: ${data[0].id}`);
+                                            return data[0] as Tables<'profiles'>;
+                                        }
+                                        return null;
+                                    };
+
+                                    let profile = await findProfile(1);
+
+                                    if (!profile) {
+                                        console.log('[DEBUG] Primeira tentativa falhou, aguardando 1 segundo para tentar novamente...');
+                                        await new Promise(resolve => setTimeout(resolve, 1000));
+                                        profile = await findProfile(2);
+                                    }
+                                    
+
+                                    if (!profile) {
+                                        // Apenas para fins de depuração, busca todos os IDs para ajudar o usuário a encontrar o problema
+                                        const { data: allProfilesWithIds } = await supabaseAdmin.from('profiles').select('id, meta_phone_number_id').not('meta_phone_number_id', 'is', null);
+                                        const profilesWithIds = allProfilesWithIds || [];
                                         
-                                        if (dbPhoneNumberId === phoneNumberIdStr) {
-                                            console.log(`[DEBUG] *** CORRESPONDÊNCIA ENCONTRADA! *** Perfil ID: ${profile.id}`);
-                                            foundProfile = profile;
-                                            break; 
-                                        }
-                                    }
-
-                                    if (!foundProfile) {
-                                        const profilesWithIds = allProfiles.filter(p => p.meta_phone_number_id);
                                         console.warn(`
 ===============================================================
 [AVISO DE CONFIGURAÇÃO] NENHUM PERFIL CORRESPONDENTE ENCONTRADO
@@ -135,10 +133,6 @@ O sistema verificou ${profilesWithIds.length} perfis configurados no banco de da
 IDs verificados no banco de dados:
 ${profilesWithIds.map(p => `- '${p.meta_phone_number_id}' (para o perfil ${p.id})`).join('\n') || 'Nenhum'}
 
-Causa Provável:
-O "ID do número de telefone" salvo nas Configurações da sua conta
-não corresponde exatamente ao ID que a Meta está enviando.
-
 Como Corrigir:
 1. Copie o ID da Meta acima ('${phoneNumberIdStr}').
 2. Vá para a página de 'Configurações' no ZapFlow AI.
@@ -149,9 +143,7 @@ Como Corrigir:
                                         return;
                                     }
                                     
-                                    const userId = foundProfile.id;
-                                    console.log(`[LOG] Perfil encontrado com sucesso! user_id: ${userId}`);
-
+                                    const userId = profile.id;
                                     const contactName = value.contacts?.[0]?.profile?.name || 'Contato via WhatsApp';
                                     const { contact, isNew } = await findOrCreateContactByPhone(userId, message.from, contactName);
                                     
