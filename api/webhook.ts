@@ -54,7 +54,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                             // This can run in the background
                             supabaseAdmin
                                 .from('campaign_messages')
-                                .update(updateData as never)
+                                .update(updateData as any)
                                 .eq('meta_message_id', status.id)
                                 .then(({ error }) => {
                                     if(error) console.error("Error updating message status:", error);
@@ -92,7 +92,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                                    message_body: messageBody
                                 };
                                 // Store received message
-                                await supabaseAdmin.from('received_messages').insert(receivedMessagePayload as never);
+                                await supabaseAdmin.from('received_messages').insert(receivedMessagePayload as any);
                                 
                                 // ---- Publish events and await them ----
                                 await publishEvent('message_received', userId, { contact, message });
