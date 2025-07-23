@@ -25,7 +25,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // 2. Handle Event Notifications from Meta
     if (req.method === 'POST') {
-        // Log detalhado do corpo da requisição para depuração
         console.log("Webhook payload recebido:", JSON.stringify(req.body, null, 2));
 
         const { entry } = req.body;
@@ -44,99 +43,89 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 for (const change of item.changes) {
                     const { field, value } = change;
 
-                    console.log(`[LOG] Processando campo: '${field}'`);
                     if (field !== 'messages') {
-                        console.log(`[LOG] Ignorando campo '${field}', pois não é 'messages'.`);
                         continue;
                     }
                     
                     // ---- ATUALIZAÇÕES DE STATUS ----
                     if (value.statuses) {
-                        console.log(`[LOG] Processando ${value.statuses.length} atualização(ões) de status.`);
                         for (const status of value.statuses) {
-                             console.log(`[LOG] Atualizando status para a mensagem ${status.id} para: ${status.status}`);
-                            const newStatus = status.status;
-                            const updateData: TablesUpdate<'campaign_messages'> = { status: newStatus };
-                            if (newStatus === 'delivered') updateData.delivered_at = new Date(status.timestamp * 1000).toISOString();
-                            if (newStatus === 'read') updateData.read_at = new Date(status.timestamp * 1000).toISOString();
-                            
-                            const p1 = supabaseAdmin.from('campaign_messages').update(updateData).eq('meta_message_id', status.id).then(({ error }) => {
-                                if(error && error.code !== 'PGRST116') console.error("[ERRO] Erro ao atualizar status em campaign_messages:", error);
-                            });
-                            
-                            const sentMessagesUpdate: TablesUpdate<'sent_messages'> = { status: newStatus };
-                             if (newStatus === 'delivered') sentMessagesUpdate.delivered_at = new Date(status.timestamp * 1000).toISOString();
-                            if (newStatus === 'read') sentMessagesUpdate.read_at = new Date(status.timestamp * 1000).toISOString();
+                             const promise = (async () => {
+                                try {
+                                    const newStatus = status.status;
+                                    const updateData: TablesUpdate<'campaign_messages'> = { status: newStatus };
+                                    if (newStatus === 'delivered') updateData.delivered_at = new Date(status.timestamp * 1000).toISOString();
+                                    if (newStatus === 'read') updateData.read_at = new Date(status.timestamp * 1000).toISOString();
+                                    
+                                    await supabaseAdmin.from('campaign_messages').update(updateData).eq('meta_message_id', status.id);
+                                    
+                                    const sentMessagesUpdate: TablesUpdate<'sent_messages'> = { status: newStatus };
+                                    if (newStatus === 'delivered') sentMessagesUpdate.delivered_at = new Date(status.timestamp * 1000).toISOString();
+                                    if (newStatus === 'read') sentMessagesUpdate.read_at = new Date(status.timestamp * 1000).toISOString();
 
-                            const p2 = supabaseAdmin.from('sent_messages').update(sentMessagesUpdate).eq('meta_message_id', status.id).then(({ error }) => {
-                                if(error && error.code !== 'PGRST116') console.error("[ERRO] Erro ao atualizar status em sent_messages:", error);
-                            });
-
-                            processingPromises.push(p1, p2);
+                                    await supabaseAdmin.from('sent_messages').update(sentMessagesUpdate).eq('meta_message_id', status.id);
+                                } catch(e: any) {
+                                    console.error(`[ERRO] Falha ao processar atualização de status para a mensagem ${status.id}:`, e.message);
+                                }
+                            })();
+                            processingPromises.push(promise);
                         }
                     }
 
                     // ---- MENSAGENS RECEBIDAS ----
                     if (value.messages) {
-                         console.log(`[LOG] Processando ${value.messages.length} mensagem(ns) recebida(s).`);
                         for (const message of value.messages) {
                              const promise = (async () => {
-                                const wabaId = value.metadata.phone_number_id;
-                                console.log(`[LOG] Procurando perfil com meta_phone_number_id: ${wabaId}`);
+                                try {
+                                    const wabaId = value.metadata.phone_number_id;
+                                    console.log(`[LOG] Procurando perfil com meta_phone_number_id: ${wabaId}`);
 
-                                const { data: profileData, error: profileError } = await supabaseAdmin.from('profiles').select('id').eq('meta_phone_number_id', wabaId).single();
-                                
-                                if (profileError || !profileData) {
-                                    console.error(`[ERRO CRÍTICO] Perfil não encontrado para o wabaId ${wabaId}. Verifique a página de Configurações.`, JSON.stringify(profileError, null, 2));
-                                    return; // Para o processamento desta mensagem
-                                }
-                                const userId = (profileData as unknown as Tables<'profiles'>).id;
-                                console.log(`[LOG] Perfil encontrado com sucesso! user_id: ${userId}`);
-
-                                const { contact, isNew } = await findOrCreateContactByPhone(userId, message.from, value.contacts[0].profile.name);
-                                if (!contact) {
-                                    console.error(`[ERRO] Não foi possível encontrar ou criar o contato para o telefone ${message.from}.`);
-                                    return;
-                                }
-                                console.log(`[LOG] Contato processado: ID ${contact.id}, É Novo: ${isNew}`);
-
-
-                                let messageBody = `[${message.type}]`; // Padrão para mídias
-                                if (message.type === 'text') {
-                                    messageBody = message.text.body;
-                                } else if (message.type === 'interactive' && message.interactive?.button_reply) {
-                                    messageBody = `Botão Clicado: "${message.interactive.button_reply.title}"`;
-                                }
-                                console.log(`[LOG] Corpo da mensagem parseado: "${messageBody}"`);
-                                
-                                const receivedMessagePayload: TablesInsert<'received_messages'> = {
-                                   user_id: userId,
-                                   contact_id: contact.id,
-                                   meta_message_id: message.id,
-                                   message_body: messageBody
-                                };
-                                
-                                console.log("[LOG] Tentando inserir na tabela 'received_messages':", JSON.stringify(receivedMessagePayload));
-                                const { error: insertError } = await supabaseAdmin.from('received_messages').insert(receivedMessagePayload);
-                                if (insertError) {
-                                    console.error("[ERRO] ERRO ao inserir mensagem recebida:", JSON.stringify(insertError, null, 2));
-                                } else {
-                                    console.log("[LOG] Mensagem inserida com sucesso em 'received_messages'.");
-                                }
-                                
-                                // ---- Publica eventos para automações ----
-                                console.log("[LOG] Publicando eventos para a nova mensagem...");
-                                await publishEvent('message_received', userId, { contact, message });
-                                if (isNew) {
-                                    console.log("[LOG] Publicando eventos para novo contato...");
-                                    await publishEvent('contact_created', userId, { contact });
-                                    if (contact.tags && contact.tags.length > 0) {
-                                        await Promise.all(
-                                            contact.tags.map(tag => publishEvent('tag_added', userId, { contact, tag }))
-                                        );
+                                    const { data: profileData, error: profileError } = await supabaseAdmin.from('profiles').select('id').eq('meta_phone_number_id', wabaId).single();
+                                    
+                                    if (profileError || !profileData) {
+                                        throw new Error(`[ERRO CRÍTICO] Perfil não encontrado para o wabaId ${wabaId}. Verifique a página de Configurações. Erro: ${JSON.stringify(profileError, null, 2)}`);
                                     }
+                                    const userId = (profileData as unknown as Tables<'profiles'>).id;
+                                    console.log(`[LOG] Perfil encontrado com sucesso! user_id: ${userId}`);
+
+                                    const { contact, isNew } = await findOrCreateContactByPhone(userId, message.from, value.contacts[0].profile.name);
+                                    if (!contact) {
+                                        throw new Error(`[ERRO] Não foi possível encontrar ou criar o contato para o telefone ${message.from}.`);
+                                    }
+                                    console.log(`[LOG] Contato processado: ID ${contact.id}, É Novo: ${isNew}`);
+
+                                    let messageBody = `[${message.type}]`;
+                                    if (message.type === 'text') {
+                                        messageBody = message.text.body;
+                                    } else if (message.type === 'interactive' && message.interactive?.button_reply) {
+                                        messageBody = `Botão Clicado: "${message.interactive.button_reply.title}"`;
+                                    }
+                                    
+                                    const receivedMessagePayload: TablesInsert<'received_messages'> = {
+                                        user_id: userId,
+                                        contact_id: contact.id,
+                                        meta_message_id: message.id,
+                                        message_body: messageBody
+                                    };
+                                    
+                                    const { error: insertError } = await supabaseAdmin.from('received_messages').insert(receivedMessagePayload);
+                                    if (insertError) {
+                                        throw new Error(`[ERRO] ERRO ao inserir mensagem recebida: ${JSON.stringify(insertError, null, 2)}`);
+                                    }
+                                    console.log("[LOG] Mensagem inserida com sucesso em 'received_messages'.");
+                                    
+                                    await publishEvent('message_received', userId, { contact, message });
+                                    if (isNew) {
+                                        await publishEvent('contact_created', userId, { contact });
+                                        if (contact.tags && contact.tags.length > 0) {
+                                            await Promise.all(
+                                                contact.tags.map(tag => publishEvent('tag_added', userId, { contact, tag }))
+                                            );
+                                        }
+                                    }
+                                } catch(e: any) {
+                                     console.error(`[ERRO] Falha ao processar a mensagem ${message.id}:`, e.message);
                                 }
-                                console.log("[LOG] Processamento da mensagem individual concluído.");
                             })();
                             processingPromises.push(promise);
                         }
@@ -150,7 +139,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             console.error("[ERRO GERAL] Erro não tratado no processamento do webhook:", error.message, error.stack);
         }
         
-        return; // Resposta já enviada
+        return;
     }
 
     return res.status(405).send('Method Not Allowed');

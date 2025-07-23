@@ -1,5 +1,4 @@
 
-
 import { supabaseAdmin } from '../supabaseAdmin.js';
 import { executeAutomation, createDefaultLoggingHooks } from './engine.js';
 import { Automation, Contact, Json, Profile } from '../types.js';
@@ -10,11 +9,9 @@ type TriggerInfo = {
     node_id: string;
 };
 
-// Dispatches automations found by a trigger lookup.
 const dispatchAutomations = async (userId: string, triggers: TriggerInfo[], contact: Contact | null, triggerPayload: Json | null) => {
     if (triggers.length === 0) return;
 
-    // Fetch the user's profile which contains necessary configs (like Meta tokens)
     const { data: profile, error: profileError } = await supabaseAdmin
         .from('profiles')
         .select('*')
@@ -22,11 +19,10 @@ const dispatchAutomations = async (userId: string, triggers: TriggerInfo[], cont
         .single();
     
     if (profileError || !profile) {
-        console.error(`Trigger Dispatcher Error: Could not find profile for user ${userId}.`, profileError);
+        console.error(`[DISPATCHER] Erro: Perfil não encontrado para o usuário ${userId}.`, profileError);
         return;
     }
 
-    // Deduplicate by automation ID to prevent running the same automation multiple times for the same event
     const uniqueAutomationIds = [...new Set(triggers.map(t => t.automation_id))];
 
     const { data: automations, error } = await supabaseAdmin
@@ -35,7 +31,7 @@ const dispatchAutomations = async (userId: string, triggers: TriggerInfo[], cont
         .in('id', uniqueAutomationIds);
 
     if (error) {
-        console.error(`Trigger Dispatcher Error: Failed to fetch automations by IDs`, error);
+        console.error(`[DISPATCHER] Erro: Falha ao buscar automações.`, error);
         return;
     }
     
@@ -44,19 +40,22 @@ const dispatchAutomations = async (userId: string, triggers: TriggerInfo[], cont
     const executionPromises = triggers.map(trigger => {
         const rawAutomation = automationsMap.get(trigger.automation_id);
         if (rawAutomation) {
+            // VERIFICAÇÃO CRÍTICA DO STATUS
+            if (rawAutomation.status !== 'active') {
+                console.log(`[DISPATCHER] Ignorando automação '${rawAutomation.name}' (ID: ${rawAutomation.id}) pois está com status '${rawAutomation.status}'.`);
+                return Promise.resolve();
+            }
             const automation = sanitizeAutomation(rawAutomation);
-            console.log(`Dispatching automation '${automation.name}' (ID: ${automation.id}) starting from node ${trigger.node_id}`);
+            console.log(`[DISPATCHER] Despachando automação '${automation.name}' (ID: ${automation.id}) a partir do nó ${trigger.node_id}`);
             const hooks = createDefaultLoggingHooks(automation.id, contact ? contact.id : null);
-            // Return the promise from executeAutomation
             return executeAutomation(automation, contact, trigger.node_id, triggerPayload, hooks, profile as unknown as Profile);
         }
-        return Promise.resolve(); // Return a resolved promise for triggers without a matching automation
+        return Promise.resolve();
     });
 
     await Promise.all(executionPromises);
 };
 
-// Handles events related to incoming messages from Meta
 const handleMetaMessageEvent = async (userId: string, contact: Contact, message: any) => {
     const messageBody = message.type === 'text' 
         ? message.text.body.toLowerCase() 
@@ -65,44 +64,46 @@ const handleMetaMessageEvent = async (userId: string, contact: Contact, message:
         ? message.interactive.button_reply.id 
         : undefined;
 
-    const triggerLookups = [];
+    const matchingTriggers: TriggerInfo[] = [];
 
-    // Lookup for keyword triggers
-    if (messageBody) {
-        triggerLookups.push(
-            supabaseAdmin
-                .from('automation_triggers')
-                .select('automation_id, node_id')
-                .eq('user_id', userId)
-                .eq('trigger_type', 'message_received_with_keyword')
-                .eq('trigger_key', messageBody)
-        );
-    }
-    
-    // Lookup for button click triggers
     if (buttonPayload) {
-         triggerLookups.push(
-            supabaseAdmin
-                .from('automation_triggers')
-                .select('automation_id, node_id')
-                .eq('user_id', userId)
-                .eq('trigger_type', 'button_clicked')
-                .eq('trigger_key', buttonPayload)
-        );
+        const { data: buttonTriggers, error } = await supabaseAdmin
+            .from('automation_triggers')
+            .select('automation_id, node_id')
+            .eq('user_id', userId)
+            .eq('trigger_type', 'button_clicked')
+            .eq('trigger_key', buttonPayload);
+        
+        if (error) console.error("[HANDLER] Erro ao buscar gatilhos de botão:", error);
+        else if (buttonTriggers) matchingTriggers.push(...(buttonTriggers as unknown as TriggerInfo[]));
     }
 
-    if (triggerLookups.length === 0) return;
+    if (messageBody) {
+        const { data: allKeywordTriggers, error } = await supabaseAdmin
+            .from('automation_triggers')
+            .select('automation_id, node_id, trigger_key')
+            .eq('user_id', userId)
+            .eq('trigger_type', 'message_received_with_keyword');
+
+        if (error) {
+            console.error("[HANDLER] Erro ao buscar gatilhos de palavra-chave:", error);
+        } else if (allKeywordTriggers) {
+            console.log(`[HANDLER] Verificando ${allKeywordTriggers.length} gatilhos de palavra-chave para a mensagem: "${messageBody}"`);
+            for (const trigger of allKeywordTriggers) {
+                if (trigger.trigger_key && typeof trigger.trigger_key === 'string' && messageBody.includes(trigger.trigger_key.toLowerCase())) {
+                    console.log(`[HANDLER] Correspondência encontrada! Palavra-chave: "${trigger.trigger_key}". Despachando automação ${trigger.automation_id}`);
+                    matchingTriggers.push({ automation_id: trigger.automation_id, node_id: trigger.node_id });
+                }
+            }
+        }
+    }
     
-    const results = await Promise.all(triggerLookups);
-    const allTriggers: TriggerInfo[] = results.flatMap(res => res.error ? [] : (res.data as unknown as TriggerInfo[] || []));
-    
-    if (allTriggers.length > 0) {
+    if (matchingTriggers.length > 0) {
        const triggerData = { type: 'meta_message', payload: message };
-       await dispatchAutomations(userId, allTriggers, contact, triggerData);
+       await dispatchAutomations(userId, matchingTriggers, contact, triggerData);
     }
 };
 
-// Handles events for newly created contacts
 const handleNewContactEvent = async (userId: string, contact: Contact) => {
     const { data: triggers, error } = await supabaseAdmin
         .from('automation_triggers')
@@ -111,7 +112,7 @@ const handleNewContactEvent = async (userId: string, contact: Contact) => {
         .eq('trigger_type', 'new_contact');
         
     if (error) {
-        console.error(`handleNewContactEvent Error:`, error);
+        console.error(`[HANDLER] Erro em NewContactEvent:`, error);
         return;
     }
 
@@ -121,7 +122,6 @@ const handleNewContactEvent = async (userId: string, contact: Contact) => {
     }
 };
 
-// Handles events when a specific tag is added to a contact
 export const handleTagAddedEvent = async (userId: string, contact: Contact, addedTag: string) => {
     const { data: triggers, error } = await supabaseAdmin
         .from('automation_triggers')
@@ -131,7 +131,7 @@ export const handleTagAddedEvent = async (userId: string, contact: Contact, adde
         .ilike('trigger_key', addedTag);
         
     if (error) {
-        console.error(`handleTagAddedEvent Error:`, error);
+        console.error(`[HANDLER] Erro em TagAddedEvent:`, error);
         return;
     }
     
@@ -141,35 +141,23 @@ export const handleTagAddedEvent = async (userId: string, contact: Contact, adde
     }
 };
 
-/**
- * The central event bus for the application. All business events that can trigger automations
- * should be published through this function. It ensures a decoupled architecture where
- * event sources (like webhooks or API calls) don't need to know about the automation engine.
- * @param eventType A string identifying the business event (e.g., 'contact_created').
- * @param userId The ID of the user who owns the event.
- * @param data The payload associated with the event.
- */
 export const publishEvent = async (eventType: string, userId: string, data: any) => {
-    console.log(`Publishing event: ${eventType} for user ${userId}`);
+    console.log(`[EVENT BUS] Publicando evento: ${eventType} para o usuário ${userId}`);
     try {
         switch (eventType) {
             case 'message_received':
-                // data = { contact, message }
                 await handleMetaMessageEvent(userId, data.contact, data.message);
                 break;
             case 'contact_created':
-                // data = { contact }
                 await handleNewContactEvent(userId, data.contact);
                 break;
             case 'tag_added':
-                // data = { contact, tag }
                 await handleTagAddedEvent(userId, data.contact, data.tag);
                 break;
             default:
-                console.warn(`Unknown event type published: ${eventType}`);
+                console.warn(`[EVENT BUS] Tipo de evento desconhecido: ${eventType}`);
         }
     } catch (error) {
-        console.error(`Error processing event ${eventType}:`, error);
-        // Do not re-throw, to avoid crashing the caller (like a webhook response)
+        console.error(`[EVENT BUS] Erro ao processar o evento ${eventType}:`, error);
     }
 };
