@@ -1,11 +1,10 @@
-
-
 import React, { useContext } from 'react';
-import { AppContext } from '../../contexts/AppContext';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import { TEMPLATE_ICON, SEND_ICON, MAIL_CHECK_ICON, MAIL_OPEN_ICON } from '../../components/icons';
 import { CampaignWithMetrics } from '../../types';
+import { CampaignsContext } from '../../contexts/providers/CampaignsContext';
+import { NavigationContext } from '../../contexts/providers/NavigationContext';
 
 const CampaignCard: React.FC<{ campaign: CampaignWithMetrics; onViewDetails: () => void; }> = ({ campaign, onViewDetails }) => {
     const readRate = campaign.metrics.sent > 0 ? ((campaign.metrics.read / campaign.metrics.sent) * 100).toFixed(1) + '%' : '0.0%';
@@ -70,7 +69,8 @@ const CampaignCard: React.FC<{ campaign: CampaignWithMetrics; onViewDetails: () 
 };
 
 const Campaigns: React.FC = () => {
-    const { campaigns, setCurrentPage } = useContext(AppContext);
+    const { campaigns } = useContext(CampaignsContext);
+    const { setCurrentPage } = useContext(NavigationContext);
 
     return (
         <div className="space-y-8">

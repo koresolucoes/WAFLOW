@@ -1,8 +1,8 @@
 import React, { useState, useContext, useEffect } from 'react';
 import { EditableProfile } from '../../types';
-import { AppContext } from '../../contexts/AppContext';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
+import { AuthContext } from '../../contexts/providers/AuthContext';
 
 const ProfileInput: React.FC<{
     label: string;
@@ -44,7 +44,7 @@ const ProfileTextarea: React.FC<{
 );
 
 const CompanyProfile: React.FC = () => {
-  const { profile, updateProfile } = useContext(AppContext);
+  const { profile, updateProfile } = useContext(AuthContext);
   const [localProfile, setLocalProfile] = useState<EditableProfile | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isSaved, setIsSaved] = useState(false);

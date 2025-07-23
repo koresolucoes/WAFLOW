@@ -1,8 +1,9 @@
-
 import React, { useContext, useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { AppContext } from '../../contexts/AppContext';
 import Card from '../../components/common/Card';
+import { CampaignsContext } from '../../contexts/providers/CampaignsContext';
+import { ContactsContext } from '../../contexts/providers/ContactsContext';
+import { TemplatesContext } from '../../contexts/providers/TemplatesContext';
 
 const StatCard: React.FC<{ title: string; value: string; icon: React.ReactNode; }> = ({ title, value, icon }) => (
     <Card className="flex items-center p-4">
@@ -33,7 +34,10 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 const Dashboard: React.FC = () => {
-  const { campaigns, contacts, templates } = useContext(AppContext);
+  const { campaigns } = useContext(CampaignsContext);
+  const { contacts } = useContext(ContactsContext);
+  const { templates } = useContext(TemplatesContext);
+
 
   const { totalRecipients, totalRead, readRate } = useMemo(() => {
     const totalRecipients = campaigns.reduce((acc, c) => acc + c.recipient_count, 0);

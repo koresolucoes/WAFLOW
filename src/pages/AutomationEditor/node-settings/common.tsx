@@ -1,5 +1,3 @@
-
-
 import React, { useState, useRef, memo } from 'react';
 import { AutomationNode, MessageTemplate, Profile, AutomationNodeData } from '../../../types';
 

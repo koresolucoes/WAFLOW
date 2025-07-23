@@ -1,25 +1,24 @@
 import React, { useContext, useState, useEffect, useCallback, memo, FC, useMemo, useRef, createContext } from 'react';
 import { ReactFlow, ReactFlowProvider, useNodesState, useEdgesState, addEdge, Background, Controls, Handle, Position, type Node, type Edge, type Connection, type NodeProps, useReactFlow, NodeTypes, EdgeLabelRenderer, getBezierPath, type EdgeProps as XyEdgeProps, MarkerType, BackgroundVariant } from '@xyflow/react';
-import { AppContext } from '../../contexts/AppContext';
 import { Automation, AutomationNode, AutomationNodeData, AutomationNodeStats, AutomationNodeLog, TriggerType, ActionType, LogicType, AutomationStatus } from '../../types';
 import Button from '../../components/common/Button';
-import Card from '../../components/common/Card';
 import { supabase } from '../../lib/supabaseClient';
 import { nodeConfigs } from '../../lib/automation/nodeConfigs';
-import { Json } from '../../types/database.types';
 import NodeSettingsModal from './NodeSettingsModal';
 import NodeStats from './NodeStats';
 import NodeLogsModal from './NodeLogsModal';
 import { nodeIcons } from '../../lib/automation/nodeIcons';
 import Switch from '../../components/common/Switch';
 import { ALERT_TRIANGLE_ICON, ARROW_LEFT_ICON, TRASH_ICON } from '../../components/icons';
-
+import { AutomationsContext } from '../../contexts/providers/AutomationsContext';
+import { TemplatesContext } from '../../contexts/providers/TemplatesContext';
+import { ContactsContext } from '../../contexts/providers/ContactsContext';
+import { AuthContext } from '../../contexts/providers/AuthContext';
+import { NavigationContext } from '../../contexts/providers/NavigationContext';
 
 const initialNodes: AutomationNode[] = [];
 const initialEdges: Edge[] = [];
 
-// Create a context to pass callbacks down to custom nodes without prop drilling
-// or unstable instance mutations.
 const EditorContext = createContext<{
     onNodeLogsClick: (nodeId: string, nodeLabel: string) => void;
 } | null>(null);
@@ -106,7 +105,7 @@ const nodeStyles = {
 
 const CustomNode: FC<NodeProps<AutomationNode>> = memo(({ data, id, isConnectable }) => {
     const { onNodeLogsClick } = useContext(EditorContext)!;
-    const { automationStats } = useContext(AppContext);
+    const { automationStats } = useContext(AutomationsContext);
     const { setNodes } = useReactFlow();
     const { nodeType, type, label } = data;
     const Icon = nodeIcons[type] || nodeIcons.default;
@@ -242,7 +241,12 @@ const IconForType: FC<{ type: string, nodeType: string}> = ({ type, nodeType }) 
 // Main Component
 const AutomationEditor: FC = () => {
     // --- Hooks ---
-    const { pageParams, automations, templates, profile, updateAutomation, fetchAutomationStats, fetchNodeLogs, setCurrentPage, allTags } = useContext(AppContext);
+    const { automations, updateAutomation, fetchAutomationStats, fetchNodeLogs } = useContext(AutomationsContext);
+    const { templates } = useContext(TemplatesContext);
+    const { allTags } = useContext(ContactsContext);
+    const { profile } = useContext(AuthContext);
+    const { pageParams, setCurrentPage } = useContext(NavigationContext);
+
     const reactFlowWrapper = useRef<HTMLDivElement>(null);
     const { screenToFlowPosition } = useReactFlow();
 
@@ -314,7 +318,6 @@ const AutomationEditor: FC = () => {
         const config = nodeConfigs[type];
         if (!config || !reactFlowWrapper.current) return;
         
-        // This calculates the position inside the flow pane, not the screen
         const position = screenToFlowPosition({
             x: event.clientX,
             y: event.clientY,
@@ -330,8 +333,6 @@ const AutomationEditor: FC = () => {
     }, [screenToFlowPosition, setNodes]);
 
     // --- Effects ---
-    // This effect loads the automation from context, but ONLY when the ID changes.
-    // This prevents remote updates from overwriting local, unsaved changes (like node deletion).
     useEffect(() => {
         const currentAutomation = automations.find(a => a.id === pageParams.automationId);
         if (currentAutomation) {
@@ -342,10 +343,12 @@ const AutomationEditor: FC = () => {
                 fetchAutomationStats(currentAutomation.id);
                 loadedAutomationId.current = pageParams.automationId;
             }
+        } else {
+             const foundAutomation = automations.find(a => a.id === loadedAutomationId.current)
+             if(foundAutomation) setAutomation(foundAutomation)
         }
     }, [pageParams.automationId, automations, setNodes, setEdges, fetchAutomationStats]);
 
-    // This effect handles the real-time subscription for webhook data capture.
     useEffect(() => {
         if (!automation) return;
 
@@ -364,7 +367,6 @@ const AutomationEditor: FC = () => {
         return () => { supabase.removeChannel(channel); };
     }, [automation, setNodes]);
     
-    // --- Memos for derived state & validation ---
     const selectedNode = useMemo(() => {
         if (!selectedNodeId) return null;
         return nodes.find(n => n.id === selectedNodeId) as AutomationNode || null;
@@ -386,12 +388,10 @@ const AutomationEditor: FC = () => {
         return { isValid: true, reason: '' };
     }, [nodes, hasTriggerNode]);
 
-    // --- Early return for loading state ---
     if (!automation) {
         return <div className="flex items-center justify-center h-full w-full text-center text-white">Carregando automação...</div>;
     }
 
-    // --- Render ---
     return (
         <EditorContext.Provider value={contextValue}>
             <div className="w-full h-full flex bg-slate-900 overflow-hidden">
@@ -446,9 +446,6 @@ const AutomationEditor: FC = () => {
                     }}
                     node={selectedNode}
                     nodes={nodes}
-                    templates={templates}
-                    allTags={allTags}
-                    profile={profile}
                     onUpdateNodes={onUpdateNodes}
                     automationId={automation.id}
                 />

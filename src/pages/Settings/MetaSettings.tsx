@@ -1,15 +1,13 @@
-
-
 import React, { useState, useContext, useEffect } from 'react';
-import { AppContext } from '../../contexts/AppContext';
 import { Profile } from '../../types';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import InfoCard from '../../components/common/InfoCard';
 import { COPY_ICON } from '../../components/icons';
+import { AuthContext } from '../../contexts/providers/AuthContext';
 
 const MetaSettings: React.FC = () => {
-    const { profile, updateProfile } = useContext(AppContext);
+    const { profile, updateProfile } = useContext(AuthContext);
     const [localConfig, setLocalConfig] = useState({
         meta_access_token: '',
         meta_waba_id: '',

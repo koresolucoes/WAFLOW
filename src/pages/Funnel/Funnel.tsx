@@ -1,17 +1,15 @@
-
-
 import React, { useContext, useMemo, useState } from 'react';
-import { AppContext } from '../../contexts/AppContext';
 import StageColumn from './StageColumn';
 import { FUNNEL_ICON, PLUS_ICON } from '../../components/icons';
 import Button from '../../components/common/Button';
 import PipelineManagerModal from './PipelineManagerModal';
+import { FunnelContext } from '../../contexts/providers/FunnelContext';
 
 const Funnel: React.FC = () => {
     const { 
         pipelines, stages, deals, updateDealStage, createDefaultPipeline, 
         activePipelineId, setActivePipelineId, addStage,
-    } = useContext(AppContext);
+    } = useContext(FunnelContext);
 
     const [draggedDealId, setDraggedDealId] = useState<string | null>(null);
     const [isCreating, setIsCreating] = useState(false);

@@ -1,7 +1,6 @@
-
 import React, { useContext } from 'react';
 import { DealWithContact } from '../../types';
-import { AppContext } from '../../contexts/AppContext';
+import { NavigationContext } from '../../contexts/providers/NavigationContext';
 
 interface DealCardProps {
     deal: DealWithContact;
@@ -10,7 +9,7 @@ interface DealCardProps {
 }
 
 const DealCard: React.FC<DealCardProps> = ({ deal, onDragStart, isGhost }) => {
-    const { setCurrentPage } = useContext(AppContext);
+    const { setCurrentPage } = useContext(NavigationContext);
 
     const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
         onDragStart(deal.id);

@@ -1,9 +1,10 @@
 import React, { useContext, useEffect, useMemo, useState } from 'react';
-import { AppContext } from '../../contexts/AppContext';
 import { CampaignMessage, MessageTemplate } from '../../types';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import { ARROW_LEFT_ICON, SEND_ICON, MAIL_CHECK_ICON, MAIL_OPEN_ICON } from '../../components/icons';
+import { CampaignsContext } from '../../contexts/providers/CampaignsContext';
+import { NavigationContext } from '../../contexts/providers/NavigationContext';
 
 const StatCard: React.FC<{ title: string; value: string; icon: React.ReactNode; }> = ({ title, value, icon }) => (
     <Card className="flex items-center p-4">
@@ -54,7 +55,8 @@ const TemplatePreview: React.FC<{ template: MessageTemplate | null }> = ({ templ
 
 
 const CampaignDetails: React.FC = () => {
-    const { pageParams, setCurrentPage, campaignDetails, fetchCampaignDetails } = useContext(AppContext);
+    const { pageParams, setCurrentPage } = useContext(NavigationContext);
+    const { campaignDetails, fetchCampaignDetails } = useContext(CampaignsContext);
     const [isLoading, setIsLoading] = useState(true);
     
     useEffect(() => {

@@ -1,19 +1,23 @@
-
 import React, { useState, useContext, useMemo } from 'react';
 import { generateTemplateWithAI } from '../../services/geminiService';
 import { createMetaTemplate } from '../../services/meta/templates';
-import { AppContext } from '../../contexts/AppContext';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import { SPARKLES_ICON, PLUS_ICON, TRASH_ICON } from '../../components/icons';
 import { MessageTemplate, MessageTemplateInsert } from '../../types';
 import { MetaTemplateComponent, MetaButton } from '../../services/meta/types';
 import TemplatePreview from '../../components/common/TemplatePreview';
+import { TemplatesContext } from '../../contexts/providers/TemplatesContext';
+import { NavigationContext } from '../../contexts/providers/NavigationContext';
+import { AuthContext } from '../../contexts/providers/AuthContext';
 
 type EditableTemplate = Omit<MessageTemplateInsert, 'id' | 'user_id' | 'created_at' | 'status' | 'meta_id'>;
 
 const TemplateEditor: React.FC = () => {
-  const { profile, addTemplate, setCurrentPage, metaConfig, user } = useContext(AppContext);
+  const { addTemplate } = useContext(TemplatesContext);
+  const { setCurrentPage } = useContext(NavigationContext);
+  const { profile, metaConfig, user } = useContext(AuthContext);
+
   const [campaignGoal, setCampaignGoal] = useState('');
   const [template, setTemplate] = useState<EditableTemplate>({
     template_name: '',

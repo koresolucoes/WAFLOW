@@ -1,19 +1,19 @@
-
-
 import React, { useContext, useMemo } from 'react';
-import { AppContext } from '../../contexts/AppContext';
 import { Automation } from '../../types';
 import Card from '../../components/common/Card';
 import Switch from '../../components/common/Switch';
 import Button from '../../components/common/Button';
 import { TRASH_ICON } from '../../components/icons';
+import { AutomationsContext } from '../../contexts/providers/AutomationsContext';
+import { NavigationContext } from '../../contexts/providers/NavigationContext';
 
 interface AutomationCardProps {
     automation: Automation;
 }
 
 const AutomationCard: React.FC<AutomationCardProps> = ({ automation }) => {
-    const { updateAutomation, deleteAutomation, setCurrentPage } = useContext(AppContext);
+    const { updateAutomation, deleteAutomation } = useContext(AutomationsContext);
+    const { setCurrentPage } = useContext(NavigationContext);
 
     const handleStatusChange = async (checked: boolean) => {
         await updateAutomation({ ...automation, status: checked ? 'active' : 'paused' });

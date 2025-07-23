@@ -1,14 +1,12 @@
-
-
 import React, { useContext, useState } from 'react';
-import { AppContext } from '../../contexts/AppContext';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import { PLUS_ICON, AUTOMATION_ICON } from '../../components/icons';
 import AutomationCard from './AutomationCard';
+import { AutomationsContext } from '../../contexts/providers/AutomationsContext';
 
 const Automations: React.FC = () => {
-    const { automations, createAndNavigateToAutomation } = useContext(AppContext);
+    const { automations, createAndNavigateToAutomation } = useContext(AutomationsContext);
     const [isCreating, setIsCreating] = useState(false);
 
     const handleCreate = async () => {

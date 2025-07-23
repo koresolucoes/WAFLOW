@@ -1,11 +1,15 @@
 import React, { useContext, useState, useMemo, useEffect } from 'react';
-import { AppContext } from '../../contexts/AppContext';
 import { sendTemplatedMessage } from '../../services/meta/messages';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import Modal from '../../components/common/Modal';
 import { CampaignMessageInsert, Contact, MessageTemplate } from '../../types';
 import TemplatePreview from '../../components/common/TemplatePreview';
+import { TemplatesContext } from '../../contexts/providers/TemplatesContext';
+import { ContactsContext } from '../../contexts/providers/ContactsContext';
+import { CampaignsContext } from '../../contexts/providers/CampaignsContext';
+import { NavigationContext } from '../../contexts/providers/NavigationContext';
+import { AuthContext } from '../../contexts/providers/AuthContext';
 
 interface SendResult {
     success: boolean;
@@ -14,7 +18,12 @@ interface SendResult {
 }
 
 const NewCampaign: React.FC = () => {
-  const { pageParams, templates, contacts, addCampaign, setCurrentPage, metaConfig } = useContext(AppContext);
+  const { templates } = useContext(TemplatesContext);
+  const { contacts } = useContext(ContactsContext);
+  const { addCampaign } = useContext(CampaignsContext);
+  const { pageParams, setCurrentPage } = useContext(NavigationContext);
+  const { metaConfig } = useContext(AuthContext);
+  
   const [campaignName, setCampaignName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

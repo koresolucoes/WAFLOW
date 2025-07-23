@@ -1,6 +1,7 @@
 
+
 import { Session, User } from '@supabase/supabase-js';
-import { Database, Json } from './database.types';
+import { Database, Json, TablesInsert, TablesUpdate } from './database.types';
 import { MetaTemplateComponent } from '../services/meta/types';
 import type { Node as XyNode, Edge } from '@xyflow/react';
 
@@ -143,4 +144,4 @@ export interface MetaConfig {
 }
 
 // Tipos de Autenticação
-export type { Session, User, Edge, Json };
+export type { Session, User, Edge, Json, MetaTemplateComponent, TablesInsert, TablesUpdate };

@@ -1,19 +1,14 @@
-
-
-
-
-
-
-
 import React, { useContext, useState, useMemo } from 'react';
 import { MessageTemplate, TemplateStatus } from '../../types';
-import { AppContext } from '../../contexts/AppContext';
 import { getMetaTemplates } from '../../services/meta/templates';
 import { supabase } from '../../lib/supabaseClient';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import { SPARKLES_ICON } from '../../components/icons';
-import { Json, TablesInsert } from '../../types/database.types';
+import { Json } from '../../types/database.types';
+import { TemplatesContext } from '../../contexts/providers/TemplatesContext';
+import { NavigationContext } from '../../contexts/providers/NavigationContext';
+import { AuthContext } from '../../contexts/providers/AuthContext';
 
 const StatusBadge: React.FC<{ status: MessageTemplate['status'] }> = ({ status }) => {
     const statusStyles: Record<TemplateStatus, string> = {
@@ -58,7 +53,9 @@ const TemplateCard: React.FC<{ template: MessageTemplate; onUse: () => void }> =
 }
 
 const Templates: React.FC = () => {
-  const { templates, setTemplates, setCurrentPage, metaConfig, user } = useContext(AppContext);
+  const { templates, setTemplates } = useContext(TemplatesContext);
+  const { setCurrentPage } = useContext(NavigationContext);
+  const { metaConfig, user } = useContext(AuthContext);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);

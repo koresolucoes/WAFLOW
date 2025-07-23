@@ -1,6 +1,4 @@
-
-
-import React, { useMemo } from 'react';
+import React, { useMemo, useContext } from 'react';
 import { Node } from '@xyflow/react';
 import { AutomationNode, MessageTemplate, Profile, AutomationNodeData } from '../../types';
 import Button from '../../components/common/Button';
@@ -13,11 +11,11 @@ interface NodeSettingsModalProps {
     isOpen: boolean;
     onClose: () => void;
     nodes: AutomationNode[];
+    onUpdateNodes: (nodes: AutomationNode[], options?: { immediate?: boolean }) => Promise<void>;
+    automationId?: string;
     templates: MessageTemplate[];
     allTags: string[];
     profile: Profile | null;
-    onUpdateNodes: (nodes: AutomationNode[], options?: { immediate?: boolean }) => Promise<void>;
-    automationId?: string;
 }
 
 const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({ 
@@ -25,11 +23,11 @@ const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     isOpen, 
     onClose, 
     nodes, 
+    onUpdateNodes,
+    automationId,
     templates,
     allTags,
-    profile, 
-    onUpdateNodes,
-    automationId
+    profile
 }) => {
     
     const availableVariables = useMemo(() => getContextVariables(nodes), [nodes]);

@@ -1,9 +1,8 @@
-
 import React, { useState, useContext, useRef, useEffect } from 'react';
 import { PipelineStage, DealWithContact } from '../../types';
 import DealCard from './DealCard';
-import { AppContext } from '../../contexts/AppContext';
 import { TRASH_ICON } from '../../components/icons';
+import { FunnelContext } from '../../contexts/providers/FunnelContext';
 
 interface StageColumnProps {
     stage: PipelineStage;
@@ -14,7 +13,7 @@ interface StageColumnProps {
 }
 
 const StageColumn: React.FC<StageColumnProps> = ({ stage, deals, onDragStart, onDrop, draggedDealId }) => {
-    const { updateStage, deleteStage } = useContext(AppContext);
+    const { updateStage, deleteStage } = useContext(FunnelContext);
     const [isDragOver, setIsDragOver] = useState(false);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isEditing, setIsEditing] = useState(false);

@@ -1,9 +1,6 @@
-
-
-
-
 import React, { useContext, Suspense, lazy } from 'react';
-import { AppContext } from './contexts/AppContext';
+import { AuthContext } from './contexts/providers/AuthContext';
+import { NavigationContext } from './contexts/providers/NavigationContext';
 import MainLayout from './components/layout/MainLayout';
 
 const Auth = lazy(() => import('./pages/Auth/Auth'));
@@ -37,7 +34,8 @@ const FullPageSuspenseFallback = () => (
 );
 
 const App: React.FC = () => {
-  const { session, loading, currentPage } = useContext(AppContext);
+  const { session, loading } = useContext(AuthContext);
+  const { currentPage } = useContext(NavigationContext);
 
   const renderPage = () => {
     switch (currentPage) {

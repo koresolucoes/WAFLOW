@@ -1,15 +1,21 @@
-
 import React, { useContext, useEffect, useState } from 'react';
-import { AppContext } from '../../contexts/AppContext';
 import { Contact, DealInsert } from '../../types';
 import Button from '../../components/common/Button';
 import Card from '../../components/common/Card';
 import Modal from '../../components/common/Modal';
 import { ARROW_LEFT_ICON, PLUS_ICON } from '../../components/icons';
 import DealFormModal from '../../components/common/DealFormModal';
+import { ContactsContext } from '../../contexts/providers/ContactsContext';
+import { NavigationContext } from '../../contexts/providers/NavigationContext';
+import { FunnelContext } from '../../contexts/providers/FunnelContext';
+import { AuthContext } from '../../contexts/providers/AuthContext';
 
 const ContactDetails: React.FC = () => {
-    const { pageParams, setCurrentPage, contactDetails, fetchContactDetails, updateContact, addDeal, pipelines, stages } = useContext(AppContext);
+    const { pageParams, setCurrentPage } = useContext(NavigationContext);
+    const { contactDetails, fetchContactDetails, updateContact } = useContext(ContactsContext);
+    const { addDeal, pipelines, stages } = useContext(FunnelContext);
+    const { user } = useContext(AuthContext);
+
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [isDealModalOpen, setIsDealModalOpen] = useState(false);
@@ -82,14 +88,11 @@ const ContactDetails: React.FC = () => {
                 contact_id: contactDetails.id,
             });
             setIsDealModalOpen(false);
-            // Re-fetch details to show the new deal
             await fetchContactDetails(contactDetails.id);
         } catch(err: any) {
             alert(`Erro ao criar negócio: ${err.message}`)
         }
     }
-    
-    const { user } = useContext(AppContext);
 
     if (isLoading) return <div className="text-center text-white">Carregando detalhes do contato...</div>;
     if (!contactDetails || !localContact) return <div className="text-center text-white">Contato não encontrado.</div>;

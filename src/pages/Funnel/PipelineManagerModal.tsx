@@ -1,13 +1,12 @@
-
 import React, { useContext, useState } from 'react';
-import { AppContext } from '../../contexts/AppContext';
 import Modal from '../../components/common/Modal';
 import Button from '../../components/common/Button';
 import { TRASH_ICON } from '../../components/icons';
 import { Pipeline } from '../../types';
+import { FunnelContext } from '../../contexts/providers/FunnelContext';
 
 const PipelineManagerModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ isOpen, onClose }) => {
-    const { pipelines, addPipeline, updatePipeline, deletePipeline } = useContext(AppContext);
+    const { pipelines, addPipeline, updatePipeline, deletePipeline } = useContext(FunnelContext);
     const [newPipelineName, setNewPipelineName] = useState('');
     const [editingPipelineId, setEditingPipelineId] = useState<string | null>(null);
     const [editingName, setEditingName] = useState('');

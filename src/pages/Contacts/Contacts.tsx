@@ -1,14 +1,12 @@
-
-
-
 import React, { useContext, useState, useRef } from 'react';
-import { AppContext } from '../../contexts/AppContext';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import Modal from '../../components/common/Modal';
 import ContactForm from './ContactForm';
 import { Contact, EditableContact } from '../../types';
 import { PLUS_ICON, TRASH_ICON, CONTACTS_ICON, UPLOAD_ICON, FILE_TEXT_ICON } from '../../components/icons';
+import { ContactsContext } from '../../contexts/providers/ContactsContext';
+import { NavigationContext } from '../../contexts/providers/NavigationContext';
 
 const Tag: React.FC<{ children: React.ReactNode }> = ({ children }) => (
     <span className="mr-2 mb-2 inline-block px-2 py-1 text-xs font-semibold rounded-full bg-sky-500/20 text-sky-400">
@@ -39,7 +37,8 @@ const ContactRow: React.FC<{ contact: Contact; onViewDetails: () => void; onDele
 
 
 const Contacts: React.FC = () => {
-    const { contacts, addContact, updateContact, deleteContact, importContacts, setCurrentPage } = useContext(AppContext);
+    const { contacts, addContact, deleteContact, importContacts } = useContext(ContactsContext);
+    const { setCurrentPage } = useContext(NavigationContext);
     const [isFormModalOpen, setIsFormModalOpen] = useState(false);
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
