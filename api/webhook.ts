@@ -82,15 +82,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
                                     const { data: profileData, error: profileError } = await supabaseAdmin.from('profiles').select('id').eq('meta_phone_number_id', wabaId).single();
                                     
+                                    // LOG DE DIAGNÓSTICO ADICIONADO
+                                    console.log(`[DIAGNÓSTICO] Resultado da busca de perfil: profileData=${JSON.stringify(profileData)}, profileError=${JSON.stringify(profileError)}`);
+                                    
                                     if (profileError || !profileData) {
-                                        throw new Error(`[ERRO CRÍTICO] Perfil não encontrado para o wabaId ${wabaId}. Verifique a página de Configurações. Erro: ${JSON.stringify(profileError, null, 2)}`);
+                                        // Lógica de erro aprimorada para garantir o log
+                                        const errorMessage = `[ERRO CRÍTICO] Perfil não encontrado para o wabaId ${wabaId}. Verifique a página de Configurações. Erro do Supabase: ${JSON.stringify(profileError, null, 2)}`;
+                                        console.error(errorMessage);
+                                        return; // Interrompe o processamento desta mensagem específica
                                     }
                                     const userId = (profileData as unknown as Tables<'profiles'>).id;
                                     console.log(`[LOG] Perfil encontrado com sucesso! user_id: ${userId}`);
 
                                     const { contact, isNew } = await findOrCreateContactByPhone(userId, message.from, value.contacts[0].profile.name);
                                     if (!contact) {
-                                        throw new Error(`[ERRO] Não foi possível encontrar ou criar o contato para o telefone ${message.from}.`);
+                                        console.error(`[ERRO] Não foi possível encontrar ou criar o contato para o telefone ${message.from}.`);
+                                        return; // Interrompe
                                     }
                                     console.log(`[LOG] Contato processado: ID ${contact.id}, É Novo: ${isNew}`);
 
@@ -110,7 +117,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                                     
                                     const { error: insertError } = await supabaseAdmin.from('received_messages').insert(receivedMessagePayload);
                                     if (insertError) {
-                                        throw new Error(`[ERRO] ERRO ao inserir mensagem recebida: ${JSON.stringify(insertError, null, 2)}`);
+                                        console.error(`[ERRO] ERRO ao inserir mensagem recebida: ${JSON.stringify(insertError, null, 2)}`);
+                                        return; // Interrompe
                                     }
                                     console.log("[LOG] Mensagem inserida com sucesso em 'received_messages'.");
                                     
@@ -124,7 +132,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                                         }
                                     }
                                 } catch(e: any) {
-                                     console.error(`[ERRO] Falha ao processar a mensagem ${message.id}:`, e.message);
+                                     console.error(`[ERRO] Falha ao processar a mensagem ${message.id}:`, e.message, e.stack);
                                 }
                             })();
                             processingPromises.push(promise);
