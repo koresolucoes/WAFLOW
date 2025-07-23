@@ -1,8 +1,7 @@
 
 
-
 import { Session, User } from '@supabase/supabase-js';
-import { Json, Tables, TablesInsert, TablesUpdate } from './database.types';
+import { Database, Json } from './database.types';
 import { MetaTemplateComponent } from '../services/meta/types';
 import type { Node as XyNode, Edge } from '@xyflow/react';
 
@@ -21,7 +20,7 @@ export type AutomationLogStatus = 'success' | 'failed';
 export type NodeType = 'trigger' | 'action' | 'logic';
 
 // Tipos expandidos para corresponderem ao backend
-export type TriggerType = 'new_contact_with_tag' | 'message_received_with_keyword' | 'button_clicked' | 'new_contact' | 'webhook_received';
+export type TriggerType = 'tag_added' | 'message_received_with_keyword' | 'button_clicked' | 'new_contact' | 'webhook_received';
 export type ActionType = 'send_template' | 'add_tag' | 'remove_tag' | 'send_text_message' | 'send_media' | 'send_interactive_message' | 'set_custom_field' | 'send_webhook';
 export type LogicType = 'condition' | 'split_path';
 
@@ -37,38 +36,38 @@ export interface AutomationNodeData {
 export type AutomationNode = XyNode<AutomationNodeData>;
 
 // --- Plain object types to avoid TS recursion from generated types ---
-export type Profile = Tables<'profiles'>;
-export type Contact = Tables<'contacts'>;
+export type Profile = Database['public']['Tables']['profiles']['Row'];
+export type Contact = Database['public']['Tables']['contacts']['Row'];
 
-export type MessageTemplate = Omit<Tables<'message_templates'>, 'category' | 'status' | 'components'> & {
+export type MessageTemplate = Omit<Database['public']['Tables']['message_templates']['Row'], 'category' | 'status' | 'components'> & {
     category: TemplateCategory;
     status: TemplateStatus;
     components: MetaTemplateComponent[];
 };
 
-export type Campaign = Tables<'campaigns'> & {
+export type Campaign = Database['public']['Tables']['campaigns']['Row'] & {
     status: CampaignStatus;
 };
 
-export type CampaignMessage = Tables<'campaign_messages'> & {
+export type CampaignMessage = Database['public']['Tables']['campaign_messages']['Row'] & {
     status: MessageStatus;
 };
 
-export type Automation = Omit<Tables<'automations'>, 'nodes' | 'edges' | 'status'> & {
+export type Automation = Omit<Database['public']['Tables']['automations']['Row'], 'nodes' | 'edges' | 'status'> & {
     nodes: AutomationNode[];
     edges: Edge[];
     status: AutomationStatus;
 };
 
-export type Pipeline = Tables<'pipelines'>;
-export type PipelineStage = Tables<'pipeline_stages'>;
-export type Deal = Tables<'deals'>;
-export type Segment = Tables<'segments'>;
-export type SegmentRule = Tables<'segment_rules'>;
-export type ReceivedMessage = Tables<'received_messages'>;
-export type AutomationRun = Tables<'automation_runs'>;
-export type AutomationNodeStats = Tables<'automation_node_stats'>;
-export type AutomationNodeLog = Tables<'automation_node_logs'>;
+export type Pipeline = Database['public']['Tables']['pipelines']['Row'];
+export type PipelineStage = Database['public']['Tables']['pipeline_stages']['Row'];
+export type Deal = Database['public']['Tables']['deals']['Row'];
+export type Segment = Database['public']['Tables']['segments']['Row'];
+export type SegmentRule = Database['public']['Tables']['segment_rules']['Row'];
+export type ReceivedMessage = Database['public']['Tables']['received_messages']['Row'];
+export type AutomationRun = Database['public']['Tables']['automation_runs']['Row'];
+export type AutomationNodeStats = Database['public']['Tables']['automation_node_stats']['Row'];
+export type AutomationNodeLog = Database['public']['Tables']['automation_node_logs']['Row'];
 
 // --- END of Plain object types ---
 
@@ -78,7 +77,7 @@ export type DealWithContact = Deal & {
 };
 
 // --- INSERT TYPES ---
-export interface MessageTemplateInsert extends Omit<TablesInsert<'message_templates'>, 'category' | 'status' | 'components'> {
+export interface MessageTemplateInsert extends Omit<Database['public']['Tables']['message_templates']['Insert'], 'category' | 'status' | 'components'> {
     user_id: string;
     template_name: string;
     category: TemplateCategory;
@@ -87,11 +86,11 @@ export interface MessageTemplateInsert extends Omit<TablesInsert<'message_templa
     meta_id?: string | null;
 }
 
-export interface CampaignMessageInsert extends Omit<TablesInsert<'campaign_messages'>, 'status'> {
+export interface CampaignMessageInsert extends Omit<Database['public']['Tables']['campaign_messages']['Insert'], 'status'> {
   status: MessageStatus;
 }
 
-export interface AutomationInsert extends Omit<TablesInsert<'automations'>, 'status' | 'nodes' | 'edges'> {
+export interface AutomationInsert extends Omit<Database['public']['Tables']['automations']['Insert'], 'status' | 'nodes' | 'edges'> {
   user_id: string;
   name: string;
   status: AutomationStatus;
@@ -99,7 +98,7 @@ export interface AutomationInsert extends Omit<TablesInsert<'automations'>, 'sta
   edges: Edge[];
 }
 
-export type DealInsert = TablesInsert<'deals'>;
+export type DealInsert = Database['public']['Tables']['deals']['Insert'];
 
 // Tipos para formulários e operações específicas
 export type EditableContact = Omit<Contact, 'id' | 'user_id' | 'created_at'> & { id?: string };

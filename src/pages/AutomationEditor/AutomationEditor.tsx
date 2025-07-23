@@ -242,7 +242,7 @@ const IconForType: FC<{ type: string, nodeType: string}> = ({ type, nodeType }) 
 // Main Component
 const AutomationEditor: FC = () => {
     // --- Hooks ---
-    const { pageParams, automations, templates, profile, updateAutomation, fetchAutomationStats, fetchNodeLogs, setCurrentPage } = useContext(AppContext);
+    const { pageParams, automations, templates, profile, updateAutomation, fetchAutomationStats, fetchNodeLogs, setCurrentPage, allTags } = useContext(AppContext);
     const reactFlowWrapper = useRef<HTMLDivElement>(null);
     const { screenToFlowPosition } = useReactFlow();
 
@@ -447,6 +447,7 @@ const AutomationEditor: FC = () => {
                     node={selectedNode}
                     nodes={nodes}
                     templates={templates}
+                    allTags={allTags}
                     profile={profile}
                     onUpdateNodes={onUpdateNodes}
                     automationId={automation.id}

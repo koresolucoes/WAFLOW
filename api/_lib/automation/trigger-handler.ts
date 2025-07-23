@@ -94,7 +94,7 @@ const handleMetaMessageEvent = async (userId: string, contact: Contact, message:
     if (triggerLookups.length === 0) return;
     
     const results = await Promise.all(triggerLookups);
-    const allTriggers: TriggerInfo[] = results.flatMap(res => res.data || []);
+    const allTriggers: TriggerInfo[] = results.flatMap(res => res.error ? [] : (res.data || []));
     
     if (allTriggers.length > 0) {
        const triggerData = { type: 'meta_message', payload: message };
@@ -117,7 +117,7 @@ const handleNewContactEvent = async (userId: string, contact: Contact) => {
 
     if (triggers && triggers.length > 0) {
         const triggerData = { type: 'new_contact', payload: { contact } };
-        await dispatchAutomations(userId, triggers, contact, triggerData);
+        await dispatchAutomations(userId, triggers as TriggerInfo[], contact, triggerData);
     }
 };
 
@@ -127,7 +127,7 @@ export const handleTagAddedEvent = async (userId: string, contact: Contact, adde
         .from('automation_triggers')
         .select('automation_id, node_id')
         .eq('user_id', userId)
-        .eq('trigger_type', 'new_contact_with_tag')
+        .eq('trigger_type', 'tag_added')
         .ilike('trigger_key', addedTag);
         
     if (error) {
@@ -137,7 +137,7 @@ export const handleTagAddedEvent = async (userId: string, contact: Contact, adde
     
     if (triggers && triggers.length > 0) {
         const triggerData = { type: 'tag_added', payload: { contact, addedTag } };
-        await dispatchAutomations(userId, triggers, contact, triggerData);
+        await dispatchAutomations(userId, triggers as TriggerInfo[], contact, triggerData);
     }
 };
 

@@ -403,7 +403,7 @@ export const actionHandlers: Record<string, ActionHandler> = {
     'message_received_with_keyword': triggerHandler,
     'button_clicked': triggerHandler,
     'new_contact': triggerHandler,
-    'new_contact_with_tag': triggerHandler,
+    'tag_added': triggerHandler,
     'webhook_received': triggerHandler,
 
     // Actions

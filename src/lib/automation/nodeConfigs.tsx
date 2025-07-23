@@ -1,7 +1,4 @@
 
-
-
-
 import React from 'react';
 import { AutomationNodeData } from '../../types';
 import MetaTriggerSettings from '../../pages/AutomationEditor/node-settings/MetaTriggerSettings';
@@ -64,12 +61,12 @@ export const nodeConfigs: Record<string, NodeConfig> = {
         description: () => 'Quando um novo contato é criado.',
         isConfigured: () => true,
     },
-    'new_contact_with_tag': {
+    'tag_added': {
         label: 'Tag Adicionada a Contato',
         nodeType: 'trigger',
         data: {
             nodeType: 'trigger',
-            type: 'new_contact_with_tag',
+            type: 'tag_added',
             label: 'Tag Adicionada a Contato',
             config: { tag: '' }
         },

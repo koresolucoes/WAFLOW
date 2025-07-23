@@ -1,16 +1,39 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { NodeSettingsProps } from './common';
 import { InputWithVariables } from './common';
 
 const baseInputClass = "w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white placeholder-slate-400 focus:ring-2 focus:ring-sky-500 focus:border-sky-500";
 
-const MetaTriggerSettings: React.FC<NodeSettingsProps> = ({ node, onConfigChange, availableVariables }) => {
+const MetaTriggerSettings: React.FC<NodeSettingsProps> = ({ node, onConfigChange, availableVariables, allTags }) => {
     const { data } = node;
     const config = (data.config as any) || {};
 
+    const [isManualEntry, setIsManualEntry] = useState(false);
+    
+    useEffect(() => {
+        // If the saved tag is not in the list of known tags, and it's not empty, enable manual entry mode.
+        if (config.tag && allTags && !allTags.includes(config.tag)) {
+            setIsManualEntry(true);
+        } else {
+            setIsManualEntry(false);
+        }
+    }, [config.tag, allTags]);
+
+
     const handleConfigChange = (key: string, value: any) => {
         onConfigChange({ ...config, [key]: value });
+    };
+    
+    const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const value = e.target.value;
+        if (value === '__manual__') {
+            setIsManualEntry(true);
+            handleConfigChange('tag', ''); // Clear the tag when switching to manual
+        } else {
+            setIsManualEntry(false);
+            handleConfigChange('tag', value);
+        }
     };
 
     switch (data.type) {
@@ -44,18 +67,34 @@ const MetaTriggerSettings: React.FC<NodeSettingsProps> = ({ node, onConfigChange
                 </div>
             );
         
-        case 'new_contact_with_tag':
+        case 'tag_added':
+            const selectedValue = isManualEntry ? '__manual__' : config.tag || '';
             return (
                  <div>
                     <label className="block text-sm font-medium text-slate-300 mb-1">Nome da Tag</label>
-                    <InputWithVariables
-                        onValueChange={val => handleConfigChange('tag', val)}
-                        value={config.tag || ''}
-                        type="text"
-                        placeholder="Ex: vip"
+                    <select
+                        value={selectedValue}
+                        onChange={handleSelectChange}
                         className={baseInputClass}
-                        variables={availableVariables}
-                    />
+                    >
+                        <option value="">-- Selecione uma tag existente --</option>
+                        {allTags.map((tag: string) => <option key={tag} value={tag}>{tag}</option>)}
+                        <option value="__manual__">Digitar tag manualmente...</option>
+                    </select>
+
+                    {isManualEntry && (
+                        <div className="mt-2">
+                             <InputWithVariables
+                                onValueChange={val => handleConfigChange('tag', val)}
+                                value={config.tag || ''}
+                                type="text"
+                                placeholder="Digite a nova tag aqui"
+                                className={baseInputClass}
+                                variables={availableVariables}
+                                autoFocus
+                            />
+                        </div>
+                    )}
                      <p className="text-xs text-slate-400 mt-1">A automação iniciará quando esta tag for adicionada a um contato.</p>
                 </div>
             );

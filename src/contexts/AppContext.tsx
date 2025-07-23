@@ -27,6 +27,7 @@ interface AppContextType {
   setTemplates: React.Dispatch<React.SetStateAction<MessageTemplate[]>>;
 
   contacts: Contact[];
+  allTags: string[];
   addContact: (contact: EditableContact) => Promise<void>;
   updateContact: (contact: Contact) => Promise<void>;
   deleteContact: (contactId: string) => Promise<void>;
@@ -761,6 +762,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setStages(s => s.filter(stage => stage.id !== id));
   }, [user]);
 
+  const allTags = useMemo(() => {
+    const tagsSet = new Set<string>();
+    contacts.forEach(c => {
+        if(c.tags) {
+            c.tags.forEach(t => tagsSet.add(t));
+        }
+    });
+    return Array.from(tagsSet).sort();
+  }, [contacts]);
+
   const value: AppContextType = {
     session,
     user,
@@ -775,6 +786,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     addTemplate,
     setTemplates,
     contacts,
+    allTags,
     addContact,
     updateContact,
     deleteContact,

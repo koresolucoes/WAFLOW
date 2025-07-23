@@ -14,6 +14,7 @@ interface NodeSettingsModalProps {
     onClose: () => void;
     nodes: AutomationNode[];
     templates: MessageTemplate[];
+    allTags: string[];
     profile: Profile | null;
     onUpdateNodes: (nodes: AutomationNode[], options?: { immediate?: boolean }) => Promise<void>;
     automationId?: string;
@@ -24,7 +25,8 @@ const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     isOpen, 
     onClose, 
     nodes, 
-    templates, 
+    templates,
+    allTags,
     profile, 
     onUpdateNodes,
     automationId
@@ -79,6 +81,7 @@ const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
                        onConfigChange={handleConfigChange}
                        availableVariables={availableVariables}
                        templates={templates}
+                       allTags={allTags}
                        profile={profile}
                        automationId={automationId}
                     />

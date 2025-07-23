@@ -1,13 +1,10 @@
 
 
-
-
-
-import { Json as DbJson, Tables, TablesInsert, TablesUpdate } from './database.types.js';
+import { Json as DbJson, Database } from './database.types.js';
 import { MetaTemplateComponent } from './meta/types.js';
 
 export type Json = DbJson;
-export type { Tables, TablesInsert, TablesUpdate };
+export type { Tables, TablesInsert, TablesUpdate } from './database.types.js';
 
 // --- Backend-safe Flow Types ---
 export interface BackendNode<T = any> {
@@ -39,7 +36,7 @@ export type AutomationStatus = 'active' | 'paused';
 export type AutomationRunStatus = 'running' | 'success' | 'failed';
 export type NodeType = 'trigger' | 'action' | 'logic';
 
-export type TriggerType = 'new_contact_with_tag' | 'message_received_with_keyword' | 'button_clicked' | 'new_contact' | 'webhook_received';
+export type TriggerType = 'tag_added' | 'message_received_with_keyword' | 'button_clicked' | 'new_contact' | 'webhook_received';
 export type ActionType = 'send_template' | 'add_tag' | 'remove_tag' | 'send_text_message' | 'send_media' | 'send_interactive_message' | 'set_custom_field' | 'send_webhook';
 export type LogicType = 'condition' | 'split_path';
 
@@ -52,16 +49,16 @@ export interface NodeData {
 }
 
 // --- Plain object types to avoid TS recursion from generated types ---
-export type Profile = Tables<'profiles'>;
-export type Contact = Tables<'contacts'>;
+export type Profile = Database['public']['Tables']['profiles']['Row'];
+export type Contact = Database['public']['Tables']['contacts']['Row'];
 
-export type MessageTemplate = Omit<Tables<'message_templates'>, 'category' | 'status' | 'components'> & {
+export type MessageTemplate = Omit<Database['public']['Tables']['message_templates']['Row'], 'category' | 'status' | 'components'> & {
     category: TemplateCategory;
     status: TemplateStatus;
     components: MetaTemplateComponent[];
 };
 
-export type Automation = Omit<Tables<'automations'>, 'nodes' | 'edges' | 'status'> & {
+export type Automation = Omit<Database['public']['Tables']['automations']['Row'], 'nodes' | 'edges' | 'status'> & {
     nodes: AutomationNode[];
     edges: BackendEdge[];
     status: AutomationStatus;
