@@ -1,8 +1,7 @@
 
 
-
 import { supabaseAdmin } from '../supabaseAdmin.js';
-import { Contact, Profile, Json, TablesInsert, TablesUpdate } from '../types.js';
+import { Contact, Profile, Json, TablesInsert } from '../types.js';
 import { getValueFromPath } from '../automation/helpers.js';
 
 export const findOrCreateContactByPhone = async (user_id: string, phone: string, name: string): Promise<{ contact: Contact | null, isNew: boolean }> => {

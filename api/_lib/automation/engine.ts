@@ -1,6 +1,4 @@
 
-
-
 import { supabaseAdmin } from '../supabaseAdmin.js';
 import { Automation, Contact, Json, AutomationNode, Profile, TablesInsert } from '../types.js';
 import { actionHandlers } from './handlers/index.js';
@@ -37,7 +35,7 @@ export const createDefaultLoggingHooks = (automationId: string, contactId: strin
         await supabaseAdmin.from('automation_runs').update({ status, details } as any).eq('id', runId);
     });
 
-    hooks.addHandler('nodeExecuteBefore', async (node) => {
+    hooks.addHandler('nodeExecuteBefore', async (_node) => {
         // This could be used for more granular, real-time logging if needed in the future.
     });
 
