@@ -92,14 +92,17 @@ export const executeAutomation = async (
     const executionQueue: { node: AutomationNode; contextContact: Contact | null }[] = [];
     let currentContactState = contact;
 
-    // Find the initial nodes to execute from the trigger
-    const startingEdges = edgesMap.get(startNodeId) || [];
-    startingEdges.forEach((edge: any) => {
-        const nextNode = nodesMap.get(edge.target);
-        if (nextNode) {
-            executionQueue.push({ node: nextNode, contextContact: currentContactState });
-        }
-    });
+    // Start the execution with the trigger node itself.
+    const startNode = nodesMap.get(startNodeId);
+    if (startNode) {
+        executionQueue.push({ node: startNode, contextContact: currentContactState });
+    } else {
+        const error = new Error(`Start node with ID ${startNodeId} not found in automation ${automation.id}.`);
+        console.error(error.message);
+        await hooks.runHook('workflowExecuteAfter', 'failed', error.message);
+        return;
+    }
+    
 
     try {
         while (executionQueue.length > 0) {

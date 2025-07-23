@@ -1,9 +1,4 @@
 
-
-
-
-
-
 import { supabaseAdmin } from '../supabaseAdmin.js';
 import { sendTemplatedMessage, sendTextMessage, sendMediaMessage, sendInteractiveMessage } from '../meta/messages.js';
 import { AutomationNode, Contact, Json, MetaConfig, MessageTemplate, Profile, TablesUpdate } from '../types.js';
@@ -80,6 +75,20 @@ const getMetaConfig = (profile: Profile): MetaConfig => {
     }
     return metaConfig;
 };
+
+// ====================================================================================
+// Trigger Handler Implementation (NEW)
+// ====================================================================================
+
+/**
+ * A generic handler for all trigger nodes. Since the trigger's job is to start
+ * the workflow, this handler simply needs to acknowledge its successful execution
+ * so the engine can proceed to the next connected node.
+ */
+const triggerHandler: ActionHandler = async ({ node }) => {
+    return { details: `Gatilho '${node.data.label}' executado com sucesso.` };
+};
+
 
 // ====================================================================================
 // Action Handler Implementations
@@ -390,6 +399,14 @@ const splitPath: ActionHandler = async () => {
 // ====================================================================================
 
 export const actionHandlers: Record<string, ActionHandler> = {
+    // Triggers
+    'message_received_with_keyword': triggerHandler,
+    'button_clicked': triggerHandler,
+    'new_contact': triggerHandler,
+    'new_contact_with_tag': triggerHandler,
+    'webhook_received': triggerHandler,
+
+    // Actions
     'send_template': sendTemplate,
     'send_text_message': sendTextMessageAction,
     'send_media': sendMediaAction,
@@ -398,7 +415,8 @@ export const actionHandlers: Record<string, ActionHandler> = {
     'remove_tag': removeTag,
     'set_custom_field': setCustomField,
     'send_webhook': sendWebhook,
+
+    // Logic
     'condition': condition,
     'split_path': splitPath,
-    // Triggers don't have actions, so they are not included here.
 };
