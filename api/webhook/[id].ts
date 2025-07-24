@@ -1,9 +1,9 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
-import { TablesInsert, TablesUpdate } from '../_lib/types.js';
-import { publishEvent } from '../_lib/automation/trigger-handler.js';
-import { findOrCreateContactByPhone } from '../_lib/webhook/contact-mapper.js';
+import { supabaseAdmin } from '../_lib/supabaseAdmin';
+import { TablesInsert, TablesUpdate, Tables } from '../_lib/types';
+import { publishEvent } from '../_lib/automation/trigger-handler';
+import { findOrCreateContactByPhone } from '../_lib/webhook/contact-mapper';
 
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -100,12 +100,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
                         if (profileData.meta_phone_number_id !== String(phoneNumberId)) {
                              console.warn(`
-                                [AVISO DE INCOMPATIBILIDADE] Mensagem ignorada.
+                                [AVISO DE INCOMPATIBILIDADE] Mensagem processada, mas com aviso.
                                 O 'ID do número de telefone' recebido da Meta ('${phoneNumberId}') 
                                 não corresponde ao configurado para o usuário ${userId} ('${profileData.meta_phone_number_id}').
-                                Verifique suas configurações na Meta e no ZapFlow AI.
+                                Verifique suas configurações na Meta e no ZapFlow AI para garantir o funcionamento correto. A mensagem ainda será processada.
                             `);
-                            continue; // Pula este lote de mensagens
                         }
 
                         // O userId foi validado. Agora processa as mensagens.
@@ -132,7 +131,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                                         contact_id: contact.id,
                                         meta_message_id: message.id,
                                         message_body: messageBody
-                                    } as TablesInsert<'received_messages'>);
+                                    });
                                     
                                     await publishEvent('message_received', userId, { contact, message });
                                     if (isNew) {

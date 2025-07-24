@@ -552,15 +552,7 @@ export type Database = {
           updated_at?: string | null
           webhook_path_prefix?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "profiles_id_fkey"
-            columns: ["id"]
-            isOneToOne: true
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       received_messages: {
         Row: {

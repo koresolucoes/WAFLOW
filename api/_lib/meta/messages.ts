@@ -1,9 +1,7 @@
 
-
-
-import { MetaConfig } from "../types.js";
-import metaApiClient from "./apiClient.js";
-import { MetaMessagePayload } from "./types.js";
+import { MetaConfig } from "../types";
+import metaApiClient from "./apiClient";
+import { MetaMessagePayload } from "./types";
 
 interface SendMessageResponse {
     messaging_product: 'whatsapp';

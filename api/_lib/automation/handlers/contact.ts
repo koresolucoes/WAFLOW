@@ -1,9 +1,9 @@
 
-import { supabaseAdmin } from '../../supabaseAdmin.js';
-import { Contact, TablesUpdate } from '../../types.js';
-import { handleTagAddedEvent } from '../trigger-handler.js';
-import { ActionHandler } from '../types.js';
-import { resolveVariables } from '../helpers.js';
+import { supabaseAdmin } from '../../supabaseAdmin';
+import { Contact, TablesUpdate } from '../../types';
+import { handleTagAddedEvent } from '../trigger-handler';
+import { ActionHandler } from '../types';
+import { resolveVariables } from '../helpers';
 
 export const addTag: ActionHandler = async ({ contact, node, trigger }) => {
     if (!contact) {
@@ -21,7 +21,7 @@ export const addTag: ActionHandler = async ({ contact, node, trigger }) => {
         const updatePayload: TablesUpdate<'contacts'> = { tags: newTags };
         const { data: updatedContact, error } = await supabaseAdmin
             .from('contacts')
-            .update(updatePayload as never)
+            .update(updatePayload)
             .eq('id', contact.id)
             .select()
             .single();
@@ -46,7 +46,7 @@ export const removeTag: ActionHandler = async ({ contact, node, trigger }) => {
         const tagToRemove = resolveVariables(config.tag, { contact, trigger });
         const newTags = (contact.tags || []).filter(t => t !== tagToRemove);
         const updatePayload: TablesUpdate<'contacts'> = { tags: newTags };
-        const { data, error } = await supabaseAdmin.from('contacts').update(updatePayload as never).eq('id', contact.id).select().single();
+        const { data, error } = await supabaseAdmin.from('contacts').update(updatePayload).eq('id', contact.id).select().single();
         if (error) throw error;
         if (!data) throw new Error('Failed to update contact after removing tag.');
         return { updatedContact: data as unknown as Contact, details: `Tag '${tagToRemove}' removida do contato.` };
@@ -64,7 +64,7 @@ export const setCustomField: ActionHandler = async ({ contact, node, trigger }) 
         const fieldValue = resolveVariables(config.field_value || '', { contact, trigger });
         const newCustomFields = { ...(contact.custom_fields as object || {}), [fieldName]: fieldValue };
         const updatePayload: TablesUpdate<'contacts'> = { custom_fields: newCustomFields };
-        const { data, error } = await supabaseAdmin.from('contacts').update(updatePayload as never).eq('id', contact.id).select().single();
+        const { data, error } = await supabaseAdmin.from('contacts').update(updatePayload).eq('id', contact.id).select().single();
         if (error) throw error;
         if (!data) throw new Error('Failed to update contact after setting custom field.');
         return { updatedContact: data as unknown as Contact, details: `Campo '${fieldName}' atualizado para '${fieldValue}'.` };

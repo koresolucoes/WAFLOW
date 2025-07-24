@@ -76,7 +76,7 @@ const Templates: React.FC = () => {
     try {
         const metaTemplates = await getMetaTemplates(metaConfig);
 
-        const templatesToUpsert = metaTemplates.map(mt => ({
+        const templatesToUpsert: TablesInsert<'message_templates'>[] = metaTemplates.map(mt => ({
             meta_id: mt.id,
             user_id: user.id,
             template_name: mt.name,
@@ -86,7 +86,7 @@ const Templates: React.FC = () => {
         }));
         
         if (templatesToUpsert.length > 0) {
-            const { error: upsertError } = await supabase.from('message_templates').upsert(templatesToUpsert as TablesInsert<'message_templates'>[], { onConflict: 'meta_id, user_id' });
+            const { error: upsertError } = await supabase.from('message_templates').upsert(templatesToUpsert, { onConflict: 'meta_id, user_id' });
             if (upsertError) throw upsertError;
         }
 

@@ -1,13 +1,12 @@
 
-
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
-import { executeAutomation, createDefaultLoggingHooks } from '../_lib/automation/engine.js';
-import { publishEvent } from '../_lib/automation/trigger-handler.js';
-import { Automation, Profile } from '../_lib/types.js';
-import { getRawBody, parseMultipartFormData } from '../_lib/webhook/parser.js';
-import { processWebhookPayloadForContact } from '../_lib/webhook/contact-mapper.js';
-import { sanitizeAutomation } from '../_lib/automation/utils.js';
+import { supabaseAdmin } from '../_lib/supabaseAdmin';
+import { executeAutomation, createDefaultLoggingHooks } from '../_lib/automation/engine';
+import { publishEvent } from '../_lib/automation/trigger-handler';
+import { Automation, Profile } from '../_lib/types';
+import { getRawBody, parseMultipartFormData } from '../_lib/webhook/parser';
+import { processWebhookPayloadForContact } from '../_lib/webhook/contact-mapper';
+import { sanitizeAutomation } from '../_lib/automation/utils';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { id: rawId } = req.query;

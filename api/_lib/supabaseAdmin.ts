@@ -1,8 +1,6 @@
 
-
-
 import { createClient } from '@supabase/supabase-js';
-import { Database } from './database.types.js';
+import { Database } from './database.types';
 
 // These should be set in Vercel environment variables.
 // VITE_SUPABASE_URL is publicly available, SUPABASE_SERVICE_ROLE_KEY is secret.

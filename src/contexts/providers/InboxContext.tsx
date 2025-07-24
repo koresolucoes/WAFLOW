@@ -40,8 +40,8 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             setIsLoading(false);
             return;
         }
-
-        if (data) {
+        
+        if (data && Array.isArray(data)) {
             // CORREÇÃO: Mapeia corretamente a estrutura retornada pelo RPC.
             // O objeto 'last_message' já vem completo e aninhado.
             const fetchedConversations: Conversation[] = (data as any[]).map(item => ({
@@ -50,6 +50,8 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 unread_count: item.unread_count
             }));
             setConversations(fetchedConversations);
+        } else {
+            setConversations([]);
         }
         setIsLoading(false);
     }, [user]);
@@ -123,7 +125,7 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             const response = await sendTextMessage(metaConfig, contact.phone, text);
             const metaMessageId = response.messages[0].id;
 
-            const messagePayload: SentMessageInsert = {
+            const messagePayload: TablesInsert<'sent_messages'> = {
                 user_id: user.id,
                 contact_id: contactId,
                 content: text,
