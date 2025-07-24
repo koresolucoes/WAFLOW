@@ -16,7 +16,7 @@ const Auth: React.FC = () => {
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const captcha = useRef<HCaptcha>(null);
   
-  const sitekey = process.env.VITE_HCAPTCHA_SITEKEY;
+  const sitekey = import.meta.env.VITE_HCAPTCHA_SITEKEY;
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
