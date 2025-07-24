@@ -46,10 +46,17 @@ const ConversationListItem: React.FC<{ conversation: Conversation; isActive: boo
                         </p>
                     )}
                 </div>
-                <p className="text-sm text-slate-400 truncate">
-                    {conversation.last_message?.type === 'outbound' && 'Você: '}
-                    {truncate(conversation.last_message?.content, 30)}
-                </p>
+                <div className="flex justify-between items-start mt-0.5">
+                    <p className="text-sm text-slate-400 truncate pr-2">
+                        {conversation.last_message?.type === 'outbound' && 'Você: '}
+                        {truncate(conversation.last_message?.content, 30)}
+                    </p>
+                     {conversation.unread_count > 0 && (
+                        <span className="ml-2 flex-shrink-0 bg-sky-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                            {conversation.unread_count}
+                        </span>
+                    )}
+                </div>
             </div>
         </li>
     );
