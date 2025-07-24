@@ -4,9 +4,10 @@ import Button from '../../components/common/Button';
 import Modal from '../../components/common/Modal';
 import ContactForm from './ContactForm';
 import { Contact, EditableContact } from '../../types';
-import { PLUS_ICON, TRASH_ICON, CONTACTS_ICON, UPLOAD_ICON, FILE_TEXT_ICON } from '../../components/icons';
+import { PLUS_ICON, TRASH_ICON, CONTACTS_ICON, UPLOAD_ICON, FILE_TEXT_ICON, SEND_ICON } from '../../components/icons';
 import { ContactsContext } from '../../contexts/providers/ContactsContext';
 import { NavigationContext } from '../../contexts/providers/NavigationContext';
+import DirectMessageModal from './DirectMessageModal';
 
 const Tag: React.FC<{ children: React.ReactNode }> = ({ children }) => (
     <span className="mr-2 mb-2 inline-block px-2 py-1 text-xs font-semibold rounded-full bg-sky-500/20 text-sky-400">
@@ -37,10 +38,11 @@ const ContactRow: React.FC<{ contact: Contact; onViewDetails: () => void; onDele
 
 
 const Contacts: React.FC = () => {
-    const { contacts, addContact, deleteContact, importContacts } = useContext(ContactsContext);
+    const { contacts, addContact, deleteContact, importContacts, sendDirectMessages } = useContext(ContactsContext);
     const { setCurrentPage } = useContext(NavigationContext);
     const [isFormModalOpen, setIsFormModalOpen] = useState(false);
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+    const [isDirectMessageModalOpen, setIsDirectMessageModalOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -118,6 +120,19 @@ const Contacts: React.FC = () => {
         reader.readAsText(file);
     };
 
+    const handleSendDirect = async (message: string, recipients: Contact[]) => {
+        setIsLoading(true);
+        try {
+            await sendDirectMessages(message, recipients);
+            alert(`Mensagem enviada para ${recipients.length} contatos. Verifique a Caixa de Entrada para o status de envio.`);
+            setIsDirectMessageModalOpen(false);
+        } catch (err: any) {
+            alert(`Erro ao enviar mensagens: ${err.message}`);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     return (
         <div className="space-y-8">
             <div className="flex justify-between items-center">
@@ -130,9 +145,13 @@ const Contacts: React.FC = () => {
                         accept=".csv"
                         className="hidden"
                     />
-                    <Button variant="secondary" onClick={() => setIsImportModalOpen(true)} isLoading={isLoading}>
+                     <Button variant="secondary" onClick={() => setIsImportModalOpen(true)} isLoading={isLoading}>
                         <UPLOAD_ICON className="w-5 h-5 mr-2" />
                         Importar CSV
+                    </Button>
+                     <Button variant="secondary" onClick={() => setIsDirectMessageModalOpen(true)}>
+                        <SEND_ICON className="w-5 h-5 mr-2" />
+                        Enviar Mensagem
                     </Button>
                     <Button variant="primary" onClick={handleOpenFormModal}>
                         <PLUS_ICON className="w-5 h-5 mr-2" />
@@ -230,6 +249,15 @@ const Contacts: React.FC = () => {
                     </Button>
                 </div>
             </Modal>
+            
+            <DirectMessageModal
+                isOpen={isDirectMessageModalOpen}
+                onClose={() => setIsDirectMessageModalOpen(false)}
+                onSend={handleSendDirect}
+                contacts={contacts}
+                isSending={isLoading}
+            />
+
         </div>
     );
 };

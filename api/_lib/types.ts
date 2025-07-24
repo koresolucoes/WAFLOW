@@ -44,7 +44,7 @@ export interface NodeData {
   nodeType: NodeType;
   type: TriggerType | ActionType | LogicType;
   label: string;
-  config: Json;
+  config: any;
 }
 
 // --- Plain object types to avoid TS recursion from generated types ---

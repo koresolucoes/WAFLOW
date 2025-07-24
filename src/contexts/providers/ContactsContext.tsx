@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabaseClient';
 import { Contact, EditableContact, ContactWithDetails, Deal } from '../../types';
 import { TablesInsert, TablesUpdate } from '../../types/database.types';
 import { AuthContext } from './AuthContext';
+import { sendTextMessage } from '../../services/meta/messages';
 
 interface ContactsContextType {
   contacts: Contact[];
@@ -16,6 +17,7 @@ interface ContactsContextType {
   deleteContact: (contactId: string) => Promise<void>;
   importContacts: (newContacts: EditableContact[]) => Promise<{ importedCount: number; skippedCount: number }>;
   fetchContactDetails: (contactId: string) => Promise<void>;
+  sendDirectMessages: (message: string, recipients: Contact[]) => Promise<void>;
 }
 
 export const ContactsContext = createContext<ContactsContextType>(null!);
@@ -50,7 +52,7 @@ const normalizePhoneNumber = (phone: string): string => {
 
 
 export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    const { user } = useContext(AuthContext);
+    const { user, metaConfig } = useContext(AuthContext);
     const [contacts, setContacts] = useState<Contact[]>([]);
     const [contactDetails, setContactDetails] = useState<ContactWithDetails | null>(null);
 
@@ -193,6 +195,45 @@ export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }
         return { importedCount: contactsToInsert.length, skippedCount: skippedCount };
     }, [user, contacts]);
     
+    const sendDirectMessages = useCallback(async (message: string, recipients: Contact[]) => {
+        if (!user) throw new Error("Usuário não autenticado.");
+        if (!metaConfig.accessToken || !metaConfig.phoneNumberId) throw new Error("Configuração da Meta ausente.");
+
+        const messagesToInsert: TablesInsert<'sent_messages'>[] = [];
+        const promises = recipients.map(contact => (async () => {
+            try {
+                const response = await sendTextMessage(metaConfig, contact.phone, message);
+                messagesToInsert.push({
+                    user_id: user.id,
+                    contact_id: contact.id,
+                    content: message,
+                    meta_message_id: response.messages[0].id,
+                    status: 'sent',
+                    source: 'direct_bulk',
+                });
+            } catch (err: any) {
+                console.error(`Falha ao enviar mensagem direta para ${contact.name}: ${err.message}`);
+                messagesToInsert.push({
+                    user_id: user.id,
+                    contact_id: contact.id,
+                    content: message,
+                    status: 'failed',
+                    error_message: err.message,
+                    source: 'direct_bulk',
+                });
+            }
+        })());
+        
+        await Promise.all(promises);
+
+        if (messagesToInsert.length > 0) {
+            const { error } = await supabase.from('sent_messages').insert(messagesToInsert);
+            if (error) {
+                console.error("Falha ao salvar registros de mensagens diretas enviadas:", error);
+            }
+        }
+    }, [user, metaConfig]);
+
     const allTags = useMemo(() => {
         const tagsSet = new Set<string>();
         contacts.forEach(c => {
@@ -214,6 +255,7 @@ export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }
         deleteContact,
         importContacts,
         fetchContactDetails,
+        sendDirectMessages,
     };
 
     return (

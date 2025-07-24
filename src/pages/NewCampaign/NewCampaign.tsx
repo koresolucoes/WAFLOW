@@ -1,5 +1,6 @@
 import React, { useContext, useState, useMemo, useEffect } from 'react';
 import { sendTemplatedMessage } from '../../services/meta/messages';
+import { getMetaTemplateById } from '../../services/meta/templates';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import Modal from '../../components/common/Modal';
@@ -139,6 +140,17 @@ const NewCampaign: React.FC = () => {
     const results: SendResult[] = [];
 
     try {
+      if (!template.meta_id) {
+        throw new Error(`Este template não está sincronizado com a Meta. Por favor, sincronize seus templates e tente novamente.`);
+      }
+
+      let metaTemplateDetails: { name: string; language: string; };
+      try {
+          metaTemplateDetails = await getMetaTemplateById(metaConfig, template.meta_id);
+      } catch (err: any) {
+          throw new Error(`Falha ao verificar o template na Meta: ${err.message}. Certifique-se de que o template existe e está aprovado.`);
+      }
+        
       const messagesToInsert: Omit<CampaignMessageInsert, 'campaign_id'>[] = [];
       
       const promises = recipients.map(contact => (async () => {
@@ -195,7 +207,8 @@ const NewCampaign: React.FC = () => {
             const response = await sendTemplatedMessage(
                 metaConfig,
                 contact.phone,
-                template.template_name,
+                metaTemplateDetails.name,
+                metaTemplateDetails.language,
                 finalComponents.length > 0 ? finalComponents : undefined
             );
           

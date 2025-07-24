@@ -18,6 +18,24 @@ export const getMetaTemplates = async (config: MetaConfig): Promise<MetaTemplate
 };
 
 /**
+ * Busca os detalhes de um template específico pelo seu ID da Meta.
+ * @param config - Configuração da API da Meta.
+ * @param templateId - O ID do template na plataforma da Meta (não o ID do banco de dados).
+ * @returns Os detalhes do template, incluindo nome e idioma.
+ */
+export const getMetaTemplateById = async (config: MetaConfig, templateId: string): Promise<Pick<MetaTemplate, 'name' | 'language'>> => {
+    if (!templateId) throw new Error("O ID do template da Meta é necessário.");
+
+    // A API retorna um objeto que inclui nome e idioma.
+    const response = await metaApiClient<{ name: string; language: string; }>(
+        config,
+        `/${templateId}?fields=name,language`
+    );
+    return { name: response.name, language: response.language };
+};
+
+
+/**
  * Cria um novo template de mensagem na plataforma da Meta.
  * @param config - Configuração da API da Meta.
  * @param template - O template a ser criado.

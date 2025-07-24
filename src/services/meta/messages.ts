@@ -1,4 +1,5 @@
 
+
 import { MetaConfig } from "../../types";
 import metaApiClient from "./apiClient";
 import { MetaMessagePayload } from "./types";
@@ -15,6 +16,7 @@ interface SendMessageResponse {
  * @param config - Configuração da API da Meta.
  * @param to - Número de telefone do destinatário no formato internacional (ex: 5511999998888).
  * @param templateName - O nome do template a ser enviado.
+ * @param languageCode - O código de idioma do template (ex: 'pt_BR').
  * @param components - Array de componentes para substituir variáveis no template.
  * @returns A resposta da API da Meta.
  */
@@ -22,6 +24,7 @@ export const sendTemplatedMessage = async (
     config: MetaConfig,
     to: string,
     templateName: string,
+    languageCode: string,
     components?: any[]
 ): Promise<SendMessageResponse> => {
     if (!config.phoneNumberId) throw new Error("ID do Número de Telefone não configurado.");
@@ -35,7 +38,7 @@ export const sendTemplatedMessage = async (
         template: {
             name: templateName,
             language: {
-                code: 'pt_BR'
+                code: languageCode
             },
             components,
         }
