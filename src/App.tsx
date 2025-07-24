@@ -1,6 +1,7 @@
 
+
 import React, { useContext, Suspense, lazy } from 'react';
-import { AuthContext } from './contexts/providers/AuthContext';
+import { useAuthStore } from './stores/authStore';
 import { NavigationContext } from './contexts/providers/NavigationContext';
 import MainLayout from './components/layout/MainLayout';
 
@@ -36,7 +37,8 @@ const FullPageSuspenseFallback = () => (
 );
 
 const App: React.FC = () => {
-  const { session, loading } = useContext(AuthContext);
+  const session = useAuthStore(state => state.session);
+  const loading = useAuthStore(state => state.loading);
   const { currentPage } = useContext(NavigationContext);
 
   const renderPage = () => {

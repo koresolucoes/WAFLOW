@@ -1,18 +1,17 @@
 
+
+
 import React, { useContext, useEffect, useState, useCallback, ReactNode } from 'react';
-import { supabase } from '../../lib/supabaseClient';
-import { AuthContext } from './AuthContext';
+import { useAuthStore } from '../../stores/authStore';
 import { TemplatesContext } from './TemplatesContext';
 import { ContactsContext } from './ContactsContext';
 import { CampaignsContext } from './CampaignsContext';
 import { AutomationsContext } from './AutomationsContext';
 import { FunnelContext } from './FunnelContext';
-import { Campaign, CampaignWithMetrics, MessageStatus, TemplateCategory, TemplateStatus, AutomationStatus, Edge, AutomationNode } from '../../types';
-import { MetaTemplateComponent } from '../../services/meta/types';
-import { Tables } from '../../types/database.types';
+import { fetchAllInitialData } from '../../services/dataService';
 
 export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    const { user } = useContext(AuthContext);
+    const user = useAuthStore(state => state.user);
     const { setTemplates } = useContext(TemplatesContext);
     const { setContacts } = useContext(ContactsContext);
     const { setCampaigns } = useContext(CampaignsContext);
@@ -22,81 +21,25 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const [loading, setLoading] = useState(false);
     const [dataLoadedForUser, setDataLoadedForUser] = useState<string | null>(null);
     
-    const fetchCampaignsWithMetrics = useCallback(async (campaignsData: Campaign[]) => {
-        const campaignsWithMetrics: CampaignWithMetrics[] = await Promise.all(
-            campaignsData.map(async (campaign) => {
-                const { data, error, count } = await supabase
-                    .from('campaign_messages')
-                    .select('status', { count: 'exact', head: false })
-                    .eq('campaign_id', campaign.id);
-
-                if (error) {
-                    console.error(`Error fetching metrics for campaign ${campaign.id}:`, error);
-                    return { ...campaign, recipient_count: campaign.recipient_count || 0, metrics: { sent: campaign.recipient_count || 0, delivered: 0, read: 0 } };
-                }
-                
-                const typedData = (data as unknown as { status: MessageStatus }[]) || [];
-                const delivered = typedData.filter(d => d.status === 'delivered' || d.status === 'read').length;
-                const read = typedData.filter(d => d.status === 'read').length;
-
-                return {
-                    ...campaign,
-                    recipient_count: campaign.recipient_count || 0,
-                    metrics: { sent: count || campaign.recipient_count || 0, delivered, read }
-                };
-            })
-        );
-        setCampaigns(campaignsWithMetrics);
-    }, [setCampaigns]);
-
     const fetchInitialData = useCallback(async () => {
         if (!user) return;
         setLoading(true);
         
         try {
-            const [templatesRes, contactsRes, campaignsRes, automationsRes, pipelinesRes, stagesRes, dealsRes] = await Promise.all([
-                supabase.from('message_templates').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
-                supabase.from('contacts').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
-                supabase.from('campaigns').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
-                supabase.from('automations').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
-                supabase.from('pipelines').select('*').eq('user_id', user.id).order('created_at', { ascending: true }),
-                supabase.from('pipeline_stages').select('*, pipelines!inner(user_id)').eq('pipelines.user_id', user.id),
-                supabase.from('deals').select('*, contacts(id, name)').eq('user_id', user.id).order('created_at', { ascending: false }),
-            ]);
-
-            if (templatesRes.data) {
-                setTemplates(((templatesRes.data as unknown as Tables<'message_templates'>[]) || []).map(t => ({
-                    ...t,
-                    category: t.category as TemplateCategory,
-                    status: t.status as TemplateStatus,
-                    components: (t.components as unknown as MetaTemplateComponent[]) || [],
-                } as any)));
-            }
-
-            if (contactsRes.data) setContacts(contactsRes.data as any);
-            if (campaignsRes.data) await fetchCampaignsWithMetrics(campaignsRes.data as any);
+            const data = await fetchAllInitialData(user.id);
             
-            if (automationsRes.data){
-                const automationsData = automationsRes.data as unknown as Tables<'automations'>[];
-                const sanitizedAutomations = automationsData.map((a) => ({
-                    ...a,
-                    nodes: (Array.isArray(a.nodes) ? a.nodes : []) as unknown as AutomationNode[],
-                    edges: (Array.isArray(a.edges) ? a.edges : []) as unknown as Edge[],
-                    status: a.status as AutomationStatus,
-                }));
-                setAutomations(sanitizedAutomations as any);
-            }
-            
-            if (pipelinesRes.data) {
-                const typedPipelines = pipelinesRes.data as any[];
-                setPipelines(typedPipelines);
-                if (typedPipelines.length > 0 && !activePipelineId) {
-                    setActivePipelineId(typedPipelines[0].id);
+            if (data.templates) setTemplates(data.templates);
+            if (data.contacts) setContacts(data.contacts);
+            if (data.campaigns) setCampaigns(data.campaigns);
+            if (data.automations) setAutomations(data.automations);
+            if (data.pipelines) {
+                setPipelines(data.pipelines);
+                 if (data.pipelines.length > 0 && !activePipelineId) {
+                    setActivePipelineId(data.pipelines[0].id);
                 }
             }
-            
-            if (stagesRes.data) setStages(stagesRes.data as any);
-            if (dealsRes.data) setDeals(dealsRes.data as any);
+            if (data.stages) setStages(data.stages);
+            if (data.deals) setDeals(data.deals);
 
         } catch (err) {
             console.error("A critical error occurred during initial data fetch:", (err as any).message || err);
@@ -104,7 +47,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             setLoading(false);
             setDataLoadedForUser(user.id);
         }
-    }, [user, activePipelineId, fetchCampaignsWithMetrics, setTemplates, setContacts, setAutomations, setPipelines, setStages, setDeals, setActivePipelineId]);
+    }, [user, activePipelineId, setTemplates, setContacts, setCampaigns, setAutomations, setPipelines, setStages, setDeals, setActivePipelineId]);
 
     useEffect(() => {
         if (user && user.id !== dataLoadedForUser) {

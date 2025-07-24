@@ -96,7 +96,7 @@ const handleMetaMessageEvent = async (userId: string, contact: Contact, message:
             console.error("[HANDLER] Erro ao buscar gatilhos de palavra-chave:", error);
         } else if (allKeywordTriggers) {
             console.log(`[HANDLER] Verificando ${allKeywordTriggers.length} gatilhos de palavra-chave para a mensagem: "${messageBody}"`);
-            for (const trigger of allKeywordTriggers) {
+            for (const trigger of allKeywordTriggers as any[]) {
                 if (trigger.trigger_key && typeof trigger.trigger_key === 'string' && messageBody.includes(trigger.trigger_key.toLowerCase())) {
                     console.log(`[HANDLER] Correspondência encontrada! Palavra-chave: "${trigger.trigger_key}". Despachando automação ${trigger.automation_id}`);
                     matchingTriggers.push({ automation_id: trigger.automation_id, node_id: trigger.node_id });

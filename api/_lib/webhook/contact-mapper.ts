@@ -9,26 +9,15 @@ const normalizePhoneNumber = (phone: string): string => {
     // 1. Strip all non-numeric characters.
     let digits = phone.replace(/\D/g, '');
 
-    // 2. Remove the optional leading '0' for DDD.
-    if (digits.length > 10 && digits.startsWith('0')) {
-        digits = digits.substring(1);
-    }
-
-    // 3. Handle country code (55 for Brazil).
-    // If it has 10 or 11 digits, it's likely a local number (DDD + number). Prepend 55.
+    // 2. If it's a local number (e.g., 11987654321 or 3132345678), add the Brazilian country code.
+    // 10 digits = DDD (2) + 8-digit number
+    // 11 digits = DDD (2) + 9-digit number
     if (digits.length === 10 || digits.length === 11) {
         digits = '55' + digits;
     }
     
-    // 4. Add the '9' for mobiles if missing (full old number is 12 digits: 55 + DDD + 8-digit number)
-    if (digits.length === 12 && digits.startsWith('55')) {
-        const areaCode = digits.substring(2, 4);
-        const numberPart = digits.substring(4);
-        if (parseInt(areaCode) >= 11) {
-             digits = `55${areaCode}9${numberPart}`;
-        }
-    }
-    
+    // 3. Return the cleaned number. Do not attempt to add the 9th digit, as numbers from Meta
+    // should already be in the correct E.164 format. This prevents corrupting valid numbers.
     return digits;
 };
 
@@ -47,7 +36,7 @@ export const findOrCreateContactByPhone = async (user_id: string, phone: string,
         const { data: newContact, error: insertError } = await supabaseAdmin
             .from('contacts')
             .insert(newContactPayload as any)
-            .select()
+            .select('*')
             .single();
         if (insertError || !newContact) {
              console.error("Error creating new contact:", insertError);

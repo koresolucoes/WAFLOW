@@ -1,11 +1,11 @@
 
 
+
 import React, { createContext, useState, useCallback, ReactNode, useContext, useEffect } from 'react';
 import { supabase } from '../../lib/supabaseClient';
-import { Campaign, CampaignWithMetrics, CampaignMessageInsert, CampaignWithDetails, CampaignMessageWithContact, CampaignStatus, MessageStatus, TemplateCategory, TemplateStatus } from '../../types';
-import { MetaTemplateComponent } from '../../services/meta/types';
-import { Tables, TablesInsert } from '../../types/database.types';
-import { AuthContext } from './AuthContext';
+import { Campaign, CampaignWithMetrics, CampaignMessageInsert, CampaignWithDetails, CampaignStatus, MessageStatus, Tables } from '../../types';
+import { useAuthStore } from '../../stores/authStore';
+import { fetchCampaignDetailsFromDb, addCampaignToDb, deleteCampaignFromDb } from '../../services/campaignService';
 
 interface CampaignsContextType {
   campaigns: CampaignWithMetrics[];
@@ -20,91 +20,25 @@ interface CampaignsContextType {
 export const CampaignsContext = createContext<CampaignsContextType>(null!);
 
 export const CampaignsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { user } = useContext(AuthContext);
+  const user = useAuthStore(state => state.user);
   const [campaigns, setCampaigns] = useState<CampaignWithMetrics[]>([]);
   const [campaignDetails, setCampaignDetails] = useState<CampaignWithDetails | null>(null);
 
   const fetchCampaignDetails = useCallback(async (campaignId: string) => {
     if (!user) return;
-    setCampaignDetails(null);
-
     try {
-      const { data: campaignData, error: campaignError } = await supabase
-        .from('campaigns')
-        .select('*, message_templates(*)')
-        .eq('id', campaignId)
-        .eq('user_id', user.id)
-        .single();
-        
-      if (campaignError || !campaignData) {
-        throw campaignError || new Error("Campanha não encontrada ou acesso negado.");
-      }
-      
-      const { data: messagesData, error: messagesError } = await supabase
-        .from('campaign_messages')
-        .select('*, contacts(name, phone)')
-        .eq('campaign_id', campaignId)
-        .order('created_at', { ascending: true });
-        
-      if (messagesError) throw messagesError;
-
-      const typedMessagesData = (messagesData as unknown as CampaignMessageWithContact[]) || [];
-      const delivered = typedMessagesData.filter(d => d.status === 'delivered' || d.status === 'read').length;
-      const read = typedMessagesData.filter(d => d.status === 'read').length;
-      
-      const campaignDataTyped = campaignData as unknown as (Tables<'campaigns'> & { message_templates: Tables<'message_templates'> | null });
-      const message_template_data = campaignDataTyped.message_templates;
-
-
-      setCampaignDetails({
-        ...(campaignDataTyped as unknown as Campaign),
-        messages: typedMessagesData,
-        status: campaignDataTyped.status as CampaignStatus,
-        message_templates: message_template_data ? {
-            ...(message_template_data as any),
-            category: message_template_data.category as TemplateCategory,
-            status: message_template_data.status as TemplateStatus,
-            components: (message_template_data.components as unknown as MetaTemplateComponent[]) || []
-        } : null,
-        metrics: {
-          sent: campaignDataTyped.recipient_count || 0,
-          delivered,
-          read
-        }
-      });
-
+        const details = await fetchCampaignDetailsFromDb(user.id, campaignId);
+        setCampaignDetails(details);
     } catch (err) {
-      console.error("Error fetching campaign details:", (err as any).message || err);
-      throw err;
+        console.error("Error in Campaign Context fetching details:", (err as any).message || err);
+        throw err;
     }
   }, [user]);
   
   const addCampaign = useCallback(async (campaign: Omit<Campaign, 'id' | 'user_id' | 'sent_at' | 'created_at' | 'recipient_count' | 'status'> & {status: CampaignStatus}, messages: Omit<CampaignMessageInsert, 'campaign_id'>[]) => {
     if (!user) throw new Error("User not authenticated.");
     
-    const now = new Date().toISOString();
-    const campaignPayload: TablesInsert<'campaigns'> = {
-        ...campaign,
-        user_id: user.id,
-        created_at: now,
-        sent_at: campaign.status === 'Sent' ? now : undefined,
-        recipient_count: messages.length,
-        status: campaign.status
-    };
-    const { data: newCampaignData, error: campaignError } = await supabase.from('campaigns').insert(campaignPayload as any).select('*').single();
-
-    if (campaignError) throw campaignError;
-    const newCampaign = newCampaignData as unknown as Tables<'campaigns'>;
-    if (!newCampaign) throw new Error("Failed to create campaign.");
-
-    const messagesToInsert = messages.map(msg => ({ ...msg, campaign_id: newCampaign.id }));
-    const { error: messagesError } = await supabase.from('campaign_messages').insert(messagesToInsert as any);
-
-    if (messagesError) {
-        await supabase.from('campaigns').delete().eq('id', newCampaign.id);
-        throw messagesError;
-    }
-    
+    const newCampaign = await addCampaignToDb(user.id, campaign, messages);
     const sentCount = messages.filter(m => m.status !== 'failed').length;
 
     const newCampaignWithMetrics: CampaignWithMetrics = {
@@ -117,19 +51,7 @@ export const CampaignsProvider: React.FC<{ children: ReactNode }> = ({ children 
   const deleteCampaign = useCallback(async (campaignId: string) => {
     if (!user) throw new Error("User not authenticated.");
 
-    const { error: messagesError } = await supabase
-        .from('campaign_messages')
-        .delete()
-        .eq('campaign_id', campaignId);
-    
-    if (messagesError) throw messagesError;
-
-    const { error: campaignError } = await supabase
-        .from('campaigns')
-        .delete()
-        .eq('id', campaignId);
-
-    if (campaignError) throw campaignError;
+    await deleteCampaignFromDb(user.id, campaignId);
 
     setCampaigns(prev => prev.filter(c => c.id !== campaignId));
     if (campaignDetails?.id === campaignId) {

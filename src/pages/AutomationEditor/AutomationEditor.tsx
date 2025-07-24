@@ -13,7 +13,7 @@ import { ALERT_TRIANGLE_ICON, ARROW_LEFT_ICON, TRASH_ICON } from '../../componen
 import { AutomationsContext } from '../../contexts/providers/AutomationsContext';
 import { TemplatesContext } from '../../contexts/providers/TemplatesContext';
 import { ContactsContext } from '../../contexts/providers/ContactsContext';
-import { AuthContext } from '../../contexts/providers/AuthContext';
+import { useAuthStore } from '../../stores/authStore';
 import { NavigationContext } from '../../contexts/providers/NavigationContext';
 
 const initialNodes: AutomationNode[] = [];
@@ -244,7 +244,7 @@ const AutomationEditor: FC = () => {
     const { automations, updateAutomation, fetchAutomationStats, fetchNodeLogs } = useContext(AutomationsContext);
     const { templates } = useContext(TemplatesContext);
     const { allTags } = useContext(ContactsContext);
-    const { profile } = useContext(AuthContext);
+    const profile = useAuthStore(state => state.profile);
     const { pageParams, setCurrentPage } = useContext(NavigationContext);
 
     const reactFlowWrapper = useRef<HTMLDivElement>(null);

@@ -5,7 +5,7 @@ import { Profile, TablesInsert } from '../types.js';
 export async function getProfileForWebhook(userId: string): Promise<Profile | null> {
     let { data: profileData, error: profileError } = await supabaseAdmin
         .from('profiles')
-        .select()
+        .select('*')
         .eq('id', userId)
         .single();
 
@@ -26,7 +26,7 @@ export async function getProfileForWebhook(userId: string): Promise<Profile | nu
         const { data: newProfile, error: newProfileError } = await supabaseAdmin
             .from('profiles')
             .insert(newProfilePayload as any)
-            .select()
+            .select('*')
             .single();
             
         if (newProfileError || !newProfile) {

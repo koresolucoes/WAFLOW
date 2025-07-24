@@ -1,6 +1,6 @@
 
+
 import React, { ReactNode } from 'react';
-import { AuthProvider } from './providers/AuthContext';
 import { NavigationProvider } from './providers/NavigationContext';
 import { DataProvider } from './providers/DataProvider';
 import { TemplatesProvider } from './providers/TemplatesContext';
@@ -12,24 +12,22 @@ import { InboxProvider } from './providers/InboxContext';
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     return (
-        <AuthProvider>
-            <NavigationProvider>
-                <TemplatesProvider>
-                    <ContactsProvider>
-                        <CampaignsProvider>
-                            <AutomationsProvider>
-                                <FunnelProvider>
-                                    <InboxProvider>
-                                        <DataProvider>
-                                            {children}
-                                        </DataProvider>
-                                    </InboxProvider>
-                                </FunnelProvider>
-                            </AutomationsProvider>
-                        </CampaignsProvider>
-                    </ContactsProvider>
-                </TemplatesProvider>
-            </NavigationProvider>
-        </AuthProvider>
+        <NavigationProvider>
+            <TemplatesProvider>
+                <ContactsProvider>
+                    <CampaignsProvider>
+                        <AutomationsProvider>
+                            <FunnelProvider>
+                                <InboxProvider>
+                                    <DataProvider>
+                                        {children}
+                                    </DataProvider>
+                                </InboxProvider>
+                            </FunnelProvider>
+                        </AutomationsProvider>
+                    </CampaignsProvider>
+                </ContactsProvider>
+            </TemplatesProvider>
+        </NavigationProvider>
     );
 };

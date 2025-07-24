@@ -1,10 +1,10 @@
-import React, { useContext } from 'react';
+import React from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import Button from '../common/Button';
-import { AuthContext } from '../../contexts/providers/AuthContext';
+import { useAuthStore } from '../../stores/authStore';
 
 const Header: React.FC = () => {
-  const { user } = useContext(AuthContext);
+  const user = useAuthStore(state => state.user);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();

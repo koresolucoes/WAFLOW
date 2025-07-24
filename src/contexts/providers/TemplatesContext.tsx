@@ -1,50 +1,32 @@
 
 import React, { createContext, useState, useCallback, ReactNode, useContext } from 'react';
-import { supabase } from '../../lib/supabaseClient';
-import { MessageTemplate, MessageTemplateInsert, TemplateCategory, TemplateStatus, Json } from '../../types';
-import { TablesInsert } from '../../types/database.types';
-import { MetaTemplateComponent } from '../../services/meta/types';
-import { AuthContext } from './AuthContext';
+import { MessageTemplate, MessageTemplateInsert } from '../../types';
+import { useAuthStore, useMetaConfig } from '../../stores/authStore';
+import { createTemplateOnMetaAndDb } from '../../services/templateService';
 
 interface TemplatesContextType {
   templates: MessageTemplate[];
   setTemplates: React.Dispatch<React.SetStateAction<MessageTemplate[]>>;
-  addTemplate: (template: MessageTemplateInsert) => Promise<void>;
+  createTemplate: (templateData: Omit<MessageTemplateInsert, 'id' | 'user_id' | 'created_at' | 'status' | 'meta_id'>) => Promise<void>;
 }
 
 export const TemplatesContext = createContext<TemplatesContextType>(null!);
 
 export const TemplatesProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { user } = useContext(AuthContext);
+  const user = useAuthStore(state => state.user);
+  const metaConfig = useMetaConfig();
   const [templates, setTemplates] = useState<MessageTemplate[]>([]);
 
-  const addTemplate = useCallback(async (template: MessageTemplateInsert) => {
+  const createTemplate = useCallback(async (templateData: Omit<MessageTemplateInsert, 'id' | 'user_id' | 'created_at' | 'status' | 'meta_id'>) => {
     if (!user) throw new Error("User not authenticated.");
-    
-    const dbTemplate: TablesInsert<'message_templates'> = {
-        ...template,
-        components: template.components as unknown as Json,
-    };
-    
-    const { data, error } = await supabase
-      .from('message_templates')
-      .insert(dbTemplate as any)
-      .select()
-      .single();
-    if (error) throw error;
-    if (data) {
-        const newTemplateData = data as any;
-        const newTemplate: MessageTemplate = {
-            ...newTemplateData,
-            category: newTemplateData.category as TemplateCategory,
-            status: newTemplateData.status as TemplateStatus,
-            components: (newTemplateData.components as unknown as MetaTemplateComponent[]) || []
-        };
-        setTemplates(prev => [newTemplate, ...prev]);
-    }
-  }, [user]);
+    if (!metaConfig.wabaId || !metaConfig.accessToken) throw new Error("Meta configuration is missing.");
 
-  const value = { templates, setTemplates, addTemplate };
+    const newTemplate = await createTemplateOnMetaAndDb(metaConfig, templateData, user.id);
+    setTemplates(prev => [newTemplate, ...prev]);
+
+  }, [user, metaConfig]);
+
+  const value = { templates, setTemplates, createTemplate };
   
   return (
       <TemplatesContext.Provider value={value}>

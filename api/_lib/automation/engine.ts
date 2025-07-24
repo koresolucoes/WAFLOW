@@ -53,7 +53,7 @@ export const createDefaultLoggingHooks = (automationId: string, contactId: strin
         await supabaseAdmin.from('automation_node_logs').insert(logPayload as any);
         
         // Increment the success/error counter for the node
-        await supabaseAdmin.rpc('increment_node_stat' as any, {
+        await supabaseAdmin.rpc('increment_node_stat', {
             p_automation_id: automationId,
             p_node_id: node.id,
             p_status: status,

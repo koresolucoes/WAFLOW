@@ -3,7 +3,7 @@ import { Contact, DealInsert } from '../../types';
 import { ContactsContext } from '../../contexts/providers/ContactsContext';
 import { FunnelContext } from '../../contexts/providers/FunnelContext';
 import { NavigationContext } from '../../contexts/providers/NavigationContext';
-import { AuthContext } from '../../contexts/providers/AuthContext';
+import { useAuthStore } from '../../stores/authStore';
 import Button from '../../components/common/Button';
 import Card from '../../components/common/Card';
 import DealFormModal from '../../components/common/DealFormModal';
@@ -29,7 +29,7 @@ const ContactPanel: React.FC<{ contactId: string }> = ({ contactId }) => {
     const { contacts, updateContact } = useContext(ContactsContext);
     const { deals, addDeal, pipelines, stages } = useContext(FunnelContext);
     const { setCurrentPage } = useContext(NavigationContext);
-    const { user } = useContext(AuthContext);
+    const user = useAuthStore(state => state.user);
 
     const [localContact, setLocalContact] = useState<Contact | null>(null);
     const [tagInput, setTagInput] = useState('');

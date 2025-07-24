@@ -1,11 +1,10 @@
 
 
+
 import React, { createContext, useState, useCallback, ReactNode, useContext, useMemo } from 'react';
-import { supabase } from '../../lib/supabaseClient';
-import { Contact, EditableContact, ContactWithDetails, Deal } from '../../types';
-import { TablesInsert, TablesUpdate } from '../../types/database.types';
-import { AuthContext } from './AuthContext';
-import { sendTextMessage } from '../../services/meta/messages';
+import { Contact, EditableContact, ContactWithDetails } from '../../types';
+import { useAuthStore, useMetaConfig } from '../../stores/authStore';
+import * as contactService from '../../services/contactService';
 
 interface ContactsContextType {
   contacts: Contact[];
@@ -23,37 +22,9 @@ interface ContactsContextType {
 
 export const ContactsContext = createContext<ContactsContextType>(null!);
 
-const normalizePhoneNumber = (phone: string): string => {
-    if (!phone) return '';
-    // 1. Strip all non-numeric characters.
-    let digits = phone.replace(/\D/g, '');
-
-    // 2. Remove the optional leading '0' for DDD.
-    if (digits.length > 10 && digits.startsWith('0')) {
-        digits = digits.substring(1);
-    }
-
-    // 3. Handle country code (55 for Brazil).
-    // If it has 10 or 11 digits, it's likely a local number (DDD + number). Prepend 55.
-    if (digits.length === 10 || digits.length === 11) {
-        digits = '55' + digits;
-    }
-    
-    // 4. Add the '9' for mobiles if missing (full old number is 12 digits: 55 + DDD + 8-digit number)
-    if (digits.length === 12 && digits.startsWith('55')) {
-        const areaCode = digits.substring(2, 4);
-        const numberPart = digits.substring(4);
-        if (parseInt(areaCode) >= 11) {
-             digits = `55${areaCode}9${numberPart}`;
-        }
-    }
-    
-    return digits;
-};
-
-
 export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    const { user, metaConfig } = useContext(AuthContext);
+    const user = useAuthStore(state => state.user);
+    const metaConfig = useMetaConfig();
     const [contacts, setContacts] = useState<Contact[]>([]);
     const [contactDetails, setContactDetails] = useState<ContactWithDetails | null>(null);
 
@@ -61,29 +32,8 @@ export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }
         if (!user) return;
         setContactDetails(null);
         try {
-            const { data: contactData, error: contactError } = await supabase
-                .from('contacts')
-                .select('*')
-                .eq('id', contactId)
-                .eq('user_id', user.id)
-                .single();
-
-            if (contactError || !contactData) {
-                throw contactError || new Error("Contato não encontrado ou acesso negado.");
-            }
-
-            const { data: dealsData, error: dealsError } = await supabase
-                .from('deals')
-                .select('*')
-                .eq('contact_id', contactId);
-            
-            if (dealsError) throw dealsError;
-            
-            setContactDetails({
-                ...(contactData as unknown as Contact),
-                deals: (dealsData as unknown as Deal[]) || []
-            });
-
+            const details = await contactService.fetchContactDetailsFromDb(user.id, contactId);
+            setContactDetails(details);
         } catch (err) {
             console.error("Error fetching contact details:", (err as any).message || err);
             throw err;
@@ -92,19 +42,17 @@ export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }
 
     const addContact = useCallback(async (contact: EditableContact) => {
         if (!user) throw new Error("User not authenticated.");
-        const payload: TablesInsert<'contacts'> = { ...contact, phone: normalizePhoneNumber(contact.phone), user_id: user.id };
-        const { data, error } = await supabase.from('contacts').insert(payload as any).select('*').single();
-        if (error) throw error;
-        if(data) {
-          const newContact = data as unknown as Contact;
-          setContacts(prev => [newContact, ...prev]);
-          
-          fetch('/api/run-trigger', {
+        
+        const newContact = await contactService.addContactToDb(user.id, contact);
+        setContacts(prev => [newContact, ...prev]);
+        
+        // Post-DB side effect
+        fetch('/api/run-trigger', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ eventType: 'contact_created', userId: user.id, contactId: newContact.id })
-          }).catch(err => console.error("Failed to call contact_created trigger API", err));
-        }
+        }).catch(err => console.error("Failed to call contact_created trigger API", err));
+
     }, [user]);
   
     const updateContact = useCallback(async (updatedContact: Contact) => {
@@ -114,125 +62,55 @@ export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }
             ? contactDetails
             : contacts.find(c => c.id === updatedContact.id);
 
-        const updatePayload: TablesUpdate<'contacts'> = {
-            name: updatedContact.name,
-            phone: normalizePhoneNumber(updatedContact.phone),
-            email: updatedContact.email,
-            company: updatedContact.company,
-            tags: updatedContact.tags,
-            custom_fields: updatedContact.custom_fields,
-        };
+        const newContact = await contactService.updateContactInDb(user.id, updatedContact);
+        setContacts(prev => prev.map(c => c.id === newContact.id ? newContact : c));
+        
+        if(contactDetails?.id === newContact.id) {
+            setContactDetails(prev => prev ? { ...prev, ...newContact } : null)
+        }
 
-        const { data, error } = await supabase
-            .from('contacts')
-            .update(updatePayload as any)
-            .eq('id', updatedContact.id)
-            .eq('user_id', user.id)
-            .select('*')
-            .single();
+        const oldTags = new Set(oldContact?.tags || []);
+        const newTags = newContact.tags || [];
+        const addedTags = newTags.filter(tag => !oldTags.has(tag));
 
-        if (error) throw error;
-        if(data) {
-            const newContact = data as unknown as Contact;
-            setContacts(prev => prev.map(c => c.id === newContact.id ? newContact : c));
-            
-            if(contactDetails?.id === newContact.id) {
-                setContactDetails(prev => prev ? { ...prev, ...newContact } : null)
-            }
-
-            const oldTags = new Set(oldContact?.tags || []);
-            const newTags = newContact.tags || [];
-            const addedTags = newTags.filter(tag => !oldTags.has(tag));
-
-            if (addedTags.length > 0) {
-                fetch('/api/run-trigger', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ eventType: 'tags_added', userId: user.id, contactId: newContact.id, data: { addedTags } })
-                }).catch(err => console.error("Failed to call tags_added trigger API", err));
-            }
+        if (addedTags.length > 0) {
+            fetch('/api/run-trigger', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ eventType: 'tags_added', userId: user.id, contactId: newContact.id, data: { addedTags } })
+            }).catch(err => console.error("Failed to call tags_added trigger API", err));
         }
     }, [user, contacts, contactDetails]);
 
     const deleteContact = useCallback(async (contactId: string) => {
         if (!user) throw new Error("User not authenticated.");
-        const { error } = await supabase.from('contacts').delete().eq('id', contactId).eq('user_id', user.id);
-        if (error) throw error;
+        await contactService.deleteContactFromDb(user.id, contactId);
         setContacts(prev => prev.filter(c => c.id !== contactId));
     }, [user]);
     
     const importContacts = useCallback(async (newContacts: EditableContact[]): Promise<{ importedCount: number; skippedCount: number }> => {
         if (!user) throw new Error("User not authenticated.");
         
-        const existingPhones = new Set(contacts.map(c => normalizePhoneNumber(c.phone)));
-        const contactsToInsert: TablesInsert<'contacts'>[] = [];
-        let skippedCount = 0;
+        const existingPhones = new Set(contacts.map(c => contactService.normalizePhoneNumber(c.phone)));
+        const { imported, skippedCount } = await contactService.importContactsToDb(user.id, newContacts, existingPhones);
         
-        newContacts.forEach(contact => {
-            const sanitizedPhone = normalizePhoneNumber(contact.phone);
-            if (sanitizedPhone && !existingPhones.has(sanitizedPhone)) {
-                contactsToInsert.push({ ...contact, phone: sanitizedPhone, user_id: user.id, custom_fields: contact.custom_fields || null });
-                existingPhones.add(sanitizedPhone);
-            } else {
-                skippedCount++;
-            }
-        });
-
-        if (contactsToInsert.length > 0) {
-            const { data, error } = await supabase.from('contacts').insert(contactsToInsert as any).select('*');
-            if (error) throw error;
-            if(data) {
-                const newContactList = data as unknown as Contact[];
-                setContacts(prev => [...newContactList, ...prev].sort((a,b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()));
-                for(const contact of newContactList) {
-                    fetch('/api/run-trigger', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ eventType: 'contact_created', userId: user.id, contactId: contact.id })
-                    }).catch(err => console.error("Failed to call contact_created trigger API for imported contact", err));
-                }
+        if (imported.length > 0) {
+            setContacts(prev => [...imported, ...prev].sort((a,b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()));
+            for(const contact of imported) {
+                fetch('/api/run-trigger', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ eventType: 'contact_created', userId: user.id, contactId: contact.id })
+                }).catch(err => console.error("Failed to call contact_created trigger API for imported contact", err));
             }
         }
-        return { importedCount: contactsToInsert.length, skippedCount: skippedCount };
+        return { importedCount: imported.length, skippedCount };
     }, [user, contacts]);
     
     const sendDirectMessages = useCallback(async (message: string, recipients: Contact[]) => {
         if (!user) throw new Error("Usuário não autenticado.");
         if (!metaConfig.accessToken || !metaConfig.phoneNumberId) throw new Error("Configuração da Meta ausente.");
-
-        const messagesToInsert: TablesInsert<'sent_messages'>[] = [];
-        const promises = recipients.map(contact => (async () => {
-            try {
-                const response = await sendTextMessage(metaConfig, contact.phone, message);
-                messagesToInsert.push({
-                    user_id: user.id,
-                    contact_id: contact.id,
-                    content: message,
-                    meta_message_id: response.messages[0].id,
-                    status: 'sent',
-                    source: 'direct_bulk',
-                });
-            } catch (err: any) {
-                console.error(`Falha ao enviar mensagem direta para ${contact.name}: ${err.message}`);
-                messagesToInsert.push({
-                    user_id: user.id,
-                    contact_id: contact.id,
-                    content: message,
-                    status: 'failed',
-                    error_message: err.message,
-                    source: 'direct_bulk',
-                });
-            }
-        })());
-        
-        await Promise.all(promises);
-
-        if (messagesToInsert.length > 0) {
-            const { error } = await supabase.from('sent_messages').insert(messagesToInsert as any);
-            if (error) {
-                console.error("Falha ao salvar registros de mensagens diretas enviadas:", error);
-            }
-        }
+        await contactService.sendDirectMessagesFromApi(metaConfig, user.id, message, recipients);
     }, [user, metaConfig]);
 
     const allTags = useMemo(() => {

@@ -2,7 +2,7 @@
 // Removing them to avoid confusion and relying on a local cast where needed.
 
 import { Session, User } from '@supabase/supabase-js';
-import { Database, Json, TablesInsert, TablesUpdate } from './database.types';
+import { Database, Json, Tables, TablesInsert, TablesUpdate } from './database.types';
 import { MetaTemplateComponent } from '../services/meta/types';
 import type { Node as XyNode, Edge } from '@xyflow/react';
 
@@ -167,4 +167,4 @@ export interface MetaConfig {
 }
 
 // Tipos de Autenticação
-export type { Session, User, Edge, Json, MetaTemplateComponent, TablesInsert, TablesUpdate };
+export type { Session, User, Edge, Json, MetaTemplateComponent, Tables, TablesInsert, TablesUpdate };

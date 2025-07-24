@@ -1,12 +1,12 @@
 
 
+
 import React, { createContext, useState, useCallback, ReactNode, useContext, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabaseClient';
-import { AuthContext } from './AuthContext';
+import { useAuthStore, useMetaConfig } from '../../stores/authStore';
 import { ContactsContext } from './ContactsContext';
-import { Conversation, UnifiedMessage, Contact, SentMessageInsert, MessageStatus } from '../../types';
-import { sendTextMessage } from '../../services/meta/messages';
-import { Tables } from '../../types/database.types';
+import { Conversation, UnifiedMessage, Contact, MessageStatus, Tables } from '../../types';
+import * as inboxService from '../../services/inboxService';
 
 interface InboxContextType {
     conversations: Conversation[];
@@ -20,23 +20,9 @@ interface InboxContextType {
 
 export const InboxContext = createContext<InboxContextType>(null!);
 
-// Mapeia o payload do Supabase (tabelas sent_messages ou received_messages) para o tipo unificado de mensagem.
-const mapPayloadToUnifiedMessage = (payload: Tables<'sent_messages'> | Tables<'received_messages'>): UnifiedMessage => {
-    const isReceived = 'message_body' in payload;
-    return {
-        id: payload.id,
-        contact_id: payload.contact_id,
-        content: isReceived ? (payload.message_body || '') : (payload as Tables<'sent_messages'>).content,
-        created_at: isReceived ? payload.received_at : (payload as Tables<'sent_messages'>).created_at,
-        type: isReceived ? 'inbound' : 'outbound',
-        status: !isReceived ? (payload as Tables<'sent_messages'>).status as MessageStatus : undefined,
-        sourceTable: isReceived ? 'received_messages' : 'sent_messages',
-    };
-};
-
-
 export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    const { user, metaConfig } = useContext(AuthContext);
+    const user = useAuthStore(state => state.user);
+    const metaConfig = useMetaConfig();
     const { contacts } = useContext(ContactsContext);
 
     const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -54,25 +40,15 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const fetchConversations = useCallback(async () => {
         if (!user) return;
         setIsLoading(true);
-        const { data, error } = await supabase.rpc('get_conversations_with_contacts' as any, { p_user_id: user.id });
-
-        if (error) {
+        try {
+            const data = await inboxService.fetchConversationsFromDb(user.id);
+            setConversations(data);
+        } catch (error) {
             console.error("Error fetching conversations:", error);
-            setIsLoading(false);
-            return;
-        }
-        
-        if (data && Array.isArray(data)) {
-            const fetchedConversations: Conversation[] = (data as any[]).map(item => ({
-                contact: item.contact_details as Contact,
-                last_message: item.last_message as UnifiedMessage,
-                unread_count: item.unread_count
-            }));
-            setConversations(fetchedConversations);
-        } else {
             setConversations([]);
+        } finally {
+            setIsLoading(false);
         }
-        setIsLoading(false);
     }, [user]);
     
     const fetchMessages = useCallback(async (contactId: string | null) => {
@@ -81,20 +57,15 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             return;
         }
         setIsLoading(true);
-
-        const { data, error } = await supabase.rpc('get_unified_message_history' as any, {
-            p_user_id: user.id,
-            p_contact_id: contactId
-        });
-
-        if (error) {
+        try {
+            const data = await inboxService.fetchMessagesFromDb(user.id, contactId);
+            setMessages(data);
+        } catch (error) {
             console.error(`Error fetching messages for contact ${contactId}:`, error);
             setMessages([]);
-        } else if (data && Array.isArray(data)) {
-            setMessages(data as unknown as UnifiedMessage[]);
+        } finally {
+            setIsLoading(false);
         }
-        
-        setIsLoading(false);
 
     }, [user]);
     
@@ -119,7 +90,7 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             fetchConversations();
 
             const handleNewMessage = (payload: any) => {
-                const newMessage = mapPayloadToUnifiedMessage(payload.new as Tables<'sent_messages'> | Tables<'received_messages'>);
+                const newMessage = inboxService.mapPayloadToUnifiedMessage(payload.new as Tables<'sent_messages'> | Tables<'received_messages'>);
                 const contactId = newMessage.contact_id;
                 
                 setConversations(prev => {
@@ -152,7 +123,7 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             };
 
             const handleMessageUpdate = (payload: any) => {
-                 const updatedMessage = mapPayloadToUnifiedMessage(payload.new as Tables<'sent_messages'> | Tables<'received_messages'>);
+                 const updatedMessage = inboxService.mapPayloadToUnifiedMessage(payload.new as Tables<'sent_messages'> | Tables<'received_messages'>);
                  if (updatedMessage.contact_id === activeContactIdRef.current) {
                     setMessages(prev => prev.map(m => (m.id === updatedMessage.id && m.sourceTable === 'sent_messages') ? updatedMessage : m));
                  }
@@ -184,13 +155,7 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         
         setIsSending(true);
         try {
-            const response = await sendTextMessage(metaConfig, contact.phone, text);
-            const metaMessageId = response.messages[0].id;
-
-            const messagePayload: SentMessageInsert = { user_id: user.id, contact_id: contactId, content: text, meta_message_id: metaMessageId, status: 'sent', source: 'direct' };
-            
-            const { data: insertedMessage, error } = await supabase.from('sent_messages').insert(messagePayload as any).select('*').single();
-            if (error) throw error;
+            await inboxService.sendMessageToApi(user.id, contact, text, metaConfig);
             // Realtime will handle the update
         } catch (error: any) {
             console.error("Failed to send message:", error);

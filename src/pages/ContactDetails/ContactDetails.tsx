@@ -8,13 +8,13 @@ import DealFormModal from '../../components/common/DealFormModal';
 import { ContactsContext } from '../../contexts/providers/ContactsContext';
 import { NavigationContext } from '../../contexts/providers/NavigationContext';
 import { FunnelContext } from '../../contexts/providers/FunnelContext';
-import { AuthContext } from '../../contexts/providers/AuthContext';
+import { useAuthStore } from '../../stores/authStore';
 
 const ContactDetails: React.FC = () => {
     const { pageParams, setCurrentPage } = useContext(NavigationContext);
     const { contactDetails, fetchContactDetails, updateContact } = useContext(ContactsContext);
     const { addDeal, pipelines, stages } = useContext(FunnelContext);
-    const { user } = useContext(AuthContext);
+    const user = useAuthStore(state => state.user);
 
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);

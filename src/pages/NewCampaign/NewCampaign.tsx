@@ -10,7 +10,7 @@ import { TemplatesContext } from '../../contexts/providers/TemplatesContext';
 import { ContactsContext } from '../../contexts/providers/ContactsContext';
 import { CampaignsContext } from '../../contexts/providers/CampaignsContext';
 import { NavigationContext } from '../../contexts/providers/NavigationContext';
-import { AuthContext } from '../../contexts/providers/AuthContext';
+import { useMetaConfig } from '../../stores/authStore';
 
 interface SendResult {
     success: boolean;
@@ -23,7 +23,7 @@ const NewCampaign: React.FC = () => {
   const { contacts } = useContext(ContactsContext);
   const { addCampaign } = useContext(CampaignsContext);
   const { pageParams, setCurrentPage } = useContext(NavigationContext);
-  const { metaConfig } = useContext(AuthContext);
+  const metaConfig = useMetaConfig();
   
   const [campaignName, setCampaignName] = useState('');
   const [isLoading, setIsLoading] = useState(false);

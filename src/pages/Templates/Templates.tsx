@@ -1,6 +1,7 @@
 
 
 
+
 import React, { useContext, useState, useMemo } from 'react';
 import { MessageTemplate, TemplateStatus } from '../../types';
 import { getMetaTemplates } from '../../services/meta/templates';
@@ -11,7 +12,7 @@ import { SPARKLES_ICON } from '../../components/icons';
 import { Json, TablesInsert } from '../../types/database.types';
 import { TemplatesContext } from '../../contexts/providers/TemplatesContext';
 import { NavigationContext } from '../../contexts/providers/NavigationContext';
-import { AuthContext } from '../../contexts/providers/AuthContext';
+import { useAuthStore, useMetaConfig } from '../../stores/authStore';
 
 const StatusBadge: React.FC<{ status: MessageTemplate['status'] }> = ({ status }) => {
     const statusStyles: Record<TemplateStatus, string> = {
@@ -58,7 +59,8 @@ const TemplateCard: React.FC<{ template: MessageTemplate; onUse: () => void }> =
 const Templates: React.FC = () => {
   const { templates, setTemplates } = useContext(TemplatesContext);
   const { setCurrentPage } = useContext(NavigationContext);
-  const { metaConfig, user } = useContext(AuthContext);
+  const user = useAuthStore(state => state.user);
+  const metaConfig = useMetaConfig();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);

@@ -1,14 +1,18 @@
 
-import React, { useState, useContext, useEffect } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { EditableProfile } from '../../types';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import InfoCard from '../../components/common/InfoCard';
 import { COPY_ICON } from '../../components/icons';
-import { AuthContext } from '../../contexts/providers/AuthContext';
+import { useAuthStore } from '../../stores/authStore';
 
 const MetaSettings: React.FC = () => {
-    const { profile, updateProfile, user } = useContext(AuthContext);
+    const profile = useAuthStore(state => state.profile);
+    const user = useAuthStore(state => state.user);
+    const updateProfile = useAuthStore(state => state.updateProfile);
+
     const [localConfig, setLocalConfig] = useState<EditableProfile>({
         meta_access_token: '',
         meta_waba_id: '',

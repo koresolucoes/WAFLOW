@@ -4,6 +4,79 @@ import { getProfileForWebhook } from '../_lib/webhook/profile-handler.js';
 import { processStatusUpdate } from '../_lib/webhook/status-handler.js';
 import { processIncomingMessage } from '../_lib/webhook/message-handler.js';
 
+const handlePostRequest = async (req: VercelRequest) => {
+    try {
+        const { id: userId } = req.query;
+        if (typeof userId !== 'string' || !userId) {
+            console.error("[Webhook] Requisição recebida sem um ID de usuário na URL.");
+            // No response can be sent here as it's already sent.
+            return;
+        }
+
+        console.log(`[Webhook] Payload recebido para o usuário: ${userId}`);
+        console.log('[Webhook] Corpo completo da requisição:', JSON.stringify(req.body, null, 2));
+        
+        const profile = await getProfileForWebhook(userId);
+        if (!profile) {
+            console.error(`[Webhook] Não foi possível recuperar o perfil para o usuário ${userId}. Abortando.`);
+            return;
+        }
+
+        console.log(`[Webhook] Perfil recuperado com sucesso para ${profile.id}.`);
+
+        const { entry } = req.body;
+        if (!entry || !Array.isArray(entry)) {
+            console.error("[Webhook] Payload inválido: 'entry' não encontrado ou não é um array.");
+            return;
+        }
+
+        const promises: Promise<void>[] = [];
+        for (const item of entry) {
+            console.log(`[Webhook] Processando item de entrada: ${item.id}`);
+            for (const change of item.changes) {
+                console.log(`[Webhook] Processando alteração de campo: ${change.field}`);
+                if (change.field !== 'messages') continue;
+                
+                const value = change.value;
+
+                // A) Lidar com Atualizações de Status
+                if (value.statuses) {
+                    console.log(`[Webhook] Encontrados ${value.statuses.length} status para processar.`);
+                    for (const status of value.statuses) {
+                        promises.push(processStatusUpdate(status));
+                    }
+                }
+
+                // B) Lidar com Mensagens Recebidas
+                if (value.messages) {
+                    console.log(`[Webhook] Encontradas ${value.messages.length} mensagens para processar.`);
+                    const incomingPhoneNumberId = value?.metadata?.phone_number_id;
+                    if (profile.meta_phone_number_id !== String(incomingPhoneNumberId)) {
+                        console.warn(`[Webhook] O phone_number_id (${incomingPhoneNumberId}) recebido não corresponde ao configurado para o usuário ${userId}. Processando mesmo assim.`);
+                    }
+                    
+                    for (const message of value.messages) {
+                        console.log(`[Webhook] Enfileirando processamento para a mensagem ${message.id}.`);
+                        promises.push(processIncomingMessage(userId, message, value.contacts));
+                    }
+                }
+            }
+        }
+        
+        if (promises.length > 0) {
+             console.log(`[Webhook] Aguardando a conclusão de ${promises.length} promessas.`);
+             await Promise.all(promises);
+             console.log(`[Webhook] Lote de processamento para o usuário ${userId} concluído.`);
+        } else {
+            console.log('[Webhook] Nenhuma promessa de mensagem ou status para processar no payload.');
+        }
+
+    } catch (error: any) {
+        console.error("[Webhook] Erro não tratado durante o processamento assíncrono:", error.message, error.stack);
+    }
+}
+
+
 /**
  * Manipulador de webhook principal para todos os eventos da Meta.
  * Atua como um despachante para manipuladores modularizados.
@@ -27,78 +100,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // 2. Lidar com Notificações de Eventos da Meta
     if (req.method === 'POST') {
-        const { id: userId } = req.query;
-        if (typeof userId !== 'string' || !userId) {
-            console.error("[Webhook] Requisição recebida sem um ID de usuário na URL.");
-            return res.status(400).send('ID de usuário inválido na URL do webhook');
-        }
-
-        // Responde imediatamente à Meta para evitar timeouts
+        // Responde imediatamente à Meta para evitar timeouts e processa em segundo plano.
         res.status(200).send('EVENT_RECEIVED');
-        
-        console.log(`[Webhook] Payload recebido para o usuário: ${userId}`);
-        console.log('[Webhook] Corpo completo da requisição:', JSON.stringify(req.body, null, 2));
-        
-        const profile = await getProfileForWebhook(userId);
-        if (!profile) {
-            console.error(`[Webhook] Não foi possível recuperar o perfil para o usuário ${userId}. Abortando.`);
-            return;
-        }
-
-        console.log(`[Webhook] Perfil recuperado com sucesso para ${profile.id}.`);
-
-        const { entry } = req.body;
-        if (!entry || !Array.isArray(entry)) {
-            console.error("[Webhook] Payload inválido: 'entry' não encontrado ou não é um array.");
-            return;
-        }
-
-        try {
-            const promises: Promise<void>[] = [];
-            for (const item of entry) {
-                console.log(`[Webhook] Processando item de entrada: ${item.id}`);
-                for (const change of item.changes) {
-                    console.log(`[Webhook] Processando alteração de campo: ${change.field}`);
-                    if (change.field !== 'messages') continue;
-                    
-                    const value = change.value;
-
-                    // A) Lidar com Atualizações de Status
-                    if (value.statuses) {
-                        console.log(`[Webhook] Encontrados ${value.statuses.length} status para processar.`);
-                        for (const status of value.statuses) {
-                            promises.push(processStatusUpdate(status));
-                        }
-                    }
-
-                    // B) Lidar com Mensagens Recebidas
-                    if (value.messages) {
-                        console.log(`[Webhook] Encontradas ${value.messages.length} mensagens para processar.`);
-                        const incomingPhoneNumberId = value?.metadata?.phone_number_id;
-                        if (profile.meta_phone_number_id !== String(incomingPhoneNumberId)) {
-                            console.warn(`[Webhook] O phone_number_id (${incomingPhoneNumberId}) recebido não corresponde ao configurado para o usuário ${userId}. Processando mesmo assim.`);
-                        }
-                        
-                        for (const message of value.messages) {
-                            console.log(`[Webhook] Enfileirando processamento para a mensagem ${message.id}.`);
-                            promises.push(processIncomingMessage(userId, message, value.contacts));
-                        }
-                    }
-                }
-            }
-            
-            if (promises.length > 0) {
-                 console.log(`[Webhook] Aguardando a conclusão de ${promises.length} promessas.`);
-                 await Promise.all(promises);
-                 console.log(`[Webhook] Lote de processamento para o usuário ${userId} concluído.`);
-            } else {
-                console.log('[Webhook] Nenhuma promessa de mensagem ou status para processar no payload.');
-            }
-
-        } catch (error: any) {
-            console.error("[Webhook] Erro não tratado durante o loop de processamento:", error.message, error.stack);
-        }
-        
+        await handlePostRequest(req);
         return;
     }
 

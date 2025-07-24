@@ -1,11 +1,13 @@
 
 
+
 import React, { createContext, useState, useCallback, ReactNode, useContext, useEffect } from 'react';
 import { supabase } from '../../lib/supabaseClient';
-import { Automation, AutomationInsert, AutomationNode, Edge, AutomationNodeStats, AutomationNodeLog, AutomationStatus, Json } from '../../types';
-import { Tables, TablesInsert, TablesUpdate } from '../../types/database.types';
-import { AuthContext } from './AuthContext';
+import { Automation, AutomationNode, Edge, AutomationNodeStats, AutomationNodeLog, AutomationStatus } from '../../types';
+import { Tables } from '../../types/database.types';
+import { useAuthStore } from '../../stores/authStore';
 import { NavigationContext } from './NavigationContext';
+import * as automationService from '../../services/automationService';
 
 interface AutomationsContextType {
   automations: Automation[];
@@ -22,7 +24,7 @@ interface AutomationsContextType {
 export const AutomationsContext = createContext<AutomationsContextType>(null!);
 
 export const AutomationsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    const { user } = useContext(AuthContext);
+    const user = useAuthStore(state => state.user);
     const { setCurrentPage } = useContext(NavigationContext);
     const [automations, setAutomations] = useState<Automation[]>([]);
     const [automationStats, setAutomationStats] = useState<Record<string, AutomationNodeStats>>({});
@@ -77,65 +79,31 @@ export const AutomationsProvider: React.FC<{ children: ReactNode }> = ({ childre
 
     const createAndNavigateToAutomation = useCallback(async () => {
         if (!user) throw new Error("User not authenticated.");
-        const dbAutomation: TablesInsert<'automations'> = { user_id: user.id, name: 'Nova Automação (Rascunho)', status: 'paused', nodes: [] as unknown as Json, edges: [] as unknown as Json };
-        const { data, error } = await supabase.from('automations').insert(dbAutomation as any).select('*').single();
-
-        if (error) throw error;
-        if (data) {
-            const newAutomationData = data as unknown as Tables<'automations'>;
-            const newAutomation: Automation = { ...newAutomationData, nodes: [], edges: [], status: newAutomationData.status as AutomationStatus };
-            // setAutomations(prev => [newAutomation, ...prev]); // Realtime will handle this
-            setCurrentPage('automation-editor', { automationId: newAutomation.id });
-        }
+        const newAutomation = await automationService.createAutomationInDb(user.id);
+        setCurrentPage('automation-editor', { automationId: newAutomation.id });
     }, [user, setCurrentPage]);
 
     const updateAutomation = useCallback(async (automation: Automation) => {
         if (!user) throw new Error("User not authenticated.");
-        const updatePayload: TablesUpdate<'automations'> = { name: automation.name, status: automation.status, nodes: automation.nodes as unknown as Json, edges: automation.edges as unknown as Json };
-        
-        const { data, error } = await supabase.from('automations').update(updatePayload as any).eq('id', automation.id).eq('user_id', user.id).select('*').single();
-        if(error) throw error;
-
-        const { error: rpcError } = await supabase.rpc('sync_automation_triggers' as any, { automation_id_in: automation.id } as any);
-        if (rpcError) {
-            console.error("Falha ao sincronizar gatilhos de automação:", rpcError);
-        }
-
-        // Realtime should handle the state update, but we can do it optimistically too
-        if(data) {
-            const updatedAutomationData = data as unknown as Tables<'automations'>;
-            const updatedAutomation: Automation = { ...updatedAutomationData, nodes: (Array.isArray(updatedAutomationData.nodes) ? updatedAutomationData.nodes : []) as unknown as AutomationNode[], edges: (Array.isArray(updatedAutomationData.edges) ? updatedAutomationData.edges : []) as unknown as Edge[], status: updatedAutomationData.status as AutomationStatus };
-            setAutomations(prev => prev.map(a => a.id === updatedAutomation.id ? updatedAutomation : a));
-        }
+        const updated = await automationService.updateAutomationInDb(user.id, automation);
+        setAutomations(prev => prev.map(a => a.id === updated.id ? updated : a));
     }, [user]);
     
     const deleteAutomation = useCallback(async (automationId: string) => {
         if (!user) throw new Error("User not authenticated.");
-        const { error } = await supabase.from('automations').delete().eq('id', automationId);
-        if (error) throw error;
+        await automationService.deleteAutomationFromDb(automationId);
         // Realtime handles state update
     }, [user]);
     
     const fetchAutomationStats = useCallback(async (automationId: string) => {
         if (!user) return;
-        const { data, error } = await supabase.from('automation_node_stats').select('*').eq('automation_id', automationId);
-        if (error) { console.error("Error fetching automation stats:", error); return; }
-        if (data) {
-            const statsMap = (data as unknown as AutomationNodeStats[]).reduce((acc, stat) => { acc[stat.node_id] = stat; return acc; }, {} as Record<string, AutomationNodeStats>);
-            setAutomationStats(prev => ({...prev, ...statsMap}));
-        }
+        const statsMap = await automationService.fetchStatsForAutomation(automationId);
+        setAutomationStats(prev => ({...prev, ...statsMap}));
     }, [user]);
 
     const fetchNodeLogs = useCallback(async (automationId: string, nodeId: string): Promise<AutomationNodeLog[]> => {
         if (!user) return [];
-        
-        const { data: runIdsData, error: runIdsError } = await supabase.from('automation_runs').select('id').eq('automation_id', automationId);
-        if (runIdsError || !runIdsData) { console.error('Error fetching run IDs for logs:', runIdsError); return []; }
-        const runIds = (runIdsData as { id: string }[]).map(r => r.id);
-        if (runIds.length === 0) return [];
-        const { data, error } = await supabase.from('automation_node_logs').select('*').in('run_id', runIds).eq('node_id', nodeId).order('created_at', { ascending: false }).limit(100);
-        if (error) { console.error("Error fetching node logs:", error); return []; }
-        return (data as unknown as AutomationNodeLog[]) || [];
+        return await automationService.fetchLogsForNode(automationId, nodeId);
     }, [user]);
 
     const value = {

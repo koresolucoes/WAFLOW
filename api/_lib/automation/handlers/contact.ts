@@ -1,6 +1,5 @@
 
 
-
 import { supabaseAdmin } from '../../supabaseAdmin.js';
 import { Contact, TablesUpdate } from '../../types.js';
 import { handleTagAddedEvent } from '../trigger-handler.js';

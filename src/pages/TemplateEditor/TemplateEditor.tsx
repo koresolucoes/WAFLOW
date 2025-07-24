@@ -1,6 +1,7 @@
+
+
 import React, { useState, useContext, useMemo } from 'react';
 import { generateTemplateWithAI } from '../../services/geminiService';
-import { createMetaTemplate } from '../../services/meta/templates';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import { SPARKLES_ICON, PLUS_ICON, TRASH_ICON } from '../../components/icons';
@@ -9,14 +10,15 @@ import { MetaTemplateComponent, MetaButton } from '../../services/meta/types';
 import TemplatePreview from '../../components/common/TemplatePreview';
 import { TemplatesContext } from '../../contexts/providers/TemplatesContext';
 import { NavigationContext } from '../../contexts/providers/NavigationContext';
-import { AuthContext } from '../../contexts/providers/AuthContext';
+import { useAuthStore, useMetaConfig } from '../../stores/authStore';
 
 type EditableTemplate = Omit<MessageTemplateInsert, 'id' | 'user_id' | 'created_at' | 'status' | 'meta_id'>;
 
 const TemplateEditor: React.FC = () => {
-  const { addTemplate } = useContext(TemplatesContext);
+  const { createTemplate } = useContext(TemplatesContext);
   const { setCurrentPage } = useContext(NavigationContext);
-  const { profile, metaConfig, user } = useContext(AuthContext);
+  const profile = useAuthStore(state => state.profile);
+  const metaConfig = useMetaConfig();
 
   const [campaignGoal, setCampaignGoal] = useState('');
   const [template, setTemplate] = useState<EditableTemplate>({
@@ -74,21 +76,12 @@ const TemplateEditor: React.FC = () => {
         setError("Credenciais da Meta não configuradas. Por favor, vá para Configurações.");
         return;
     }
-    if (!user) {
-        setError("Usuário não autenticado. Por favor, recarregue a página.");
-        return;
-    }
 
     setIsSaving(true);
     setError(null);
     setSuccessMessage(null);
     try {
-        const result = await createMetaTemplate(metaConfig, {
-            templateName: template.template_name,
-            category: template.category,
-            components: template.components
-        });
-        await addTemplate({ ...template, user_id: user.id, meta_id: result.id, status: 'PENDING' });
+        await createTemplate(template);
         
         setSuccessMessage('Template enviado para aprovação com sucesso! Ele aparecerá como "PENDING" na sua lista. Você será redirecionado em 3 segundos.');
         
