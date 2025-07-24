@@ -42,16 +42,16 @@ export const fetchContactDetailsFromDb = async (userId: string, contactId: strin
     if (dealsError) throw dealsError;
     
     return {
-        ...(contactData as unknown as Contact),
-        deals: (dealsData as unknown as Deal[]) || []
+        ...contactData,
+        deals: (dealsData as Deal[]) || []
     };
 };
 
 export const addContactToDb = async (userId: string, contact: EditableContact): Promise<Contact> => {
     const payload: TablesInsert<'contacts'> = { ...contact, phone: normalizePhoneNumber(contact.phone), user_id: userId };
-    const { data, error } = await supabase.from('contacts').insert(payload as any).select('*').single();
+    const { data, error } = await supabase.from('contacts').insert(payload).select('*').single();
     if (error) throw error;
-    return data as unknown as Contact;
+    return data;
 };
 
 export const updateContactInDb = async (userId: string, updatedContact: Contact): Promise<Contact> => {
@@ -66,14 +66,14 @@ export const updateContactInDb = async (userId: string, updatedContact: Contact)
 
     const { data, error } = await supabase
         .from('contacts')
-        .update(updatePayload as any)
+        .update(updatePayload)
         .eq('id', updatedContact.id)
         .eq('user_id', userId)
         .select('*')
         .single();
 
     if (error) throw error;
-    return data as unknown as Contact;
+    return data;
 };
 
 export const deleteContactFromDb = async (userId: string, contactId: string): Promise<void> => {
@@ -99,10 +99,10 @@ export const importContactsToDb = async (userId: string, newContacts: EditableCo
         return { imported: [], skippedCount };
     }
 
-    const { data, error } = await supabase.from('contacts').insert(contactsToInsert as any).select('*');
+    const { data, error } = await supabase.from('contacts').insert(contactsToInsert).select('*');
     if (error) throw error;
     
-    return { imported: (data || []) as unknown as Contact[], skippedCount };
+    return { imported: (data || []), skippedCount };
 };
 
 export const sendDirectMessagesFromApi = async (metaConfig: MetaConfig, userId: string, message: string, recipients: Contact[]): Promise<void> => {
@@ -134,7 +134,7 @@ export const sendDirectMessagesFromApi = async (metaConfig: MetaConfig, userId: 
     await Promise.all(promises);
 
     if (messagesToInsert.length > 0) {
-        const { error } = await supabase.from('sent_messages').insert(messagesToInsert as any);
+        const { error } = await supabase.from('sent_messages').insert(messagesToInsert);
         if (error) {
             console.error("Falha ao salvar registros de mensagens diretas enviadas:", error);
             // Don't throw here, as some messages might have been sent successfully

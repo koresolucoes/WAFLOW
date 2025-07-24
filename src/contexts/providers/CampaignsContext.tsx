@@ -1,6 +1,7 @@
 
 
 
+
 import React, { createContext, useState, useCallback, ReactNode, useContext, useEffect } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { Campaign, CampaignWithMetrics, CampaignMessageInsert, CampaignWithDetails, CampaignStatus, MessageStatus, Tables } from '../../types';
@@ -62,10 +63,10 @@ export const CampaignsProvider: React.FC<{ children: ReactNode }> = ({ children 
   useEffect(() => {
     if (!user) return;
 
-    const handleCampaignMessageUpdate = async (payload: any) => {
+    const handleCampaignMessageUpdate = async (payload: { new: Tables<'campaign_messages'>, eventType: string }) => {
         if (payload.eventType !== 'UPDATE') return;
 
-        const updatedMessage = payload.new as Tables<'campaign_messages'>;
+        const updatedMessage = payload.new;
         const campaignId = updatedMessage.campaign_id;
 
         // Find the campaign in the current state
@@ -83,7 +84,7 @@ export const CampaignsProvider: React.FC<{ children: ReactNode }> = ({ children 
             return;
         }
 
-        const typedData = (data as unknown as { status: MessageStatus }[]) || [];
+        const typedData = (data as { status: MessageStatus }[]) || [];
         const newMetrics = {
             sent: campaignToUpdate.metrics.sent, // 'sent' count does not change
             delivered: typedData.filter(d => d.status === 'delivered' || d.status === 'read').length,

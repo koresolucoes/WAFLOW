@@ -1,45 +1,27 @@
 
 import { supabaseAdmin } from '../supabaseAdmin.js';
-import { Profile, TablesInsert } from '../types.js';
+import { Profile } from '../types.js';
 
 export async function getProfileForWebhook(userId: string): Promise<Profile | null> {
-    let { data: profileData, error: profileError } = await supabaseAdmin
+    console.log(`[ProfileHandler] Buscando perfil para o usuário com ID: ${userId}`);
+
+    const { data: profileData, error } = await supabaseAdmin
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .single();
 
-    if (profileError && profileError.code === 'PGRST116') {
-        console.warn(`[Manipulador de Perfil] Perfil não encontrado para o usuário ${userId}. Verificando usuário de autenticação e tentando criar um perfil.`);
-        
-        const { data: authUserData, error: authUserError } = await supabaseAdmin.auth.admin.getUserById(userId);
-        
-        if (authUserError || !authUserData.user) {
-            console.error(`[Manipulador de Perfil] CRÍTICO: Usuário de autenticação não encontrado para user_id: ${userId}. A URL do webhook pode estar incorreta ou o usuário pode ter sido excluído.`);
-            return null;
-        }
+    if (error) {
+        console.error(`[ProfileHandler] Erro ao buscar perfil para o usuário ${userId}:`, error);
+        // Retorna nulo para que o chamador possa lidar com a falha
+        return null; 
+    }
 
-        const newProfilePayload: TablesInsert<'profiles'> = { 
-            id: userId, 
-            company_name: `Empresa de ${authUserData.user.email || 'Usuário'}`
-        };
-        const { data: newProfile, error: newProfileError } = await supabaseAdmin
-            .from('profiles')
-            .insert(newProfilePayload as any)
-            .select('*')
-            .single();
-            
-        if (newProfileError || !newProfile) {
-            console.error(`[Manipulador de Perfil] CRÍTICO: Falha ao criar um perfil padrão para o usuário ${userId}.`, newProfileError);
-            return null;
-        }
-
-        profileData = newProfile;
-        console.log(`[Manipulador de Perfil] Perfil padrão criado com sucesso para o usuário ${userId}.`);
-    } else if (profileError) {
-        console.error(`[Manipulador de Perfil] CRÍTICO: Erro de banco de dados ao buscar perfil para o usuário ${userId}.`, profileError);
+    if (!profileData) {
+        console.error(`[ProfileHandler] Nenhum perfil encontrado para o usuário ${userId}.`);
         return null;
     }
     
+    console.log(`[ProfileHandler] Perfil encontrado com sucesso para o usuário ${userId}.`);
     return profileData as unknown as Profile;
 }

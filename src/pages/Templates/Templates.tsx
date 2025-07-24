@@ -90,7 +90,7 @@ const Templates: React.FC = () => {
         }));
         
         if (templatesToUpsert.length > 0) {
-            const { error: upsertError } = await supabase.from('message_templates').upsert(templatesToUpsert as any, { onConflict: 'meta_id, user_id' });
+            const { error: upsertError } = await supabase.from('message_templates').upsert(templatesToUpsert, { onConflict: 'meta_id, user_id' });
             if (upsertError) throw upsertError;
         }
 

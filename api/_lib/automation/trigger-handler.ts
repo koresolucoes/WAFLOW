@@ -50,7 +50,7 @@ const dispatchAutomations = async (userId: string, triggers: TriggerInfo[], cont
             const automation = sanitizeAutomation(rawAutomation);
             console.log(`[DISPATCHER] Despachando automação '${automation.name}' (ID: ${automation.id}) a partir do nó ${trigger.node_id}`);
             const hooks = createDefaultLoggingHooks(automation.id, contact ? contact.id : null);
-            return executeAutomation(automation, contact, trigger.node_id, triggerPayload, hooks, profile as unknown as Profile);
+            return executeAutomation(automation, contact, trigger.node_id, triggerPayload, hooks, profile);
         }
         return Promise.resolve();
     });
@@ -73,7 +73,7 @@ const handleMetaMessageEvent = async (userId: string, contact: Contact, message:
     if (buttonPayload) {
         const { data: buttonTriggers, error } = await supabaseAdmin
             .from('automation_triggers')
-            .select('*')
+            .select('automation_id, node_id')
             .eq('user_id', userId)
             .eq('trigger_type', 'button_clicked')
             .eq('trigger_key', buttonPayload);
@@ -81,7 +81,7 @@ const handleMetaMessageEvent = async (userId: string, contact: Contact, message:
         if (error) console.error("[HANDLER] Erro ao buscar gatilhos de botão:", error);
         else if (buttonTriggers) {
             console.log(`[HANDLER] Found ${buttonTriggers.length} matching button triggers.`);
-            matchingTriggers.push(...(buttonTriggers as unknown as TriggerInfo[]));
+            matchingTriggers.push(...(buttonTriggers as TriggerInfo[]));
         }
     }
 
@@ -96,7 +96,7 @@ const handleMetaMessageEvent = async (userId: string, contact: Contact, message:
             console.error("[HANDLER] Erro ao buscar gatilhos de palavra-chave:", error);
         } else if (allKeywordTriggers) {
             console.log(`[HANDLER] Verificando ${allKeywordTriggers.length} gatilhos de palavra-chave para a mensagem: "${messageBody}"`);
-            for (const trigger of allKeywordTriggers as any[]) {
+            for (const trigger of allKeywordTriggers) {
                 if (trigger.trigger_key && typeof trigger.trigger_key === 'string' && messageBody.includes(trigger.trigger_key.toLowerCase())) {
                     console.log(`[HANDLER] Correspondência encontrada! Palavra-chave: "${trigger.trigger_key}". Despachando automação ${trigger.automation_id}`);
                     matchingTriggers.push({ automation_id: trigger.automation_id, node_id: trigger.node_id });
@@ -117,7 +117,7 @@ const handleNewContactEvent = async (userId: string, contact: Contact) => {
     console.log(`[HANDLER] Processing new_contact event for contact ${contact.id}`);
     const { data: triggers, error } = await supabaseAdmin
         .from('automation_triggers')
-        .select('*')
+        .select('automation_id, node_id')
         .eq('user_id', userId)
         .eq('trigger_type', 'new_contact');
         
@@ -128,7 +128,7 @@ const handleNewContactEvent = async (userId: string, contact: Contact) => {
 
     if (triggers && triggers.length > 0) {
         const triggerData = { type: 'new_contact', payload: { contact } };
-        await dispatchAutomations(userId, triggers as unknown as TriggerInfo[], contact, triggerData);
+        await dispatchAutomations(userId, triggers as TriggerInfo[], contact, triggerData);
     }
 };
 
@@ -136,7 +136,7 @@ export const handleTagAddedEvent = async (userId: string, contact: Contact, adde
     console.log(`[HANDLER] Processing tag_added event for contact ${contact.id}. Tag: "${addedTag}"`);
     const { data: triggers, error } = await supabaseAdmin
         .from('automation_triggers')
-        .select('*')
+        .select('automation_id, node_id')
         .eq('user_id', userId)
         .eq('trigger_type', 'new_contact_with_tag')
         .ilike('trigger_key', addedTag);
@@ -148,7 +148,7 @@ export const handleTagAddedEvent = async (userId: string, contact: Contact, adde
     
     if (triggers && triggers.length > 0) {
         const triggerData = { type: 'tag_added', payload: { contact, addedTag } };
-        await dispatchAutomations(userId, triggers as unknown as TriggerInfo[], contact, triggerData);
+        await dispatchAutomations(userId, triggers as TriggerInfo[], contact, triggerData);
     }
 };
 

@@ -10,10 +10,10 @@ export const createAutomationInDb = async (userId: string): Promise<Automation> 
         nodes: [] as unknown as Json, 
         edges: [] as unknown as Json 
     };
-    const { data, error } = await supabase.from('automations').insert(dbAutomation as any).select('*').single();
+    const { data, error } = await supabase.from('automations').insert(dbAutomation).select('*').single();
     if (error) throw error;
     
-    const newAutomationData = data as unknown as Tables<'automations'>;
+    const newAutomationData = data;
     return { 
         ...newAutomationData, 
         nodes: [], 
@@ -32,7 +32,7 @@ export const updateAutomationInDb = async (userId: string, automation: Automatio
     
     const { data, error } = await supabase
         .from('automations')
-        .update(updatePayload as any)
+        .update(updatePayload)
         .eq('id', automation.id)
         .eq('user_id', userId)
         .select('*')
@@ -40,12 +40,12 @@ export const updateAutomationInDb = async (userId: string, automation: Automatio
 
     if (error) throw error;
 
-    const { error: rpcError } = await supabase.rpc('sync_automation_triggers', { automation_id_in: automation.id } as any);
+    const { error: rpcError } = await supabase.rpc('sync_automation_triggers', { automation_id_in: automation.id });
     if (rpcError) {
         console.error("Falha ao sincronizar gatilhos de automação:", rpcError);
     }
     
-    const updated = data as unknown as Tables<'automations'>;
+    const updated = data;
     return { 
         ...updated, 
         nodes: (Array.isArray(updated.nodes) ? updated.nodes : []) as unknown as AutomationNode[], 
@@ -65,7 +65,7 @@ export const fetchStatsForAutomation = async (automationId: string): Promise<Rec
         console.error("Error fetching automation stats:", error); 
         return {}; 
     }
-    const statsData = (data as unknown as AutomationNodeStats[]) || [];
+    const statsData = (data as AutomationNodeStats[]) || [];
     return statsData.reduce((acc, stat) => {
         acc[stat.node_id] = stat;
         return acc;
@@ -87,5 +87,5 @@ export const fetchLogsForNode = async (automationId: string, nodeId: string): Pr
         console.error("Error fetching node logs:", error); 
         return []; 
     }
-    return (data as unknown as AutomationNodeLog[]) || [];
+    return (data as AutomationNodeLog[]) || [];
 };

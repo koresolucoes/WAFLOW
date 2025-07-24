@@ -2,8 +2,14 @@
 import { supabaseAdmin } from '../supabaseAdmin.js';
 import { findOrCreateContactByPhone } from './contact-mapper.js';
 import { publishEvent } from '../automation/trigger-handler.js';
+import { Profile } from '../types.js';
 
-export async function processIncomingMessage(userId: string, message: any, contactsPayload: any): Promise<void> {
+export async function processIncomingMessage(
+    userId: string, 
+    profile: Profile, 
+    message: any, 
+    contactsPayload: any
+): Promise<void> {
     try {
         const contactName = contactsPayload?.[0]?.profile?.name || 'Contato via WhatsApp';
         const { contact, isNew } = await findOrCreateContactByPhone(userId, message.from, contactName);
@@ -31,6 +37,8 @@ export async function processIncomingMessage(userId: string, message: any, conta
             console.error(`[Manipulador de Mensagem] Falha ao inserir mensagem recebida para o contato ${contact.id}:`, insertError);
             return;
         }
+
+        console.log(`[MessageHandler] Mensagem de ${contact.name} salva. Disparando eventos de automação.`);
 
         // Publica eventos para automações e outros efeitos colaterais
         await publishEvent('message_received', userId, { contact, message });

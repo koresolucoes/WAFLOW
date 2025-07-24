@@ -30,12 +30,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Robust Profile Lookup: First try by the custom path prefix.
     const { data: profileByPrefix } = await supabaseAdmin.from('profiles').select('*').eq('webhook_path_prefix', webhookPrefix).maybeSingle();
     if (profileByPrefix) {
-        profileData = profileByPrefix as unknown as Profile;
+        profileData = profileByPrefix;
     } else {
         // As a fallback, check if the prefix was actually a user ID.
         const { data: profileById } = await supabaseAdmin.from('profiles').select('*').eq('id', webhookPrefix).maybeSingle();
         if (profileById) {
-            profileData = profileById as unknown as Profile;
+            profileData = profileById;
         }
     }
     

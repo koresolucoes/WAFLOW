@@ -35,19 +35,19 @@ export const findOrCreateContactByPhone = async (user_id: string, phone: string,
         const newContactPayload: TablesInsert<'contacts'> = { user_id, phone: normalizedPhone, name, tags: ['new-lead'], custom_fields: null };
         const { data: newContact, error: insertError } = await supabaseAdmin
             .from('contacts')
-            .insert(newContactPayload as any)
+            .insert(newContactPayload)
             .select('*')
             .single();
         if (insertError || !newContact) {
              console.error("Error creating new contact:", insertError);
              return { contact: null, isNew: false };
         }
-        return { contact: newContact as unknown as Contact, isNew: true };
+        return { contact: newContact, isNew: true };
     } else if (error) {
          console.error("Error finding contact:", error);
         return { contact: null, isNew: false };
     }
-    return { contact: contactData as unknown as Contact, isNew: false };
+    return { contact: contactData, isNew: false };
 };
 
 export const processWebhookPayloadForContact = async (
@@ -121,11 +121,11 @@ export const processWebhookPayloadForContact = async (
 
         if (needsUpdate) {
             const { id, user_id, created_at, ...updatePayload} = contact;
-            const { data: updatedContact, error: updateContactError } = await supabaseAdmin.from('contacts').update(updatePayload as any).eq('id', contact.id).select('*').single();
+            const { data: updatedContact, error: updateContactError } = await supabaseAdmin.from('contacts').update(updatePayload).eq('id', contact.id).select('*').single();
             if(updateContactError) {
                 console.error("Webhook trigger: Failed to update contact with data", updateContactError)
             } else if(updatedContact) {
-                contact = updatedContact as unknown as Contact;
+                contact = updatedContact;
             }
         }
     }

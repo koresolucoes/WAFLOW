@@ -11,16 +11,16 @@ export const getProfile = async (userId: string): Promise<Profile | null> => {
         console.error("Error fetching profile:", error);
         throw error;
     }
-    return data as unknown as Profile | null;
+    return data;
 };
 
 export const updateProfileInDb = async (userId: string, profileData: EditableProfile): Promise<Profile> => {
     const { data, error } = await supabase
         .from('profiles')
-        .update(profileData as any)
+        .update(profileData)
         .eq('id', userId)
         .select('*')
         .single();
     if (error) throw error;
-    return data as unknown as Profile;
+    return data;
 };

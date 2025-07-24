@@ -1,4 +1,5 @@
 
+
 export type Json =
   | string
   | number
@@ -528,16 +529,16 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      [key: string]: never
     }
     Functions: {
-      [_ in never]: never
+      [key: string]: never
     }
     Enums: {
-      [_ in never]: never
+      [key: string]: never
     }
     CompositeTypes: {
-      [_ in never]: never
+      [key: string]: never
     }
   }
 }

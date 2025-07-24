@@ -16,7 +16,7 @@ export const mapPayloadToUnifiedMessage = (payload: Tables<'sent_messages'> | Ta
 };
 
 export const fetchConversationsFromDb = async (userId: string): Promise<Conversation[]> => {
-    const { data, error } = await supabase.rpc('get_conversations_with_contacts', { p_user_id: userId } as any);
+    const { data, error } = await supabase.rpc('get_conversations_with_contacts', { p_user_id: userId });
     if (error) {
         console.error("Error fetching conversations:", error);
         throw error;
@@ -35,7 +35,7 @@ export const fetchMessagesFromDb = async (userId: string, contactId: string): Pr
     const { data, error } = await supabase.rpc('get_unified_message_history', {
         p_user_id: userId,
         p_contact_id: contactId
-    } as any);
+    });
     if (error) throw error;
     return (data as UnifiedMessage[]) || [];
 };
@@ -53,6 +53,6 @@ export const sendMessageToApi = async (userId: string, contact: Contact, text: s
         source: 'direct' 
     };
     
-    const { error } = await supabase.from('sent_messages').insert(messagePayload as any);
+    const { error } = await supabase.from('sent_messages').insert(messagePayload);
     if (error) throw error;
 };

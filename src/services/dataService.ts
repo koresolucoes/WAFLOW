@@ -16,7 +16,7 @@ const fetchCampaignsWithMetrics = async (campaignsData: Campaign[]): Promise<Cam
                 return { ...campaign, recipient_count: campaign.recipient_count || 0, metrics: { sent: campaign.recipient_count || 0, delivered: 0, read: 0 } };
             }
             
-            const typedData = (data as {status: MessageStatus}[]) || [];
+            const typedData = (data as unknown as {status: MessageStatus}[]) || [];
             const delivered = typedData.filter(d => d.status === 'delivered' || d.status === 'read').length;
             const read = typedData.filter(d => d.status === 'read').length;
 
@@ -50,7 +50,7 @@ export const fetchAllInitialData = async (userId: string) => {
     if (dealsRes.error) console.error("DataService Error (Deals):", dealsRes.error);
 
     // Process Templates
-    const templates = ((templatesRes.data as unknown as Tables<'message_templates'>[]) || []).map(t => ({
+    const templates = (templatesRes.data || []).map(t => ({
         ...t,
         category: t.category as TemplateCategory,
         status: t.status as TemplateStatus,
@@ -58,7 +58,7 @@ export const fetchAllInitialData = async (userId: string) => {
     } as MessageTemplate));
     
     // Process Automations
-    const automationsData = (automationsRes.data as unknown as Tables<'automations'>[]) || [];
+    const automationsData = (automationsRes.data || []);
     const automations = automationsData.map((a) => ({
         ...a,
         nodes: (Array.isArray(a.nodes) ? a.nodes : []) as unknown as AutomationNode[],
@@ -67,15 +67,15 @@ export const fetchAllInitialData = async (userId: string) => {
     } as Automation));
     
     // Process Campaigns
-    const campaigns = await fetchCampaignsWithMetrics((campaignsRes.data || []) as unknown as Campaign[]);
+    const campaigns = await fetchCampaignsWithMetrics((campaignsRes.data || []) as Campaign[]);
 
     return {
         templates,
-        contacts: (contactsRes.data || []) as unknown as Contact[],
+        contacts: (contactsRes.data || []) as Contact[],
         campaigns,
         automations,
-        pipelines: (pipelinesRes.data || []) as unknown as Pipeline[],
-        stages: (stagesRes.data || []) as unknown as PipelineStage[],
-        deals: (dealsRes.data || []) as unknown as DealWithContact[],
+        pipelines: (pipelinesRes.data || []) as Pipeline[],
+        stages: (stagesRes.data || []) as PipelineStage[],
+        deals: (dealsRes.data || []) as DealWithContact[],
     };
 };

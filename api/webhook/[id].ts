@@ -9,20 +9,16 @@ const handlePostRequest = async (req: VercelRequest) => {
         const { id: userId } = req.query;
         if (typeof userId !== 'string' || !userId) {
             console.error("[Webhook] Requisição recebida sem um ID de usuário na URL.");
-            // No response can be sent here as it's already sent.
             return;
         }
 
         console.log(`[Webhook] Payload recebido para o usuário: ${userId}`);
-        console.log('[Webhook] Corpo completo da requisição:', JSON.stringify(req.body, null, 2));
         
         const profile = await getProfileForWebhook(userId);
         if (!profile) {
             console.error(`[Webhook] Não foi possível recuperar o perfil para o usuário ${userId}. Abortando.`);
             return;
         }
-
-        console.log(`[Webhook] Perfil recuperado com sucesso para ${profile.id}.`);
 
         const { entry } = req.body;
         if (!entry || !Array.isArray(entry)) {
@@ -52,12 +48,12 @@ const handlePostRequest = async (req: VercelRequest) => {
                     console.log(`[Webhook] Encontradas ${value.messages.length} mensagens para processar.`);
                     const incomingPhoneNumberId = value?.metadata?.phone_number_id;
                     if (profile.meta_phone_number_id !== String(incomingPhoneNumberId)) {
-                        console.warn(`[Webhook] O phone_number_id (${incomingPhoneNumberId}) recebido não corresponde ao configurado para o usuário ${userId}. Processando mesmo assim.`);
+                        console.warn(`[Webhook] AVISO: O phone_number_id (${incomingPhoneNumberId}) do webhook não corresponde ao configurado para o usuário ${userId}. A mensagem será processada mesmo assim.`);
                     }
                     
                     for (const message of value.messages) {
                         console.log(`[Webhook] Enfileirando processamento para a mensagem ${message.id}.`);
-                        promises.push(processIncomingMessage(userId, message, value.contacts));
+                        promises.push(processIncomingMessage(userId, profile, message, value.contacts));
                     }
                 }
             }
