@@ -118,7 +118,7 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             fetchConversations();
 
             const handleNewMessage = (payload: any) => {
-                const newMessage = mapPayloadToUnifiedMessage(payload.new);
+                const newMessage = mapPayloadToUnifiedMessage(payload.new as Tables<'sent_messages'> | Tables<'received_messages'>);
                 const contactId = newMessage.contact_id;
                 
                 setConversations(prev => {
@@ -151,7 +151,7 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             };
 
             const handleMessageUpdate = (payload: any) => {
-                 const updatedMessage = mapPayloadToUnifiedMessage(payload.new);
+                 const updatedMessage = mapPayloadToUnifiedMessage(payload.new as Tables<'sent_messages'> | Tables<'received_messages'>);
                  if (updatedMessage.contact_id === activeContactIdRef.current) {
                     setMessages(prev => prev.map(m => (m.id === updatedMessage.id && m.sourceTable === 'sent_messages') ? updatedMessage : m));
                  }
@@ -187,11 +187,11 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
             const messagePayload: SentMessageInsert = { user_id: user.id, contact_id: contactId, content: text, meta_message_id: metaMessageId, status: 'sent', source: 'direct' };
             
-            const { data: insertedMessage, error } = await supabase.from('sent_messages').insert(messagePayload).select().single();
+            const { data: insertedMessage, error } = await supabase.from('sent_messages').insert(messagePayload as any).select().single();
             if (error) throw error;
 
             if (insertedMessage) {
-                const newMessage = mapPayloadToUnifiedMessage(insertedMessage as Tables<'sent_messages'>);
+                const newMessage = mapPayloadToUnifiedMessage(insertedMessage as unknown as Tables<'sent_messages'>);
                 setMessages(prev => [...prev, newMessage]);
                 setConversations(prev => {
                     const convoIndex = prev.findIndex(c => c.contact.id === contactId);

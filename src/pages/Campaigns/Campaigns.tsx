@@ -1,12 +1,12 @@
 import React, { useContext } from 'react';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
-import { TEMPLATE_ICON, SEND_ICON, MAIL_CHECK_ICON, MAIL_OPEN_ICON } from '../../components/icons';
+import { TEMPLATE_ICON, SEND_ICON, MAIL_CHECK_ICON, MAIL_OPEN_ICON, TRASH_ICON } from '../../components/icons';
 import { CampaignWithMetrics } from '../../types';
 import { CampaignsContext } from '../../contexts/providers/CampaignsContext';
 import { NavigationContext } from '../../contexts/providers/NavigationContext';
 
-const CampaignCard: React.FC<{ campaign: CampaignWithMetrics; onViewDetails: () => void; }> = ({ campaign, onViewDetails }) => {
+const CampaignCard: React.FC<{ campaign: CampaignWithMetrics; onViewDetails: () => void; onDelete: () => void; }> = ({ campaign, onViewDetails, onDelete }) => {
     const readRate = campaign.metrics.sent > 0 ? ((campaign.metrics.read / campaign.metrics.sent) * 100).toFixed(1) + '%' : '0.0%';
 
     const statusStyle = {
@@ -18,7 +18,16 @@ const CampaignCard: React.FC<{ campaign: CampaignWithMetrics; onViewDetails: () 
     const sentDate = new Date(campaign.sent_at).toLocaleDateString('pt-BR', { year: 'numeric', month: 'long', day: 'numeric' });
 
     return (
-        <Card className="flex flex-col justify-between hover:border-sky-500 border border-transparent transition-colors duration-200">
+        <Card className="flex flex-col justify-between hover:border-sky-500 border border-transparent transition-colors duration-200 group relative">
+             <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => { e.stopPropagation(); onDelete(); }}
+                className="absolute top-3 right-3 text-slate-500 hover:text-red-400 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                title="Excluir campanha"
+            >
+                <TRASH_ICON className="w-4 h-4" />
+            </Button>
             <div>
                 <div className="flex justify-between items-start gap-2">
                     <h3 className="text-lg font-semibold text-white break-all">{campaign.name}</h3>
@@ -69,8 +78,19 @@ const CampaignCard: React.FC<{ campaign: CampaignWithMetrics; onViewDetails: () 
 };
 
 const Campaigns: React.FC = () => {
-    const { campaigns } = useContext(CampaignsContext);
+    const { campaigns, deleteCampaign } = useContext(CampaignsContext);
     const { setCurrentPage } = useContext(NavigationContext);
+
+    const handleDeleteCampaign = async (campaignId: string, campaignName: string) => {
+        if (window.confirm(`Tem certeza de que deseja excluir a campanha "${campaignName}"? Esta ação não pode ser desfeita e excluirá todos os seus dados.`)) {
+            try {
+                await deleteCampaign(campaignId);
+            } catch (err: any) {
+                alert(`Erro ao excluir campanha: ${err.message}`);
+            }
+        }
+    };
+
 
     return (
         <div className="space-y-8">
@@ -97,6 +117,7 @@ const Campaigns: React.FC = () => {
                             key={campaign.id}
                             campaign={campaign}
                             onViewDetails={() => setCurrentPage('campaign-details', { campaignId: campaign.id })}
+                            onDelete={() => handleDeleteCampaign(campaign.id, campaign.name)}
                         />
                     ))}
                 </div>

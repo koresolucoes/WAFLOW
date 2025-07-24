@@ -63,7 +63,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const updateProfile = useCallback(async (profileData: EditableProfile) => {
     if (!user) throw new Error("User not authenticated.");
-    const { data, error } = await supabase.from('profiles').update(profileData).eq('id', user.id).select().single();
+    const { data, error } = await supabase.from('profiles').update(profileData as any).eq('id', user.id).select().single();
     if (error) throw error;
     if (data) setProfile(data as unknown as Profile);
   }, [user]);

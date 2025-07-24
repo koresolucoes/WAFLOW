@@ -1,5 +1,5 @@
 
-import React, { createContext, useState, useCallback, ReactNode, useContext } from 'react';
+import React, { createContext, useState, useCallback, ReactNode, useContext, useEffect } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { Campaign, CampaignWithMetrics, CampaignMessageInsert, CampaignWithDetails, CampaignMessageWithContact, CampaignStatus, MessageStatus, TemplateCategory, TemplateStatus } from '../../types';
 import { MetaTemplateComponent } from '../../services/meta/types';
@@ -13,6 +13,7 @@ interface CampaignsContextType {
   setCampaignDetails: React.Dispatch<React.SetStateAction<CampaignWithDetails | null>>;
   addCampaign: (campaign: Omit<Campaign, 'id' | 'user_id' | 'sent_at' | 'created_at' | 'recipient_count' | 'status'> & { status: CampaignStatus }, messages: Omit<CampaignMessageInsert, 'campaign_id'>[]) => Promise<void>;
   fetchCampaignDetails: (campaignId: string) => Promise<void>;
+  deleteCampaign: (campaignId: string) => Promise<void>;
 }
 
 export const CampaignsContext = createContext<CampaignsContextType>(null!);
@@ -55,7 +56,7 @@ export const CampaignsProvider: React.FC<{ children: ReactNode }> = ({ children 
 
 
       setCampaignDetails({
-        ...(campaignDataTyped as Campaign),
+        ...(campaignDataTyped as unknown as Campaign),
         messages: typedMessagesData,
         status: campaignDataTyped.status as CampaignStatus,
         message_templates: message_template_data ? {
@@ -89,14 +90,14 @@ export const CampaignsProvider: React.FC<{ children: ReactNode }> = ({ children 
         recipient_count: messages.length,
         status: campaign.status
     };
-    const { data: newCampaignData, error: campaignError } = await supabase.from('campaigns').insert(campaignPayload).select().single();
+    const { data: newCampaignData, error: campaignError } = await supabase.from('campaigns').insert(campaignPayload as any).select().single();
 
     if (campaignError) throw campaignError;
     const newCampaign = newCampaignData as unknown as Tables<'campaigns'>;
     if (!newCampaign) throw new Error("Failed to create campaign.");
 
     const messagesToInsert = messages.map(msg => ({ ...msg, campaign_id: newCampaign.id }));
-    const { error: messagesError } = await supabase.from('campaign_messages').insert(messagesToInsert);
+    const { error: messagesError } = await supabase.from('campaign_messages').insert(messagesToInsert as any);
 
     if (messagesError) {
         await supabase.from('campaigns').delete().eq('id', newCampaign.id);
@@ -112,13 +113,87 @@ export const CampaignsProvider: React.FC<{ children: ReactNode }> = ({ children 
     setCampaigns(prev => [newCampaignWithMetrics, ...prev]);
   }, [user]);
 
+  const deleteCampaign = useCallback(async (campaignId: string) => {
+    if (!user) throw new Error("User not authenticated.");
+
+    const { error: messagesError } = await supabase
+        .from('campaign_messages')
+        .delete()
+        .eq('campaign_id', campaignId);
+    
+    if (messagesError) throw messagesError;
+
+    const { error: campaignError } = await supabase
+        .from('campaigns')
+        .delete()
+        .eq('id', campaignId);
+
+    if (campaignError) throw campaignError;
+
+    setCampaigns(prev => prev.filter(c => c.id !== campaignId));
+    if (campaignDetails?.id === campaignId) {
+        setCampaignDetails(null);
+    }
+  }, [user, campaignDetails]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const handleCampaignMessageUpdate = (payload: any) => {
+        if (payload.eventType !== 'UPDATE') return;
+
+        const { campaign_id, status: newStatus } = payload.new as Tables<'campaign_messages'>;
+        const { status: oldStatus } = payload.old as Partial<Tables<'campaign_messages'>>;
+
+        if (newStatus === oldStatus) return;
+
+        setCampaigns(prevCampaigns => {
+            const campaignIndex = prevCampaigns.findIndex(c => c.id === campaign_id);
+            if (campaignIndex === -1) return prevCampaigns;
+
+            const updatedCampaigns = [...prevCampaigns];
+            const campaignToUpdate = { ...updatedCampaigns[campaignIndex] };
+            const metrics = { ...campaignToUpdate.metrics };
+
+            if (newStatus === 'read' && oldStatus !== 'read') {
+                metrics.read++;
+                if (oldStatus !== 'delivered') {
+                    metrics.delivered++;
+                }
+            } else if (newStatus === 'delivered' && oldStatus !== 'delivered') {
+                metrics.delivered++;
+            }
+            
+            campaignToUpdate.metrics = metrics;
+            updatedCampaigns[campaignIndex] = campaignToUpdate;
+
+            return updatedCampaigns;
+        });
+    };
+
+    const channel = supabase
+        .channel('campaign-message-updates')
+        .on(
+            'postgres_changes',
+            { event: 'UPDATE', schema: 'public', table: 'campaign_messages' },
+            handleCampaignMessageUpdate
+        )
+        .subscribe();
+        
+    return () => {
+        supabase.removeChannel(channel);
+    };
+  }, [user]);
+
+
   const value = {
     campaigns,
     setCampaigns,
     campaignDetails,
     setCampaignDetails,
     addCampaign,
-    fetchCampaignDetails
+    fetchCampaignDetails,
+    deleteCampaign
   };
   
   return (

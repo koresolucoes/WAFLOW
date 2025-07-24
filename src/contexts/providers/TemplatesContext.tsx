@@ -28,7 +28,7 @@ export const TemplatesProvider: React.FC<{ children: ReactNode }> = ({ children 
     
     const { data, error } = await supabase
       .from('message_templates')
-      .insert(dbTemplate)
+      .insert(dbTemplate as any)
       .select()
       .single();
     if (error) throw error;

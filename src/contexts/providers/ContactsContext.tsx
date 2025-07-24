@@ -92,7 +92,7 @@ export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }
     const addContact = useCallback(async (contact: EditableContact) => {
         if (!user) throw new Error("User not authenticated.");
         const payload: TablesInsert<'contacts'> = { ...contact, phone: normalizePhoneNumber(contact.phone), user_id: user.id };
-        const { data, error } = await supabase.from('contacts').insert(payload).select().single();
+        const { data, error } = await supabase.from('contacts').insert(payload as any).select().single();
         if (error) throw error;
         if(data) {
           const newContact = data as unknown as Contact;
@@ -124,7 +124,7 @@ export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }
 
         const { data, error } = await supabase
             .from('contacts')
-            .update(updatePayload)
+            .update(updatePayload as any)
             .eq('id', updatedContact.id)
             .eq('user_id', user.id)
             .select()
@@ -178,7 +178,7 @@ export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }
         });
 
         if (contactsToInsert.length > 0) {
-            const { data, error } = await supabase.from('contacts').insert(contactsToInsert).select();
+            const { data, error } = await supabase.from('contacts').insert(contactsToInsert as any).select();
             if (error) throw error;
             if(data) {
                 const newContactList = data as unknown as Contact[];
@@ -227,7 +227,7 @@ export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }
         await Promise.all(promises);
 
         if (messagesToInsert.length > 0) {
-            const { error } = await supabase.from('sent_messages').insert(messagesToInsert);
+            const { error } = await supabase.from('sent_messages').insert(messagesToInsert as any);
             if (error) {
                 console.error("Falha ao salvar registros de mensagens diretas enviadas:", error);
             }

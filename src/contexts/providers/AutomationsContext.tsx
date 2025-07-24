@@ -77,7 +77,7 @@ export const AutomationsProvider: React.FC<{ children: ReactNode }> = ({ childre
     const createAndNavigateToAutomation = useCallback(async () => {
         if (!user) throw new Error("User not authenticated.");
         const dbAutomation: TablesInsert<'automations'> = { user_id: user.id, name: 'Nova Automação (Rascunho)', status: 'paused', nodes: [] as unknown as Json, edges: [] as unknown as Json };
-        const { data, error } = await supabase.from('automations').insert(dbAutomation).select().single();
+        const { data, error } = await supabase.from('automations').insert(dbAutomation as any).select().single();
 
         if (error) throw error;
         if (data) {
@@ -92,10 +92,10 @@ export const AutomationsProvider: React.FC<{ children: ReactNode }> = ({ childre
         if (!user) throw new Error("User not authenticated.");
         const updatePayload: TablesUpdate<'automations'> = { name: automation.name, status: automation.status, nodes: automation.nodes as unknown as Json, edges: automation.edges as unknown as Json };
         
-        const { data, error } = await supabase.from('automations').update(updatePayload).eq('id', automation.id).eq('user_id', user.id).select().single();
+        const { data, error } = await supabase.from('automations').update(updatePayload as any).eq('id', automation.id).eq('user_id', user.id).select().single();
         if(error) throw error;
 
-        const { error: rpcError } = await supabase.rpc('sync_automation_triggers' as any, { automation_id_in: automation.id });
+        const { error: rpcError } = await supabase.rpc('sync_automation_triggers' as any, { automation_id_in: automation.id } as any);
         if (rpcError) {
             console.error("Falha ao sincronizar gatilhos de automação:", rpcError);
         }

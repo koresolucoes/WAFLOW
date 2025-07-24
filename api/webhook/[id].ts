@@ -1,7 +1,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
-import { TablesUpdate } from '../_lib/types.js';
+import { Profile, TablesUpdate } from '../_lib/types.js';
 import { publishEvent } from '../_lib/automation/trigger-handler.js';
 import { findOrCreateContactByPhone } from '../_lib/webhook/contact-mapper.js';
 
@@ -15,13 +15,13 @@ const processStatusUpdate = async (status: any) => {
         const campaignUpdate: TablesUpdate<'campaign_messages'> = { status: newStatus };
         if (newStatus === 'delivered') campaignUpdate.delivered_at = timestamp;
         if (newStatus === 'read') campaignUpdate.read_at = timestamp;
-        await supabaseAdmin.from('campaign_messages').update(campaignUpdate).eq('meta_message_id', status.id);
+        await supabaseAdmin.from('campaign_messages').update(campaignUpdate as any).eq('meta_message_id', status.id);
 
         // Update direct sent messages
         const sentMessagesUpdate: TablesUpdate<'sent_messages'> = { status: newStatus };
         if (newStatus === 'delivered') sentMessagesUpdate.delivered_at = timestamp;
         if (newStatus === 'read') sentMessagesUpdate.read_at = timestamp;
-        await supabaseAdmin.from('sent_messages').update(sentMessagesUpdate).eq('meta_message_id', status.id);
+        await supabaseAdmin.from('sent_messages').update(sentMessagesUpdate as any).eq('meta_message_id', status.id);
 
     } catch (e: any) {
         console.error(`[ERROR] Failed to process status update for message ${status.id}:`, e.message);
@@ -50,7 +50,7 @@ const processIncomingMessage = async (userId: string, message: any, contactsPayl
             contact_id: contact.id,
             meta_message_id: message.id,
             message_body: messageBody
-        });
+        } as any);
 
         if (insertError) {
             console.error(`[ERROR] Failed to insert received message for contact ${contact.id}:`, insertError);
@@ -137,7 +137,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     // Handle Incoming Messages
                     if (value.messages) {
                         const incomingPhoneNumberId = value?.metadata?.phone_number_id;
-                        if (profile.meta_phone_number_id !== String(incomingPhoneNumberId)) {
+                        if ((profile as Profile).meta_phone_number_id !== String(incomingPhoneNumberId)) {
                              console.warn(`[WARN] Incoming phone_number_id (${incomingPhoneNumberId}) does not match the one configured for user ${userId}. Processing anyway.`);
                         }
                         
