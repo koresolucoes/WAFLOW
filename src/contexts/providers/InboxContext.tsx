@@ -1,6 +1,7 @@
 
 
-import React, { createContext, useState, useCallback, ReactNode, useContext, useEffect } from 'react';
+
+import React, { createContext, useState, useCallback, ReactNode, useContext, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { AuthContext } from './AuthContext';
 import { ContactsContext } from './ContactsContext';
@@ -29,22 +30,27 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const [activeContactId, setActiveContactId] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [isSending, setIsSending] = useState(false);
+    
+    const activeContactIdRef = useRef(activeContactId);
+    useEffect(() => {
+        activeContactIdRef.current = activeContactId;
+    }, [activeContactId]);
+
 
     const fetchConversations = useCallback(async () => {
         if (!user) return;
-        setIsLoading(true);
+        // Don't set loading for background refreshes
+        // setIsLoading(true);
 
         const { data, error } = await supabase.rpc('get_conversations_with_contacts', { p_user_id: user.id });
 
         if (error) {
             console.error("Error fetching conversations:", error);
-            setIsLoading(false);
+            // setIsLoading(false);
             return;
         }
         
         if (data && Array.isArray(data)) {
-            // CORREÇÃO: Mapeia corretamente a estrutura retornada pelo RPC.
-            // O objeto 'last_message' já vem completo e aninhado.
             const fetchedConversations: Conversation[] = (data as any[]).map(item => ({
                 contact: item.contact_details as Contact,
                 last_message: item.last_message as UnifiedMessage,
@@ -54,7 +60,7 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         } else {
             setConversations([]);
         }
-        setIsLoading(false);
+        // setIsLoading(false);
     }, [user]);
     
     const fetchMessages = useCallback(async (contactId: string | null) => {
@@ -92,28 +98,24 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         if (user) {
             fetchConversations();
 
-            const channel = supabase.channel(`inbox-${user.id}`)
-                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'received_messages' }, payload => {
-                    console.log('Realtime new received message', payload);
-                    fetchConversations();
-                    if((payload.new as Tables<'received_messages'>).contact_id === activeContactId){
-                         fetchMessages(activeContactId);
-                    }
-                })
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'sent_messages' }, payload => {
-                    console.log('Realtime sent message change', payload);
-                    fetchConversations();
-                    if((payload.new as Tables<'sent_messages'>).contact_id === activeContactId){
-                         fetchMessages(activeContactId);
-                    }
-                })
+            const handleDbChange = (payload: any) => {
+                console.log('Realtime DB change received:', payload.eventType, payload.table);
+                fetchConversations();
+                if (payload.new.contact_id === activeContactIdRef.current) {
+                    fetchMessages(activeContactIdRef.current);
+                }
+            };
+            
+            const channel = supabase.channel(`inbox-changes-for-user-${user.id}`)
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'received_messages' }, handleDbChange)
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'sent_messages' }, handleDbChange)
                 .subscribe();
             
             return () => {
                 supabase.removeChannel(channel);
             }
         }
-    }, [user, fetchConversations, fetchMessages, activeContactId]);
+    }, [user, fetchConversations, fetchMessages]);
 
     const sendMessage = useCallback(async (contactId: string, text: string) => {
         if (!user || !metaConfig.accessToken) throw new Error("Usuário ou configuração da Meta ausente.");

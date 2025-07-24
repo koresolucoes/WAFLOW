@@ -20,6 +20,35 @@ interface ContactsContextType {
 
 export const ContactsContext = createContext<ContactsContextType>(null!);
 
+const normalizePhoneNumber = (phone: string): string => {
+    if (!phone) return '';
+    // 1. Strip all non-numeric characters.
+    let digits = phone.replace(/\D/g, '');
+
+    // 2. Remove the optional leading '0' for DDD.
+    if (digits.length > 10 && digits.startsWith('0')) {
+        digits = digits.substring(1);
+    }
+
+    // 3. Handle country code (55 for Brazil).
+    // If it has 10 or 11 digits, it's likely a local number (DDD + number). Prepend 55.
+    if (digits.length === 10 || digits.length === 11) {
+        digits = '55' + digits;
+    }
+    
+    // 4. Add the '9' for mobiles if missing (full old number is 12 digits: 55 + DDD + 8-digit number)
+    if (digits.length === 12 && digits.startsWith('55')) {
+        const areaCode = digits.substring(2, 4);
+        const numberPart = digits.substring(4);
+        if (parseInt(areaCode) >= 11) {
+             digits = `55${areaCode}9${numberPart}`;
+        }
+    }
+    
+    return digits;
+};
+
+
 export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const { user } = useContext(AuthContext);
     const [contacts, setContacts] = useState<Contact[]>([]);
@@ -60,7 +89,7 @@ export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }
 
     const addContact = useCallback(async (contact: EditableContact) => {
         if (!user) throw new Error("User not authenticated.");
-        const payload: TablesInsert<'contacts'> = { ...contact, user_id: user.id };
+        const payload: TablesInsert<'contacts'> = { ...contact, phone: normalizePhoneNumber(contact.phone), user_id: user.id };
         const { data, error } = await supabase.from('contacts').insert(payload).select().single();
         if (error) throw error;
         if(data) {
@@ -84,7 +113,7 @@ export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }
 
         const updatePayload: TablesUpdate<'contacts'> = {
             name: updatedContact.name,
-            phone: updatedContact.phone,
+            phone: normalizePhoneNumber(updatedContact.phone),
             email: updatedContact.email,
             company: updatedContact.company,
             tags: updatedContact.tags,
@@ -132,14 +161,14 @@ export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }
     const importContacts = useCallback(async (newContacts: EditableContact[]): Promise<{ importedCount: number; skippedCount: number }> => {
         if (!user) throw new Error("User not authenticated.");
         
-        const existingPhones = new Set(contacts.map(c => c.phone.replace(/\D/g, '')));
+        const existingPhones = new Set(contacts.map(c => normalizePhoneNumber(c.phone)));
         const contactsToInsert: TablesInsert<'contacts'>[] = [];
         let skippedCount = 0;
         
         newContacts.forEach(contact => {
-            const sanitizedPhone = contact.phone.replace(/\D/g, '');
+            const sanitizedPhone = normalizePhoneNumber(contact.phone);
             if (sanitizedPhone && !existingPhones.has(sanitizedPhone)) {
-                contactsToInsert.push({ ...contact, user_id: user.id, custom_fields: contact.custom_fields || null });
+                contactsToInsert.push({ ...contact, phone: sanitizedPhone, user_id: user.id, custom_fields: contact.custom_fields || null });
                 existingPhones.add(sanitizedPhone);
             } else {
                 skippedCount++;

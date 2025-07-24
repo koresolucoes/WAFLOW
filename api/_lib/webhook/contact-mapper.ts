@@ -3,16 +3,46 @@ import { supabaseAdmin } from '../supabaseAdmin.js';
 import { Contact, Profile, Json, TablesInsert, TablesUpdate } from '../types.js';
 import { getValueFromPath } from '../automation/helpers.js';
 
+const normalizePhoneNumber = (phone: string): string => {
+    if (!phone) return '';
+    // 1. Strip all non-numeric characters.
+    let digits = phone.replace(/\D/g, '');
+
+    // 2. Remove the optional leading '0' for DDD.
+    if (digits.length > 10 && digits.startsWith('0')) {
+        digits = digits.substring(1);
+    }
+
+    // 3. Handle country code (55 for Brazil).
+    // If it has 10 or 11 digits, it's likely a local number (DDD + number). Prepend 55.
+    if (digits.length === 10 || digits.length === 11) {
+        digits = '55' + digits;
+    }
+    
+    // 4. Add the '9' for mobiles if missing (full old number is 12 digits: 55 + DDD + 8-digit number)
+    if (digits.length === 12 && digits.startsWith('55')) {
+        const areaCode = digits.substring(2, 4);
+        const numberPart = digits.substring(4);
+        if (parseInt(areaCode) >= 11) {
+             digits = `55${areaCode}9${numberPart}`;
+        }
+    }
+    
+    return digits;
+};
+
 export const findOrCreateContactByPhone = async (user_id: string, phone: string, name: string): Promise<{ contact: Contact | null, isNew: boolean }> => {
+    const normalizedPhone = normalizePhoneNumber(phone);
+    
     let { data: contactData, error } = await supabaseAdmin
         .from('contacts')
         .select('*')
         .eq('user_id', user_id)
-        .eq('phone', phone)
+        .eq('phone', normalizedPhone)
         .single();
 
     if (error && error.code === 'PGRST116') { // Not found
-        const newContactPayload: TablesInsert<'contacts'> = { user_id, phone, name, tags: ['new-lead'], custom_fields: null };
+        const newContactPayload: TablesInsert<'contacts'> = { user_id, phone: normalizedPhone, name, tags: ['new-lead'], custom_fields: null };
         const { data: newContact, error: insertError } = await supabaseAdmin
             .from('contacts')
             .insert(newContactPayload)
@@ -44,27 +74,18 @@ export const processWebhookPayloadForContact = async (
 
     if (phoneRule && phoneRule.source) {
         const phoneValue = getValueFromPath(fullPayloadForEvent, phoneRule.source);
-        const phone = phoneValue ? String(phoneValue).replace(/\D/g, '') : null;
+        const phone = phoneValue ? String(phoneValue) : null;
 
         if (phone) {
-            let { data: contactData, error: contactError } = await supabaseAdmin.from('contacts').select('*').eq('user_id', profile.id).eq('phone', phone).single();
+            // Use the findOrCreate logic which normalizes the number
+            const nameRule = mappingRules.find((m: any) => m.destination === 'name');
+            const name = getValueFromPath(fullPayloadForEvent, nameRule?.source) || 'New Webhook Lead';
+            const { contact: foundOrCreatedContact, isNew } = await findOrCreateContactByPhone(profile.id, phone, name);
             
-            if (contactError && contactError.code === 'PGRST116') { // not found
-                isNewContact = true;
-                const nameRule = mappingRules.find((m: any) => m.destination === 'name');
-                const name = getValueFromPath(fullPayloadForEvent, nameRule?.source) || 'New Webhook Lead';
-                const newContactPayload: TablesInsert<'contacts'> = { user_id: profile.id, name, phone, tags: ['new-webhook-lead'], custom_fields: null };
-                const { data: newContact, error: insertError } = await supabaseAdmin.from('contacts').insert(newContactPayload).select().single();
-                if (insertError) {
-                    console.error('Webhook trigger: Failed to create new contact.', insertError);
-                } else if (newContact) {
-                    contact = newContact as unknown as Contact;
-                }
-            } else if (contactError) {
-                console.error('Webhook trigger: Failed to query contact.', contactError);
-            } else if (contactData) {
-                contact = contactData as unknown as Contact;
-                if(contact) originalTags = new Set(contact.tags || []);
+            contact = foundOrCreatedContact;
+            isNewContact = isNew;
+            if (contact && !isNew) {
+                originalTags = new Set(contact.tags || []);
             }
         }
     }
