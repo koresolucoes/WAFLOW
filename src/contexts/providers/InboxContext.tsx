@@ -116,7 +116,6 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }, [user, fetchConversations, fetchMessages, activeContactId]);
 
     const sendMessage = useCallback(async (contactId: string, text: string) => {
-        const { data: { user } } = await supabase.auth.getUser();
         if (!user || !metaConfig.accessToken) throw new Error("Usuário ou configuração da Meta ausente.");
         
         const contact = contacts.find(c => c.id === contactId);
@@ -145,7 +144,7 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         } finally {
             setIsSending(false);
         }
-    }, [metaConfig, contacts]);
+    }, [user, metaConfig, contacts]);
 
 
     const value = {
