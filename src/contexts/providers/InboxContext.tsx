@@ -1,4 +1,5 @@
 
+
 import React, { createContext, useState, useCallback, ReactNode, useContext, useEffect } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { AuthContext } from './AuthContext';
@@ -115,6 +116,7 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }, [user, fetchConversations, fetchMessages, activeContactId]);
 
     const sendMessage = useCallback(async (contactId: string, text: string) => {
+        const { data: { user } } = await supabase.auth.getUser();
         if (!user || !metaConfig.accessToken) throw new Error("Usuário ou configuração da Meta ausente.");
         
         const contact = contacts.find(c => c.id === contactId);
@@ -125,7 +127,7 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             const response = await sendTextMessage(metaConfig, contact.phone, text);
             const metaMessageId = response.messages[0].id;
 
-            const messagePayload: TablesInsert<'sent_messages'> = {
+            const messagePayload: SentMessageInsert = {
                 user_id: user.id,
                 contact_id: contactId,
                 content: text,
@@ -143,7 +145,7 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         } finally {
             setIsSending(false);
         }
-    }, [user, metaConfig, contacts]);
+    }, [metaConfig, contacts]);
 
 
     const value = {

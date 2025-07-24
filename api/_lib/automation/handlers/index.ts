@@ -1,10 +1,10 @@
 
-import { ActionHandler } from '../types';
-import { addTag, removeTag, setCustomField } from './contact';
-import { sendWebhook } from './integrations';
-import { condition, splitPath } from './logic';
-import { sendTemplate, sendTextMessageAction, sendMediaAction, sendInteractiveMessageAction } from './messaging';
-import { triggerHandler } from './trigger';
+import { ActionHandler } from '../types.js';
+import { addTag, removeTag, setCustomField } from './contact.js';
+import { sendWebhook } from './integrations.js';
+import { condition, splitPath } from './logic.js';
+import { sendTemplate, sendTextMessageAction, sendMediaAction, sendInteractiveMessageAction } from './messaging.js';
+import { triggerHandler } from './trigger.js';
 
 export const actionHandlers: Record<string, ActionHandler> = {
     // Triggers

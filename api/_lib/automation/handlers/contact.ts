@@ -1,9 +1,9 @@
 
-import { supabaseAdmin } from '../../supabaseAdmin';
-import { Contact, TablesUpdate } from '../../types';
-import { handleTagAddedEvent } from '../trigger-handler';
-import { ActionHandler } from '../types';
-import { resolveVariables } from '../helpers';
+import { supabaseAdmin } from '../../supabaseAdmin.js';
+import { Contact, TablesUpdate } from '../../types.js';
+import { handleTagAddedEvent } from '../trigger-handler.js';
+import { ActionHandler } from '../types.js';
+import { resolveVariables } from '../helpers.js';
 
 export const addTag: ActionHandler = async ({ contact, node, trigger }) => {
     if (!contact) {

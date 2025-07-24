@@ -1,9 +1,9 @@
 
-import { supabaseAdmin } from '../supabaseAdmin';
-import { Automation, Contact, Json, AutomationNode, Profile, TablesInsert, TablesUpdate } from '../types';
-import { actionHandlers } from './handlers/index';
-import { ActionResult } from './types';
-import { ExecutionLifecycleHooks } from './ExecutionLifecycleHooks';
+import { supabaseAdmin } from '../supabaseAdmin.js';
+import { Automation, Contact, Json, AutomationNode, Profile, TablesInsert, TablesUpdate } from '../types.js';
+import { actionHandlers } from './handlers/index.js';
+import { ActionResult } from './types.js';
+import { ExecutionLifecycleHooks } from './ExecutionLifecycleHooks.js';
 
 /**
  * Creates and configures a default set of lifecycle hooks for logging automation runs.

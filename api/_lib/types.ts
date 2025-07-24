@@ -1,5 +1,4 @@
 
-
 import { Json as DbJson, Database } from './database.types.js';
 import { MetaTemplateComponent } from './meta/types.js';
 

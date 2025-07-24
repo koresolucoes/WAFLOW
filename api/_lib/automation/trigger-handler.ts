@@ -1,8 +1,8 @@
 
-import { supabaseAdmin } from '../supabaseAdmin';
-import { executeAutomation, createDefaultLoggingHooks } from './engine';
-import { Automation, Contact, Json, Profile, Tables } from '../types';
-import { sanitizeAutomation } from './utils';
+import { supabaseAdmin } from '../supabaseAdmin.js';
+import { executeAutomation, createDefaultLoggingHooks } from './engine.js';
+import { Automation, Contact, Json, Profile, Tables } from '../types.js';
+import { sanitizeAutomation } from './utils.js';
 
 type TriggerInfo = {
     automation_id: string;

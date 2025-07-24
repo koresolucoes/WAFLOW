@@ -1,9 +1,9 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { supabaseAdmin } from '../_lib/supabaseAdmin';
-import { TablesInsert, TablesUpdate, Tables } from '../_lib/types';
-import { publishEvent } from '../_lib/automation/trigger-handler';
-import { findOrCreateContactByPhone } from '../_lib/webhook/contact-mapper';
+import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
+import { TablesInsert, TablesUpdate, Tables } from '../_lib/types.js';
+import { publishEvent } from '../_lib/automation/trigger-handler.js';
+import { findOrCreateContactByPhone } from '../_lib/webhook/contact-mapper.js';
 
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
