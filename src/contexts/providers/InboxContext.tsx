@@ -52,7 +52,7 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
     const fetchConversations = useCallback(async () => {
         if (!user) return;
-        const { data, error } = await supabase.rpc('get_conversations_with_contacts', { p_user_id: user.id });
+        const { data, error } = await supabase.rpc('get_conversations_with_contacts' as any, { p_user_id: user.id });
 
         if (error) {
             console.error("Error fetching conversations:", error);
@@ -78,7 +78,7 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         }
         setIsLoading(true);
 
-        const { data, error } = await supabase.rpc('get_unified_message_history', {
+        const { data, error } = await supabase.rpc('get_unified_message_history' as any, {
             p_user_id: user.id,
             p_contact_id: contactId
         });
@@ -166,27 +166,26 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             };
             
             const channel = supabase.channel(`inbox-changes-for-user-${user.id}`)
-                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'received_messages' }, handleDbChange)
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'sent_messages' }, handleDbChange)
-                .subscribe();
+                .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'sent_messages' }, handleDbChange)
+                .on('broadcast', { event: 'new_message' }, ({ payload }) => {
+                    console.log('New message broadcast received:', payload);
+                    handleDbChange(payload);
+                })
+                .subscribe((status, err) => {
+                    if (status === 'SUBSCRIBED') console.log('Successfully subscribed to inbox channel.');
+                    if (err) console.error('Error subscribing to inbox channel:', err);
+                });
             
             return () => {
                 supabase.removeChannel(channel);
             }
         }
-    }, [user, fetchConversations, fetchMessages]);
+    }, [user, fetchConversations]);
 
     const sendMessage = useCallback(async (contactId: string, text: string) => {
         if (!user) {
             throw new Error("Usuário não autenticado.");
         }
-        const { data: authData } = await supabase.auth.getUser();
-        if (!authData.user) {
-            throw new Error("Sessão de usuário inválida. Por favor, faça login novamente.");
-        }
-
-        const currentUserId = authData.user.id;
-        
         if (!metaConfig.accessToken) throw new Error("Configuração da Meta ausente.");
         
         const contact = contacts.find(c => c.id === contactId);
@@ -198,7 +197,7 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             const metaMessageId = response.messages[0].id;
 
             const messagePayload: SentMessageInsert = {
-                user_id: currentUserId,
+                user_id: user.id,
                 contact_id: contactId,
                 content: text,
                 meta_message_id: metaMessageId,
@@ -206,14 +205,41 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 source: 'direct'
             };
             
-            // O gatilho de tempo real cuidará da atualização da UI
-            const { error } = await supabase.from('sent_messages').insert(messagePayload);
+            const { data: insertedMessage, error } = await supabase
+                .from('sent_messages')
+                .insert(messagePayload)
+                .select()
+                .single();
+            
             if (error) {
-                // Se a inserção falhar, lança o erro para a UI tratar.
                  if (error.message.includes('violates row-level security policy')) {
                     throw new Error("Falha de permissão ao salvar a mensagem. Verifique se sua sessão não expirou.");
                  }
                 throw error;
+            }
+
+            if (insertedMessage) {
+                const newMessage = mapPayloadToUnifiedMessage(insertedMessage as Tables<'sent_messages'>);
+                setMessages(prev => [...prev, newMessage]);
+                setConversations(prev => {
+                    const convoIndex = prev.findIndex(c => c.contact.id === contactId);
+                    if (convoIndex > -1) {
+                        const updatedConvo = { ...prev[convoIndex], last_message: newMessage, unread_count: 0 };
+                        const otherConvos = prev.filter(c => c.contact.id !== contactId);
+                        return [updatedConvo, ...otherConvos];
+                    } else {
+                        const contactDetails = contacts.find(c => c.id === contactId);
+                        if (contactDetails) {
+                            const newConvo: Conversation = {
+                                contact: contactDetails,
+                                last_message: newMessage,
+                                unread_count: 0
+                            };
+                            return [newConvo, ...prev];
+                        }
+                        return prev;
+                    }
+                });
             }
             
         } catch (error: any) {

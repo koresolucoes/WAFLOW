@@ -1,7 +1,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
-import { TablesInsert, TablesUpdate, Tables } from '../_lib/types.js';
+import { TablesUpdate } from '../_lib/types.js';
 import { publishEvent } from '../_lib/automation/trigger-handler.js';
 import { findOrCreateContactByPhone } from '../_lib/webhook/contact-mapper.js';
 
@@ -126,12 +126,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                                         messageBody = `Botão Clicado: "${message.interactive.button_reply.title}"`;
                                     }
                                     
-                                    await supabaseAdmin.from('received_messages').insert({
+                                    const { data: insertedMessage, error: insertError } = await supabaseAdmin.from('received_messages').insert({
                                         user_id: userId,
                                         contact_id: contact.id,
                                         meta_message_id: message.id,
                                         message_body: messageBody
+                                    }).select().single();
+
+                                    if (insertError || !insertedMessage) {
+                                        console.error(`Error inserting received message for contact ${contact.id}:`, insertError);
+                                        return;
+                                    }
+                                    
+                                    // Broadcast the new message to the client
+                                    const channel = supabaseAdmin.channel(`inbox-changes-for-user-${userId}`);
+                                    await channel.send({
+                                        type: 'broadcast',
+                                        event: 'new_message',
+                                        payload: {
+                                            eventType: 'INSERT',
+                                            table: 'received_messages',
+                                            new: insertedMessage
+                                        }
                                     });
+                                    await supabaseAdmin.removeChannel(channel);
                                     
                                     await publishEvent('message_received', userId, { contact, message });
                                     if (isNew) {

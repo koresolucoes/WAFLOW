@@ -1,5 +1,11 @@
 
-export type Json = any
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
 
 export type Database = {
   public: {
@@ -525,41 +531,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      get_conversations_with_contacts: {
-        Args: {
-          p_user_id: string
-        }
-        Returns: Json[]
-      }
-      get_unified_message_history: {
-        Args: {
-          p_user_id: string
-          p_contact_id: string
-        }
-        Returns: Json[]
-      }
-      handle_new_user: {
-        Args: Record<PropertyKey, never>
-        Returns: unknown
-      }
-      increment_node_stat: {
-        Args: {
-          p_automation_id: string
-          p_node_id: string
-          p_status: string
-        }
-        Returns: undefined
-      }
-      sync_automation_triggers: {
-        Args: {
-          automation_id_in: string
-        }
-        Returns: undefined
-      }
-      update_deal_updated_at_column: {
-        Args: Record<PropertyKey, never>
-        Returns: unknown
-      }
+      [_ in never]: never
     }
     Enums: {
       [_ in never]: never

@@ -95,7 +95,7 @@ export const AutomationsProvider: React.FC<{ children: ReactNode }> = ({ childre
         const { data, error } = await supabase.from('automations').update(updatePayload).eq('id', automation.id).eq('user_id', user.id).select().single();
         if(error) throw error;
 
-        const { error: rpcError } = await supabase.rpc('sync_automation_triggers', { automation_id_in: automation.id });
+        const { error: rpcError } = await supabase.rpc('sync_automation_triggers' as any, { automation_id_in: automation.id });
         if (rpcError) {
             console.error("Falha ao sincronizar gatilhos de automação:", rpcError);
         }

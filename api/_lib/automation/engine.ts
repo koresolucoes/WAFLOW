@@ -1,6 +1,6 @@
 
 import { supabaseAdmin } from '../supabaseAdmin.js';
-import { Automation, Contact, Json, AutomationNode, Profile, TablesInsert, TablesUpdate } from '../types.js';
+import { Automation, Contact, Json, AutomationNode, Profile, TablesInsert } from '../types.js';
 import { actionHandlers } from './handlers/index.js';
 import { ActionResult } from './types.js';
 import { ExecutionLifecycleHooks } from './ExecutionLifecycleHooks.js';
@@ -52,7 +52,7 @@ export const createDefaultLoggingHooks = (automationId: string, contactId: strin
         await supabaseAdmin.from('automation_node_logs').insert(logPayload);
         
         // Increment the success/error counter for the node
-        await supabaseAdmin.rpc('increment_node_stat', {
+        await supabaseAdmin.rpc('increment_node_stat' as any, {
             p_automation_id: automationId,
             p_node_id: node.id,
             p_status: status,
