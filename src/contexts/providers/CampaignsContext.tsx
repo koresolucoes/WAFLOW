@@ -139,36 +139,39 @@ export const CampaignsProvider: React.FC<{ children: ReactNode }> = ({ children 
   useEffect(() => {
     if (!user) return;
 
-    const handleCampaignMessageUpdate = (payload: any) => {
+    const handleCampaignMessageUpdate = async (payload: any) => {
         if (payload.eventType !== 'UPDATE') return;
 
-        const { campaign_id, status: newStatus } = payload.new as Tables<'campaign_messages'>;
-        const { status: oldStatus } = payload.old as Partial<Tables<'campaign_messages'>>;
+        const updatedMessage = payload.new as Tables<'campaign_messages'>;
+        const campaignId = updatedMessage.campaign_id;
 
-        if (newStatus === oldStatus) return;
+        // Find the campaign in the current state
+        const campaignToUpdate = campaigns.find(c => c.id === campaignId);
+        if (!campaignToUpdate) return; // Not a campaign we are currently displaying
 
-        setCampaigns(prevCampaigns => {
-            const campaignIndex = prevCampaigns.findIndex(c => c.id === campaign_id);
-            if (campaignIndex === -1) return prevCampaigns;
-
-            const updatedCampaigns = [...prevCampaigns];
-            const campaignToUpdate = { ...updatedCampaigns[campaignIndex] };
-            const metrics = { ...campaignToUpdate.metrics };
-
-            if (newStatus === 'read' && oldStatus !== 'read') {
-                metrics.read++;
-                if (oldStatus !== 'delivered') {
-                    metrics.delivered++;
-                }
-            } else if (newStatus === 'delivered' && oldStatus !== 'delivered') {
-                metrics.delivered++;
-            }
+        // Refetch metrics directly from the DB for accuracy
+        const { data, error } = await supabase
+            .from('campaign_messages')
+            .select('status')
+            .eq('campaign_id', campaignId);
             
-            campaignToUpdate.metrics = metrics;
-            updatedCampaigns[campaignIndex] = campaignToUpdate;
+        if (error) {
+            console.error(`Realtime: Failed to refetch metrics for campaign ${campaignId}`, error);
+            return;
+        }
 
-            return updatedCampaigns;
-        });
+        const typedData = (data as unknown as { status: MessageStatus }[]) || [];
+        const newMetrics = {
+            sent: campaignToUpdate.metrics.sent, // 'sent' count does not change
+            delivered: typedData.filter(d => d.status === 'delivered' || d.status === 'read').length,
+            read: typedData.filter(d => d.status === 'read').length,
+        };
+
+        setCampaigns(prevCampaigns =>
+            prevCampaigns.map(c =>
+                c.id === campaignId ? { ...c, metrics: newMetrics } : c
+            )
+        );
     };
 
     const channel = supabase
@@ -183,7 +186,7 @@ export const CampaignsProvider: React.FC<{ children: ReactNode }> = ({ children 
     return () => {
         supabase.removeChannel(channel);
     };
-  }, [user]);
+  }, [user, campaigns]);
 
 
   const value = {

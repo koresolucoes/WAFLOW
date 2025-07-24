@@ -7,24 +7,41 @@ import { findOrCreateContactByPhone } from '../_lib/webhook/contact-mapper.js';
 
 
 const processStatusUpdate = async (status: any) => {
+    console.log(`[STATUS] Processing status update for message ${status.id}: ${status.status}`);
     try {
-        const newStatus = status.status;
-        const timestamp = new Date(status.timestamp * 1000).toISOString();
+        const newStatus = status.status; // 'sent', 'delivered', 'read', 'failed'
+        if (!['sent', 'delivered', 'read', 'failed'].includes(newStatus)) {
+            console.warn(`[STATUS] Ignored unknown status type: ${newStatus}`);
+            return;
+        }
+        
+        const timestamp = new Date(parseInt(status.timestamp, 10) * 1000).toISOString();
 
-        // Update campaign messages
-        const campaignUpdate: TablesUpdate<'campaign_messages'> = { status: newStatus };
-        if (newStatus === 'delivered') campaignUpdate.delivered_at = timestamp;
-        if (newStatus === 'read') campaignUpdate.read_at = timestamp;
-        await supabaseAdmin.from('campaign_messages').update(campaignUpdate as any).eq('meta_message_id', status.id);
+        const baseUpdate: Partial<TablesUpdate<'campaign_messages' | 'sent_messages'>> = {
+            status: newStatus,
+        };
 
-        // Update direct sent messages
-        const sentMessagesUpdate: TablesUpdate<'sent_messages'> = { status: newStatus };
-        if (newStatus === 'delivered') sentMessagesUpdate.delivered_at = timestamp;
-        if (newStatus === 'read') sentMessagesUpdate.read_at = timestamp;
-        await supabaseAdmin.from('sent_messages').update(sentMessagesUpdate as any).eq('meta_message_id', status.id);
+        if (newStatus === 'delivered') {
+            baseUpdate.delivered_at = timestamp;
+        } else if (newStatus === 'read') {
+            // If a message is read, it must have been delivered.
+            // This handles cases where the 'delivered' webhook is missed or arrives out of order.
+            baseUpdate.read_at = timestamp;
+            baseUpdate.delivered_at = baseUpdate.delivered_at || timestamp;
+        } else if (newStatus === 'failed' && status.errors) {
+            baseUpdate.error_message = `${status.errors[0]?.title} (Code: ${status.errors[0]?.code})`;
+        }
+
+        // Attempt to update both tables. One of them will match the message ID.
+        // This is safe because meta_message_id is unique across the user's messages.
+        const { error: campaignError } = await supabaseAdmin.from('campaign_messages').update(baseUpdate as any).eq('meta_message_id', status.id);
+        const { error: sentError } = await supabaseAdmin.from('sent_messages').update(baseUpdate as any).eq('meta_message_id', status.id);
+
+        if (campaignError) console.error(`[STATUS] Error updating campaign_messages for ${status.id}:`, campaignError.message);
+        if (sentError) console.error(`[STATUS] Error updating sent_messages for ${status.id}:`, sentError.message);
 
     } catch (e: any) {
-        console.error(`[ERROR] Failed to process status update for message ${status.id}:`, e.message);
+        console.error(`[STATUS] FATAL: Failed to process status update for message ${status.id}:`, e.message);
     }
 };
 
@@ -121,7 +138,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
         
         try {
-            const allPromises: Promise<void>[] = [];
+            const promises: Promise<void>[] = [];
             for (const item of entry) {
                 for (const change of item.changes) {
                     const { field, value } = change;
@@ -130,7 +147,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     // Handle Status Updates
                     if (value.statuses) {
                         for (const status of value.statuses) {
-                            allPromises.push(processStatusUpdate(status));
+                            promises.push(processStatusUpdate(status));
                         }
                     }
 
@@ -142,14 +159,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                         }
                         
                         for (const message of value.messages) {
-                            allPromises.push(processIncomingMessage(userId, message, value.contacts));
+                            promises.push(processIncomingMessage(userId, message, value.contacts));
                         }
                     }
                 }
             }
 
-            await Promise.all(allPromises);
-            console.log(`[LOG] Webhook processing for user ${userId} completed.`);
+            // Process all notifications concurrently
+            await Promise.all(promises);
+            console.log(`[LOG] Webhook processing batch for user ${userId} completed.`);
 
         } catch (error: any) {
             console.error("[FATAL] Unhandled error during webhook processing:", error.message, error.stack);
