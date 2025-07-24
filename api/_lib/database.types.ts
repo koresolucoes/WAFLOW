@@ -36,7 +36,6 @@ export type Database = {
           run_id?: string
           status?: string
         }
-        Relationships: []
       }
       automation_node_stats: {
         Row: {
@@ -60,7 +59,6 @@ export type Database = {
           node_id?: string
           success_count?: number
         }
-        Relationships: []
       }
       automation_runs: {
         Row: {
@@ -87,7 +85,6 @@ export type Database = {
           run_at?: string
           status?: string
         }
-        Relationships: []
       }
       automation_triggers: {
         Row: {
@@ -117,7 +114,6 @@ export type Database = {
           trigger_key?: string | null
           created_at?: string
         }
-        Relationships: []
       }
       automations: {
         Row: {
@@ -147,7 +143,6 @@ export type Database = {
           status?: string
           user_id?: string
         }
-        Relationships: []
       }
       campaign_messages: {
         Row: {
@@ -183,7 +178,6 @@ export type Database = {
           read_at?: string | null
           status?: string
         }
-        Relationships: []
       }
       campaigns: {
         Row: {
@@ -216,7 +210,6 @@ export type Database = {
           template_id?: string
           user_id?: string
         }
-        Relationships: []
       }
       contacts: {
         Row: {
@@ -252,7 +245,6 @@ export type Database = {
           tags?: string[] | null
           user_id?: string
         }
-        Relationships: []
       }
       deals: {
         Row: {
@@ -288,7 +280,6 @@ export type Database = {
           user_id?: string
           value?: number | null
         }
-        Relationships: []
       }
       message_templates: {
         Row: {
@@ -321,7 +312,6 @@ export type Database = {
           template_name?: string
           user_id?: string
         }
-        Relationships: []
       }
       pipeline_stages: {
         Row: {
@@ -345,7 +335,6 @@ export type Database = {
           pipeline_id?: string
           sort_order?: number
         }
-        Relationships: []
       }
       pipelines: {
         Row: {
@@ -366,7 +355,6 @@ export type Database = {
           name?: string
           user_id?: string
         }
-        Relationships: []
       }
       profiles: {
         Row: {
@@ -408,7 +396,6 @@ export type Database = {
           updated_at?: string | null
           webhook_path_prefix?: string | null
         }
-        Relationships: []
       }
       received_messages: {
         Row: {
@@ -438,7 +425,6 @@ export type Database = {
           sentiment?: string | null
           user_id?: string
         }
-        Relationships: []
       }
       segment_rules: {
         Row: {
@@ -462,7 +448,6 @@ export type Database = {
           segment_id?: string
           value?: string
         }
-        Relationships: []
       }
       segments: {
         Row: {
@@ -483,7 +468,6 @@ export type Database = {
           name?: string
           user_id?: string
         }
-        Relationships: []
       }
       sent_messages: {
         Row: {
@@ -525,14 +509,13 @@ export type Database = {
           status?: string
           user_id?: string
         }
-        Relationships: []
       }
     }
     Views: {
       [key: string]: never
     }
     Functions: {
-      [key: string]: never
+      [key: string]: any
     }
     Enums: {
       [key: string]: never
