@@ -1,11 +1,11 @@
 
-import { supabaseAdmin } from '../supabaseAdmin';
-import { Profile, TablesInsert } from '../types';
+import { supabaseAdmin } from '../supabaseAdmin.js';
+import { Profile, TablesInsert } from '../types.js';
 
 export async function getProfileForWebhook(userId: string): Promise<Profile | null> {
     let { data: profileData, error: profileError } = await supabaseAdmin
         .from('profiles')
-        .select('*')
+        .select()
         .eq('id', userId)
         .single();
 
@@ -25,7 +25,7 @@ export async function getProfileForWebhook(userId: string): Promise<Profile | nu
         };
         const { data: newProfile, error: newProfileError } = await supabaseAdmin
             .from('profiles')
-            .insert(newProfilePayload)
+            .insert(newProfilePayload as any)
             .select()
             .single();
             
@@ -41,5 +41,5 @@ export async function getProfileForWebhook(userId: string): Promise<Profile | nu
         return null;
     }
     
-    return profileData as Profile;
+    return profileData as unknown as Profile;
 }

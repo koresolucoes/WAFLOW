@@ -1,5 +1,5 @@
 
-import { AutomationNode } from '../types';
+import { AutomationNode } from '../types.js';
 
 // Defines the names of available hooks in the execution lifecycle.
 export type HookName =

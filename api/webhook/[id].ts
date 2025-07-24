@@ -1,8 +1,8 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getProfileForWebhook } from '../_lib/webhook/profile-handler';
-import { processStatusUpdate } from '../_lib/webhook/status-handler';
-import { processIncomingMessage } from '../_lib/webhook/message-handler';
+import { getProfileForWebhook } from '../_lib/webhook/profile-handler.js';
+import { processStatusUpdate } from '../_lib/webhook/status-handler.js';
+import { processIncomingMessage } from '../_lib/webhook/message-handler.js';
 
 /**
  * Manipulador de webhook principal para todos os eventos da Meta.

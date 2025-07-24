@@ -1,8 +1,8 @@
 
-import { supabaseAdmin } from '../supabaseAdmin';
-import { executeAutomation, createDefaultLoggingHooks } from './engine';
-import { Automation, Contact, Json, Profile, Tables } from '../types';
-import { sanitizeAutomation } from './utils';
+import { supabaseAdmin } from '../supabaseAdmin.js';
+import { executeAutomation, createDefaultLoggingHooks } from './engine.js';
+import { Automation, Contact, Json, Profile, Tables } from '../types.js';
+import { sanitizeAutomation } from './utils.js';
 
 type TriggerInfo = {
     automation_id: string;
@@ -16,7 +16,7 @@ const dispatchAutomations = async (userId: string, triggers: TriggerInfo[], cont
 
     const { data: profile, error: profileError } = await supabaseAdmin
         .from('profiles')
-        .select('*')
+        .select()
         .eq('id', userId)
         .single();
     
@@ -29,7 +29,7 @@ const dispatchAutomations = async (userId: string, triggers: TriggerInfo[], cont
 
     const { data: automations, error } = await supabaseAdmin
         .from('automations')
-        .select('*')
+        .select()
         .in('id', uniqueAutomationIds);
 
     if (error) {
@@ -87,7 +87,7 @@ const handleMetaMessageEvent = async (userId: string, contact: Contact, message:
     if (messageBody) {
         const { data: allKeywordTriggers, error } = await supabaseAdmin
             .from('automation_triggers')
-            .select('*')
+            .select('automation_id, node_id, trigger_key')
             .eq('user_id', userId)
             .eq('trigger_type', 'message_received_with_keyword');
 

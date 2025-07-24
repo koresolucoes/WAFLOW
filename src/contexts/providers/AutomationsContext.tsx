@@ -83,7 +83,7 @@ export const AutomationsProvider: React.FC<{ children: ReactNode }> = ({ childre
         if (data) {
             const newAutomationData = data as unknown as Tables<'automations'>;
             const newAutomation: Automation = { ...newAutomationData, nodes: [], edges: [], status: newAutomationData.status as AutomationStatus };
-            setAutomations(prev => [newAutomation, ...prev]);
+            // setAutomations(prev => [newAutomation, ...prev]); // Realtime will handle this
             setCurrentPage('automation-editor', { automationId: newAutomation.id });
         }
     }, [user, setCurrentPage]);
@@ -100,6 +100,7 @@ export const AutomationsProvider: React.FC<{ children: ReactNode }> = ({ childre
             console.error("Falha ao sincronizar gatilhos de automação:", rpcError);
         }
 
+        // Realtime should handle the state update, but we can do it optimistically too
         if(data) {
             const updatedAutomationData = data as unknown as Tables<'automations'>;
             const updatedAutomation: Automation = { ...updatedAutomationData, nodes: (Array.isArray(updatedAutomationData.nodes) ? updatedAutomationData.nodes : []) as unknown as AutomationNode[], edges: (Array.isArray(updatedAutomationData.edges) ? updatedAutomationData.edges : []) as unknown as Edge[], status: updatedAutomationData.status as AutomationStatus };
@@ -111,11 +112,12 @@ export const AutomationsProvider: React.FC<{ children: ReactNode }> = ({ childre
         if (!user) throw new Error("User not authenticated.");
         const { error } = await supabase.from('automations').delete().eq('id', automationId);
         if (error) throw error;
+        // Realtime handles state update
     }, [user]);
     
     const fetchAutomationStats = useCallback(async (automationId: string) => {
         if (!user) return;
-        const { data, error } = await supabase.from('automation_node_stats').select('*').eq('automation_id', automationId);
+        const { data, error } = await supabase.from('automation_node_stats').select().eq('automation_id', automationId);
         if (error) { console.error("Error fetching automation stats:", error); return; }
         if (data) {
             const statsMap = (data as unknown as AutomationNodeStats[]).reduce((acc, stat) => { acc[stat.node_id] = stat; return acc; }, {} as Record<string, AutomationNodeStats>);
@@ -128,9 +130,9 @@ export const AutomationsProvider: React.FC<{ children: ReactNode }> = ({ childre
         
         const { data: runIdsData, error: runIdsError } = await supabase.from('automation_runs').select('id').eq('automation_id', automationId);
         if (runIdsError || !runIdsData) { console.error('Error fetching run IDs for logs:', runIdsError); return []; }
-        const runIds = (runIdsData as unknown as { id: string }[]).map(r => r.id);
+        const runIds = (runIdsData as { id: string }[]).map(r => r.id);
         if (runIds.length === 0) return [];
-        const { data, error } = await supabase.from('automation_node_logs').select('*').in('run_id', runIds).eq('node_id', nodeId).order('created_at', { ascending: false }).limit(100);
+        const { data, error } = await supabase.from('automation_node_logs').select().in('run_id', runIds).eq('node_id', nodeId).order('created_at', { ascending: false }).limit(100);
         if (error) { console.error("Error fetching node logs:", error); return []; }
         return (data as unknown as AutomationNodeLog[]) || [];
     }, [user]);

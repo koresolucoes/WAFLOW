@@ -1,5 +1,5 @@
 
-import { Automation, AutomationNode, BackendEdge } from '../types';
+import { Automation, AutomationNode, BackendEdge } from '../types.js';
 
 /**
  * Garante que um objeto de automação recuperado do banco de dados tenha uma estrutura segura,

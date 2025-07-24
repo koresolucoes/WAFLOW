@@ -1,12 +1,13 @@
 
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { supabaseAdmin } from '../_lib/supabaseAdmin';
-import { executeAutomation, createDefaultLoggingHooks } from '../_lib/automation/engine';
-import { publishEvent } from '../_lib/automation/trigger-handler';
-import { Automation, Profile } from '../_lib/types';
-import { getRawBody, parseMultipartFormData } from '../_lib/webhook/parser';
-import { processWebhookPayloadForContact } from '../_lib/webhook/contact-mapper';
-import { sanitizeAutomation } from '../_lib/automation/utils';
+import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
+import { executeAutomation, createDefaultLoggingHooks } from '../_lib/automation/engine.js';
+import { publishEvent } from '../_lib/automation/trigger-handler.js';
+import { Automation, Profile } from '../_lib/types.js';
+import { getRawBody, parseMultipartFormData } from '../_lib/webhook/parser.js';
+import { processWebhookPayloadForContact } from '../_lib/webhook/contact-mapper.js';
+import { sanitizeAutomation } from '../_lib/automation/utils.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { id: rawId } = req.query;
@@ -27,14 +28,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let profileData: Profile | null = null;
 
     // Robust Profile Lookup: First try by the custom path prefix.
-    const { data: profileByPrefix } = await supabaseAdmin.from('profiles').select('*').eq('webhook_path_prefix', webhookPrefix).maybeSingle();
+    const { data: profileByPrefix } = await supabaseAdmin.from('profiles').select().eq('webhook_path_prefix', webhookPrefix).maybeSingle();
     if (profileByPrefix) {
-        profileData = profileByPrefix as unknown as Profile;
+        profileData = profileByPrefix as Profile;
     } else {
         // As a fallback, check if the prefix was actually a user ID.
-        const { data: profileById } = await supabaseAdmin.from('profiles').select('*').eq('id', webhookPrefix).maybeSingle();
+        const { data: profileById } = await supabaseAdmin.from('profiles').select().eq('id', webhookPrefix).maybeSingle();
         if (profileById) {
-            profileData = profileById as unknown as Profile;
+            profileData = profileById as Profile;
         }
     }
     
@@ -43,13 +44,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     const profile = profileData;
 
-    const { data: automationsData, error: automationsError } = await supabaseAdmin.from('automations').select('*').eq('user_id', profile.id).eq('status', 'active');
+    const { data: automationsData, error: automationsError } = await supabaseAdmin.from('automations').select().eq('user_id', profile.id).eq('status', 'active');
     
     if(automationsError || !automationsData) {
          return res.status(500).json({ error: 'Failed to retrieve automations.' });
     }
     
-    const automations = (automationsData as unknown as Automation[]) || [];
+    const automations = (automationsData as Automation[]) || [];
     const rawAutomation = automations.find(a => (a.nodes || []).some(n => n.id === nodeId));
 
     if (!rawAutomation) {

@@ -1,6 +1,6 @@
 
-import { ActionHandler } from '../types';
-import { getValueFromPath, resolveVariables } from '../helpers';
+import { ActionHandler } from '../types.js';
+import { getValueFromPath, resolveVariables } from '../helpers.js';
 
 export const condition: ActionHandler = async ({ contact, node, trigger }) => {
     const config = (node.data.config || {}) as any;

@@ -1,7 +1,7 @@
 
-import { supabaseAdmin } from '../supabaseAdmin';
-import { findOrCreateContactByPhone } from './contact-mapper';
-import { publishEvent } from '../automation/trigger-handler';
+import { supabaseAdmin } from '../supabaseAdmin.js';
+import { findOrCreateContactByPhone } from './contact-mapper.js';
+import { publishEvent } from '../automation/trigger-handler.js';
 
 export async function processIncomingMessage(userId: string, message: any, contactsPayload: any): Promise<void> {
     try {

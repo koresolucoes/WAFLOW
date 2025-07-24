@@ -62,7 +62,7 @@ export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }
         try {
             const { data: contactData, error: contactError } = await supabase
                 .from('contacts')
-                .select('*')
+                .select()
                 .eq('id', contactId)
                 .eq('user_id', user.id)
                 .single();
@@ -73,7 +73,7 @@ export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }
 
             const { data: dealsData, error: dealsError } = await supabase
                 .from('deals')
-                .select('*')
+                .select()
                 .eq('contact_id', contactId);
             
             if (dealsError) throw dealsError;

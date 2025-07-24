@@ -164,6 +164,7 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             
             const sentMessagesChannel = supabase.channel(`sent-messages-${user.id}`)
                 .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'sent_messages', filter: `user_id=eq.${user.id}` }, handleMessageUpdate)
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'sent_messages', filter: `user_id=eq.${user.id}` }, handleNewMessage)
                 .subscribe();
             
             return () => {
@@ -189,21 +190,7 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             
             const { data: insertedMessage, error } = await supabase.from('sent_messages').insert(messagePayload as any).select().single();
             if (error) throw error;
-
-            if (insertedMessage) {
-                const newMessage = mapPayloadToUnifiedMessage(insertedMessage as unknown as Tables<'sent_messages'>);
-                setMessages(prev => [...prev, newMessage]);
-                setConversations(prev => {
-                    const convoIndex = prev.findIndex(c => c.contact.id === contactId);
-                    if (convoIndex > -1) {
-                        const updatedConvo = { ...prev[convoIndex], last_message: newMessage, unread_count: 0 };
-                        return [updatedConvo, ...prev.filter(c => c.contact.id !== contactId)];
-                    } else {
-                        const newConvo: Conversation = { contact, last_message: newMessage, unread_count: 0 };
-                        return [newConvo, ...prev];
-                    }
-                });
-            }
+            // Realtime will handle the update
         } catch (error: any) {
             console.error("Failed to send message:", error);
             throw error;

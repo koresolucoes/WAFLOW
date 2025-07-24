@@ -86,7 +86,7 @@ export const CampaignsProvider: React.FC<{ children: ReactNode }> = ({ children 
         ...campaign,
         user_id: user.id,
         created_at: now,
-        sent_at: campaign.status === 'Sent' ? now : null,
+        sent_at: campaign.status === 'Sent' ? now : undefined,
         recipient_count: messages.length,
         status: campaign.status
     };

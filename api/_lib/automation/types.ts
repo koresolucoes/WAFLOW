@@ -1,5 +1,5 @@
 
-import { AutomationNode, Contact, Json, Profile } from '../types';
+import { AutomationNode, Contact, Json, Profile } from '../types.js';
 
 export interface ActionContext {
     profile: Profile;
