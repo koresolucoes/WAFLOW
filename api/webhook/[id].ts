@@ -1,7 +1,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
-import { Profile, TablesUpdate } from '../_lib/types.js';
+import { Profile, TablesUpdate, TablesInsert } from '../_lib/types.js';
 import { publishEvent } from '../_lib/automation/trigger-handler.js';
 import { findOrCreateContactByPhone } from '../_lib/webhook/contact-mapper.js';
 
@@ -125,17 +125,51 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // Respond immediately to Meta to avoid timeouts
         res.status(200).send('EVENT_RECEIVED');
 
-        // Fetch user profile once to validate and use for all messages in this batch
-        const { data: profile, error: profileError } = await supabaseAdmin
+        // Fetch user profile, with a fallback to create it if missing.
+        let { data: profileData, error: profileError } = await supabaseAdmin
             .from('profiles')
             .select('*')
             .eq('id', userId)
             .single();
 
-        if (profileError || !profile) {
-            console.error(`[ERROR] Profile not found for user_id: ${userId}. Webhook URL may be incorrect.`);
-            return; // Stop all processing if the user profile is invalid
+        // If profile not found, check if auth user exists and create a default profile.
+        if (profileError && profileError.code === 'PGRST116') { 
+            console.warn(`[WARN] Profile not found for user ${userId}. Checking auth user and attempting to create a profile.`);
+            
+            const { data: authUserData, error: authUserError } = await supabaseAdmin.auth.admin.getUserById(userId);
+            
+            if (authUserError || !authUserData.user) {
+                console.error(`[ERROR] Auth user not found for user_id: ${userId}. Webhook URL is incorrect.`);
+                return; // Stop processing
+            }
+    
+            // Auth user exists, but profile is missing. Create one.
+            const newProfilePayload: TablesInsert<'profiles'> = { 
+                id: userId, 
+                company_name: `Empresa de ${authUserData.user.email || 'Usuário'}`
+            };
+            const { data: newProfile, error: newProfileError } = await supabaseAdmin
+                .from('profiles')
+                .insert(newProfilePayload)
+                .select()
+                .single();
+                
+            if (newProfileError || !newProfile) {
+                console.error(`[ERROR] CRITICAL: Failed to create a default profile for user ${userId}.`, newProfileError);
+                return; // Stop processing
+            }
+
+            profileData = newProfile; // Use the newly created profile
+            profileError = null; // Reset the error
+            console.log(`[LOG] Successfully created a default profile for user ${userId}.`);
         }
+        
+        if (profileError || !profileData) {
+            console.error(`[ERROR] Profile not found for user_id: ${userId} and could not be created. Webhook URL may be incorrect.`, profileError);
+            return; // Stop processing if profile is still invalid
+        }
+        
+        const profile = profileData as Profile;
         
         try {
             const promises: Promise<void>[] = [];
@@ -154,7 +188,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     // Handle Incoming Messages
                     if (value.messages) {
                         const incomingPhoneNumberId = value?.metadata?.phone_number_id;
-                        if ((profile as Profile).meta_phone_number_id !== String(incomingPhoneNumberId)) {
+                        if (profile.meta_phone_number_id !== String(incomingPhoneNumberId)) {
                              console.warn(`[WARN] Incoming phone_number_id (${incomingPhoneNumberId}) does not match the one configured for user ${userId}. Processing anyway.`);
                         }
                         
