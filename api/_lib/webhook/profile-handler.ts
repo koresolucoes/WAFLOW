@@ -15,7 +15,7 @@ export async function getProfileForWebhook(userId: string): Promise<Profile | nu
         const { data: authUserData, error: authUserError } = await supabaseAdmin.auth.admin.getUserById(userId);
         
         if (authUserError || !authUserData.user) {
-            console.error(`[Manipulador de Perfil] Usuário de autenticação não encontrado para user_id: ${userId}. A URL do webhook está incorreta.`);
+            console.error(`[Manipulador de Perfil] CRÍTICO: Usuário de autenticação não encontrado para user_id: ${userId}. A URL do webhook pode estar incorreta ou o usuário pode ter sido excluído.`);
             return null;
         }
 
@@ -37,7 +37,7 @@ export async function getProfileForWebhook(userId: string): Promise<Profile | nu
         profileData = newProfile;
         console.log(`[Manipulador de Perfil] Perfil padrão criado com sucesso para o usuário ${userId}.`);
     } else if (profileError) {
-        console.error(`[Manipulador de Perfil] Erro ao buscar perfil para o usuário ${userId}.`, profileError);
+        console.error(`[Manipulador de Perfil] CRÍTICO: Erro de banco de dados ao buscar perfil para o usuário ${userId}.`, profileError);
         return null;
     }
     

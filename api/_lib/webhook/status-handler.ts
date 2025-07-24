@@ -1,4 +1,5 @@
 
+
 import { supabaseAdmin } from '../supabaseAdmin.js';
 import { TablesUpdate } from '../types.js';
 
@@ -13,7 +14,12 @@ export async function processStatusUpdate(status: any): Promise<void> {
         
         const timestamp = new Date(parseInt(status.timestamp, 10) * 1000).toISOString();
 
-        const baseUpdate: Partial<TablesUpdate<'campaign_messages' | 'sent_messages'>> = {
+        const baseUpdate: {
+            status: string;
+            delivered_at?: string;
+            read_at?: string;
+            error_message?: string;
+        } = {
             status: newStatus,
         };
 
@@ -26,8 +32,8 @@ export async function processStatusUpdate(status: any): Promise<void> {
             baseUpdate.error_message = `${status.errors[0]?.title} (Código: ${status.errors[0]?.code})`;
         }
 
-        const { error: campaignError } = await supabaseAdmin.from('campaign_messages').update(baseUpdate as any).eq('meta_message_id', status.id);
-        const { error: sentError } = await supabaseAdmin.from('sent_messages').update(baseUpdate as any).eq('meta_message_id', status.id);
+        const { error: campaignError } = await supabaseAdmin.from('campaign_messages').update(baseUpdate).eq('meta_message_id', status.id);
+        const { error: sentError } = await supabaseAdmin.from('sent_messages').update(baseUpdate).eq('meta_message_id', status.id);
 
         if (campaignError) console.error(`[Manipulador de Status] Erro ao atualizar campaign_messages para ${status.id}:`, campaignError.message);
         if (sentError) console.error(`[Manipulador de Status] Erro ao atualizar sent_messages para ${status.id}:`, sentError.message);

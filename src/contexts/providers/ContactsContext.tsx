@@ -1,4 +1,5 @@
 
+
 import React, { createContext, useState, useCallback, ReactNode, useContext, useMemo } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { Contact, EditableContact, ContactWithDetails, Deal } from '../../types';
@@ -62,7 +63,7 @@ export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }
         try {
             const { data: contactData, error: contactError } = await supabase
                 .from('contacts')
-                .select()
+                .select('*')
                 .eq('id', contactId)
                 .eq('user_id', user.id)
                 .single();
@@ -73,7 +74,7 @@ export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }
 
             const { data: dealsData, error: dealsError } = await supabase
                 .from('deals')
-                .select()
+                .select('*')
                 .eq('contact_id', contactId);
             
             if (dealsError) throw dealsError;
@@ -92,7 +93,7 @@ export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }
     const addContact = useCallback(async (contact: EditableContact) => {
         if (!user) throw new Error("User not authenticated.");
         const payload: TablesInsert<'contacts'> = { ...contact, phone: normalizePhoneNumber(contact.phone), user_id: user.id };
-        const { data, error } = await supabase.from('contacts').insert(payload as any).select().single();
+        const { data, error } = await supabase.from('contacts').insert(payload as any).select('*').single();
         if (error) throw error;
         if(data) {
           const newContact = data as unknown as Contact;
@@ -127,7 +128,7 @@ export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }
             .update(updatePayload as any)
             .eq('id', updatedContact.id)
             .eq('user_id', user.id)
-            .select()
+            .select('*')
             .single();
 
         if (error) throw error;
@@ -178,7 +179,7 @@ export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }
         });
 
         if (contactsToInsert.length > 0) {
-            const { data, error } = await supabase.from('contacts').insert(contactsToInsert as any).select();
+            const { data, error } = await supabase.from('contacts').insert(contactsToInsert as any).select('*');
             if (error) throw error;
             if(data) {
                 const newContactList = data as unknown as Contact[];

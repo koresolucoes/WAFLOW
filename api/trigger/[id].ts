@@ -28,12 +28,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let profileData: Profile | null = null;
 
     // Robust Profile Lookup: First try by the custom path prefix.
-    const { data: profileByPrefix } = await supabaseAdmin.from('profiles').select().eq('webhook_path_prefix', webhookPrefix).maybeSingle();
+    const { data: profileByPrefix } = await supabaseAdmin.from('profiles').select('*').eq('webhook_path_prefix', webhookPrefix).maybeSingle();
     if (profileByPrefix) {
         profileData = profileByPrefix as Profile;
     } else {
         // As a fallback, check if the prefix was actually a user ID.
-        const { data: profileById } = await supabaseAdmin.from('profiles').select().eq('id', webhookPrefix).maybeSingle();
+        const { data: profileById } = await supabaseAdmin.from('profiles').select('*').eq('id', webhookPrefix).maybeSingle();
         if (profileById) {
             profileData = profileById as Profile;
         }
@@ -44,7 +44,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     const profile = profileData;
 
-    const { data: automationsData, error: automationsError } = await supabaseAdmin.from('automations').select().eq('user_id', profile.id).eq('status', 'active');
+    const { data: automationsData, error: automationsError } = await supabaseAdmin.from('automations').select('*').eq('user_id', profile.id).eq('status', 'active');
     
     if(automationsError || !automationsData) {
          return res.status(500).json({ error: 'Failed to retrieve automations.' });

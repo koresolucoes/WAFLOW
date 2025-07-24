@@ -37,12 +37,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         res.status(200).send('EVENT_RECEIVED');
         
         console.log(`[Webhook] Payload recebido para o usuário: ${userId}`);
+        console.log('[Webhook] Corpo completo da requisição:', JSON.stringify(req.body, null, 2));
         
         const profile = await getProfileForWebhook(userId);
         if (!profile) {
-            console.error(`[Webhook] Não foi possível recuperar ou criar um perfil para o usuário ${userId}. Abortando.`);
+            console.error(`[Webhook] Não foi possível recuperar o perfil para o usuário ${userId}. Abortando.`);
             return;
         }
+
+        console.log(`[Webhook] Perfil recuperado com sucesso para ${profile.id}.`);
 
         const { entry } = req.body;
         if (!entry || !Array.isArray(entry)) {
@@ -53,13 +56,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         try {
             const promises: Promise<void>[] = [];
             for (const item of entry) {
+                console.log(`[Webhook] Processando item de entrada: ${item.id}`);
                 for (const change of item.changes) {
+                    console.log(`[Webhook] Processando alteração de campo: ${change.field}`);
                     if (change.field !== 'messages') continue;
                     
                     const value = change.value;
 
                     // A) Lidar com Atualizações de Status
                     if (value.statuses) {
+                        console.log(`[Webhook] Encontrados ${value.statuses.length} status para processar.`);
                         for (const status of value.statuses) {
                             promises.push(processStatusUpdate(status));
                         }
@@ -67,21 +73,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
                     // B) Lidar com Mensagens Recebidas
                     if (value.messages) {
+                        console.log(`[Webhook] Encontradas ${value.messages.length} mensagens para processar.`);
                         const incomingPhoneNumberId = value?.metadata?.phone_number_id;
                         if (profile.meta_phone_number_id !== String(incomingPhoneNumberId)) {
                             console.warn(`[Webhook] O phone_number_id (${incomingPhoneNumberId}) recebido não corresponde ao configurado para o usuário ${userId}. Processando mesmo assim.`);
                         }
                         
                         for (const message of value.messages) {
+                            console.log(`[Webhook] Enfileirando processamento para a mensagem ${message.id}.`);
                             promises.push(processIncomingMessage(userId, message, value.contacts));
                         }
                     }
                 }
             }
-
-            // Processa todas as notificações concorrentemente
-            await Promise.all(promises);
-            console.log(`[Webhook] Lote de processamento para o usuário ${userId} concluído.`);
+            
+            if (promises.length > 0) {
+                 console.log(`[Webhook] Aguardando a conclusão de ${promises.length} promessas.`);
+                 await Promise.all(promises);
+                 console.log(`[Webhook] Lote de processamento para o usuário ${userId} concluído.`);
+            } else {
+                console.log('[Webhook] Nenhuma promessa de mensagem ou status para processar no payload.');
+            }
 
         } catch (error: any) {
             console.error("[Webhook] Erro não tratado durante o loop de processamento:", error.message, error.stack);

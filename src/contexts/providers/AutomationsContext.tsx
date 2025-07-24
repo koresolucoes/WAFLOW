@@ -1,4 +1,5 @@
 
+
 import React, { createContext, useState, useCallback, ReactNode, useContext, useEffect } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { Automation, AutomationInsert, AutomationNode, Edge, AutomationNodeStats, AutomationNodeLog, AutomationStatus, Json } from '../../types';
@@ -77,7 +78,7 @@ export const AutomationsProvider: React.FC<{ children: ReactNode }> = ({ childre
     const createAndNavigateToAutomation = useCallback(async () => {
         if (!user) throw new Error("User not authenticated.");
         const dbAutomation: TablesInsert<'automations'> = { user_id: user.id, name: 'Nova Automação (Rascunho)', status: 'paused', nodes: [] as unknown as Json, edges: [] as unknown as Json };
-        const { data, error } = await supabase.from('automations').insert(dbAutomation as any).select().single();
+        const { data, error } = await supabase.from('automations').insert(dbAutomation as any).select('*').single();
 
         if (error) throw error;
         if (data) {
@@ -92,7 +93,7 @@ export const AutomationsProvider: React.FC<{ children: ReactNode }> = ({ childre
         if (!user) throw new Error("User not authenticated.");
         const updatePayload: TablesUpdate<'automations'> = { name: automation.name, status: automation.status, nodes: automation.nodes as unknown as Json, edges: automation.edges as unknown as Json };
         
-        const { data, error } = await supabase.from('automations').update(updatePayload as any).eq('id', automation.id).eq('user_id', user.id).select().single();
+        const { data, error } = await supabase.from('automations').update(updatePayload as any).eq('id', automation.id).eq('user_id', user.id).select('*').single();
         if(error) throw error;
 
         const { error: rpcError } = await supabase.rpc('sync_automation_triggers' as any, { automation_id_in: automation.id } as any);
@@ -117,7 +118,7 @@ export const AutomationsProvider: React.FC<{ children: ReactNode }> = ({ childre
     
     const fetchAutomationStats = useCallback(async (automationId: string) => {
         if (!user) return;
-        const { data, error } = await supabase.from('automation_node_stats').select().eq('automation_id', automationId);
+        const { data, error } = await supabase.from('automation_node_stats').select('*').eq('automation_id', automationId);
         if (error) { console.error("Error fetching automation stats:", error); return; }
         if (data) {
             const statsMap = (data as unknown as AutomationNodeStats[]).reduce((acc, stat) => { acc[stat.node_id] = stat; return acc; }, {} as Record<string, AutomationNodeStats>);
@@ -132,7 +133,7 @@ export const AutomationsProvider: React.FC<{ children: ReactNode }> = ({ childre
         if (runIdsError || !runIdsData) { console.error('Error fetching run IDs for logs:', runIdsError); return []; }
         const runIds = (runIdsData as { id: string }[]).map(r => r.id);
         if (runIds.length === 0) return [];
-        const { data, error } = await supabase.from('automation_node_logs').select().in('run_id', runIds).eq('node_id', nodeId).order('created_at', { ascending: false }).limit(100);
+        const { data, error } = await supabase.from('automation_node_logs').select('*').in('run_id', runIds).eq('node_id', nodeId).order('created_at', { ascending: false }).limit(100);
         if (error) { console.error("Error fetching node logs:", error); return []; }
         return (data as unknown as AutomationNodeLog[]) || [];
     }, [user]);

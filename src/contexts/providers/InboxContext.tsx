@@ -1,4 +1,5 @@
 
+
 import React, { createContext, useState, useCallback, ReactNode, useContext, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { AuthContext } from './AuthContext';
@@ -188,7 +189,7 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
             const messagePayload: SentMessageInsert = { user_id: user.id, contact_id: contactId, content: text, meta_message_id: metaMessageId, status: 'sent', source: 'direct' };
             
-            const { data: insertedMessage, error } = await supabase.from('sent_messages').insert(messagePayload as any).select().single();
+            const { data: insertedMessage, error } = await supabase.from('sent_messages').insert(messagePayload as any).select('*').single();
             if (error) throw error;
             // Realtime will handle the update
         } catch (error: any) {

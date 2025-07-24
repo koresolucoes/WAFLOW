@@ -1,4 +1,5 @@
 
+
 import React, { createContext, useState, useCallback, ReactNode, useContext, useEffect } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { Campaign, CampaignWithMetrics, CampaignMessageInsert, CampaignWithDetails, CampaignMessageWithContact, CampaignStatus, MessageStatus, TemplateCategory, TemplateStatus } from '../../types';
@@ -90,7 +91,7 @@ export const CampaignsProvider: React.FC<{ children: ReactNode }> = ({ children 
         recipient_count: messages.length,
         status: campaign.status
     };
-    const { data: newCampaignData, error: campaignError } = await supabase.from('campaigns').insert(campaignPayload as any).select().single();
+    const { data: newCampaignData, error: campaignError } = await supabase.from('campaigns').insert(campaignPayload as any).select('*').single();
 
     if (campaignError) throw campaignError;
     const newCampaign = newCampaignData as unknown as Tables<'campaigns'>;

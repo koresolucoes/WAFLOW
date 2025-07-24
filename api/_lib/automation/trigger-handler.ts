@@ -1,4 +1,5 @@
 
+
 import { supabaseAdmin } from '../supabaseAdmin.js';
 import { executeAutomation, createDefaultLoggingHooks } from './engine.js';
 import { Automation, Contact, Json, Profile, Tables } from '../types.js';
@@ -16,7 +17,7 @@ const dispatchAutomations = async (userId: string, triggers: TriggerInfo[], cont
 
     const { data: profile, error: profileError } = await supabaseAdmin
         .from('profiles')
-        .select()
+        .select('*')
         .eq('id', userId)
         .single();
     
@@ -29,7 +30,7 @@ const dispatchAutomations = async (userId: string, triggers: TriggerInfo[], cont
 
     const { data: automations, error } = await supabaseAdmin
         .from('automations')
-        .select()
+        .select('*')
         .in('id', uniqueAutomationIds);
 
     if (error) {
@@ -72,7 +73,7 @@ const handleMetaMessageEvent = async (userId: string, contact: Contact, message:
     if (buttonPayload) {
         const { data: buttonTriggers, error } = await supabaseAdmin
             .from('automation_triggers')
-            .select('automation_id, node_id')
+            .select('*')
             .eq('user_id', userId)
             .eq('trigger_type', 'button_clicked')
             .eq('trigger_key', buttonPayload);
@@ -87,7 +88,7 @@ const handleMetaMessageEvent = async (userId: string, contact: Contact, message:
     if (messageBody) {
         const { data: allKeywordTriggers, error } = await supabaseAdmin
             .from('automation_triggers')
-            .select('automation_id, node_id, trigger_key')
+            .select('*')
             .eq('user_id', userId)
             .eq('trigger_type', 'message_received_with_keyword');
 
@@ -116,7 +117,7 @@ const handleNewContactEvent = async (userId: string, contact: Contact) => {
     console.log(`[HANDLER] Processing new_contact event for contact ${contact.id}`);
     const { data: triggers, error } = await supabaseAdmin
         .from('automation_triggers')
-        .select('automation_id, node_id')
+        .select('*')
         .eq('user_id', userId)
         .eq('trigger_type', 'new_contact');
         
@@ -135,7 +136,7 @@ export const handleTagAddedEvent = async (userId: string, contact: Contact, adde
     console.log(`[HANDLER] Processing tag_added event for contact ${contact.id}. Tag: "${addedTag}"`);
     const { data: triggers, error } = await supabaseAdmin
         .from('automation_triggers')
-        .select('automation_id, node_id')
+        .select('*')
         .eq('user_id', userId)
         .eq('trigger_type', 'new_contact_with_tag')
         .ilike('trigger_key', addedTag);

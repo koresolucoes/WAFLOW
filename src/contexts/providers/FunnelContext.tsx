@@ -1,4 +1,5 @@
 
+
 import React, { createContext, useState, useCallback, ReactNode, useContext } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { Pipeline, PipelineStage, Deal, DealInsert, DealWithContact } from '../../types';
@@ -55,7 +56,7 @@ export const FunnelProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const createDefaultPipeline = useCallback(async () => {
         if (!user) throw new Error("User not authenticated.");
 
-        const { data: pipelineData, error: pipelineError } = await supabase.from('pipelines').insert({ user_id: user.id, name: 'Funil de Vendas Padrão' } as any).select().single();
+        const { data: pipelineData, error: pipelineError } = await supabase.from('pipelines').insert({ user_id: user.id, name: 'Funil de Vendas Padrão' } as any).select('*').single();
         if (pipelineError || !pipelineData) throw pipelineError || new Error("Falha ao criar funil.");
         
         const pipelineDataTyped = pipelineData as unknown as Pipeline;
@@ -75,7 +76,7 @@ export const FunnelProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
     const addPipeline = useCallback(async (name: string) => {
         if (!user) throw new Error("User not authenticated.");
-        const { data: pipelineData, error } = await supabase.from('pipelines').insert({ user_id: user.id, name } as any).select().single();
+        const { data: pipelineData, error } = await supabase.from('pipelines').insert({ user_id: user.id, name } as any).select('*').single();
         if (error || !pipelineData) throw error || new Error("Falha ao criar funil.");
 
         const pipelineDataTyped = pipelineData as unknown as Pipeline;
@@ -92,7 +93,7 @@ export const FunnelProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
     const updatePipeline = useCallback(async (id: string, name: string) => {
         if (!user) throw new Error("User not authenticated.");
-        const { data, error } = await supabase.from('pipelines').update({ name } as any).eq('id', id).select().single();
+        const { data, error } = await supabase.from('pipelines').update({ name } as any).eq('id', id).select('*').single();
         if (error || !data) throw error || new Error("Falha ao renomear funil.");
         setPipelines(p => p.map(pl => pl.id === id ? (data as unknown as Pipeline) : pl));
     }, [user]);
@@ -119,7 +120,7 @@ export const FunnelProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             name: 'Nova Etapa',
             sort_order: maxSortOrder + 1,
         };
-        const { data, error } = await supabase.from('pipeline_stages').insert(newStagePayload as any).select().single();
+        const { data, error } = await supabase.from('pipeline_stages').insert(newStagePayload as any).select('*').single();
         
         if (error) throw error;
         if (data) setStages(prev => [...prev, data as unknown as PipelineStage]);
@@ -127,7 +128,7 @@ export const FunnelProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
     const updateStage = useCallback(async (id: string, name: string) => {
         if (!user) throw new Error("User not authenticated.");
-        const { data, error } = await supabase.from('pipeline_stages').update({ name } as any).eq('id', id).select().single();
+        const { data, error } = await supabase.from('pipeline_stages').update({ name } as any).eq('id', id).select('*').single();
         if (error || !data) throw error || new Error("Falha ao renomear etapa.");
         setStages(s => s.map(stage => stage.id === id ? (data as unknown as PipelineStage) : stage));
     }, [user]);
