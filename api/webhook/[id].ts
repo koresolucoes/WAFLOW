@@ -1,97 +1,15 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
-import { Profile, TablesUpdate, TablesInsert } from '../_lib/types.js';
-import { publishEvent } from '../_lib/automation/trigger-handler.js';
-import { findOrCreateContactByPhone } from '../_lib/webhook/contact-mapper.js';
+import { getProfileForWebhook } from '../_lib/webhook/profile-handler';
+import { processStatusUpdate } from '../_lib/webhook/status-handler';
+import { processIncomingMessage } from '../_lib/webhook/message-handler';
 
-
-const processStatusUpdate = async (status: any) => {
-    console.log(`[STATUS] Processing status update for message ${status.id}: ${status.status}`);
-    try {
-        const newStatus = status.status; // 'sent', 'delivered', 'read', 'failed'
-        if (!['sent', 'delivered', 'read', 'failed'].includes(newStatus)) {
-            console.warn(`[STATUS] Ignored unknown status type: ${newStatus}`);
-            return;
-        }
-        
-        const timestamp = new Date(parseInt(status.timestamp, 10) * 1000).toISOString();
-
-        const baseUpdate: Partial<TablesUpdate<'campaign_messages' | 'sent_messages'>> = {
-            status: newStatus,
-        };
-
-        if (newStatus === 'delivered') {
-            baseUpdate.delivered_at = timestamp;
-        } else if (newStatus === 'read') {
-            // If a message is read, it must have been delivered.
-            // This handles cases where the 'delivered' webhook is missed or arrives out of order.
-            baseUpdate.read_at = timestamp;
-            baseUpdate.delivered_at = baseUpdate.delivered_at || timestamp;
-        } else if (newStatus === 'failed' && status.errors) {
-            baseUpdate.error_message = `${status.errors[0]?.title} (Code: ${status.errors[0]?.code})`;
-        }
-
-        // Attempt to update both tables. One of them will match the message ID.
-        // This is safe because meta_message_id is unique across the user's messages.
-        const { error: campaignError } = await supabaseAdmin.from('campaign_messages').update(baseUpdate as any).eq('meta_message_id', status.id);
-        const { error: sentError } = await supabaseAdmin.from('sent_messages').update(baseUpdate as any).eq('meta_message_id', status.id);
-
-        if (campaignError) console.error(`[STATUS] Error updating campaign_messages for ${status.id}:`, campaignError.message);
-        if (sentError) console.error(`[STATUS] Error updating sent_messages for ${status.id}:`, sentError.message);
-
-    } catch (e: any) {
-        console.error(`[STATUS] FATAL: Failed to process status update for message ${status.id}:`, e.message);
-    }
-};
-
-const processIncomingMessage = async (userId: string, message: any, contactsPayload: any) => {
-    try {
-        const contactName = contactsPayload?.[0]?.profile?.name || 'Contato via WhatsApp';
-        const { contact, isNew } = await findOrCreateContactByPhone(userId, message.from, contactName);
-
-        if (!contact) {
-            console.error(`[ERROR] Could not find or create contact for phone ${message.from}.`);
-            return;
-        }
-
-        let messageBody = `[${message.type}]`;
-        if (message.type === 'text' && message.text?.body) {
-            messageBody = message.text.body;
-        } else if (message.type === 'interactive' && message.interactive?.button_reply) {
-            messageBody = `Botão Clicado: "${message.interactive.button_reply.title}"`;
-        }
-
-        const { error: insertError } = await supabaseAdmin.from('received_messages').insert({
-            user_id: userId,
-            contact_id: contact.id,
-            meta_message_id: message.id,
-            message_body: messageBody
-        } as any);
-
-        if (insertError) {
-            console.error(`[ERROR] Failed to insert received message for contact ${contact.id}:`, insertError);
-            return;
-        }
-
-        // Publish events for automations and other side effects
-        await publishEvent('message_received', userId, { contact, message });
-        if (isNew) {
-            await publishEvent('contact_created', userId, { contact });
-            if (contact.tags && contact.tags.length > 0) {
-                await Promise.all(
-                    contact.tags.map(tag => publishEvent('tag_added', userId, { contact, tag }))
-                );
-            }
-        }
-    } catch (e: any) {
-        console.error(`[ERROR] General failure in message processing for message ID ${message.id}:`, e.message, e.stack);
-    }
-};
-
-
+/**
+ * Manipulador de webhook principal para todos os eventos da Meta.
+ * Atua como um despachante para manipuladores modularizados.
+ */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-    // 1. Handle Verification Request from Meta
+    // 1. Lidar com a Solicitação de Verificação da Meta
     if (req.method === 'GET') {
         const verifyToken = process.env.META_VERIFY_TOKEN;
         const mode = req.query['hub.mode'];
@@ -99,97 +17,59 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const challenge = req.query['hub.challenge'];
 
         if (mode === 'subscribe' && token === verifyToken) {
-            console.log('Webhook verified successfully!');
+            console.log('Webhook verificado com sucesso!');
             return res.status(200).send(challenge);
         } else {
-            console.error('Failed webhook verification. Make sure META_VERIFY_TOKEN is set.');
+            console.error('Falha na verificação do webhook. Certifique-se de que META_VERIFY_TOKEN está configurado.');
             return res.status(403).send('Forbidden');
         }
     }
 
-    // 2. Handle Event Notifications from Meta
+    // 2. Lidar com Notificações de Eventos da Meta
     if (req.method === 'POST') {
         const { id: userId } = req.query;
         if (typeof userId !== 'string' || !userId) {
-            console.error("[ERROR] Webhook request received without a user ID in the URL.");
-            return res.status(400).send('Invalid User ID in webhook URL');
+            console.error("[Webhook] Requisição recebida sem um ID de usuário na URL.");
+            return res.status(400).send('ID de usuário inválido na URL do webhook');
         }
 
-        console.log(`[LOG] Webhook payload received for user: ${userId}`);
+        // Responde imediatamente à Meta para evitar timeouts
+        res.status(200).send('EVENT_RECEIVED');
+        
+        console.log(`[Webhook] Payload recebido para o usuário: ${userId}`);
+        
+        const profile = await getProfileForWebhook(userId);
+        if (!profile) {
+            console.error(`[Webhook] Não foi possível recuperar ou criar um perfil para o usuário ${userId}. Abortando.`);
+            return;
+        }
+
         const { entry } = req.body;
         if (!entry || !Array.isArray(entry)) {
-            console.error("Invalid payload: 'entry' not found or not an array.");
-            return res.status(400).send('Invalid payload');
+            console.error("[Webhook] Payload inválido: 'entry' não encontrado ou não é um array.");
+            return;
         }
 
-        // Respond immediately to Meta to avoid timeouts
-        res.status(200).send('EVENT_RECEIVED');
-
-        // Fetch user profile, with a fallback to create it if missing.
-        let { data: profileData, error: profileError } = await supabaseAdmin
-            .from('profiles')
-            .select('*')
-            .eq('id', userId)
-            .single();
-
-        // If profile not found, check if auth user exists and create a default profile.
-        if (profileError && profileError.code === 'PGRST116') { 
-            console.warn(`[WARN] Profile not found for user ${userId}. Checking auth user and attempting to create a profile.`);
-            
-            const { data: authUserData, error: authUserError } = await supabaseAdmin.auth.admin.getUserById(userId);
-            
-            if (authUserError || !authUserData.user) {
-                console.error(`[ERROR] Auth user not found for user_id: ${userId}. Webhook URL is incorrect.`);
-                return; // Stop processing
-            }
-    
-            // Auth user exists, but profile is missing. Create one.
-            const newProfilePayload: TablesInsert<'profiles'> = { 
-                id: userId, 
-                company_name: `Empresa de ${authUserData.user.email || 'Usuário'}`
-            };
-            const { data: newProfile, error: newProfileError } = await supabaseAdmin
-                .from('profiles')
-                .insert(newProfilePayload)
-                .select()
-                .single();
-                
-            if (newProfileError || !newProfile) {
-                console.error(`[ERROR] CRITICAL: Failed to create a default profile for user ${userId}.`, newProfileError);
-                return; // Stop processing
-            }
-
-            profileData = newProfile; // Use the newly created profile
-            profileError = null; // Reset the error
-            console.log(`[LOG] Successfully created a default profile for user ${userId}.`);
-        }
-        
-        if (profileError || !profileData) {
-            console.error(`[ERROR] Profile not found for user_id: ${userId} and could not be created. Webhook URL may be incorrect.`, profileError);
-            return; // Stop processing if profile is still invalid
-        }
-        
-        const profile = profileData as Profile;
-        
         try {
             const promises: Promise<void>[] = [];
             for (const item of entry) {
                 for (const change of item.changes) {
-                    const { field, value } = change;
-                    if (field !== 'messages') continue;
+                    if (change.field !== 'messages') continue;
+                    
+                    const value = change.value;
 
-                    // Handle Status Updates
+                    // A) Lidar com Atualizações de Status
                     if (value.statuses) {
                         for (const status of value.statuses) {
                             promises.push(processStatusUpdate(status));
                         }
                     }
 
-                    // Handle Incoming Messages
+                    // B) Lidar com Mensagens Recebidas
                     if (value.messages) {
                         const incomingPhoneNumberId = value?.metadata?.phone_number_id;
                         if (profile.meta_phone_number_id !== String(incomingPhoneNumberId)) {
-                             console.warn(`[WARN] Incoming phone_number_id (${incomingPhoneNumberId}) does not match the one configured for user ${userId}. Processing anyway.`);
+                            console.warn(`[Webhook] O phone_number_id (${incomingPhoneNumberId}) recebido não corresponde ao configurado para o usuário ${userId}. Processando mesmo assim.`);
                         }
                         
                         for (const message of value.messages) {
@@ -199,16 +79,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 }
             }
 
-            // Process all notifications concurrently
+            // Processa todas as notificações concorrentemente
             await Promise.all(promises);
-            console.log(`[LOG] Webhook processing batch for user ${userId} completed.`);
+            console.log(`[Webhook] Lote de processamento para o usuário ${userId} concluído.`);
 
         } catch (error: any) {
-            console.error("[FATAL] Unhandled error during webhook processing:", error.message, error.stack);
+            console.error("[Webhook] Erro não tratado durante o loop de processamento:", error.message, error.stack);
         }
         
         return;
     }
 
+    // 3. Lidar com outros métodos
     return res.status(405).send('Method Not Allowed');
 }

@@ -1,6 +1,6 @@
-
 import React from 'react';
 import { UnifiedMessage, MessageStatus } from '../../types';
+import { FILE_TEXT_ICON } from '../../components/icons';
 
 interface MessageBubbleProps {
     message: UnifiedMessage;
@@ -45,6 +45,14 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
                  <p className="text-sm break-words whitespace-pre-wrap">
                     {message.content}
                 </p>
+
+                {message.sourceTable === 'campaign_messages' && (
+                    <div className="flex items-center gap-1.5 text-xs text-slate-300/70 mt-2 border-t border-white/10 pt-1">
+                        <FILE_TEXT_ICON className="w-3 h-3"/>
+                        <span>Enviado via Campanha</span>
+                    </div>
+                )}
+
                 <div className="text-right text-xs text-slate-300/80 mt-1 flex items-center justify-end">
                     <span>{formatTime(message.created_at)}</span>
                     {isOutbound && <ReadReceipt status={message.status} />}

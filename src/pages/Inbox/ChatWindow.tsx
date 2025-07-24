@@ -1,12 +1,18 @@
-
 import React, { useContext, useRef, useEffect } from 'react';
 import { InboxContext } from '../../contexts/providers/InboxContext';
 import { ContactsContext } from '../../contexts/providers/ContactsContext';
 import MessageBubble from './MessageBubble';
 import MessageInput from './MessageInput';
+import Button from '../../components/common/Button';
+import { INFO_ICON } from '../../components/icons';
 import { UnifiedMessage } from '../../types';
 
-const ChatWindow: React.FC = () => {
+interface ChatWindowProps {
+    isPanelOpen: boolean;
+    setIsPanelOpen: (isOpen: boolean) => void;
+}
+
+const ChatWindow: React.FC<ChatWindowProps> = ({ isPanelOpen, setIsPanelOpen }) => {
     const { messages, activeContactId, isLoading } = useContext(InboxContext);
     const { contacts } = useContext(ContactsContext);
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -14,7 +20,7 @@ const ChatWindow: React.FC = () => {
     const activeContact = contacts.find(c => c.id === activeContactId);
 
     useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
     }, [messages]);
 
     if (!activeContact) {
@@ -22,7 +28,7 @@ const ChatWindow: React.FC = () => {
     }
 
     return (
-        <section className="flex-1 flex flex-col bg-slate-900">
+        <section className="flex-1 flex flex-col bg-slate-900 overflow-hidden">
             <header className="flex-shrink-0 flex items-center p-3 border-b border-slate-700/50 bg-slate-800/50">
                 <img
                     className="h-10 w-10 rounded-full object-cover"
@@ -32,6 +38,17 @@ const ChatWindow: React.FC = () => {
                 <div className="ml-3">
                     <h2 className="font-semibold text-white">{activeContact.name}</h2>
                     <p className="text-sm text-slate-400 font-mono">{activeContact.phone}</p>
+                </div>
+                 <div className="ml-auto">
+                    <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => setIsPanelOpen(!isPanelOpen)}
+                        className={`${isPanelOpen ? 'bg-slate-700' : ''}`}
+                        title={isPanelOpen ? 'Ocultar Detalhes' : 'Mostrar Detalhes'}
+                    >
+                        <INFO_ICON className="w-5 h-5" />
+                    </Button>
                 </div>
             </header>
 

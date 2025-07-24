@@ -1,5 +1,5 @@
 
-import { ActionHandler } from '../types.js';
+import { ActionHandler } from '../types';
 
 /**
  * A generic handler for all trigger nodes. Since the trigger's job is to start

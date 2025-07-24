@@ -1,6 +1,6 @@
 
-import { ActionHandler } from '../types.js';
-import { resolveJsonPlaceholders, resolveVariables } from '../helpers.js';
+import { ActionHandler } from '../types';
+import { resolveJsonPlaceholders, resolveVariables } from '../helpers';
 
 export const sendWebhook: ActionHandler = async ({ contact, node, trigger }) => {
     const config = (node.data.config || {}) as any;

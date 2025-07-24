@@ -1,8 +1,8 @@
 
-import { supabaseAdmin } from '../supabaseAdmin.js';
-import { executeAutomation, createDefaultLoggingHooks } from './engine.js';
-import { Automation, Contact, Json, Profile, Tables } from '../types.js';
-import { sanitizeAutomation } from './utils.js';
+import { supabaseAdmin } from '../supabaseAdmin';
+import { executeAutomation, createDefaultLoggingHooks } from './engine';
+import { Automation, Contact, Json, Profile, Tables } from '../types';
+import { sanitizeAutomation } from './utils';
 
 type TriggerInfo = {
     automation_id: string;
@@ -96,10 +96,9 @@ const handleMetaMessageEvent = async (userId: string, contact: Contact, message:
         } else if (allKeywordTriggers) {
             console.log(`[HANDLER] Verificando ${allKeywordTriggers.length} gatilhos de palavra-chave para a mensagem: "${messageBody}"`);
             for (const trigger of allKeywordTriggers) {
-                const triggerTyped = trigger as Tables<'automation_triggers'>;
-                if (triggerTyped.trigger_key && typeof triggerTyped.trigger_key === 'string' && messageBody.includes(triggerTyped.trigger_key.toLowerCase())) {
-                    console.log(`[HANDLER] Correspondência encontrada! Palavra-chave: "${triggerTyped.trigger_key}". Despachando automação ${triggerTyped.automation_id}`);
-                    matchingTriggers.push({ automation_id: triggerTyped.automation_id, node_id: triggerTyped.node_id });
+                if (trigger.trigger_key && typeof trigger.trigger_key === 'string' && messageBody.includes(trigger.trigger_key.toLowerCase())) {
+                    console.log(`[HANDLER] Correspondência encontrada! Palavra-chave: "${trigger.trigger_key}". Despachando automação ${trigger.automation_id}`);
+                    matchingTriggers.push({ automation_id: trigger.automation_id, node_id: trigger.node_id });
                 }
             }
         }

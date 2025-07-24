@@ -1,4 +1,5 @@
 
+
 import React, { useContext, useState, useMemo } from 'react';
 import { MessageTemplate, TemplateStatus } from '../../types';
 import { getMetaTemplates } from '../../services/meta/templates';
@@ -86,7 +87,7 @@ const Templates: React.FC = () => {
         }));
         
         if (templatesToUpsert.length > 0) {
-            const { error: upsertError } = await supabase.from('message_templates').upsert(templatesToUpsert as any, { onConflict: 'meta_id, user_id' });
+            const { error: upsertError } = await supabase.from('message_templates').upsert(templatesToUpsert, { onConflict: 'meta_id, user_id' });
             if (upsertError) throw upsertError;
         }
 

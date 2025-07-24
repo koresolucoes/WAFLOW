@@ -1,8 +1,8 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { supabaseAdmin } from './_lib/supabaseAdmin.js';
-import { publishEvent } from './_lib/automation/trigger-handler.js';
-import { Contact } from './_lib/types.js';
+import { supabaseAdmin } from './_lib/supabaseAdmin';
+import { publishEvent } from './_lib/automation/trigger-handler';
+import { Contact } from './_lib/types';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'POST') {

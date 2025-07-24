@@ -1,5 +1,5 @@
 
-import { Contact, MetaConfig, Profile } from '../types.js';
+import { Contact, MetaConfig, Profile } from '../types';
 
 export const getValueFromPath = (obj: any, path: string): any => {
     if (!path || !obj) return undefined;

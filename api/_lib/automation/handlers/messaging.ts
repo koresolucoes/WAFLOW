@@ -1,9 +1,9 @@
 
-import { supabaseAdmin } from '../../supabaseAdmin.js';
-import { sendTemplatedMessage, sendTextMessage, sendMediaMessage, sendInteractiveMessage } from '../../meta/messages.js';
-import { MessageTemplate } from '../../types.js';
-import { ActionHandler } from '../types.js';
-import { getMetaConfig, resolveVariables } from '../helpers.js';
+import { supabaseAdmin } from '../../supabaseAdmin';
+import { sendTemplatedMessage, sendTextMessage, sendMediaMessage, sendInteractiveMessage } from '../../meta/messages';
+import { MessageTemplate } from '../../types';
+import { ActionHandler } from '../types';
+import { getMetaConfig, resolveVariables } from '../helpers';
 
 export const sendTemplate: ActionHandler = async ({ profile, contact, node, trigger }) => {
     if (!contact) {

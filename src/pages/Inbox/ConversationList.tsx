@@ -1,5 +1,4 @@
-
-import React, { useContext } from 'react';
+import React, { useContext, useState, useMemo } from 'react';
 import { InboxContext } from '../../contexts/providers/InboxContext';
 import { Conversation } from '../../types';
 
@@ -62,25 +61,56 @@ const ConversationListItem: React.FC<{ conversation: Conversation; isActive: boo
     );
 };
 
+const FilterButton: React.FC<{ label: string; isActive: boolean; onClick: () => void }> = ({ label, isActive, onClick }) => (
+    <button
+        onClick={onClick}
+        className={`px-3 py-1 text-xs font-semibold rounded-full transition-colors ${isActive ? 'bg-sky-500 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}
+    >
+        {label}
+    </button>
+);
+
 const ConversationList: React.FC = () => {
     const { conversations, activeContactId, setActiveContactId, isLoading } = useContext(InboxContext);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [filter, setFilter] = useState<'all' | 'unread'>('all');
+
+    const filteredConversations = useMemo(() => {
+        return conversations
+            .filter(conv => {
+                if (filter === 'unread') {
+                    return conv.unread_count > 0;
+                }
+                return true;
+            })
+            .filter(conv => {
+                if (searchTerm.trim() === '') return true;
+                return conv.contact.name.toLowerCase().includes(searchTerm.toLowerCase());
+            });
+    }, [conversations, searchTerm, filter]);
     
     return (
         <aside className="w-96 flex-shrink-0 bg-slate-800/50 border-r border-slate-700/50 flex flex-col">
-            <div className="p-4 border-b border-slate-700/50">
+            <div className="p-4 border-b border-slate-700/50 space-y-3">
                 <input
                     type="search"
-                    placeholder="Pesquisar ou começar nova conversa..."
+                    placeholder="Pesquisar..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-full bg-slate-700 border-slate-600 rounded-md p-2 text-sm text-white placeholder-slate-400"
                 />
+                <div className="flex items-center gap-2">
+                    <FilterButton label="Todas" isActive={filter === 'all'} onClick={() => setFilter('all')} />
+                    <FilterButton label="Não Lidas" isActive={filter === 'unread'} onClick={() => setFilter('unread')} />
+                </div>
             </div>
             <ul className="flex-grow overflow-y-auto">
                  {isLoading && conversations.length === 0 ? (
                     <div className="p-4 text-center text-slate-400">Carregando conversas...</div>
-                ) : conversations.length === 0 ? (
+                ) : filteredConversations.length === 0 ? (
                     <div className="p-4 text-center text-slate-400">Nenhuma conversa encontrada.</div>
                 ) : (
-                    conversations.map(conv => (
+                    filteredConversations.map(conv => (
                         <ConversationListItem
                             key={conv.contact.id}
                             conversation={conv}

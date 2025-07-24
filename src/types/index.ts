@@ -1,5 +1,5 @@
-
-
+// Type definitions for Vite environment variables were not being picked up correctly.
+// Removing them to avoid confusion and relying on a local cast where needed.
 
 import { Session, User } from '@supabase/supabase-js';
 import { Database, Json, TablesInsert, TablesUpdate } from './database.types';
@@ -34,7 +34,7 @@ export interface AutomationNodeData {
   config: Json;
 }
 
-export type AutomationNode = XyNode<AutomationNodeData>;
+export type AutomationNode = XyNode<AutomationNodeData, string>;
 
 // --- Plain object types to avoid TS recursion from generated types ---
 export type Profile = Database['public']['Tables']['profiles']['Row'];

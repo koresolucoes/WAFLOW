@@ -1,4 +1,5 @@
 
+
 import React, { useState, useRef } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { ZAPFLOW_AI_LOGO } from '../../components/icons';
@@ -16,7 +17,7 @@ const Auth: React.FC = () => {
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const captcha = useRef<HCaptcha>(null);
   
-  const sitekey = import.meta.env.VITE_HCAPTCHA_SITEKEY;
+  const sitekey = (import.meta as any).env.VITE_HCAPTCHA_SITEKEY;
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
