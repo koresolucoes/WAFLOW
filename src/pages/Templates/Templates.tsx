@@ -1,3 +1,4 @@
+
 import React, { useContext, useState, useMemo } from 'react';
 import { MessageTemplate, TemplateStatus } from '../../types';
 import { getMetaTemplates } from '../../services/meta/templates';
@@ -5,7 +6,7 @@ import { supabase } from '../../lib/supabaseClient';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import { SPARKLES_ICON } from '../../components/icons';
-import { Json } from '../../types/database.types';
+import { Json, TablesInsert } from '../../types/database.types';
 import { TemplatesContext } from '../../contexts/providers/TemplatesContext';
 import { NavigationContext } from '../../contexts/providers/NavigationContext';
 import { AuthContext } from '../../contexts/providers/AuthContext';
@@ -85,7 +86,7 @@ const Templates: React.FC = () => {
         }));
         
         if (templatesToUpsert.length > 0) {
-            const { error: upsertError } = await supabase.from('message_templates').upsert(templatesToUpsert as any, { onConflict: 'meta_id, user_id' });
+            const { error: upsertError } = await supabase.from('message_templates').upsert(templatesToUpsert as TablesInsert<'message_templates'>[], { onConflict: 'meta_id, user_id' });
             if (upsertError) throw upsertError;
         }
 

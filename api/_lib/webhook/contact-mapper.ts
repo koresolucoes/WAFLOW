@@ -1,7 +1,6 @@
 
-
 import { supabaseAdmin } from '../supabaseAdmin.js';
-import { Contact, Profile, Json, TablesInsert } from '../types.js';
+import { Contact, Profile, Json, TablesInsert, TablesUpdate } from '../types.js';
 import { getValueFromPath } from '../automation/helpers.js';
 
 export const findOrCreateContactByPhone = async (user_id: string, phone: string, name: string): Promise<{ contact: Contact | null, isNew: boolean }> => {
@@ -16,7 +15,7 @@ export const findOrCreateContactByPhone = async (user_id: string, phone: string,
         const newContactPayload: TablesInsert<'contacts'> = { user_id, phone, name, tags: ['new-lead'], custom_fields: null };
         const { data: newContact, error: insertError } = await supabaseAdmin
             .from('contacts')
-            .insert(newContactPayload as never)
+            .insert(newContactPayload)
             .select()
             .single();
         if (insertError || !newContact) {
@@ -55,7 +54,7 @@ export const processWebhookPayloadForContact = async (
                 const nameRule = mappingRules.find((m: any) => m.destination === 'name');
                 const name = getValueFromPath(fullPayloadForEvent, nameRule?.source) || 'New Webhook Lead';
                 const newContactPayload: TablesInsert<'contacts'> = { user_id: profile.id, name, phone, tags: ['new-webhook-lead'], custom_fields: null };
-                const { data: newContact, error: insertError } = await supabaseAdmin.from('contacts').insert(newContactPayload as never).select().single();
+                const { data: newContact, error: insertError } = await supabaseAdmin.from('contacts').insert(newContactPayload).select().single();
                 if (insertError) {
                     console.error('Webhook trigger: Failed to create new contact.', insertError);
                 } else if (newContact) {
@@ -111,7 +110,7 @@ export const processWebhookPayloadForContact = async (
 
         if (needsUpdate) {
             const { id, user_id, created_at, ...updatePayload} = contact;
-            const { data: updatedContact, error: updateContactError } = await supabaseAdmin.from('contacts').update(updatePayload as never).eq('id', contact.id).select().single();
+            const { data: updatedContact, error: updateContactError } = await supabaseAdmin.from('contacts').update(updatePayload as TablesUpdate<'contacts'>).eq('id', contact.id).select().single();
             if(updateContactError) {
                 console.error("Webhook trigger: Failed to update contact with data", updateContactError)
             } else if(updatedContact) {

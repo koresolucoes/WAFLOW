@@ -1,9 +1,9 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { supabaseAdmin } from './_lib/supabaseAdmin.js';
-import { Tables, TablesInsert, TablesUpdate } from './_lib/types.js';
-import { publishEvent } from './_lib/automation/trigger-handler.js';
-import { findOrCreateContactByPhone } from './_lib/webhook/contact-mapper.js';
+import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
+import { TablesInsert, TablesUpdate } from '../_lib/types.js';
+import { publishEvent } from '../_lib/automation/trigger-handler.js';
+import { findOrCreateContactByPhone } from '../_lib/webhook/contact-mapper.js';
 
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -25,8 +25,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // 2. Handle Event Notifications from Meta
     if (req.method === 'POST') {
-        console.log("Webhook payload recebido:", JSON.stringify(req.body, null, 2));
+        const { id: userId } = req.query;
+        if (typeof userId !== 'string' || !userId) {
+            console.error("[ERRO] Requisição de Webhook recebida sem um ID de usuário na URL.");
+            return res.status(400).send('Invalid User ID in webhook URL');
+        }
 
+        console.log(`[LOG] Webhook payload recebido para o usuário: ${userId}`);
+        
         const { entry } = req.body;
         if (!entry || !Array.isArray(entry)) {
             console.error("Payload inválido: 'entry' não encontrado ou não é um array.");
@@ -47,7 +53,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                         continue;
                     }
                     
-                    // ---- ATUALIZAÇÕES DE STATUS ----
+                    // ---- ATUALIZAÇÕES DE STATUS (não depende do perfil) ----
                     if (value.statuses) {
                         for (const status of value.statuses) {
                              const promise = (async () => {
@@ -74,73 +80,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
                     // ---- MENSAGENS RECEBIDAS ----
                     if (value.messages) {
-                        // **LÓGICA REATORADA**: Busca o perfil UMA VEZ para este lote inteiro de mensagens.
                         const phoneNumberId = value?.metadata?.phone_number_id;
-
                         if (!phoneNumberId) {
                             console.warn(`[AVISO] Webhook para ${value.contacts?.[0]?.wa_id} ignorado por não conter 'phone_number_id' nos metadados.`);
-                            continue; // Pula este objeto 'change' inteiro.
+                            continue;
                         }
 
-                        const phoneNumberIdStr = String(phoneNumberId).trim();
-                        
-                        console.log(`[LOG] Lógica de verificação de perfil iniciada para o ID: ${phoneNumberIdStr}`);
-                        
-                        const findProfile = async (attempt: number): Promise<Tables<'profiles'> | null> => {
-                            console.log(`[LOG] Procurando perfil com meta_phone_number_id: ${phoneNumberIdStr} (Tentativa ${attempt})`);
-                            const { data, error } = await supabaseAdmin
-                                .from('profiles')
-                                .select('*')
-                                .eq('meta_phone_number_id', phoneNumberIdStr)
-                                .maybeSingle();
+                        // **NOVA LÓGICA**: VALIDA o ID do telefone, não busca por ele.
+                        const { data: profileData, error: profileError } = await supabaseAdmin
+                            .from('profiles')
+                            .select('*')
+                            .eq('id', userId)
+                            .single();
 
-                            if (error) {
-                                console.error(`[ERRO DB] Falha na busca do perfil (Tentativa ${attempt}):`, error.message);
-                                return null;
-                            }
-
-                            if (data) {
-                                console.log(`[LOG] Perfil encontrado com sucesso! user_id: ${data.id}`);
-                                return data as Tables<'profiles'>;
-                            }
-                            return null;
-                        };
-
-                        let profile = await findProfile(1);
-
-                        if (!profile) {
-                            console.log('[DEBUG] Primeira tentativa falhou, aguardando 1 segundo para tentar novamente...');
-                            await new Promise(resolve => setTimeout(resolve, 1000));
-                            profile = await findProfile(2);
+                        if (profileError || !profileData) {
+                            console.error(`[ERRO] Perfil não encontrado ou erro de DB para o user_id: ${userId}. A URL do webhook pode estar incorreta.`);
+                            continue; // Pula este lote de mensagens
                         }
-                        
-                        if (!profile) {
-                            const { data: allProfilesWithIds } = await supabaseAdmin.from('profiles').select('id, meta_phone_number_id').not('meta_phone_number_id', 'is', null);
-                            const profilesWithIds = allProfilesWithIds || [];
-                            
-                            console.warn(`
-===============================================================
-[AVISO DE CONFIGURAÇÃO] NENHUM PERFIL CORRESPONDENTE ENCONTRADO
----------------------------------------------------------------
-ID do Número de Telefone recebido da Meta: '${phoneNumberIdStr}'
-IDs verificados no banco de dados:
-${profilesWithIds.map(p => `- '${p.meta_phone_number_id}'`).join('\n') || 'Nenhum'}
 
-Como Corrigir:
-1. Copie o ID da Meta ('${phoneNumberIdStr}').
-2. Vá para a página de 'Configurações'.
-3. Cole o valor no campo "ID do número de telefone".
-4. Salve as alterações.
-===============================================================
+                        if (profileData.meta_phone_number_id !== String(phoneNumberId)) {
+                             console.warn(`
+                                [AVISO DE INCOMPATIBILIDADE] Mensagem ignorada.
+                                O 'ID do número de telefone' recebido da Meta ('${phoneNumberId}') 
+                                não corresponde ao configurado para o usuário ${userId} ('${profileData.meta_phone_number_id}').
+                                Verifique suas configurações na Meta e no ZapFlow AI.
                             `);
-                            continue; // Pula este lote de mensagens.
+                            continue; // Pula este lote de mensagens
                         }
-                        
-                        // Agora que temos um perfil válido, processa as mensagens em paralelo.
+
+                        // O userId foi validado. Agora processa as mensagens.
                         for (const message of value.messages) {
                             const promise = (async () => {
                                 try {
-                                    const userId = profile!.id;
                                     const contactName = value.contacts?.[0]?.profile?.name || 'Contato via WhatsApp';
                                     const { contact, isNew } = await findOrCreateContactByPhone(userId, message.from, contactName);
                                     
@@ -182,7 +153,7 @@ Como Corrigir:
                 }
             }
             await Promise.all(processingPromises);
-            console.log("[LOG] Processamento completo do evento do webhook.");
+            console.log(`[LOG] Processamento do webhook para o usuário ${userId} concluído.`);
 
         } catch(error: any) {
             console.error("[ERRO GERAL] Erro não tratado no processamento do webhook:", error.message, error.stack);

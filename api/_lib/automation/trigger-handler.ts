@@ -1,7 +1,7 @@
 
 import { supabaseAdmin } from '../supabaseAdmin.js';
 import { executeAutomation, createDefaultLoggingHooks } from './engine.js';
-import { Automation, Contact, Json, Profile } from '../types.js';
+import { Automation, Contact, Json, Profile, Tables } from '../types.js';
 import { sanitizeAutomation } from './utils.js';
 
 type TriggerInfo = {
@@ -69,7 +69,7 @@ const handleMetaMessageEvent = async (userId: string, contact: Contact, message:
     if (buttonPayload) {
         const { data: buttonTriggers, error } = await supabaseAdmin
             .from('automation_triggers')
-            .select('automation_id, node_id')
+            .select('*')
             .eq('user_id', userId)
             .eq('trigger_type', 'button_clicked')
             .eq('trigger_key', buttonPayload);
@@ -81,7 +81,7 @@ const handleMetaMessageEvent = async (userId: string, contact: Contact, message:
     if (messageBody) {
         const { data: allKeywordTriggers, error } = await supabaseAdmin
             .from('automation_triggers')
-            .select('automation_id, node_id, trigger_key')
+            .select('*')
             .eq('user_id', userId)
             .eq('trigger_type', 'message_received_with_keyword');
 
@@ -107,7 +107,7 @@ const handleMetaMessageEvent = async (userId: string, contact: Contact, message:
 const handleNewContactEvent = async (userId: string, contact: Contact) => {
     const { data: triggers, error } = await supabaseAdmin
         .from('automation_triggers')
-        .select('automation_id, node_id')
+        .select('*')
         .eq('user_id', userId)
         .eq('trigger_type', 'new_contact');
         
@@ -125,7 +125,7 @@ const handleNewContactEvent = async (userId: string, contact: Contact) => {
 export const handleTagAddedEvent = async (userId: string, contact: Contact, addedTag: string) => {
     const { data: triggers, error } = await supabaseAdmin
         .from('automation_triggers')
-        .select('automation_id, node_id')
+        .select('*')
         .eq('user_id', userId)
         .eq('trigger_type', 'new_contact_with_tag')
         .ilike('trigger_key', addedTag);
