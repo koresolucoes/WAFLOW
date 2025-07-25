@@ -1,4 +1,5 @@
 
+
 import { createClient } from '@supabase/supabase-js';
 import { Database } from './database.types.js';
 
@@ -19,28 +20,41 @@ if (!supabaseUrl || supabaseUrl.trim() === '' || !supabaseServiceKey || supabase
   throw new Error(errorMessage);
 }
 
-console.log('[Supabase Admin] Credentials seem valid. Creating client with custom fetch timeout.');
+console.log('[Supabase Admin] Credentials seem valid. Creating client with a custom fetch timeout.');
 
 /**
- * A wrapper around the global fetch that adds a timeout.
+ * A wrapper around the global fetch that adds a reasonable timeout.
  * This is crucial in serverless environments to prevent functions from hanging
- * on stalled network requests.
+ * on stalled network requests, especially when dealing with "waking up" a free-tier database.
+ * The 15-second timeout is generous for a cold start but well within Vercel's execution limits.
  * @param url The request URL.
  * @param options The request options.
- * @param timeout The timeout in milliseconds.
  * @returns A fetch Response promise.
  */
-const fetchWithTimeout = (url: RequestInfo, options: RequestInit = {}, timeout = 9500) => {
+const fetchWithTimeout = async (
+    url: RequestInfo, 
+    options: RequestInit = {}, 
+    timeout = 15000 // 15 seconds
+): Promise<Response> => {
     const controller = new AbortController();
     const { signal } = controller;
+    
     const timeoutId = setTimeout(() => {
-        console.error(`[Supabase Admin] Fetch timeout reached after ${timeout}ms for URL: ${url}`);
-        controller.abort();
+        console.warn(`[Supabase Admin] Fetch timeout reached after ${timeout}ms for URL: ${url.toString()}`);
+        controller.abort('Timeout'); // Pass a reason for better debugging
     }, timeout);
 
-    return fetch(url, { ...options, signal })
-        .finally(() => clearTimeout(timeoutId));
+    try {
+        const response = await fetch(url, { ...options, signal });
+        clearTimeout(timeoutId); // Important: clear the timeout if fetch succeeds
+        return response;
+    } catch (error: any) {
+        clearTimeout(timeoutId); // Clear timeout on error too
+        console.error(`[Supabase Admin] Fetch failed for URL ${url.toString()}:`, error);
+        throw error;
+    }
 };
+
 
 // Create a single, shared admin client for use in server-side functions.
 export const supabaseAdmin = createClient<Database>(supabaseUrl, supabaseServiceKey, {
@@ -48,9 +62,9 @@ export const supabaseAdmin = createClient<Database>(supabaseUrl, supabaseService
         autoRefreshToken: false,
         persistSession: false,
     },
-    // Add the timeout to all fetch requests made by the Supabase client.
+    // Add the timeout logic to all fetch requests made by the Supabase client.
     global: {
-        fetch: (url, options) => fetchWithTimeout(url, options, 9500) // 9.5-second timeout
+        fetch: (url, options) => fetchWithTimeout(url, options)
     }
 });
 
