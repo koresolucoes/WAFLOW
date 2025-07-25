@@ -3,7 +3,6 @@ import { Json as DbJson, Database } from './database.types.js';
 import { MetaTemplateComponent } from './meta/types.js';
 
 export type Json = DbJson;
-export type { Tables, TablesInsert, TablesUpdate } from './database.types.js';
 
 // --- Backend-safe Flow Types ---
 export interface BackendNode<T = any> {

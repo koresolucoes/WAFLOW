@@ -98,7 +98,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method === 'POST') {
         // Responde imediatamente à Meta para evitar timeouts e processa em segundo plano.
         res.status(200).send('EVENT_RECEIVED');
-        await handlePostRequest(req);
+        handlePostRequest(req);
         return;
     }
 

@@ -1,7 +1,7 @@
 
 
 import { supabaseAdmin } from '../supabaseAdmin.js';
-import { TablesUpdate } from '../types.js';
+import { TablesUpdate } from '../database.types.js';
 
 export async function processStatusUpdate(status: any): Promise<void> {
     console.log(`[Manipulador de Status] Processando atualização de status para a mensagem ${status.id}: ${status.status}`);
@@ -32,8 +32,8 @@ export async function processStatusUpdate(status: any): Promise<void> {
             baseUpdate.error_message = `${status.errors[0]?.title} (Código: ${status.errors[0]?.code})`;
         }
 
-        const { error: campaignError } = await supabaseAdmin.from('campaign_messages').update(baseUpdate).eq('meta_message_id', status.id);
-        const { error: sentError } = await supabaseAdmin.from('sent_messages').update(baseUpdate).eq('meta_message_id', status.id);
+        const { error: campaignError } = await supabaseAdmin.from('campaign_messages').update(baseUpdate as TablesUpdate<'campaign_messages'>).eq('meta_message_id', status.id);
+        const { error: sentError } = await supabaseAdmin.from('sent_messages').update(baseUpdate as TablesUpdate<'sent_messages'>).eq('meta_message_id', status.id);
 
         if (campaignError) console.error(`[Manipulador de Status] Erro ao atualizar campaign_messages para ${status.id}:`, campaignError.message);
         if (sentError) console.error(`[Manipulador de Status] Erro ao atualizar sent_messages para ${status.id}:`, sentError.message);

@@ -1,7 +1,8 @@
 
 
 import { supabaseAdmin } from '../../supabaseAdmin.js';
-import { Contact, TablesUpdate } from '../../types.js';
+import { Contact } from '../../types.js';
+import { TablesUpdate } from '../../database.types.js';
 import { handleTagAddedEvent } from '../trigger-handler.js';
 import { ActionHandler } from '../types.js';
 import { resolveVariables } from '../helpers.js';
@@ -29,7 +30,7 @@ export const addTag: ActionHandler = async ({ contact, node, trigger }) => {
 
         if (error) throw error;
         if (!updatedContact) throw new Error('Failed to update contact after adding tag.');
-        const finalContact = updatedContact;
+        const finalContact = updatedContact as Contact;
 
         handleTagAddedEvent(contact.user_id, finalContact, tagToAdd);
         
@@ -50,7 +51,7 @@ export const removeTag: ActionHandler = async ({ contact, node, trigger }) => {
         const { data, error } = await supabaseAdmin.from('contacts').update(updatePayload).eq('id', contact.id).select('*').single();
         if (error) throw error;
         if (!data) throw new Error('Failed to update contact after removing tag.');
-        return { updatedContact: data, details: `Tag '${tagToRemove}' removida do contato.` };
+        return { updatedContact: data as Contact, details: `Tag '${tagToRemove}' removida do contato.` };
     }
     throw new Error('Tag a ser removida não está configurada.');
 };
@@ -68,7 +69,7 @@ export const setCustomField: ActionHandler = async ({ contact, node, trigger }) 
         const { data, error } = await supabaseAdmin.from('contacts').update(updatePayload).eq('id', contact.id).select('*').single();
         if (error) throw error;
         if (!data) throw new Error('Failed to update contact after setting custom field.');
-        return { updatedContact: data, details: `Campo '${fieldName}' atualizado para '${fieldValue}'.` };
+        return { updatedContact: data as Contact, details: `Campo '${fieldName}' atualizado para '${fieldValue}'.` };
     }
     throw new Error('Nome do campo personalizado não está configurado.');
 };

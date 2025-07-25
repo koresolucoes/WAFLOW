@@ -1,7 +1,8 @@
 
 
 import { supabaseAdmin } from '../supabaseAdmin.js';
-import { Contact, Profile, Json, TablesInsert, TablesUpdate } from '../types.js';
+import { Contact, Profile, Json } from '../types.js';
+import { TablesInsert, TablesUpdate } from '../database.types.js';
 import { getValueFromPath } from '../automation/helpers.js';
 
 const normalizePhoneNumber = (phone: string): string => {
@@ -42,12 +43,12 @@ export const findOrCreateContactByPhone = async (user_id: string, phone: string,
              console.error("Error creating new contact:", insertError);
              return { contact: null, isNew: false };
         }
-        return { contact: newContact, isNew: true };
+        return { contact: newContact as Contact, isNew: true };
     } else if (error) {
          console.error("Error finding contact:", error);
         return { contact: null, isNew: false };
     }
-    return { contact: contactData, isNew: false };
+    return { contact: contactData as Contact, isNew: false };
 };
 
 export const processWebhookPayloadForContact = async (
@@ -121,11 +122,11 @@ export const processWebhookPayloadForContact = async (
 
         if (needsUpdate) {
             const { id, user_id, created_at, ...updatePayload} = contact;
-            const { data: updatedContact, error: updateContactError } = await supabaseAdmin.from('contacts').update(updatePayload).eq('id', contact.id).select('*').single();
+            const { data: updatedContact, error: updateContactError } = await supabaseAdmin.from('contacts').update(updatePayload as TablesUpdate<'contacts'>).eq('id', contact.id).select('*').single();
             if(updateContactError) {
                 console.error("Webhook trigger: Failed to update contact with data", updateContactError)
             } else if(updatedContact) {
-                contact = updatedContact;
+                contact = updatedContact as Contact;
             }
         }
     }
