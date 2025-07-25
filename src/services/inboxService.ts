@@ -1,17 +1,17 @@
 import { supabase } from '../lib/supabaseClient';
-import { Conversation, UnifiedMessage, Contact, SentMessageInsert, MessageStatus, MetaConfig, Tables } from '../types';
+import { Conversation, UnifiedMessage, Contact, MessageInsert, MessageStatus, MetaConfig, Message } from '../types';
 import { sendTextMessage } from './meta/messages';
 
-export const mapPayloadToUnifiedMessage = (payload: Tables<'sent_messages'> | Tables<'received_messages'>): UnifiedMessage => {
-    const isReceived = 'message_body' in payload;
+export const mapPayloadToUnifiedMessage = (payload: Message): UnifiedMessage => {
     return {
         id: payload.id,
         contact_id: payload.contact_id,
-        content: isReceived ? (payload.message_body || '') : (payload as Tables<'sent_messages'>).content,
-        created_at: isReceived ? payload.received_at : (payload as Tables<'sent_messages'>).created_at,
-        type: isReceived ? 'inbound' : 'outbound',
-        status: !isReceived ? (payload as Tables<'sent_messages'>).status as MessageStatus : undefined,
-        sourceTable: isReceived ? 'received_messages' : 'sent_messages',
+        content: payload.content,
+        created_at: payload.created_at,
+        type: payload.type,
+        status: payload.status,
+        // Mantém a compatibilidade com a lógica de UI existente
+        sourceTable: payload.type === 'inbound' ? 'received_messages' : 'sent_messages', 
     };
 };
 
@@ -37,22 +37,24 @@ export const fetchMessagesFromDb = async (userId: string, contactId: string): Pr
         p_contact_id: contactId
     });
     if (error) throw error;
-    return (data as UnifiedMessage[]) || [];
+    return (data as any as UnifiedMessage[]) || [];
 };
 
 export const sendMessageToApi = async (userId: string, contact: Contact, text: string, metaConfig: MetaConfig) => {
     const response = await sendTextMessage(metaConfig, contact.phone, text);
     const metaMessageId = response.messages[0].id;
 
-    const messagePayload: SentMessageInsert = { 
+    const messagePayload: MessageInsert = { 
         user_id: userId, 
         contact_id: contact.id, 
         content: text, 
         meta_message_id: metaMessageId, 
         status: 'sent', 
-        source: 'direct' 
+        source: 'direct',
+        type: 'outbound',
+        sent_at: new Date().toISOString()
     };
     
-    const { error } = await supabase.from('sent_messages').insert(messagePayload);
+    const { error } = await supabase.from('messages').insert(messagePayload as any);
     if (error) throw error;
 };

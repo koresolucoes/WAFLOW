@@ -1,11 +1,8 @@
-
-
-
 import React, { createContext, useState, useCallback, ReactNode, useContext, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuthStore, useMetaConfig } from '../../stores/authStore';
 import { ContactsContext } from './ContactsContext';
-import { Conversation, UnifiedMessage, Contact, MessageStatus, Tables } from '../../types';
+import { Conversation, UnifiedMessage, Message, MessageStatus } from '../../types';
 import * as inboxService from '../../services/inboxService';
 
 interface InboxContextType {
@@ -89,14 +86,15 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         if (user) {
             fetchConversations();
 
-            const handleNewMessage = (payload: any) => {
-                const newMessage = inboxService.mapPayloadToUnifiedMessage(payload.new as Tables<'sent_messages'> | Tables<'received_messages'>);
+            const handleMessageChange = (payload: { new: Message, eventType: string }) => {
+                const newMessage = inboxService.mapPayloadToUnifiedMessage(payload.new);
                 const contactId = newMessage.contact_id;
                 
+                // Update conversation list
                 setConversations(prev => {
                     const convoIndex = prev.findIndex(c => c.contact.id === contactId);
                     if (convoIndex > -1) {
-                        const updatedConvo = { 
+                         const updatedConvo = { 
                             ...prev[convoIndex], 
                             last_message: newMessage,
                             unread_count: (newMessage.type === 'inbound' && contactId !== activeContactIdRef.current) 
@@ -111,37 +109,27 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                              const newConvo: Conversation = { contact: contactDetails, last_message: newMessage, unread_count: 1 };
                              return [newConvo, ...prev];
                         }
-                        // If contact not found in context, refetch all convos to get details
-                        fetchConversations();
+                        fetchConversations(); // Refetch if contact is not in local state
                         return prev;
                     }
                 });
-
+                
+                // Update active chat window
                 if (contactId === activeContactIdRef.current) {
-                    setMessages(prev => [...prev, newMessage]);
+                    if (payload.eventType === 'INSERT') {
+                        setMessages(prev => [...prev, newMessage]);
+                    } else if (payload.eventType === 'UPDATE') {
+                        setMessages(prev => prev.map(m => m.id === newMessage.id ? newMessage : m));
+                    }
                 }
             };
-
-            const handleMessageUpdate = (payload: any) => {
-                 const updatedMessage = inboxService.mapPayloadToUnifiedMessage(payload.new as Tables<'sent_messages'> | Tables<'received_messages'>);
-                 if (updatedMessage.contact_id === activeContactIdRef.current) {
-                    setMessages(prev => prev.map(m => (m.id === updatedMessage.id && m.sourceTable === 'sent_messages') ? updatedMessage : m));
-                 }
-                 setConversations(prev => prev.map(c => (c.last_message?.id === updatedMessage.id && c.last_message.sourceTable === 'sent_messages') ? { ...c, last_message: updatedMessage } : c));
-            };
             
-            const receivedMessagesChannel = supabase.channel(`received-messages-${user.id}`)
-                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'received_messages', filter: `user_id=eq.${user.id}` }, handleNewMessage)
-                .subscribe();
-            
-            const sentMessagesChannel = supabase.channel(`sent-messages-${user.id}`)
-                .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'sent_messages', filter: `user_id=eq.${user.id}` }, handleMessageUpdate)
-                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'sent_messages', filter: `user_id=eq.${user.id}` }, handleNewMessage)
+            const messagesChannel = supabase.channel(`messages-channel-${user.id}`)
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `user_id=eq.${user.id}` }, handleMessageChange as any)
                 .subscribe();
             
             return () => {
-                supabase.removeChannel(receivedMessagesChannel);
-                supabase.removeChannel(sentMessagesChannel);
+                supabase.removeChannel(messagesChannel);
             }
         }
     }, [user, contacts, fetchConversations]);

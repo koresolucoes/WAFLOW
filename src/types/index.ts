@@ -2,18 +2,20 @@
 // Removing them to avoid confusion and relying on a local cast where needed.
 
 import { Session, User } from '@supabase/supabase-js';
-import { Database, Json, Tables, TablesInsert, TablesUpdate } from './database.types';
+import { Database, Json, Enums, Tables, TablesInsert, TablesUpdate } from './database.types';
 import { MetaTemplateComponent } from '../services/meta/types';
 import type { Node as XyNode, Edge } from '@xyflow/react';
 
 export type Page = 'dashboard' | 'campaigns' | 'templates' | 'template-editor' | 'contacts' | 'new-campaign' | 'profile' | 'settings' | 'auth' | 'campaign-details' | 'automations' | 'automation-editor' | 'funnel' | 'contact-details' | 'inbox';
 
-// String literal unions to replace DB enums for type safety in the app
-export type TemplateCategory = 'MARKETING' | 'UTILITY' | 'AUTHENTICATION';
-export type TemplateStatus = 'APPROVED' | 'PENDING' | 'REJECTED' | 'PAUSED' | 'LOCAL';
-export type CampaignStatus = 'Sent' | 'Draft' | 'Failed';
-export type MessageStatus = 'sent' | 'delivered' | 'read' | 'failed';
-export type AutomationStatus = 'active' | 'paused';
+// Tipos de string literal para substituir os enums do BD para segurança de tipos no aplicativo
+export type TemplateCategory = Enums<'template_category'>;
+export type TemplateStatus = Enums<'template_status'>;
+export type CampaignStatus = Enums<'campaign_status'>;
+export type MessageStatus = Enums<'message_status'>;
+export type MessageType = Enums<'message_type'>;
+export type MessageSource = Enums<'message_source'>;
+export type AutomationStatus = Enums<'automation_status'>;
 export type AutomationRunStatus = 'running' | 'success' | 'failed';
 export type AutomationLogStatus = 'success' | 'failed';
 
@@ -36,7 +38,7 @@ export interface AutomationNodeData {
 
 export type AutomationNode = XyNode<AutomationNodeData, string>;
 
-// --- Plain object types to avoid TS recursion from generated types ---
+// --- Tipos de objetos simples para evitar recursão de TS de tipos gerados ---
 export type Profile = Database['public']['Tables']['profiles']['Row'];
 export type Contact = Database['public']['Tables']['contacts']['Row'];
 
@@ -50,12 +52,7 @@ export type Campaign = Database['public']['Tables']['campaigns']['Row'] & {
     status: CampaignStatus;
 };
 
-export type CampaignMessage = Database['public']['Tables']['campaign_messages']['Row'] & {
-    status: MessageStatus;
-};
-
-export type SentMessage = Database['public']['Tables']['sent_messages']['Row'];
-export type ReceivedMessage = Database['public']['Tables']['received_messages']['Row'];
+export type Message = Database['public']['Tables']['messages']['Row'];
 
 export type Automation = Omit<Database['public']['Tables']['automations']['Row'], 'nodes' | 'edges' | 'status'> & {
     nodes: AutomationNode[];
@@ -66,15 +63,16 @@ export type Automation = Omit<Database['public']['Tables']['automations']['Row']
 export type Pipeline = Database['public']['Tables']['pipelines']['Row'];
 export type PipelineStage = Database['public']['Tables']['pipeline_stages']['Row'];
 export type Deal = Database['public']['Tables']['deals']['Row'];
-export type Segment = Database['public']['Tables']['segments']['Row'];
-export type SegmentRule = Database['public']['Tables']['segment_rules']['Row'];
+// As tabelas de Segmento foram removidas no novo schema
+// export type Segment = Database['public']['Tables']['segments']['Row'];
+// export type SegmentRule = Database['public']['Tables']['segment_rules']['Row'];
 export type AutomationRun = Database['public']['Tables']['automation_runs']['Row'];
 export type AutomationNodeStats = Database['public']['Tables']['automation_node_stats']['Row'];
 export type AutomationNodeLog = Database['public']['Tables']['automation_node_logs']['Row'];
 
-// --- END of Plain object types ---
+// --- FIM dos tipos de objetos simples ---
 
-// --- CUSTOMIZED INTERFACES ---
+// --- INTERFACES PERSONALIZADAS ---
 export type DealWithContact = Deal & {
     contacts: Pick<Contact, 'id' | 'name'> | null;
 };
@@ -84,9 +82,9 @@ export interface UnifiedMessage {
     contact_id: string;
     content: string;
     created_at: string;
-    type: 'inbound' | 'outbound';
-    status?: MessageStatus;
-    sourceTable: 'received_messages' | 'campaign_messages' | 'sent_messages';
+    type: MessageType;
+    status: MessageStatus;
+    sourceTable: 'received_messages' | 'sent_messages';
     template?: MessageTemplate | null;
 }
 
@@ -97,7 +95,7 @@ export interface Conversation {
 }
 
 
-// --- INSERT TYPES ---
+// --- TIPOS DE INSERÇÃO ---
 export interface MessageTemplateInsert extends Omit<Database['public']['Tables']['message_templates']['Insert'], 'category' | 'status' | 'components'> {
     user_id: string;
     template_name: string;
@@ -107,11 +105,7 @@ export interface MessageTemplateInsert extends Omit<Database['public']['Tables']
     meta_id?: string | null;
 }
 
-export interface CampaignMessageInsert extends Omit<Database['public']['Tables']['campaign_messages']['Insert'], 'status'> {
-  status: MessageStatus;
-}
-
-export type SentMessageInsert = Database['public']['Tables']['sent_messages']['Insert'];
+export type MessageInsert = Database['public']['Tables']['messages']['Insert'];
 
 export interface AutomationInsert extends Omit<Database['public']['Tables']['automations']['Insert'], 'status' | 'nodes' | 'edges'> {
   user_id: string;
@@ -134,11 +128,12 @@ export interface CampaignWithMetrics extends Campaign {
         sent: number;
         delivered: number;
         read: number;
+        failed: number;
     };
 }
 
 // Tipo para a nova página de detalhes da campanha
-export interface CampaignMessageWithContact extends CampaignMessage {
+export interface MessageWithContact extends Message {
   contacts: Pick<Contact, 'name' | 'phone'> | null;
 }
 
@@ -148,8 +143,9 @@ export interface CampaignWithDetails extends Campaign {
       sent: number;
       delivered: number;
       read: number;
+      failed: number;
   };
-  messages: CampaignMessageWithContact[];
+  messages: MessageWithContact[];
   message_templates: MessageTemplate | null;
 }
 
@@ -167,4 +163,4 @@ export interface MetaConfig {
 }
 
 // Tipos de Autenticação
-export type { Session, User, Edge, Json, MetaTemplateComponent };
+export type { Session, User, Edge, Json, MetaTemplateComponent, Tables, TablesInsert, TablesUpdate };

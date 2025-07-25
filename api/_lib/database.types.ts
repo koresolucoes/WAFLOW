@@ -1,5 +1,4 @@
 
-
 export type Json =
   | string
   | number
@@ -122,7 +121,7 @@ export type Database = {
           id: string
           name: string
           nodes: Json | null
-          status: string
+          status: Database["public"]["Enums"]["automation_status"]
           user_id: string
         }
         Insert: {
@@ -131,7 +130,7 @@ export type Database = {
           id?: string
           name: string
           nodes?: Json | null
-          status?: string
+          status?: Database["public"]["Enums"]["automation_status"]
           user_id: string
         }
         Update: {
@@ -140,43 +139,8 @@ export type Database = {
           id?: string
           name?: string
           nodes?: Json | null
-          status?: string
+          status?: Database["public"]["Enums"]["automation_status"]
           user_id?: string
-        }
-      }
-      campaign_messages: {
-        Row: {
-          campaign_id: string
-          contact_id: string
-          created_at: string
-          delivered_at: string | null
-          error_message: string | null
-          id: string
-          meta_message_id: string | null
-          read_at: string | null
-          status: string
-        }
-        Insert: {
-          campaign_id: string
-          contact_id: string
-          created_at?: string
-          delivered_at?: string | null
-          error_message?: string | null
-          id?: string
-          meta_message_id?: string | null
-          read_at?: string | null
-          status: string
-        }
-        Update: {
-          campaign_id?: string
-          contact_id?: string
-          created_at?: string
-          delivered_at?: string | null
-          error_message?: string | null
-          id?: string
-          meta_message_id?: string | null
-          read_at?: string | null
-          status?: string
         }
       }
       campaigns: {
@@ -185,9 +149,9 @@ export type Database = {
           created_at: string
           name: string
           recipient_count: number
-          sent_at: string
-          status: string
-          template_id: string
+          sent_at: string | null
+          status: Database["public"]["Enums"]["campaign_status"]
+          template_id: string | null
           user_id: string
         }
         Insert: {
@@ -195,9 +159,9 @@ export type Database = {
           created_at?: string
           name: string
           recipient_count?: number
-          sent_at?: string
-          status: string
-          template_id: string
+          sent_at?: string | null
+          status: Database["public"]["Enums"]["campaign_status"]
+          template_id?: string | null
           user_id: string
         }
         Update: {
@@ -205,9 +169,9 @@ export type Database = {
           created_at?: string
           name?: string
           recipient_count?: number
-          sent_at?: string
-          status?: string
-          template_id?: string
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["campaign_status"]
+          template_id?: string | null
           user_id?: string
         }
       }
@@ -283,33 +247,86 @@ export type Database = {
       }
       message_templates: {
         Row: {
-          category: string
+          category: Database["public"]["Enums"]["template_category"]
           components: Json
           created_at: string
           id: string
           meta_id: string | null
-          status: string
+          status: Database["public"]["Enums"]["template_status"]
           template_name: string
           user_id: string
         }
         Insert: {
-          category: string
+          category: Database["public"]["Enums"]["template_category"]
           components: Json
           created_at?: string
           id?: string
           meta_id?: string | null
-          status?: string
+          status?: Database["public"]["Enums"]["template_status"]
           template_name: string
           user_id: string
         }
         Update: {
-          category?: string
+          category?: Database["public"]["Enums"]["template_category"]
           components?: Json
           created_at?: string
           id?: string
           meta_id?: string | null
-          status?: string
+          status?: Database["public"]["Enums"]["template_status"]
           template_name?: string
+          user_id?: string
+        }
+      }
+      messages: {
+        Row: {
+          automation_id: string | null
+          campaign_id: string | null
+          contact_id: string
+          content: string
+          created_at: string
+          delivered_at: string | null
+          error_message: string | null
+          id: string
+          meta_message_id: string | null
+          read_at: string | null
+          sent_at: string | null
+          source: Database["public"]["Enums"]["message_source"]
+          status: Database["public"]["Enums"]["message_status"]
+          type: Database["public"]["Enums"]["message_type"]
+          user_id: string
+        }
+        Insert: {
+          automation_id?: string | null
+          campaign_id?: string | null
+          contact_id: string
+          content: string
+          created_at?: string
+          delivered_at?: string | null
+          error_message?: string | null
+          id?: string
+          meta_message_id?: string | null
+          read_at?: string | null
+          sent_at?: string | null
+          source: Database["public"]["Enums"]["message_source"]
+          status: Database["public"]["Enums"]["message_status"]
+          type: Database["public"]["Enums"]["message_type"]
+          user_id: string
+        }
+        Update: {
+          automation_id?: string | null
+          campaign_id?: string | null
+          contact_id?: string
+          content?: string
+          created_at?: string
+          delivered_at?: string | null
+          error_message?: string | null
+          id?: string
+          meta_message_id?: string | null
+          read_at?: string | null
+          sent_at?: string | null
+          source?: Database["public"]["Enums"]["message_source"]
+          status?: Database["public"]["Enums"]["message_status"]
+          type?: Database["public"]["Enums"]["message_type"]
           user_id?: string
         }
       }
@@ -397,128 +414,64 @@ export type Database = {
           webhook_path_prefix?: string | null
         }
       }
-      received_messages: {
-        Row: {
-          contact_id: string
-          id: string
-          message_body: string | null
-          meta_message_id: string
-          received_at: string
-          sentiment: string | null
-          user_id: string
-        }
-        Insert: {
-          contact_id: string
-          id?: string
-          message_body?: string | null
-          meta_message_id: string
-          received_at?: string
-          sentiment?: string | null
-          user_id: string
-        }
-        Update: {
-          contact_id?: string
-          id?: string
-          message_body?: string | null
-          meta_message_id?: string
-          received_at?: string
-          sentiment?: string | null
-          user_id?: string
-        }
-      }
-      segment_rules: {
-        Row: {
-          field: string
-          id: string
-          operator: string
-          segment_id: string
-          value: string
-        }
-        Insert: {
-          field: string
-          id?: string
-          operator: string
-          segment_id: string
-          value: string
-        }
-        Update: {
-          field?: string
-          id?: string
-          operator?: string
-          segment_id?: string
-          value?: string
-        }
-      }
-      segments: {
-        Row: {
-          created_at: string
-          id: string
-          name: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          name: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          name?: string
-          user_id?: string
-        }
-      }
-      sent_messages: {
-        Row: {
-          contact_id: string
-          content: string
-          created_at: string
-          delivered_at: string | null
-          error_message: string | null
-          id: string
-          meta_message_id: string | null
-          read_at: string | null
-          source: string
-          status: string
-          user_id: string
-        }
-        Insert: {
-          contact_id: string
-          content: string
-          created_at?: string
-          delivered_at?: string | null
-          error_message?: string | null
-          id?: string
-          meta_message_id?: string | null
-          read_at?: string | null
-          source?: string
-          status?: string
-          user_id: string
-        }
-        Update: {
-          contact_id?: string
-          content?: string
-          created_at?: string
-          delivered_at?: string | null
-          error_message?: string | null
-          id?: string
-          meta_message_id?: string | null
-          read_at?: string | null
-          source?: string
-          status?: string
-          user_id?: string
-        }
-      }
     }
     Views: {
       [key: string]: never
     }
     Functions: {
-      [key: string]: any
+      get_conversations_with_contacts: {
+        Args: {
+          p_user_id: string
+        }
+        Returns: {
+          contact_details: Json
+          last_message: Json
+          unread_count: number
+        }[]
+      }
+      get_unified_message_history: {
+        Args: {
+          p_user_id: string
+          p_contact_id: string
+        }
+        Returns: {
+          id: string
+          contact_id: string
+          content: string
+          created_at: string
+          type: Database["public"]["Enums"]["message_type"]
+          status: Database["public"]["Enums"]["message_status"]
+          sourceTable: string
+          template: Json
+        }[]
+      }
+      increment_node_stat: {
+        Args: {
+          p_automation_id: string
+          p_node_id: string
+          p_status: string
+        }
+        Returns: undefined
+      }
+      sync_automation_triggers: {
+        Args: {
+          automation_id_in: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
-      [key: string]: never
+      automation_status: "active" | "paused"
+      campaign_status: "Sent" | "Draft" | "Failed" | "Scheduled"
+      message_source:
+        | "campaign"
+        | "automation"
+        | "direct"
+        | "inbound_reply"
+      message_status: "sent" | "delivered" | "read" | "failed" | "pending"
+      message_type: "inbound" | "outbound"
+      template_category: "MARKETING" | "UTILITY" | "AUTHENTICATION"
+      template_status: "APPROVED" | "PENDING" | "REJECTED" | "PAUSED" | "LOCAL"
     }
     CompositeTypes: {
       [key: string]: never
@@ -529,17 +482,29 @@ export type Database = {
 type PublicSchema = Database[Extract<keyof Database, "public">]
 
 export type Tables<
-  TableName extends keyof PublicSchema["Tables"]
-> = PublicSchema["Tables"][TableName]["Row"]
+  TableName extends keyof PublicSchema["Tables"] & string
+> = PublicSchema["Tables"][TableName] extends {
+  Row: infer R
+}
+  ? R
+  : never
 
 export type TablesInsert<
-  TableName extends keyof PublicSchema["Tables"]
-> = PublicSchema["Tables"][TableName]["Insert"]
+  TableName extends keyof PublicSchema["Tables"] & string
+> = PublicSchema["Tables"][TableName] extends {
+  Insert: infer I
+}
+  ? I
+  : never
 
 export type TablesUpdate<
-  TableName extends keyof PublicSchema["Tables"]
-> = PublicSchema["Tables"][TableName]["Update"]
+  TableName extends keyof PublicSchema["Tables"] & string
+> = PublicSchema["Tables"][TableName] extends {
+  Update: infer U
+}
+  ? U
+  : never
 
 export type Enums<
-  EnumName extends keyof PublicSchema["Enums"]
+  EnumName extends keyof PublicSchema["Enums"] & string
 > = PublicSchema["Enums"][EnumName]

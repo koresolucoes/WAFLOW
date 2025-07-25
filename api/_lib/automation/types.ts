@@ -1,4 +1,3 @@
-
 import { AutomationNode, Contact, Json, Profile } from '../types.js';
 
 export interface ActionContext {
@@ -6,6 +5,7 @@ export interface ActionContext {
     contact: Contact | null;
     trigger: Json | null;
     node: AutomationNode;
+    automationId: string;
 }
 
 export interface ActionResult {

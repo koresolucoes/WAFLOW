@@ -1,11 +1,19 @@
-
 import { supabaseAdmin } from '../../supabaseAdmin.js';
 import { sendTemplatedMessage, sendTextMessage, sendMediaMessage, sendInteractiveMessage } from '../../meta/messages.js';
-import { MessageTemplate } from '../../types.js';
+import { MessageTemplate, MessageInsert } from '../../types.js';
 import { ActionHandler } from '../types.js';
 import { getMetaConfig, resolveVariables } from '../helpers.js';
 
-export const sendTemplate: ActionHandler = async ({ profile, contact, node, trigger }) => {
+const logSentMessage = async (payload: Omit<MessageInsert, 'user_id'>, userId: string) => {
+    const { error } = await supabaseAdmin.from('messages').insert({ ...payload, user_id: userId } as any);
+    if (error) {
+        // Log the error but don't throw, as the message was already sent to Meta.
+        // This prevents the automation from failing if only the DB logging fails.
+        console.error(`[Message Logging] Failed to log sent message for contact ${payload.contact_id}:`, error);
+    }
+};
+
+export const sendTemplate: ActionHandler = async ({ profile, contact, node, trigger, automationId }) => {
     if (!contact) {
         throw new Error('Ação "Enviar Template" requer um contato. A automação foi iniciada por um gatilho que não fornece um contato.');
     }
@@ -64,17 +72,34 @@ export const sendTemplate: ActionHandler = async ({ profile, contact, node, trig
         });
     }
 
-    await sendTemplatedMessage(
+    const response = await sendTemplatedMessage(
        metaConfig, 
        contact.phone, 
        templateTyped.template_name, 
        finalComponents.length > 0 ? finalComponents : undefined
     );
+    
+    const bodyText = bodyComponent?.text || 'Mensagem de template';
+    const resolvedContent = (bodyText.match(/\{\{\d+\}\}/g) || []).reduce((text: string, placeholder: string) => {
+        return text.replace(placeholder, resolvePlaceholder(placeholder));
+    }, bodyText);
+
+    await logSentMessage({
+        contact_id: contact.id,
+        automation_id: automationId,
+        content: resolvedContent,
+        meta_message_id: response.messages[0].id,
+        status: 'sent',
+        source: 'automation',
+        type: 'outbound',
+        sent_at: new Date().toISOString()
+    }, profile.id);
+
 
     return { details: `Template '${templateTyped.template_name}' enviado para ${contact.name}.` };
 };
 
-export const sendTextMessageAction: ActionHandler = async ({ profile, contact, node, trigger }) => {
+export const sendTextMessageAction: ActionHandler = async ({ profile, contact, node, trigger, automationId }) => {
     if (!contact) {
         throw new Error('Ação "Enviar Texto Simples" requer um contato.');
     }
@@ -82,13 +107,25 @@ export const sendTextMessageAction: ActionHandler = async ({ profile, contact, n
     if (config.message_text) {
         const metaConfig = getMetaConfig(profile);
         const message = resolveVariables(config.message_text, { contact, trigger });
-        await sendTextMessage(metaConfig, contact.phone, message);
+        const response = await sendTextMessage(metaConfig, contact.phone, message);
+
+        await logSentMessage({
+            contact_id: contact.id,
+            automation_id: automationId,
+            content: message,
+            meta_message_id: response.messages[0].id,
+            status: 'sent',
+            source: 'automation',
+            type: 'outbound',
+            sent_at: new Date().toISOString()
+        }, profile.id);
+
         return { details: `Mensagem de texto enviada para ${contact.name}.` };
     }
     throw new Error('O texto da mensagem não está configurado.');
 };
 
-export const sendMediaAction: ActionHandler = async ({ profile, contact, node, trigger }) => {
+export const sendMediaAction: ActionHandler = async ({ profile, contact, node, trigger, automationId }) => {
     if (!contact) {
         throw new Error('Ação "Enviar Mídia" requer um contato.');
     }
@@ -97,13 +134,25 @@ export const sendMediaAction: ActionHandler = async ({ profile, contact, node, t
         const metaConfig = getMetaConfig(profile);
         const mediaUrl = resolveVariables(config.media_url, { contact, trigger });
         const caption = config.caption ? resolveVariables(config.caption, { contact, trigger }) : undefined;
-        await sendMediaMessage(metaConfig, contact.phone, config.media_type, mediaUrl, caption);
+        const response = await sendMediaMessage(metaConfig, contact.phone, config.media_type, mediaUrl, caption);
+
+        await logSentMessage({
+            contact_id: contact.id,
+            automation_id: automationId,
+            content: caption || `[Mídia: ${config.media_type}] ${mediaUrl}`,
+            meta_message_id: response.messages[0].id,
+            status: 'sent',
+            source: 'automation',
+            type: 'outbound',
+            sent_at: new Date().toISOString()
+        }, profile.id);
+
         return { details: `Mídia (${config.media_type}) enviada para ${contact.name}.` };
     }
     throw new Error('URL da mídia ou tipo não estão configurados.');
 };
 
-export const sendInteractiveMessageAction: ActionHandler = async ({ profile, contact, node, trigger }) => {
+export const sendInteractiveMessageAction: ActionHandler = async ({ profile, contact, node, trigger, automationId }) => {
     if (!contact) {
         throw new Error('Ação "Enviar Mensagem Interativa" requer um contato.');
     }
@@ -112,7 +161,19 @@ export const sendInteractiveMessageAction: ActionHandler = async ({ profile, con
          const metaConfig = getMetaConfig(profile);
          const message = resolveVariables(config.message_text, { contact, trigger });
          const buttons = config.buttons.map((b: any) => ({...b, text: resolveVariables(b.text, { contact, trigger })}));
-         await sendInteractiveMessage(metaConfig, contact.phone, message, buttons);
+         const response = await sendInteractiveMessage(metaConfig, contact.phone, message, buttons);
+
+        await logSentMessage({
+            contact_id: contact.id,
+            automation_id: automationId,
+            content: message,
+            meta_message_id: response.messages[0].id,
+            status: 'sent',
+            source: 'automation',
+            type: 'outbound',
+            sent_at: new Date().toISOString()
+        }, profile.id);
+
          return { details: `Mensagem interativa enviada para ${contact.name}.` };
     }
     throw new Error('Texto da mensagem ou botões não configurados.');

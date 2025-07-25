@@ -1,32 +1,48 @@
 import { supabase } from '../lib/supabaseClient';
 import { Campaign, CampaignWithMetrics, MessageStatus, TemplateCategory, TemplateStatus, AutomationStatus, Edge, AutomationNode, Contact, MessageTemplate, Automation, Pipeline, PipelineStage, DealWithContact } from '../types';
 import { MetaTemplateComponent } from './meta/types';
-import { Tables } from '../types/database.types';
 
 const fetchCampaignsWithMetrics = async (campaignsData: Campaign[]): Promise<CampaignWithMetrics[]> => {
-    return Promise.all(
-        campaignsData.map(async (campaign) => {
-            const { data, error, count } = await supabase
-                .from('campaign_messages')
-                .select('status', { count: 'exact', head: false })
-                .eq('campaign_id', campaign.id);
+    if (campaignsData.length === 0) return [];
 
-            if (error) {
-                console.error(`Error fetching metrics for campaign ${campaign.id}:`, error);
-                return { ...campaign, recipient_count: campaign.recipient_count || 0, metrics: { sent: campaign.recipient_count || 0, delivered: 0, read: 0 } };
-            }
-            
-            const typedData = (data as unknown as {status: MessageStatus}[]) || [];
-            const delivered = typedData.filter(d => d.status === 'delivered' || d.status === 'read').length;
-            const read = typedData.filter(d => d.status === 'read').length;
+    const campaignIds = campaignsData.map(c => c.id);
+    const { data, error } = await supabase
+        .from('messages')
+        .select('campaign_id, status')
+        .in('campaign_id', campaignIds);
 
-            return {
-                ...campaign,
-                recipient_count: campaign.recipient_count || 0,
-                metrics: { sent: count || campaign.recipient_count || 0, delivered, read }
-            };
-        })
-    );
+    if (error) {
+        console.error("Error fetching campaign metrics:", error);
+        return campaignsData.map(c => ({
+            ...c,
+            metrics: { sent: 0, delivered: 0, read: 0, failed: 0 }
+        }));
+    }
+
+    const metricsByCampaignId = data.reduce((acc, msg) => {
+        if (!msg.campaign_id) return acc;
+        if (!acc[msg.campaign_id]) {
+            acc[msg.campaign_id] = { sent: 0, delivered: 0, read: 0, failed: 0 };
+        }
+        if (msg.status !== 'failed') {
+            acc[msg.campaign_id].sent++;
+        }
+        if (msg.status === 'delivered' || msg.status === 'read') {
+            acc[msg.campaign_id].delivered++;
+        }
+        if (msg.status === 'read') {
+            acc[msg.campaign_id].read++;
+        }
+        if (msg.status === 'failed') {
+            acc[msg.campaign_id].failed++;
+        }
+        return acc;
+    }, {} as Record<string, CampaignWithMetrics['metrics']>);
+    
+    return campaignsData.map(campaign => ({
+        ...campaign,
+        metrics: metricsByCampaignId[campaign.id] || { sent: 0, delivered: 0, read: 0, failed: 0 }
+    }));
 };
 
 

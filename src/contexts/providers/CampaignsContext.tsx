@@ -1,10 +1,6 @@
-
-
-
-
-import React, { createContext, useState, useCallback, ReactNode, useContext, useEffect } from 'react';
+import React, { createContext, useState, useCallback, ReactNode, useEffect } from 'react';
 import { supabase } from '../../lib/supabaseClient';
-import { Campaign, CampaignWithMetrics, CampaignMessageInsert, CampaignWithDetails, CampaignStatus, MessageStatus, Tables } from '../../types';
+import { Campaign, CampaignWithMetrics, MessageInsert, CampaignWithDetails, CampaignStatus, Message, MessageStatus } from '../../types';
 import { useAuthStore } from '../../stores/authStore';
 import { fetchCampaignDetailsFromDb, addCampaignToDb, deleteCampaignFromDb } from '../../services/campaignService';
 
@@ -13,7 +9,7 @@ interface CampaignsContextType {
   campaignDetails: CampaignWithDetails | null;
   setCampaigns: React.Dispatch<React.SetStateAction<CampaignWithMetrics[]>>;
   setCampaignDetails: React.Dispatch<React.SetStateAction<CampaignWithDetails | null>>;
-  addCampaign: (campaign: Omit<Campaign, 'id' | 'user_id' | 'sent_at' | 'created_at' | 'recipient_count' | 'status'> & { status: CampaignStatus }, messages: Omit<CampaignMessageInsert, 'campaign_id'>[]) => Promise<void>;
+  addCampaign: (campaign: Omit<Campaign, 'id' | 'user_id' | 'sent_at' | 'created_at' | 'recipient_count' | 'status'> & { status: CampaignStatus }, messages: Omit<MessageInsert, 'campaign_id' | 'user_id'>[]) => Promise<void>;
   fetchCampaignDetails: (campaignId: string) => Promise<void>;
   deleteCampaign: (campaignId: string) => Promise<void>;
 }
@@ -36,7 +32,7 @@ export const CampaignsProvider: React.FC<{ children: ReactNode }> = ({ children 
     }
   }, [user]);
   
-  const addCampaign = useCallback(async (campaign: Omit<Campaign, 'id' | 'user_id' | 'sent_at' | 'created_at' | 'recipient_count' | 'status'> & {status: CampaignStatus}, messages: Omit<CampaignMessageInsert, 'campaign_id'>[]) => {
+  const addCampaign = useCallback(async (campaign: Omit<Campaign, 'id' | 'user_id' | 'sent_at' | 'created_at' | 'recipient_count' | 'status'> & {status: CampaignStatus}, messages: Omit<MessageInsert, 'campaign_id' | 'user_id'>[]) => {
     if (!user) throw new Error("User not authenticated.");
     
     const newCampaign = await addCampaignToDb(user.id, campaign, messages);
@@ -44,7 +40,12 @@ export const CampaignsProvider: React.FC<{ children: ReactNode }> = ({ children 
 
     const newCampaignWithMetrics: CampaignWithMetrics = {
         ...(newCampaign as Campaign),
-        metrics: { sent: sentCount, delivered: 0, read: 0 }
+        metrics: { 
+            sent: sentCount, 
+            delivered: 0, 
+            read: 0, 
+            failed: messages.length - sentCount 
+        }
     };
     setCampaigns(prev => [newCampaignWithMetrics, ...prev]);
   }, [user]);
@@ -60,57 +61,57 @@ export const CampaignsProvider: React.FC<{ children: ReactNode }> = ({ children 
     }
   }, [user, campaignDetails]);
 
+  const handleRealtimeMessageUpdate = useCallback(async (payload: { new: Message }) => {
+    const updatedMessage = payload.new as Message;
+    const campaignId = updatedMessage.campaign_id;
+
+    if (!campaignId) return; // Not a campaign message
+
+    const campaignToUpdate = campaigns.find(c => c.id === campaignId);
+    if (!campaignToUpdate) return; // Not a campaign we are currently displaying
+
+    // Refetch metrics for accuracy
+    const { data, error } = await supabase
+        .from('messages')
+        .select('status')
+        .eq('campaign_id', campaignId);
+        
+    if (error) {
+        console.error(`Realtime: Failed to refetch metrics for campaign ${campaignId}`, error);
+        return;
+    }
+
+    const typedData = (data as { status: MessageStatus }[]) || [];
+    const newMetrics = {
+        sent: typedData.filter(d => d.status !== 'failed').length,
+        delivered: typedData.filter(d => d.status === 'delivered' || d.status === 'read').length,
+        read: typedData.filter(d => d.status === 'read').length,
+        failed: typedData.filter(d => d.status === 'failed').length
+    };
+
+    setCampaigns(prevCampaigns =>
+        prevCampaigns.map(c =>
+            c.id === campaignId ? { ...c, metrics: newMetrics } : c
+        )
+    );
+  }, [campaigns]);
+
   useEffect(() => {
     if (!user) return;
-
-    const handleCampaignMessageUpdate = async (payload: { new: Tables<'campaign_messages'>, eventType: string }) => {
-        if (payload.eventType !== 'UPDATE') return;
-
-        const updatedMessage = payload.new;
-        const campaignId = updatedMessage.campaign_id;
-
-        // Find the campaign in the current state
-        const campaignToUpdate = campaigns.find(c => c.id === campaignId);
-        if (!campaignToUpdate) return; // Not a campaign we are currently displaying
-
-        // Refetch metrics directly from the DB for accuracy
-        const { data, error } = await supabase
-            .from('campaign_messages')
-            .select('status')
-            .eq('campaign_id', campaignId);
-            
-        if (error) {
-            console.error(`Realtime: Failed to refetch metrics for campaign ${campaignId}`, error);
-            return;
-        }
-
-        const typedData = (data as { status: MessageStatus }[]) || [];
-        const newMetrics = {
-            sent: campaignToUpdate.metrics.sent, // 'sent' count does not change
-            delivered: typedData.filter(d => d.status === 'delivered' || d.status === 'read').length,
-            read: typedData.filter(d => d.status === 'read').length,
-        };
-
-        setCampaigns(prevCampaigns =>
-            prevCampaigns.map(c =>
-                c.id === campaignId ? { ...c, metrics: newMetrics } : c
-            )
-        );
-    };
 
     const channel = supabase
         .channel('campaign-message-updates')
         .on(
             'postgres_changes',
-            { event: 'UPDATE', schema: 'public', table: 'campaign_messages' },
-            handleCampaignMessageUpdate
+            { event: 'UPDATE', schema: 'public', table: 'messages' },
+            (payload) => handleRealtimeMessageUpdate(payload as any)
         )
         .subscribe();
         
     return () => {
         supabase.removeChannel(channel);
     };
-  }, [user, campaigns]);
+  }, [user, handleRealtimeMessageUpdate]);
 
 
   const value = {

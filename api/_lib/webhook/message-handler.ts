@@ -1,8 +1,8 @@
-
 import { supabaseAdmin } from '../supabaseAdmin.js';
 import { findOrCreateContactByPhone } from './contact-mapper.js';
 import { publishEvent } from '../automation/trigger-handler.js';
 import { Profile } from '../types.js';
+import { TablesInsert } from '../database.types.js';
 
 export async function processIncomingMessage(
     userId: string, 
@@ -15,7 +15,7 @@ export async function processIncomingMessage(
         const { contact, isNew } = await findOrCreateContactByPhone(userId, message.from, contactName);
 
         if (!contact) {
-            console.error(`[Manipulador de Mensagem] Não foi possível encontrar ou criar contato para o telefone ${message.from}.`);
+            console.error(`[Message Handler] Could not find or create contact for phone ${message.from}.`);
             return;
         }
 
@@ -24,23 +24,31 @@ export async function processIncomingMessage(
             messageBody = message.text.body;
         } else if (message.type === 'interactive' && message.interactive?.button_reply) {
             messageBody = `Botão Clicado: "${message.interactive.button_reply.title}"`;
+        } else if (message.type === 'button' && message.button?.text) {
+             messageBody = `Botão de Template Clicado: "${message.button.text}"`;
         }
 
-        const { error: insertError } = await supabaseAdmin.from('received_messages').insert({
+        const messagePayload: TablesInsert<'messages'> = {
             user_id: userId,
             contact_id: contact.id,
             meta_message_id: message.id,
-            message_body: messageBody
-        } as any);
+            content: messageBody,
+            type: 'inbound',
+            source: 'inbound_reply',
+            status: 'read', // Inbound messages are implicitly read by the system
+            read_at: new Date().toISOString()
+        };
+
+        const { error: insertError } = await supabaseAdmin.from('messages').insert(messagePayload as any);
 
         if (insertError) {
-            console.error(`[Manipulador de Mensagem] Falha ao inserir mensagem recebida para o contato ${contact.id}:`, insertError);
+            console.error(`[Message Handler] Failed to insert inbound message for contact ${contact.id}:`, insertError);
             return;
         }
 
-        console.log(`[MessageHandler] Mensagem de ${contact.name} salva. Disparando eventos de automação.`);
+        console.log(`[Message Handler] Message from ${contact.name} saved. Firing automation events.`);
 
-        // Publica eventos para automações e outros efeitos colaterais
+        // Publish events for automations and other side effects
         await publishEvent('message_received', userId, { contact, message });
         if (isNew) {
             await publishEvent('contact_created', userId, { contact });
@@ -51,6 +59,6 @@ export async function processIncomingMessage(
             }
         }
     } catch (e: any) {
-        console.error(`[Manipulador de Mensagem] Falha geral no processamento da mensagem para o ID da mensagem ${message.id}:`, e.message, e.stack);
+        console.error(`[Message Handler] General failure processing message for message ID ${message.id}:`, e.message, e.stack);
     }
 }

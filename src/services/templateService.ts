@@ -12,7 +12,7 @@ const addTemplateToDb = async (template: MessageTemplateInsert): Promise<Message
     
     const { data, error } = await supabase
       .from('message_templates')
-      .insert(dbTemplate)
+      .insert(dbTemplate as any)
       .select()
       .single();
 

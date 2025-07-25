@@ -30,7 +30,7 @@ console.log('[Supabase Admin] Credentials seem valid. Creating client with custo
  * @param timeout The timeout in milliseconds.
  * @returns A fetch Response promise.
  */
-const fetchWithTimeout = (url: RequestInfo, options: RequestInit = {}, timeout = 8000) => {
+const fetchWithTimeout = (url: RequestInfo, options: RequestInit = {}, timeout = 9500) => {
     const controller = new AbortController();
     const { signal } = controller;
     const timeoutId = setTimeout(() => {
@@ -50,7 +50,7 @@ export const supabaseAdmin = createClient<Database>(supabaseUrl, supabaseService
     },
     // Add the timeout to all fetch requests made by the Supabase client.
     global: {
-        fetch: (url, options) => fetchWithTimeout(url, options, 8000) // 8-second timeout
+        fetch: (url, options) => fetchWithTimeout(url, options, 9500) // 9.5-second timeout
     }
 });
 

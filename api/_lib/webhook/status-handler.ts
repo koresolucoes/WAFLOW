@@ -1,14 +1,12 @@
-
-
 import { supabaseAdmin } from '../supabaseAdmin.js';
 import { TablesUpdate } from '../database.types.js';
 
 export async function processStatusUpdate(status: any): Promise<void> {
-    console.log(`[Manipulador de Status] Processando atualização de status para a mensagem ${status.id}: ${status.status}`);
+    console.log(`[Status Handler] Processing status update for message ${status.id}: ${status.status}`);
     try {
         const newStatus = status.status; // 'sent', 'delivered', 'read', 'failed'
         if (!['sent', 'delivered', 'read', 'failed'].includes(newStatus)) {
-            console.warn(`[Manipulador de Status] Ignorado tipo de status desconhecido: ${newStatus}`);
+            console.warn(`[Status Handler] Ignoring unknown status type: ${newStatus}`);
             return;
         }
         
@@ -27,18 +25,22 @@ export async function processStatusUpdate(status: any): Promise<void> {
             baseUpdate.delivered_at = timestamp;
         } else if (newStatus === 'read') {
             baseUpdate.read_at = timestamp;
-            baseUpdate.delivered_at = baseUpdate.delivered_at || timestamp;
+            // A message can only be read if it was delivered.
+            baseUpdate.delivered_at = baseUpdate.delivered_at || timestamp; 
         } else if (newStatus === 'failed' && status.errors) {
-            baseUpdate.error_message = `${status.errors[0]?.title} (Código: ${status.errors[0]?.code})`;
+            baseUpdate.error_message = `${status.errors[0]?.title} (Code: ${status.errors[0]?.code})`;
         }
 
-        const { error: campaignError } = await supabaseAdmin.from('campaign_messages').update(baseUpdate as TablesUpdate<'campaign_messages'>).eq('meta_message_id', status.id);
-        const { error: sentError } = await supabaseAdmin.from('sent_messages').update(baseUpdate as TablesUpdate<'sent_messages'>).eq('meta_message_id', status.id);
+        const { error } = await supabaseAdmin
+            .from('messages')
+            .update(baseUpdate as any)
+            .eq('meta_message_id', status.id);
 
-        if (campaignError) console.error(`[Manipulador de Status] Erro ao atualizar campaign_messages para ${status.id}:`, campaignError.message);
-        if (sentError) console.error(`[Manipulador de Status] Erro ao atualizar sent_messages para ${status.id}:`, sentError.message);
+        if (error) {
+            console.error(`[Status Handler] Error updating message table for ${status.id}:`, error.message);
+        }
 
     } catch (e: any) {
-        console.error(`[Manipulador de Status] FATAL: Falha ao processar atualização de status para a mensagem ${status.id}:`, e.message);
+        console.error(`[Status Handler] FATAL: Failed to process status update for message ${status.id}:`, e.message);
     }
 }

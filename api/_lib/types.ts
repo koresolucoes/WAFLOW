@@ -1,8 +1,8 @@
-
-import { Json as DbJson, Database } from './database.types.js';
+import { Json as DbJson, Database, Enums, Tables, TablesInsert, TablesUpdate } from './database.types.js';
 import { MetaTemplateComponent } from './meta/types.js';
 
 export type Json = DbJson;
+export type { Tables, TablesInsert, TablesUpdate };
 
 // --- Backend-safe Flow Types ---
 export interface BackendNode<T = any> {
@@ -28,9 +28,9 @@ export interface BackendEdge {
 export type AutomationNode = BackendNode<NodeData>;
 
 // --- String literal unions ---
-export type TemplateCategory = 'MARKETING' | 'UTILITY' | 'AUTHENTICATION';
-export type TemplateStatus = 'APPROVED' | 'PENDING' | 'REJECTED' | 'PAUSED' | 'LOCAL';
-export type AutomationStatus = 'active' | 'paused';
+export type TemplateCategory = Enums<'template_category'>;
+export type TemplateStatus = Enums<'template_status'>;
+export type AutomationStatus = Enums<'automation_status'>;
 export type AutomationRunStatus = 'running' | 'success' | 'failed';
 export type NodeType = 'trigger' | 'action' | 'logic';
 
@@ -49,6 +49,8 @@ export interface NodeData {
 // --- Plain object types to avoid TS recursion from generated types ---
 export type Profile = Database['public']['Tables']['profiles']['Row'];
 export type Contact = Database['public']['Tables']['contacts']['Row'];
+export type Message = Database['public']['Tables']['messages']['Row'];
+export type MessageInsert = Database['public']['Tables']['messages']['Insert'];
 
 export type MessageTemplate = Omit<Database['public']['Tables']['message_templates']['Row'], 'category' | 'status' | 'components'> & {
     category: TemplateCategory;
@@ -75,4 +77,5 @@ export interface ActionContext {
     contact: Contact | null;
     trigger: Json | null;
     node: AutomationNode;
+    automationId: string;
 }

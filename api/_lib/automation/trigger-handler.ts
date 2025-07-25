@@ -1,5 +1,3 @@
-
-
 import { supabaseAdmin } from '../supabaseAdmin.js';
 import { executeAutomation, createDefaultLoggingHooks } from './engine.js';
 import { Automation, Contact, Json, Profile, Tables } from '../types.js';

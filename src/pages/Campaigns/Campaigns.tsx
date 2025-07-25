@@ -13,9 +13,10 @@ const CampaignCard: React.FC<{ campaign: CampaignWithMetrics; onViewDetails: () 
         Sent: "bg-green-500/20 text-green-400",
         Draft: "bg-yellow-500/20 text-yellow-400",
         Failed: "bg-red-500/20 text-red-400",
+        Scheduled: "bg-sky-500/20 text-sky-400"
     };
     
-    const sentDate = new Date(campaign.sent_at).toLocaleDateString('pt-BR', { year: 'numeric', month: 'long', day: 'numeric' });
+    const sentDate = campaign.sent_at ? new Date(campaign.sent_at).toLocaleDateString('pt-BR', { year: 'numeric', month: 'long', day: 'numeric' }) : 'Não enviado';
 
     return (
         <Card className="flex flex-col justify-between hover:border-sky-500 border border-transparent transition-colors duration-200 group relative">
@@ -32,7 +33,7 @@ const CampaignCard: React.FC<{ campaign: CampaignWithMetrics; onViewDetails: () 
                 <div className="flex justify-between items-start gap-2">
                     <h3 className="text-lg font-semibold text-white break-all">{campaign.name}</h3>
                     <span className={`px-2 py-1 text-xs font-semibold rounded-full flex-shrink-0 ${statusStyle[campaign.status]}`}>
-                        {campaign.status === 'Sent' ? 'Enviada' : campaign.status}
+                        {campaign.status}
                     </span>
                 </div>
                 <p className="text-sm text-slate-400 mt-1">Enviada em {sentDate}</p>

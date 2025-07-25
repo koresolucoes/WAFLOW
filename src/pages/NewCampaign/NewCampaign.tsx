@@ -4,7 +4,7 @@ import { getMetaTemplateById } from '../../services/meta/templates';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import Modal from '../../components/common/Modal';
-import { CampaignMessageInsert, Contact, MessageTemplate } from '../../types';
+import { MessageInsert, Contact, MessageTemplate } from '../../types';
 import TemplatePreview from '../../components/common/TemplatePreview';
 import { TemplatesContext } from '../../contexts/providers/TemplatesContext';
 import { ContactsContext } from '../../contexts/providers/ContactsContext';
@@ -151,7 +151,8 @@ const NewCampaign: React.FC = () => {
           throw new Error(`Falha ao verificar o template na Meta: ${err.message}. Certifique-se de que o template existe e está aprovado.`);
       }
         
-      const messagesToInsert: Omit<CampaignMessageInsert, 'campaign_id'>[] = [];
+      const messagesToInsert: Omit<MessageInsert, 'campaign_id' | 'user_id'>[] = [];
+      const bodyComponentText = template.components.find(c => c.type === 'BODY')?.text || '';
       
       const promises = recipients.map(contact => (async () => {
         try {
@@ -211,11 +212,19 @@ const NewCampaign: React.FC = () => {
                 metaTemplateDetails.language,
                 finalComponents.length > 0 ? finalComponents : undefined
             );
+
+            const resolvedContent = (bodyComponentText.match(/\{\{\d+\}\}/g) || []).reduce((text: string, placeholder: string) => {
+                return text.replace(placeholder, resolvePlaceholder(placeholder));
+            }, bodyComponentText);
           
             messagesToInsert.push({
                 contact_id: contact.id,
                 meta_message_id: response.messages[0].id,
-                status: 'sent'
+                status: 'sent',
+                type: 'outbound',
+                source: 'campaign',
+                content: resolvedContent,
+                sent_at: new Date().toISOString()
             });
             results.push({ success: true, contact });
 
@@ -224,7 +233,10 @@ const NewCampaign: React.FC = () => {
             messagesToInsert.push({
                 contact_id: contact.id,
                 status: 'failed',
-                error_message: err.message
+                error_message: err.message,
+                type: 'outbound',
+                source: 'campaign',
+                content: bodyComponentText
             });
             results.push({ success: false, contact, error: err.message });
         }

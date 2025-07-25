@@ -7,7 +7,7 @@ interface MessageBubbleProps {
 }
 
 const ReadReceipt: React.FC<{ status?: MessageStatus }> = ({ status }) => {
-    if (!status || status === 'failed') {
+    if (!status || status === 'failed' || status === 'pending') {
         return null;
     }
     
@@ -46,7 +46,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
                     {message.content}
                 </p>
 
-                {message.sourceTable === 'campaign_messages' && (
+                {message.template && (
                     <div className="flex items-center gap-1.5 text-xs text-slate-300/70 mt-2 border-t border-white/10 pt-1">
                         <FILE_TEXT_ICON className="w-3 h-3"/>
                         <span>Enviado via Campanha</span>

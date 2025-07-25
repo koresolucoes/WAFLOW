@@ -10,7 +10,7 @@ export const createAutomationInDb = async (userId: string): Promise<Automation> 
         nodes: [] as unknown as Json, 
         edges: [] as unknown as Json 
     };
-    const { data, error } = await supabase.from('automations').insert(dbAutomation).select('*').single();
+    const { data, error } = await supabase.from('automations').insert(dbAutomation as any).select('*').single();
     if (error) throw error;
     
     const newAutomationData = data;
@@ -32,7 +32,7 @@ export const updateAutomationInDb = async (userId: string, automation: Automatio
     
     const { data, error } = await supabase
         .from('automations')
-        .update(updatePayload)
+        .update(updatePayload as any)
         .eq('id', automation.id)
         .eq('user_id', userId)
         .select('*')

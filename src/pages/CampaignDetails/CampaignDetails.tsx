@@ -1,8 +1,8 @@
 import React, { useContext, useEffect, useMemo, useState } from 'react';
-import { CampaignMessage, MessageTemplate } from '../../types';
+import { Message, MessageTemplate } from '../../types';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
-import { ARROW_LEFT_ICON, SEND_ICON, MAIL_CHECK_ICON, MAIL_OPEN_ICON } from '../../components/icons';
+import { ARROW_LEFT_ICON, SEND_ICON, MAIL_CHECK_ICON, MAIL_OPEN_ICON, ALERT_TRIANGLE_ICON } from '../../components/icons';
 import { CampaignsContext } from '../../contexts/providers/CampaignsContext';
 import { NavigationContext } from '../../contexts/providers/NavigationContext';
 
@@ -18,12 +18,13 @@ const StatCard: React.FC<{ title: string; value: string; icon: React.ReactNode; 
     </Card>
 );
 
-const MessageStatusBadge: React.FC<{ status: CampaignMessage['status'] }> = ({ status }) => {
+const MessageStatusBadge: React.FC<{ status: Message['status'] }> = ({ status }) => {
     const statusInfo = {
         sent: { text: 'Enviada', style: 'bg-sky-500/20 text-sky-400' },
         delivered: { text: 'Entregue', style: 'bg-green-500/20 text-green-400' },
         read: { text: 'Lida', style: 'bg-pink-500/20 text-pink-400' },
         failed: { text: 'Falhou', style: 'bg-red-500/20 text-red-400' },
+        pending: { text: 'Pendente', style: 'bg-yellow-500/20 text-yellow-400' },
     };
     const info = statusInfo[status] || { text: status, style: 'bg-slate-500/20 text-slate-400' };
     return <span className={`px-2 py-1 text-xs font-semibold rounded-full ${info.style}`}>{info.text}</span>;
@@ -114,10 +115,11 @@ const CampaignDetails: React.FC = () => {
                 </Button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
                 <StatCard title="Enviadas" value={campaignDetails.metrics.sent.toLocaleString('pt-BR')} icon={<SEND_ICON className="w-6 h-6 text-sky-400" />} />
                 <StatCard title="Entregues" value={campaignDetails.metrics.delivered.toLocaleString('pt-BR')} icon={<MAIL_CHECK_ICON className="w-6 h-6 text-green-400" />} />
                 <StatCard title="Lidas" value={campaignDetails.metrics.read.toLocaleString('pt-BR')} icon={<MAIL_OPEN_ICON className="w-6 h-6 text-pink-400" />} />
+                <StatCard title="Falhas" value={campaignDetails.metrics.failed.toLocaleString('pt-BR')} icon={<ALERT_TRIANGLE_ICON className="w-6 h-6 text-red-400" />} />
                 <StatCard title="Taxa de Leitura" value={readRate} icon={<span className="text-amber-400 font-bold text-xl">%</span>} />
             </div>
 
