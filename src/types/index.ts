@@ -6,7 +6,7 @@ import { Database, Json, Enums, Tables, TablesInsert, TablesUpdate } from './dat
 import { MetaTemplateComponent } from '../services/meta/types';
 import type { Node as XyNode, Edge } from '@xyflow/react';
 
-export type Page = 'dashboard' | 'campaigns' | 'templates' | 'template-editor' | 'contacts' | 'new-campaign' | 'profile' | 'settings' | 'auth' | 'campaign-details' | 'automations' | 'automation-editor' | 'funnel' | 'contact-details' | 'inbox';
+export type Page = 'dashboard' | 'campaigns' | 'templates' | 'template-editor' | 'contacts' | 'new-campaign' | 'profile' | 'settings' | 'auth' | 'campaign-details' | 'automations' | 'automation-editor' | 'funnel' | 'contact-details' | 'inbox' | 'webhook-inspector';
 
 // Tipos de string literal para substituir os enums do BD para segurança de tipos no aplicativo
 export type TemplateCategory = Enums<'template_category'>;
@@ -63,6 +63,7 @@ export type Automation = Omit<Database['public']['Tables']['automations']['Row']
 export type Pipeline = Database['public']['Tables']['pipelines']['Row'];
 export type PipelineStage = Database['public']['Tables']['pipeline_stages']['Row'];
 export type Deal = Database['public']['Tables']['deals']['Row'];
+export type WebhookLog = Database['public']['Tables']['webhook_logs']['Row'];
 // As tabelas de Segmento foram removidas no novo schema
 // export type Segment = Database['public']['Tables']['segments']['Row'];
 // export type SegmentRule = Database['public']['Tables']['segment_rules']['Row'];

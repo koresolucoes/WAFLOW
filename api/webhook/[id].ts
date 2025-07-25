@@ -1,8 +1,13 @@
 
+
+
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
 import { getProfileForWebhook } from '../_lib/webhook/profile-handler.js';
 import { processStatusUpdate } from '../_lib/webhook/status-handler.js';
 import { processIncomingMessage } from '../_lib/webhook/message-handler.js';
+import { TablesInsert, Json } from '../_lib/types.js';
 
 const handlePostRequest = async (req: VercelRequest) => {
     try {
@@ -10,6 +15,18 @@ const handlePostRequest = async (req: VercelRequest) => {
         if (typeof userId !== 'string' || !userId) {
             console.error("[Webhook] Requisição recebida sem um ID de usuário na URL.");
             return;
+        }
+
+        try {
+            const logPayload: TablesInsert<'webhook_logs'> = {
+                user_id: userId,
+                source: 'meta_message',
+                payload: req.body as unknown as Json,
+                path: req.url
+            };
+            await supabaseAdmin.from('webhook_logs').insert(logPayload);
+        } catch (logError) {
+            console.error('[Webhook] Failed to log incoming webhook:', logError);
         }
 
         console.log(`[Webhook] Payload recebido para o usuário: ${userId}`);

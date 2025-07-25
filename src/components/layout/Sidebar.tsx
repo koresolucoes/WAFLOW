@@ -1,7 +1,8 @@
 
+
 import React, { useContext } from 'react';
 import { Page } from '../../types';
-import { ZAPFLOW_AI_LOGO, DASHBOARD_ICON, CAMPAIGN_ICON, TEMPLATE_ICON, CONTACTS_ICON, PROFILE_ICON, SETTINGS_ICON, AUTOMATION_ICON, FUNNEL_ICON, INBOX_ICON } from '../icons';
+import { ZAPFLOW_AI_LOGO, DASHBOARD_ICON, CAMPAIGN_ICON, TEMPLATE_ICON, CONTACTS_ICON, PROFILE_ICON, SETTINGS_ICON, AUTOMATION_ICON, FUNNEL_ICON, INBOX_ICON, WEBHOOK_INSPECTOR_ICON } from '../icons';
 import { NavigationContext } from '../../contexts/providers/NavigationContext';
 
 interface NavItemProps {
@@ -45,6 +46,7 @@ const Sidebar: React.FC = () => {
   ];
   
   const bottomNavItems = [
+      { icon: <WEBHOOK_INSPECTOR_ICON className="w-5 h-5" />, label: 'Webhook Inspector', page: 'webhook-inspector' as Page },
       { icon: <SETTINGS_ICON className="w-5 h-5" />, label: 'Configurações', page: 'settings' as Page },
   ];
 

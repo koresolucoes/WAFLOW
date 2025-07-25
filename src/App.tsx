@@ -1,5 +1,7 @@
 
 
+
+
 import React, { useContext, Suspense, lazy } from 'react';
 import { useAuthStore } from './stores/authStore';
 import { NavigationContext } from './contexts/providers/NavigationContext';
@@ -20,6 +22,7 @@ const MetaSettings = lazy(() => import('./pages/Settings/MetaSettings'));
 const Automations = lazy(() => import('./pages/Automations/Automations'));
 const AutomationEditor = lazy(() => import('./pages/AutomationEditor/AutomationEditor'));
 const Inbox = lazy(() => import('./pages/Inbox/Inbox'));
+const WebhookInspector = lazy(() => import('./pages/WebhookInspector/WebhookInspector'));
 
 const PageSuspenseFallback = () => (
     <div className="flex items-center justify-center w-full h-full p-10">
@@ -71,6 +74,8 @@ const App: React.FC = () => {
         return <CompanyProfile />;
       case 'settings':
         return <MetaSettings />;
+      case 'webhook-inspector':
+        return <WebhookInspector />;
       default:
         return <Dashboard />;
     }

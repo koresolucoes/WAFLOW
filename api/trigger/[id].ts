@@ -1,10 +1,12 @@
 
 
+
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
 import { executeAutomation, createDefaultLoggingHooks } from '../_lib/automation/engine.js';
 import { publishEvent } from '../_lib/automation/trigger-handler.js';
-import { Automation, Profile } from '../_lib/types.js';
+import { Automation, Profile, Json, TablesInsert } from '../_lib/types.js';
 import { getRawBody, parseMultipartFormData } from '../_lib/webhook/parser.js';
 import { processWebhookPayloadForContact } from '../_lib/webhook/contact-mapper.js';
 import { sanitizeAutomation } from '../_lib/automation/utils.js';
@@ -72,6 +74,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         try {
             const rawBodyBuffer = await getRawBody(req);
             const rawBody = rawBodyBuffer.toString('utf-8');
+
+            // Log the raw request for the webhook inspector
+            try {
+                // Sanitize headers by removing undefined values
+                const cleanHeaders: { [key: string]: string | string[] } = {};
+                for (const key in req.headers) {
+                    const value = req.headers[key];
+                    if (value !== undefined) {
+                        cleanHeaders[key] = value;
+                    }
+                }
+                
+                const logPayload: TablesInsert<'webhook_logs'> = {
+                    user_id: profile.id,
+                    source: 'automation_trigger',
+                    payload: { rawBody, query: req.query, headers: cleanHeaders } as unknown as Json,
+                    path: req.url,
+                };
+                await supabaseAdmin.from('webhook_logs').insert(logPayload);
+            } catch (logError) {
+                console.error('[Trigger] Failed to log incoming trigger webhook:', logError);
+            }
 
             if (contentType.includes('application/json') && rawBody) {
                 body = JSON.parse(rawBody);

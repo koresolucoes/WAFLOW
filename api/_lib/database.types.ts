@@ -1,11 +1,13 @@
 
+
+
 export type Json =
   | string
   | number
   | boolean
   | null
-  | { [key: string]: any }
-  | any[]
+  | { [key: string]: unknown }
+  | unknown[]
 
 export type Database = {
   public: {
@@ -412,6 +414,32 @@ export type Database = {
           meta_waba_id?: string | null
           updated_at?: string | null
           webhook_path_prefix?: string | null
+        }
+      }
+      webhook_logs: {
+        Row: {
+          id: string
+          user_id: string
+          created_at: string
+          source: string
+          payload: Json | null
+          path: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          created_at?: string
+          source: string
+          payload?: Json | null
+          path?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          created_at?: string
+          source?: string
+          payload?: Json | null
+          path?: string | null
         }
       }
     }
