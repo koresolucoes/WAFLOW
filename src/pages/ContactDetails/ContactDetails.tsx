@@ -163,7 +163,7 @@ const ContactDetails: React.FC = () => {
                     <Card>
                          <div className="flex justify-between items-center mb-4">
                             <h2 className="text-lg font-semibold text-white">Negócios</h2>
-                            <Button variant="secondary" size="sm" onClick={() => setIsDealModalOpen(true)}>
+                            <Button variant="secondary" size="sm" onClick={() => setIsDealModalOpen(true)} disabled={!defaultPipeline} title={!defaultPipeline ? "Crie um funil de vendas na página 'Funil' para poder adicionar negócios." : "Adicionar Novo Negócio"}>
                                 <PLUS_ICON className="w-4 h-4 mr-2" />
                                 Novo Negócio
                             </Button>

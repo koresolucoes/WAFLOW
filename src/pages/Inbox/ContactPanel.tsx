@@ -135,7 +135,7 @@ const ContactPanel: React.FC<{ contactId: string }> = ({ contactId }) => {
                 <Card className="bg-slate-900/50">
                      <div className="flex justify-between items-center mb-3">
                         <h3 className="text-base font-semibold text-white">Negócios</h3>
-                         <Button variant="secondary" size="sm" onClick={() => setIsDealModalOpen(true)}>
+                         <Button variant="secondary" size="sm" onClick={() => setIsDealModalOpen(true)} disabled={!defaultPipeline} title={!defaultPipeline ? "Crie um funil de vendas na página 'Funil' para poder adicionar negócios." : "Adicionar Novo Negócio"}>
                             <PLUS_ICON className="w-4 h-4 mr-1" /> Novo
                         </Button>
                     </div>

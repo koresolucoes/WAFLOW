@@ -1,6 +1,6 @@
 
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { EditableProfile } from '../../types';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
@@ -22,6 +22,8 @@ const MetaSettings: React.FC = () => {
     const [isSaving, setIsSaving] = useState(false);
     const [isSaved, setIsSaved] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [verifyToken, setVerifyToken] = useState('');
+    const [copyStatus, setCopyStatus] = useState({ url: false, token: false });
 
     useEffect(() => {
         if (profile) {
@@ -33,6 +35,20 @@ const MetaSettings: React.FC = () => {
             });
         }
     }, [profile]);
+
+    useEffect(() => {
+        // Gera um token seguro e URL-safe para ser usado na verificação do webhook.
+        const generateToken = () => {
+            const array = new Uint8Array(24); // 24 bytes de dados aleatórios
+            window.crypto.getRandomValues(array);
+            // Converte para uma string base64 e a torna segura para URL
+            return btoa(String.fromCharCode.apply(null, Array.from(array)))
+                .replace(/\+/g, '-')
+                .replace(/\//g, '_')
+                .replace(/=/g, '');
+        };
+        setVerifyToken(generateToken());
+    }, []);
 
     const webhookUrl = user ? `${window.location.origin}/api/webhook/${user.id}` : '';
 
@@ -78,9 +94,11 @@ const MetaSettings: React.FC = () => {
         }
     };
     
-    const copyToClipboard = (text: string) => {
+    const copyToClipboard = (text: string, type: 'url' | 'token') => {
         if (text) {
            navigator.clipboard.writeText(text);
+           setCopyStatus(prev => ({ ...prev, [type]: true }));
+           setTimeout(() => setCopyStatus(prev => ({ ...prev, [type]: false })), 2000);
         }
     };
 
@@ -163,24 +181,38 @@ const MetaSettings: React.FC = () => {
             <InfoCard>
                 <h3 className="text-base font-semibold text-white mb-2">Configure o Webhook na Meta</h3>
                 <p className="mb-3">Para receber o status das mensagens e as respostas dos clientes, configure um Webhook no seu aplicativo da Meta com os seguintes valores:</p>
-                <div className="space-y-2 font-mono text-xs bg-slate-800 p-3 rounded-md">
+                <div className="space-y-3 font-mono text-xs bg-slate-800 p-3 rounded-md">
                     <div className="flex justify-between items-center">
                         <div>
                             <span className="font-bold text-slate-300">Sua URL de Callback Única:</span>
                             <br/> {webhookUrl || "Gerando URL..."}
                         </div>
-                        <Button size="sm" variant="ghost" onClick={() => copyToClipboard(webhookUrl)} disabled={!webhookUrl}><COPY_ICON className="w-4 h-4"/></Button>
+                        <Button size="sm" variant="ghost" onClick={() => copyToClipboard(webhookUrl, 'url')} disabled={!webhookUrl}>
+                            {copyStatus.url ? <span className="text-green-400 text-xs">Copiado!</span> : <COPY_ICON className="w-4 h-4"/>}
+                        </Button>
                     </div>
-                    <div className="mt-2">
-                        <span className="font-bold text-slate-300">Token de Verificação:</span>
-                        <p className="text-slate-400">
-                            Use o valor que você definiu na variável de ambiente <code className="bg-slate-900 px-1 py-0.5 rounded">META_VERIFY_TOKEN</code> no seu projeto na Vercel.
-                        </p>
+                    <div className="flex justify-between items-center">
+                        <div>
+                            <span className="font-bold text-slate-300">Token de Verificação:</span>
+                            <p className="text-slate-400 break-all">{verifyToken || "Gerando token..."}</p>
+                        </div>
+                        <Button size="sm" variant="ghost" onClick={() => copyToClipboard(verifyToken, 'token')} disabled={!verifyToken}>
+                            {copyStatus.token ? <span className="text-green-400 text-xs">Copiado!</span> : <COPY_ICON className="w-4 h-4"/>}
+                        </Button>
                     </div>
                 </div>
-                 <p className="mt-3 text-xs">
-                    <strong>Importante:</strong> Assine os campos de webhook <code className="bg-slate-900 px-1 py-0.5 rounded">messages</code> para que tudo funcione corretamente.
-                 </p>
+                 <div className="mt-3 text-xs">
+                    <p>
+                        <strong>Importante:</strong> Use o <strong>Token de Verificação</strong> gerado acima em <strong>dois lugares</strong>:
+                    </p>
+                    <ol className="list-decimal list-inside pl-2 mt-1 space-y-1">
+                        <li>No campo "Verify Token" na configuração do seu webhook na Meta.</li>
+                        <li>Como o valor da variável de ambiente <code className="bg-slate-900 px-1 py-0.5 rounded">META_VERIFY_TOKEN</code> no seu projeto na Vercel.</li>
+                    </ol>
+                    <p className="mt-2">
+                        Lembre-se também de assinar os campos de webhook <code className="bg-slate-900 px-1 py-0.5 rounded">messages</code> para que tudo funcione corretamente.
+                    </p>
+                 </div>
             </InfoCard>
         </div>
     );

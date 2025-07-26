@@ -1,7 +1,3 @@
-
-
-
-
 export type Json =
   | string
   | number
@@ -448,45 +444,7 @@ export type Database = {
       [key: string]: never
     }
     Functions: {
-      get_conversations_with_contacts: {
-        Args: {
-          p_user_id: string
-        }
-        Returns: {
-          contact_details: Json
-          last_message: Json
-          unread_count: number
-        }[]
-      }
-      get_unified_message_history: {
-        Args: {
-          p_user_id: string
-          p_contact_id: string
-        }
-        Returns: {
-          id: string
-          contact_id: string
-          content: string
-          created_at: string
-          type: Database["public"]["Enums"]["message_type"]
-          status: Database["public"]["Enums"]["message_status"]
-          template: Json
-        }[]
-      }
-      increment_node_stat: {
-        Args: {
-          p_automation_id: string
-          p_node_id: string
-          p_status: string
-        }
-        Returns: undefined
-      }
-      sync_automation_triggers: {
-        Args: {
-          automation_id_in: string
-        }
-        Returns: undefined
-      }
+      [key: string]: never
     }
     Enums: {
       automation_status: "active" | "paused"
