@@ -1,7 +1,9 @@
 
-
 import { supabaseAdmin } from '../supabaseAdmin.js';
 import { Profile } from '../types.js';
+
+const PROFILE_COLUMNS = 'id, company_audience, company_description, company_name, company_products, company_tone, meta_access_token, meta_phone_number_id, meta_waba_id, updated_at, webhook_path_prefix';
+
 
 export async function getProfileForWebhook(pathIdentifier: string): Promise<Profile | null> {
     console.log(`[ProfileHandler] Buscando perfil para o identificador: ${pathIdentifier}`);
@@ -9,7 +11,7 @@ export async function getProfileForWebhook(pathIdentifier: string): Promise<Prof
     // Tentativa 1: Buscar pelo webhook_path_prefix
     const { data: profileByPrefix, error: prefixError } = await supabaseAdmin
         .from('profiles')
-        .select('*')
+        .select(PROFILE_COLUMNS)
         .eq('webhook_path_prefix', pathIdentifier)
         .maybeSingle();
 
@@ -26,19 +28,19 @@ export async function getProfileForWebhook(pathIdentifier: string): Promise<Prof
     console.log(`[ProfileHandler] Prefixo não encontrado, tentando buscar pelo ID do usuário.`);
     const { data: profileById, error: idError } = await supabaseAdmin
         .from('profiles')
-        .select('*')
+        .select(PROFILE_COLUMNS)
         .eq('id', pathIdentifier)
-        .single();
+        .maybeSingle(); // Alterado de .single() para .maybeSingle() para mais robustez
         
+    if (idError) {
+        console.error(`[ProfileHandler] Erro final ao buscar perfil pelo ID para '${pathIdentifier}':`, idError.message);
+    }
+    
     if (profileById) {
         console.log(`[ProfileHandler] Perfil encontrado com sucesso pelo ID.`);
         return profileById as unknown as Profile;
     }
 
-    if (idError) {
-        console.error(`[ProfileHandler] Erro final ao buscar perfil pelo ID para '${pathIdentifier}':`, idError.message);
-    }
-
-    console.error(`[ProfileHandler] Nenhum perfil encontrado para o identificador '${pathIdentifier}'.`);
+    console.warn(`[ProfileHandler] Nenhum perfil encontrado para o identificador '${pathIdentifier}'. Verifique a URL do webhook configurada na Meta.`);
     return null;
 }
