@@ -1,5 +1,4 @@
 
-
 import { createClient } from '@supabase/supabase-js';
 import { Database } from './database.types.js';
 
@@ -22,6 +21,17 @@ if (!supabaseUrl || supabaseUrl.trim() === '' || !supabaseServiceKey || supabase
 
 console.log('[Supabase Admin] Credentials seem valid. Creating client with a custom fetch timeout.');
 
+const getUrlStringForLogging = (url: RequestInfo | URL): string => {
+    if (typeof url === 'string') {
+        return url;
+    }
+    if (url instanceof URL) {
+        return url.href;
+    }
+    // It's a Request object
+    return url.url;
+};
+
 /**
  * A wrapper around the global fetch that adds a reasonable timeout.
  * This is crucial in serverless environments to prevent functions from hanging
@@ -32,15 +42,17 @@ console.log('[Supabase Admin] Credentials seem valid. Creating client with a cus
  * @returns A fetch Response promise.
  */
 const fetchWithTimeout = async (
-    url: RequestInfo, 
-    options: RequestInit = {}, 
+    url: RequestInfo | URL,
+    options: RequestInit = {},
     timeout = 15000 // 15 seconds
 ): Promise<Response> => {
     const controller = new AbortController();
     const { signal } = controller;
     
+    const urlForLogging = getUrlStringForLogging(url);
+
     const timeoutId = setTimeout(() => {
-        console.warn(`[Supabase Admin] Fetch timeout reached after ${timeout}ms for URL: ${url.toString()}`);
+        console.warn(`[Supabase Admin] Fetch timeout reached after ${timeout}ms for URL: ${urlForLogging}`);
         controller.abort('Timeout'); // Pass a reason for better debugging
     }, timeout);
 
@@ -50,7 +62,7 @@ const fetchWithTimeout = async (
         return response;
     } catch (error: any) {
         clearTimeout(timeoutId); // Clear timeout on error too
-        console.error(`[Supabase Admin] Fetch failed for URL ${url.toString()}:`, error);
+        console.error(`[Supabase Admin] Fetch failed for URL ${urlForLogging}:`, error);
         throw error;
     }
 };
