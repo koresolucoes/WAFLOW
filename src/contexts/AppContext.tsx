@@ -1,5 +1,6 @@
 
 
+
 import React, { ReactNode } from 'react';
 import { NavigationProvider } from './providers/NavigationContext';
 import { DataProvider } from './providers/DataProvider';
@@ -11,6 +12,7 @@ import { FunnelProvider } from './providers/FunnelContext';
 import { InboxProvider } from './providers/InboxContext';
 import { CustomFieldsProvider } from './providers/CustomFieldsContext';
 import { ActivityProvider } from './providers/ActivityContext';
+import { CannedResponsesProvider } from './providers/CannedResponsesContext';
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     return (
@@ -20,15 +22,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                     <CampaignsProvider>
                         <AutomationsProvider>
                             <FunnelProvider>
-                                <InboxProvider>
-                                    <CustomFieldsProvider>
-                                        <ActivityProvider>
-                                            <DataProvider>
-                                                {children}
-                                            </DataProvider>
-                                        </ActivityProvider>
-                                    </CustomFieldsProvider>
-                                </InboxProvider>
+                                <CannedResponsesProvider>
+                                    <InboxProvider>
+                                        <CustomFieldsProvider>
+                                            <ActivityProvider>
+                                                <DataProvider>
+                                                    {children}
+                                                </DataProvider>
+                                            </ActivityProvider>
+                                        </CustomFieldsProvider>
+                                    </InboxProvider>
+                                </CannedResponsesProvider>
                             </FunnelProvider>
                         </AutomationsProvider>
                     </CampaignsProvider>

@@ -1,4 +1,3 @@
-
 import { supabase } from '../lib/supabaseClient';
 import { Conversation, UnifiedMessage, Contact, MessageInsert, MessageStatus, MetaConfig, Message, TemplateCategory, TemplateStatus, MetaTemplateComponent } from '../types';
 import { sendTextMessage } from './meta/messages';
@@ -11,6 +10,8 @@ export const mapPayloadToUnifiedMessage = (payload: Message): UnifiedMessage => 
         created_at: payload.created_at,
         type: payload.type,
         status: payload.status,
+        message_template_id: payload.message_template_id,
+        replied_to_message_id: payload.replied_to_message_id,
     };
 };
 
@@ -40,6 +41,8 @@ export const fetchMessagesFromDb = async (userId: string, contactId: string): Pr
             created_at,
             type,
             status,
+            message_template_id,
+            replied_to_message_id,
             campaigns (
                 message_templates (
                     *
@@ -72,6 +75,8 @@ export const fetchMessagesFromDb = async (userId: string, contactId: string): Pr
             created_at: msg.created_at,
             type: msg.type,
             status: msg.status,
+            message_template_id: msg.message_template_id,
+            replied_to_message_id: msg.replied_to_message_id,
             template: template
         };
     });

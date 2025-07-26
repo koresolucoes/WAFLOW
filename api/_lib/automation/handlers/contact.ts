@@ -1,4 +1,3 @@
-
 import { supabaseAdmin } from '../../supabaseAdmin.js';
 import { Contact } from '../../types.js';
 import { TablesUpdate } from '../../database.types.js';

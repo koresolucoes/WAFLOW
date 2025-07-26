@@ -1,21 +1,16 @@
 
-
-
-
-
-
-
 import React, { useContext, useState, useMemo } from 'react';
-import { MessageTemplate, TemplateStatus } from '../../types';
+import { MessageTemplate, TemplateCategory, TemplateStatus } from '../../types';
 import { getMetaTemplates } from '../../services/meta/templates';
 import { supabase } from '../../lib/supabaseClient';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import { SPARKLES_ICON } from '../../components/icons';
-import { Json, TablesInsert } from '../../types/database.types';
+import { Json } from '../../types/database.types';
 import { TemplatesContext } from '../../contexts/providers/TemplatesContext';
 import { NavigationContext } from '../../contexts/providers/NavigationContext';
 import { useAuthStore, useMetaConfig } from '../../stores/authStore';
+import { MetaTemplateComponent } from '../../services/meta/types';
 
 const StatusBadge: React.FC<{ status: MessageTemplate['status'] }> = ({ status }) => {
     const statusStyles: Record<TemplateStatus, string> = {
@@ -105,7 +100,14 @@ const Templates: React.FC = () => {
 
         if (refetchError) throw refetchError;
         
-        setTemplates((dbTemplates as unknown as MessageTemplate[]) || []);
+        const typedTemplates = (dbTemplates || []).map(t => ({
+            ...t,
+            category: t.category as TemplateCategory,
+            status: t.status as TemplateStatus,
+            components: (t.components as unknown as MetaTemplateComponent[]) || []
+        })) as MessageTemplate[];
+
+        setTemplates(typedTemplates);
         setSyncMessage("Sincronização concluída! Os status dos templates foram atualizados.");
         setTimeout(() => setSyncMessage(null), 4000);
 

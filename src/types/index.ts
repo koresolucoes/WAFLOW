@@ -22,6 +22,7 @@ export type CustomFieldType = Enums<'custom_field_type'>;
 export type ActivityType = 'NOTA' | 'TAREFA';
 export type DealStatus = Enums<'deal_status'>;
 export type StageType = Enums<'stage_type'>;
+export type InboxStatus = Enums<'inbox_status'>;
 
 
 // Tipos para os nós do editor de automação
@@ -45,7 +46,9 @@ export type AutomationNode = XyNode<AutomationNodeData, string>;
 
 // --- Tipos de objetos simples para evitar recursão de TS de tipos gerados ---
 export type Profile = Database['public']['Tables']['profiles']['Row'];
-export type Contact = Database['public']['Tables']['contacts']['Row'];
+export type Contact = Omit<Database['public']['Tables']['contacts']['Row'], 'inbox_status'> & {
+    inbox_status: InboxStatus | null;
+};
 export type CustomFieldDefinition = Database['public']['Tables']['custom_field_definitions']['Row'];
 export type ContactActivity = Database['public']['Tables']['contact_activities']['Row'];
 
@@ -75,6 +78,7 @@ export type Deal = Omit<Database['public']['Tables']['deals']['Row'], 'status'> 
     status: DealStatus;
 };
 export type WebhookLog = Database['public']['Tables']['webhook_logs']['Row'];
+export type CannedResponse = Database['public']['Tables']['canned_responses']['Row'];
 // As tabelas de Segmento foram removidas no novo schema
 // export type Segment = Database['public']['Tables']['segments']['Row'];
 // export type SegmentRule = Database['public'['Tables']['segment_rules']['Row'];
@@ -97,6 +101,9 @@ export interface UnifiedMessage {
     type: MessageType;
     status: MessageStatus;
     template?: MessageTemplate | null;
+    message_template_id: string | null;
+    replied_to_message_id: string | null;
+    replied_to_message_content?: string | null;
 }
 
 export interface Conversation {
@@ -133,6 +140,7 @@ export interface MessageTemplateInsert extends Omit<Database['public']['Tables']
 export type MessageInsert = Database['public']['Tables']['messages']['Insert'];
 export type CustomFieldDefinitionInsert = Database['public']['Tables']['custom_field_definitions']['Insert'];
 export type ContactActivityInsert = Database['public']['Tables']['contact_activities']['Insert'];
+export type CannedResponseInsert = Database['public']['Tables']['canned_responses']['Insert'];
 
 export interface AutomationInsert extends Omit<Database['public']['Tables']['automations']['Insert'], 'status' | 'nodes' | 'edges'> {
   user_id: string;

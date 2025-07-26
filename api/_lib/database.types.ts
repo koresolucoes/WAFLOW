@@ -11,6 +11,7 @@ export type PublicEnums = {
   campaign_status: "Sent" | "Draft" | "Failed" | "Scheduled"
   custom_field_type: "TEXTO" | "NUMERO" | "DATA" | "LISTA"
   deal_status: "Aberto" | "Ganho" | "Perdido"
+  inbox_status: "Aberta" | "Pendente" | "Resolvida"
   message_source:
     | "campaign"
     | "automation"
@@ -189,6 +190,29 @@ export type PublicTables = {
       user_id?: string
     }
   }
+  canned_responses: {
+    Row: {
+      content: string
+      created_at: string
+      id: string
+      shortcut: string
+      user_id: string
+    }
+    Insert: {
+      content: string
+      created_at?: string
+      id?: string
+      shortcut: string
+      user_id: string
+    }
+    Update: {
+      content?: string
+      created_at?: string
+      id?: string
+      shortcut?: string
+      user_id?: string
+    }
+  }
   contact_activities: {
     Row: {
       id: string
@@ -228,6 +252,7 @@ export type PublicTables = {
       custom_fields: Json | null
       email: string | null
       id: string
+      inbox_status: PublicEnums["inbox_status"] | null
       name: string
       phone: string
       tags: string[] | null
@@ -239,6 +264,7 @@ export type PublicTables = {
       custom_fields?: Json | null
       email?: string | null
       id?: string
+      inbox_status?: PublicEnums["inbox_status"] | null
       name: string
       phone: string
       tags?: string[] | null
@@ -250,6 +276,7 @@ export type PublicTables = {
       custom_fields?: Json | null
       email?: string | null
       id?: string
+      inbox_status?: PublicEnums["inbox_status"] | null
       name?: string
       phone?: string
       tags?: string[] | null
@@ -371,8 +398,10 @@ export type PublicTables = {
       delivered_at: string | null
       error_message: string | null
       id: string
+      message_template_id: string | null
       meta_message_id: string | null
       read_at: string | null
+      replied_to_message_id: string | null
       sent_at: string | null
       source: PublicEnums["message_source"]
       status: PublicEnums["message_status"]
@@ -388,8 +417,10 @@ export type PublicTables = {
       delivered_at?: string | null
       error_message?: string | null
       id?: string
+      message_template_id?: string | null
       meta_message_id?: string | null
       read_at?: string | null
+      replied_to_message_id?: string | null
       sent_at?: string | null
       source: PublicEnums["message_source"]
       status: PublicEnums["message_status"]
@@ -405,8 +436,10 @@ export type PublicTables = {
       delivered_at?: string | null
       error_message?: string | null
       id?: string
+      message_template_id?: string | null
       meta_message_id?: string | null
       read_at?: string | null
+      replied_to_message_id?: string | null
       sent_at?: string | null
       source?: PublicEnums["message_source"]
       status?: PublicEnums["message_status"]
