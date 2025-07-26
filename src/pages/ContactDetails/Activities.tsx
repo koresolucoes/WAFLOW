@@ -4,6 +4,7 @@ import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import ActivityItem from './ActivityItem';
 import { ContactActivity, ContactActivityInsert } from '../../types';
+import { useAuthStore } from '../../stores/authStore';
 
 const TabButton: React.FC<{ label: string; active: boolean; onClick: () => void }> = ({ label, active, onClick }) => (
     <button
@@ -23,6 +24,7 @@ interface ActivitiesProps {
 
 const Activities: React.FC<ActivitiesProps> = ({ contactId, onDataChange }) => {
     const { activitiesForContact, fetchActivitiesForContact, addActivity, isLoading } = useContext(ActivityContext);
+    const user = useAuthStore(state => state.user);
     const [activeTab, setActiveTab] = useState<'list' | 'note' | 'task'>('list');
     
     const [noteContent, setNoteContent] = useState('');
@@ -36,9 +38,10 @@ const Activities: React.FC<ActivitiesProps> = ({ contactId, onDataChange }) => {
 
     const handleAddNote = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!noteContent.trim()) return;
+        if (!noteContent.trim() || !user) return;
         setIsSaving(true);
         const payload: ContactActivityInsert = {
+            user_id: user.id,
             contact_id: contactId,
             type: 'NOTA',
             content: noteContent.trim(),
@@ -53,9 +56,10 @@ const Activities: React.FC<ActivitiesProps> = ({ contactId, onDataChange }) => {
 
     const handleAddTask = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!taskContent.trim() || !taskDueDate) return;
+        if (!taskContent.trim() || !taskDueDate || !user) return;
         setIsSaving(true);
         const payload: ContactActivityInsert = {
+            user_id: user.id,
             contact_id: contactId,
             type: 'TAREFA',
             content: taskContent.trim(),

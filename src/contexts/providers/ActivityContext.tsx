@@ -51,7 +51,7 @@ export const ActivityProvider: React.FC<{ children: ReactNode }> = ({ children }
 
     const addActivity = useCallback(async (activityData: ContactActivityInsert): Promise<ContactActivity | null> => {
         if (!user) throw new Error("User not authenticated.");
-        const newActivity = await activityService.addActivity({ ...activityData, user_id: user.id });
+        const newActivity = await activityService.addActivity(activityData);
         if(newActivity.contact_id === (activitiesForContact[0]?.contact_id || null)) {
             setActivitiesForContact(prev => [newActivity, ...prev]);
         }

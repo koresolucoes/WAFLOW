@@ -10,6 +10,8 @@ import Card from '../../components/common/Card';
 import DealFormModal from '../../components/common/DealFormModal';
 import AddCustomFieldModal from '../../components/common/AddCustomFieldModal';
 import { PLUS_ICON, X_ICON } from '../../components/icons';
+import { ActivityContext } from '../../contexts/providers/ActivityContext';
+import ActivityItem from '../ContactDetails/ActivityItem';
 
 const InfoRow: React.FC<{ label: string, value: string | null | undefined }> = ({ label, value }) => (
     <div>
@@ -32,6 +34,7 @@ const ContactPanel: React.FC<{ contactId: string }> = ({ contactId }) => {
     const { deals, addDeal, pipelines, stages } = useContext(FunnelContext);
     const { definitions } = useContext(CustomFieldsContext);
     const { setCurrentPage } = useContext(NavigationContext);
+    const { activitiesForContact, fetchActivitiesForContact, isLoading: isActivitiesLoading } = useContext(ActivityContext);
     const user = useAuthStore(state => state.user);
 
     const [localContact, setLocalContact] = useState<Contact | null>(null);
@@ -46,6 +49,13 @@ const ContactPanel: React.FC<{ contactId: string }> = ({ contactId }) => {
         setLocalContact(contact || null);
     }, [contact]);
     
+    useEffect(() => {
+        if (contactId) {
+            fetchActivitiesForContact(contactId);
+        }
+    }, [contactId, fetchActivitiesForContact]);
+
+
     const contactDeals = deals.filter(d => d.contact_id === contactId);
     const defaultPipeline = pipelines[0];
 
@@ -94,6 +104,10 @@ const ContactPanel: React.FC<{ contactId: string }> = ({ contactId }) => {
 
     const hasChanges = JSON.stringify(contact) !== JSON.stringify(localContact);
     
+    const handleActivityDataChange = () => {
+        fetchActivitiesForContact(contactId);
+    };
+
     return (
         <>
             <aside className="w-96 flex-shrink-0 bg-slate-800 border-l border-slate-700/50 flex flex-col p-4 overflow-y-auto">
@@ -149,6 +163,21 @@ const ContactPanel: React.FC<{ contactId: string }> = ({ contactId }) => {
                             placeholder="Adicionar tag..."
                             className="w-full mt-2 bg-slate-700 border border-slate-600 rounded-md p-1.5 text-sm text-white"
                         />
+                    </Card>
+                    
+                    <Card className="bg-slate-900/50">
+                        <h3 className="text-base font-semibold text-white mb-3">Atividades</h3>
+                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                           {isActivitiesLoading ? (
+                                <p className="text-xs text-center text-slate-500 py-2">Carregando...</p>
+                           ) : activitiesForContact.length > 0 ? (
+                                activitiesForContact.map(activity => (
+                                    <ActivityItem key={activity.id} activity={activity} onDataChange={handleActivityDataChange} />
+                                ))
+                           ) : (
+                                <p className="text-sm text-slate-400 text-center py-2">Nenhuma atividade.</p>
+                           )}
+                        </div>
                     </Card>
 
                     <Card className="bg-slate-900/50">
