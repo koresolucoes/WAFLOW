@@ -1,4 +1,5 @@
 
+
 import { supabaseAdmin } from '../supabaseAdmin.js';
 import { Contact, Profile, Json } from '../types.js';
 import { TablesInsert, TablesUpdate } from '../database.types.js';
@@ -38,17 +39,17 @@ export const findOrCreateContactByPhone = async (user_id: string, phone: string,
     
     let { data: contactData, error } = await supabaseAdmin
         .from('contacts')
-        .select('company, created_at, custom_fields, email, id, name, phone, tags, user_id, inbox_status')
+        .select('company, created_at, custom_fields, email, id, name, phone, tags, user_id')
         .eq('user_id', user_id)
         .eq('phone', normalizedPhone)
         .single();
 
     if (error && error.code === 'PGRST116') { // Not found
-        const newContactPayload: TablesInsert<'contacts'> = { user_id, phone: normalizedPhone, name, tags: ['new-lead'], custom_fields: null, inbox_status: 'Aberta' };
+        const newContactPayload: TablesInsert<'contacts'> = { user_id, phone: normalizedPhone, name, tags: ['new-lead'], custom_fields: null };
         const { data: newContact, error: insertError } = await supabaseAdmin
             .from('contacts')
-            .insert(newContactPayload)
-            .select('company, created_at, custom_fields, email, id, name, phone, tags, user_id, inbox_status')
+            .insert(newContactPayload as any)
+            .select('company, created_at, custom_fields, email, id, name, phone, tags, user_id')
             .single();
         if (insertError) {
              console.error("Error creating new contact:", insertError);
@@ -57,7 +58,7 @@ export const findOrCreateContactByPhone = async (user_id: string, phone: string,
         if (!newContact) {
             throw new Error("Failed to create new contact and retrieve it.");
         }
-        return { contact: newContact as Contact, isNew: true };
+        return { contact: newContact as unknown as Contact, isNew: true };
     } else if (error) {
          console.error("Error finding contact:", error);
         throw error;
@@ -65,7 +66,7 @@ export const findOrCreateContactByPhone = async (user_id: string, phone: string,
     
     if(!contactData) throw new Error("Contact data is null after query.");
 
-    return { contact: contactData as Contact, isNew: false };
+    return { contact: contactData as unknown as Contact, isNew: false };
 };
 
 export const processWebhookPayloadForContact = async (
@@ -144,15 +145,15 @@ export const processWebhookPayloadForContact = async (
         if (needsUpdate) {
             const { data: updatedContact, error: updateContactError } = await supabaseAdmin
                 .from('contacts')
-                .update(updatePayload)
+                .update(updatePayload as any)
                 .eq('id', contact.id)
-                .select('company, created_at, custom_fields, email, id, name, phone, tags, user_id, inbox_status')
+                .select('company, created_at, custom_fields, email, id, name, phone, tags, user_id')
                 .single();
 
             if(updateContactError) {
                 console.error("Webhook trigger: Failed to update contact with data", updateContactError)
             } else if(updatedContact) {
-                contact = updatedContact as Contact;
+                contact = updatedContact as unknown as Contact;
             }
         }
     }

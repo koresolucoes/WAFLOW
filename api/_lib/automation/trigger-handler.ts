@@ -1,10 +1,8 @@
 
 
-
-
 import { supabaseAdmin } from '../supabaseAdmin.js';
 import { executeAutomation, createDefaultLoggingHooks } from './engine.js';
-import { Automation, Contact, Json } from '../types.js';
+import { Automation, Contact, Json, Profile } from '../types.js';
 import { sanitizeAutomation } from './utils.js';
 
 type TriggerInfo = {
@@ -17,12 +15,14 @@ const dispatchAutomations = async (userId: string, triggers: TriggerInfo[], cont
 
     console.log(`[DISPATCHER] Found ${triggers.length} potential automations to dispatch for user ${userId}.`);
 
-    const { data: profile, error: profileError } = await supabaseAdmin
+    const { data, error: profileError } = await supabaseAdmin
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .single();
     
+    const profile = data as unknown as Profile;
+
     if (profileError || !profile) {
         console.error(`[DISPATCHER] ERRO: Perfil não encontrado para o usuário ${userId}.`, profileError);
         return;
@@ -83,7 +83,7 @@ const handleMetaMessageEvent = async (userId: string, contact: Contact, message:
         if (error) console.error("[HANDLER] Erro ao buscar gatilhos de botão:", error);
         else if (buttonTriggers) {
             console.log(`[HANDLER] Found ${buttonTriggers.length} matching button triggers.`);
-            matchingTriggers.push(...(buttonTriggers as TriggerInfo[]));
+            matchingTriggers.push(...(buttonTriggers as unknown as TriggerInfo[]));
         }
     }
 
@@ -98,7 +98,7 @@ const handleMetaMessageEvent = async (userId: string, contact: Contact, message:
             console.error("[HANDLER] Erro ao buscar gatilhos de palavra-chave:", error);
         } else if (allKeywordTriggers) {
             console.log(`[HANDLER] Verificando ${allKeywordTriggers.length} gatilhos de palavra-chave para a mensagem: "${messageBody}"`);
-            for (const trigger of allKeywordTriggers) {
+            for (const trigger of (allKeywordTriggers as any[])) {
                 if (trigger.trigger_key && typeof trigger.trigger_key === 'string' && messageBody.includes(trigger.trigger_key.toLowerCase())) {
                     console.log(`[HANDLER] Correspondência encontrada! Palavra-chave: "${trigger.trigger_key}". Despachando automação ${trigger.automation_id}`);
                     matchingTriggers.push({ automation_id: trigger.automation_id, node_id: trigger.node_id });
@@ -130,7 +130,7 @@ const handleNewContactEvent = async (userId: string, contact: Contact) => {
 
     if (triggers && triggers.length > 0) {
         const triggerData = { type: 'new_contact', payload: { contact } };
-        await dispatchAutomations(userId, triggers as TriggerInfo[], contact, triggerData);
+        await dispatchAutomations(userId, triggers as unknown as TriggerInfo[], contact, triggerData);
     }
 };
 
@@ -150,7 +150,7 @@ export const handleTagAddedEvent = async (userId: string, contact: Contact, adde
     
     if (triggers && triggers.length > 0) {
         const triggerData = { type: 'tag_added', payload: { contact, addedTag } };
-        await dispatchAutomations(userId, triggers as TriggerInfo[], contact, triggerData);
+        await dispatchAutomations(userId, triggers as unknown as TriggerInfo[], contact, triggerData);
     }
 };
 

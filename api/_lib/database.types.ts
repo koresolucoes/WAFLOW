@@ -11,7 +11,6 @@ export type PublicEnums = {
   campaign_status: "Sent" | "Draft" | "Failed" | "Scheduled"
   custom_field_type: "TEXTO" | "NUMERO" | "DATA" | "LISTA"
   deal_status: "Aberto" | "Ganho" | "Perdido"
-  inbox_status: "Aberta" | "Pendente" | "Resolvida"
   message_source:
     | "campaign"
     | "automation"
@@ -260,7 +259,6 @@ export type PublicTables = {
       custom_fields: Json | null
       email: string | null
       id: string
-      inbox_status: PublicEnums["inbox_status"] | null
       name: string
       phone: string
       tags: string[] | null
@@ -272,7 +270,6 @@ export type PublicTables = {
       custom_fields?: Json | null
       email?: string | null
       id?: string
-      inbox_status?: PublicEnums["inbox_status"] | null
       name: string
       phone: string
       tags?: string[] | null
@@ -284,7 +281,6 @@ export type PublicTables = {
       custom_fields?: Json | null
       email?: string | null
       id?: string
-      inbox_status?: PublicEnums["inbox_status"] | null
       name?: string
       phone?: string
       tags?: string[] | null

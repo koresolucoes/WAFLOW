@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuthStore } from '../../stores/authStore';
@@ -23,7 +24,7 @@ const WebhookInspector: React.FC = () => {
         if (error) {
             console.error("Error fetching webhook logs:", error);
         } else {
-            setLogs(data as WebhookLog[]);
+            setLogs(data as unknown as WebhookLog[]);
         }
         setIsLoading(false);
     }, [user]);

@@ -1,4 +1,5 @@
 
+
 import { supabaseAdmin } from '../supabaseAdmin.js';
 import { TablesUpdate, Database } from '../database.types.js';
 
@@ -31,7 +32,7 @@ export async function processStatusUpdate(status: any, userId: string): Promise<
 
     const { data, error } = await supabaseAdmin
         .from('messages')
-        .update(updatePayload)
+        .update(updatePayload as any)
         .eq('meta_message_id', status.id)
         .eq('user_id', userId)
         .select('id');
@@ -42,6 +43,6 @@ export async function processStatusUpdate(status: any, userId: string): Promise<
     } else if (!data || data.length === 0) {
         console.warn(`[Status Handler] No message found with meta_message_id ${status.id} for user ${userId}. Update was not applied.`);
     } else {
-        console.log(`[Status Handler] Successfully updated status for message(s): ${data.map((d) => d.id).join(', ')}`);
+        console.log(`[Status Handler] Successfully updated status for message(s): ${(data as any).map((d: any) => d.id).join(', ')}`);
     }
 }

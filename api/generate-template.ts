@@ -125,7 +125,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             contents: prompt,
             config: {
                 responseMimeType: "application/json",
-                responseSchema: schema,
+                responseSchema: schema as any,
             },
         });
 

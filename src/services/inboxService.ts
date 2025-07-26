@@ -1,3 +1,4 @@
+
 import { supabase } from '../lib/supabaseClient';
 import { Conversation, UnifiedMessage, Contact, MessageInsert, MessageStatus, MetaConfig, Message, TemplateCategory, TemplateStatus, MetaTemplateComponent } from '../types';
 import { sendTextMessage } from './meta/messages';
@@ -16,7 +17,7 @@ export const mapPayloadToUnifiedMessage = (payload: Message): UnifiedMessage => 
 };
 
 export const fetchConversationsFromDb = async (userId: string): Promise<Conversation[]> => {
-    const { data, error } = await supabase.rpc('get_conversations_with_contacts', { p_user_id: userId });
+    const { data, error } = await supabase.rpc('get_conversations_with_contacts', { p_user_id: userId } as any);
     if (error) {
         console.error("Error fetching conversations:", error);
         throw error;
@@ -58,7 +59,7 @@ export const fetchMessagesFromDb = async (userId: string, contactId: string): Pr
         throw error;
     }
 
-    return (data || []).map((msg: any) => {
+    return (data as any[] || []).map((msg: any) => {
         const templateData = msg.campaigns?.message_templates;
         
         const template = templateData ? {
@@ -107,5 +108,5 @@ export const sendMessageToApi = async (userId: string, contact: Contact, text: s
      if (!data) {
         throw new Error("A mensagem foi enviada, mas falhou ao ser salva no banco de dados.");
     }
-    return data as Message;
+    return data as unknown as Message;
 };

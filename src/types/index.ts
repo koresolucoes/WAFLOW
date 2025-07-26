@@ -22,7 +22,6 @@ export type CustomFieldType = Enums<'custom_field_type'>;
 export type ActivityType = 'NOTA' | 'TAREFA';
 export type DealStatus = Enums<'deal_status'>;
 export type StageType = Enums<'stage_type'>;
-export type InboxStatus = Enums<'inbox_status'>;
 
 
 // Tipos para os nós do editor de automação
@@ -46,9 +45,7 @@ export type AutomationNode = XyNode<AutomationNodeData, string>;
 
 // --- Tipos de objetos simples para evitar recursão de TS de tipos gerados ---
 export type Profile = Database['public']['Tables']['profiles']['Row'];
-export type Contact = Omit<Database['public']['Tables']['contacts']['Row'], 'inbox_status'> & {
-    inbox_status: InboxStatus | null;
-};
+export type Contact = Database['public']['Tables']['contacts']['Row'];
 export type CustomFieldDefinition = Database['public']['Tables']['custom_field_definitions']['Row'];
 export type ContactActivity = Database['public']['Tables']['contact_activities']['Row'];
 

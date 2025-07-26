@@ -1,4 +1,5 @@
 
+
 import { supabase } from '../lib/supabaseClient';
 import { Profile, EditableProfile } from '../types';
 
@@ -12,16 +13,16 @@ export const getProfile = async (userId: string): Promise<Profile | null> => {
         console.error("Error fetching profile:", error);
         throw error;
     }
-    return data;
+    return data as unknown as Profile | null;
 };
 
 export const updateProfileInDb = async (userId: string, profileData: EditableProfile): Promise<Profile> => {
     const { data, error } = await supabase
         .from('profiles')
-        .update(profileData)
+        .update(profileData as any)
         .eq('id', userId)
         .select('*')
         .single();
     if (error) throw error;
-    return data;
+    return data as unknown as Profile;
 };

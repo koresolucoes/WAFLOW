@@ -1,4 +1,5 @@
 
+
 import { supabase } from '../lib/supabaseClient';
 import { Automation, AutomationNode, Edge, AutomationNodeStats, AutomationNodeLog, AutomationStatus, Json } from '../types';
 import { TablesInsert, TablesUpdate, Tables } from '../types/database.types';
@@ -11,10 +12,10 @@ export const createAutomationInDb = async (userId: string): Promise<Automation> 
         nodes: [] as unknown as Json, 
         edges: [] as unknown as Json 
     };
-    const { data, error } = await supabase.from('automations').insert(dbAutomation).select('*').single();
+    const { data, error } = await supabase.from('automations').insert(dbAutomation as any).select('*').single();
     if (error) throw error;
     
-    const newAutomationData = data;
+    const newAutomationData = data as any;
     return { 
         ...newAutomationData, 
         nodes: [], 
@@ -33,7 +34,7 @@ export const updateAutomationInDb = async (userId: string, automation: Automatio
     
     const { data, error } = await supabase
         .from('automations')
-        .update(updatePayload)
+        .update(updatePayload as any)
         .eq('id', automation.id)
         .eq('user_id', userId)
         .select('*')
@@ -41,12 +42,12 @@ export const updateAutomationInDb = async (userId: string, automation: Automatio
 
     if (error) throw error;
 
-    const { error: rpcError } = await supabase.rpc('sync_automation_triggers', { automation_id_in: automation.id });
+    const { error: rpcError } = await supabase.rpc('sync_automation_triggers', { automation_id_in: automation.id } as any);
     if (rpcError) {
         console.error("Falha ao sincronizar gatilhos de automação:", rpcError);
     }
     
-    const updated = data;
+    const updated = data as any;
     return { 
         ...updated, 
         nodes: (Array.isArray(updated.nodes) ? updated.nodes : []) as unknown as AutomationNode[], 
@@ -66,7 +67,7 @@ export const fetchStatsForAutomation = async (automationId: string): Promise<Rec
         console.error("Error fetching automation stats:", error); 
         return {}; 
     }
-    const statsData = (data as AutomationNodeStats[]) || [];
+    const statsData = (data as unknown as AutomationNodeStats[]) || [];
     return statsData.reduce((acc, stat) => {
         acc[stat.node_id] = stat;
         return acc;
@@ -80,7 +81,7 @@ export const fetchLogsForNode = async (automationId: string, nodeId: string): Pr
         return []; 
     }
     
-    const runIds = (runIdsData || []).map(r => r.id);
+    const runIds = ((runIdsData || []) as any[]).map(r => r.id);
     if (runIds.length === 0) return [];
 
     const { data, error } = await supabase.from('automation_node_logs').select('id, run_id, node_id, status, details, created_at').in('run_id', runIds).eq('node_id', nodeId).order('created_at', { ascending: false }).limit(100);
@@ -88,5 +89,5 @@ export const fetchLogsForNode = async (automationId: string, nodeId: string): Pr
         console.error("Error fetching node logs:", error); 
         return []; 
     }
-    return (data as AutomationNodeLog[]) || [];
+    return (data as unknown as AutomationNodeLog[]) || [];
 };

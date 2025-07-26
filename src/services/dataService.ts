@@ -1,7 +1,5 @@
 
 
-
-
 import { supabase } from '../lib/supabaseClient';
 import { Campaign, CampaignWithMetrics, MessageStatus, TemplateCategory, TemplateStatus, AutomationStatus, Edge, AutomationNode, Contact, MessageTemplate, Automation, Pipeline, PipelineStage, DealWithContact, CustomFieldDefinition } from '../types';
 import { MetaTemplateComponent } from './meta/types';
@@ -23,7 +21,7 @@ const fetchCampaignsWithMetrics = async (campaignsData: Campaign[]): Promise<Cam
         }));
     }
 
-    const metricsByCampaignId = data.reduce((acc, msg) => {
+    const metricsByCampaignId = (data as any[]).reduce((acc, msg) => {
         if (!msg.campaign_id) return acc;
         if (!acc[msg.campaign_id]) {
             acc[msg.campaign_id] = { sent: 0, delivered: 0, read: 0, failed: 0 };
@@ -72,7 +70,7 @@ export const fetchAllInitialData = async (userId: string) => {
     if (customFieldsRes.error) console.error("DataService Error (CustomFields):", customFieldsRes.error);
 
     // Process Templates
-    const templates = (templatesRes.data || []).map(t => ({
+    const templates = ((templatesRes.data as any[]) || []).map(t => ({
         ...t,
         category: t.category as TemplateCategory,
         status: t.status as TemplateStatus,
@@ -80,7 +78,7 @@ export const fetchAllInitialData = async (userId: string) => {
     } as MessageTemplate));
     
     // Process Automations
-    const automationsData = (automationsRes.data || []);
+    const automationsData = (automationsRes.data as any[]) || [];
     const automations = automationsData.map((a) => ({
         ...a,
         nodes: (Array.isArray(a.nodes) ? a.nodes : []) as unknown as AutomationNode[],
@@ -89,17 +87,17 @@ export const fetchAllInitialData = async (userId: string) => {
     } as Automation));
     
     // Process Campaigns
-    const campaigns = await fetchCampaignsWithMetrics((campaignsRes.data || []) as Campaign[]);
+    const campaigns = await fetchCampaignsWithMetrics((campaignsRes.data as unknown as Campaign[]) || []);
 
     return {
         templates,
-        contacts: (contactsRes.data || []) as Contact[],
+        contacts: (contactsRes.data as unknown as Contact[]) || [],
         campaigns,
         automations,
-        pipelines: (pipelinesRes.data || []) as Pipeline[],
-        stages: (stagesRes.data || []) as PipelineStage[],
-        deals: (dealsRes.data || []) as DealWithContact[],
-        customFieldDefinitions: (customFieldsRes.data || []) as CustomFieldDefinition[],
+        pipelines: (pipelinesRes.data as unknown as Pipeline[]) || [],
+        stages: (stagesRes.data as unknown as PipelineStage[]) || [],
+        deals: (dealsRes.data as unknown as DealWithContact[]) || [],
+        customFieldDefinitions: (customFieldsRes.data as unknown as CustomFieldDefinition[]) || [],
     };
 };
 
@@ -145,7 +143,7 @@ export const fetchDashboardData = async (userId: string): Promise<DashboardData>
     if (campaignsRes.error) console.error("Dashboard Data Error (Campaigns):", campaignsRes.error);
     if (dealsRes.error) console.error("Dashboard Data Error (Deals):", dealsRes.error);
 
-    const automationRuns = automationRunsRes.data || [];
+    const automationRuns = (automationRunsRes.data as any[]) || [];
     const totalRunsLast7Days = automationRuns.length;
     const successfulRunsLast7Days = automationRuns.filter(r => r.status === 'success').length;
 
@@ -170,15 +168,15 @@ export const fetchDashboardData = async (userId: string): Promise<DashboardData>
         .slice(0, 3);
     
     // Montar o feed de atividades
-    const contactsEvents: GlobalActivityEvent[] = (contactsRes.data || []).map(c => ({
+    const contactsEvents: GlobalActivityEvent[] = ((contactsRes.data as any[]) || []).map(c => ({
         id: `contact-${c.id}`, type: 'NEW_CONTACT', timestamp: c.created_at,
         title: 'Novo Contato', description: c.name,
     }));
-    const campaignsEvents: GlobalActivityEvent[] = (campaignsRes.data || []).map(c => ({
+    const campaignsEvents: GlobalActivityEvent[] = ((campaignsRes.data as any[]) || []).map(c => ({
         id: `campaign-${c.id}`, type: 'CAMPAIGN_SENT', timestamp: c.sent_at!,
         title: 'Campanha Enviada', description: c.name,
     }));
-    const dealsEvents: GlobalActivityEvent[] = (dealsRes.data || []).map(d => ({
+    const dealsEvents: GlobalActivityEvent[] = ((dealsRes.data as any[]) || []).map(d => ({
         id: `deal-${d.id}`,
         type: d.status === 'Ganho' ? 'DEAL_WON' : 'DEAL_LOST',
         timestamp: d.closed_at!,

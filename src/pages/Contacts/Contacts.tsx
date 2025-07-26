@@ -99,7 +99,7 @@ const Contacts: React.FC = () => {
                 const [name, phone, email, company, tagsStr] = lines[i].split(',');
                 if (name && phone) {
                     const tags = tagsStr ? tagsStr.trim().split(';').map(t => t.trim()).filter(Boolean) : [];
-                    newContacts.push({ name: name.trim(), phone: phone.trim(), email: email?.trim() || '', company: company?.trim() || '', tags, custom_fields: null, inbox_status: 'Aberta' });
+                    newContacts.push({ name: name.trim(), phone: phone.trim(), email: email?.trim() || '', company: company?.trim() || '', tags, custom_fields: null });
                 }
             }
 

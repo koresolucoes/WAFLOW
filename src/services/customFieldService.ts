@@ -15,7 +15,7 @@ export const addCustomFieldDefinition = async (userId: string, definition: Omit<
         }
         throw error;
     };
-    return data;
+    return data as unknown as CustomFieldDefinition;
 };
 
 export const deleteCustomFieldDefinition = async (id: string, userId: string): Promise<void> => {

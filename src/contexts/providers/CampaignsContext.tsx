@@ -1,4 +1,5 @@
 
+
 import React, { createContext, useState, useCallback, ReactNode, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { Campaign, CampaignWithMetrics, MessageInsert, CampaignWithDetails, CampaignStatus, Message, MessageStatus, MessageWithContact } from '../../types';
@@ -91,7 +92,7 @@ export const CampaignsProvider: React.FC<{ children: ReactNode }> = ({ children 
             return;
         }
 
-        const typedData = (data as { status: MessageStatus }[]) || [];
+        const typedData = (data as unknown as { status: MessageStatus }[]) || [];
         const newMetrics = {
             sent: typedData.filter(d => d.status !== 'failed').length,
             delivered: typedData.filter(d => d.status === 'delivered' || d.status === 'read').length,

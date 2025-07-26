@@ -28,14 +28,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const PROFILE_COLUMNS = 'id, company_audience, company_description, company_name, company_products, company_tone, meta_access_token, meta_phone_number_id, meta_waba_id, meta_verify_token, updated_at, webhook_path_prefix';
 
     // Robust Profile Lookup: First try by the custom path prefix.
-    const { data: profileByPrefix } = await supabaseAdmin.from('profiles').select(PROFILE_COLUMNS).eq('webhook_path_prefix', webhookPrefix).maybeSingle();
+    const { data: profileByPrefix, error: prefixError } = await supabaseAdmin.from('profiles').select(PROFILE_COLUMNS).eq('webhook_path_prefix', webhookPrefix).maybeSingle();
+    if (prefixError) console.error('[Trigger API] Error fetching profile by prefix', prefixError);
+
     if (profileByPrefix) {
-        profileData = profileByPrefix as Profile;
+        profileData = profileByPrefix as unknown as Profile;
     } else {
         // As a fallback, check if the prefix was actually a user ID.
-        const { data: profileById } = await supabaseAdmin.from('profiles').select(PROFILE_COLUMNS).eq('id', webhookPrefix).maybeSingle();
+        const { data: profileById, error: idError } = await supabaseAdmin.from('profiles').select(PROFILE_COLUMNS).eq('id', webhookPrefix).maybeSingle();
+        if (idError) console.error('[Trigger API] Error fetching profile by ID', idError);
         if (profileById) {
-            profileData = profileById as Profile;
+            profileData = profileById as unknown as Profile;
         }
     }
     
@@ -90,7 +93,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     payload: { rawBody, query: req.query, headers: cleanHeaders } as unknown as Json,
                     path: req.url,
                 };
-                await supabaseAdmin.from('webhook_logs').insert(logPayload);
+                await supabaseAdmin.from('webhook_logs').insert(logPayload as any);
             } catch (logError) {
                 console.error('[Trigger] Failed to log incoming trigger webhook:', logError);
             }

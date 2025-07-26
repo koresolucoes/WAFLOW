@@ -1,4 +1,5 @@
 
+
 import { supabase } from '../lib/supabaseClient';
 import { Campaign, MessageInsert, CampaignWithDetails, MessageWithContact, CampaignStatus, TemplateCategory, TemplateStatus, MessageTemplate } from '../types';
 import { TablesInsert, Tables } from '../types/database.types';
@@ -34,7 +35,7 @@ export const fetchCampaignDetailsFromDb = async (userId: string, campaignId: str
         failed: typedMessagesData.filter(d => d.status === 'failed').length
     };
     
-    const campaignDataTyped = campaignData as (Tables<'campaigns'> & { message_templates: Tables<'message_templates'> | null });
+    const campaignDataTyped = campaignData as unknown as (Tables<'campaigns'> & { message_templates: Tables<'message_templates'> | null });
     const message_template_data = campaignDataTyped.message_templates;
 
     return {
@@ -68,7 +69,7 @@ export const addCampaignToDb = async (
     const { data: newCampaignData, error: campaignError } = await supabase.from('campaigns').insert(campaignPayload as any).select('id, created_at, name, recipient_count, sent_at, status, template_id, user_id').single();
 
     if (campaignError) throw campaignError;
-    const newCampaign = newCampaignData;
+    const newCampaign = newCampaignData as any;
     if (!newCampaign) throw new Error("Failed to create campaign.");
 
     if (messages.length > 0) {
