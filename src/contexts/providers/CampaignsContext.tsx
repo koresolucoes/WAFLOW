@@ -1,6 +1,6 @@
-import React, { createContext, useState, useCallback, ReactNode, useEffect } from 'react';
+import React, { createContext, useState, useCallback, ReactNode, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabaseClient';
-import { Campaign, CampaignWithMetrics, MessageInsert, CampaignWithDetails, CampaignStatus, Message, MessageStatus } from '../../types';
+import { Campaign, CampaignWithMetrics, MessageInsert, CampaignWithDetails, CampaignStatus, Message, MessageStatus, MessageWithContact } from '../../types';
 import { useAuthStore } from '../../stores/authStore';
 import { fetchCampaignDetailsFromDb, addCampaignToDb, deleteCampaignFromDb } from '../../services/campaignService';
 
@@ -20,6 +20,12 @@ export const CampaignsProvider: React.FC<{ children: ReactNode }> = ({ children 
   const user = useAuthStore(state => state.user);
   const [campaigns, setCampaigns] = useState<CampaignWithMetrics[]>([]);
   const [campaignDetails, setCampaignDetails] = useState<CampaignWithDetails | null>(null);
+
+  // Use a ref to access the latest campaignDetails in the subscription without causing re-renders.
+  const campaignDetailsRef = useRef(campaignDetails);
+  useEffect(() => {
+    campaignDetailsRef.current = campaignDetails;
+  }, [campaignDetails]);
 
   const fetchCampaignDetails = useCallback(async (campaignId: string) => {
     if (!user) return;
@@ -61,49 +67,53 @@ export const CampaignsProvider: React.FC<{ children: ReactNode }> = ({ children 
     }
   }, [user, campaignDetails]);
 
-  const handleRealtimeMessageUpdate = useCallback(async (payload: { new: Message }) => {
-    const updatedMessage = payload.new as Message;
-    const campaignId = updatedMessage.campaign_id;
-
-    if (!campaignId) return; // Not a campaign message
-
-    const campaignToUpdate = campaigns.find(c => c.id === campaignId);
-    if (!campaignToUpdate) return; // Not a campaign we are currently displaying
-
-    // Refetch metrics for accuracy
-    const { data, error } = await supabase
-        .from('messages')
-        .select('status')
-        .eq('campaign_id', campaignId);
-        
-    if (error) {
-        console.error(`Realtime: Failed to refetch metrics for campaign ${campaignId}`, error);
-        return;
-    }
-
-    const typedData = (data as { status: MessageStatus }[]) || [];
-    const newMetrics = {
-        sent: typedData.filter(d => d.status !== 'failed').length,
-        delivered: typedData.filter(d => d.status === 'delivered' || d.status === 'read').length,
-        read: typedData.filter(d => d.status === 'read').length,
-        failed: typedData.filter(d => d.status === 'failed').length
-    };
-
-    setCampaigns(prevCampaigns =>
-        prevCampaigns.map(c =>
-            c.id === campaignId ? { ...c, metrics: newMetrics } : c
-        )
-    );
-  }, [campaigns]);
 
   useEffect(() => {
     if (!user) return;
+
+    const handleRealtimeMessageUpdate = async (payload: { new: Message }) => {
+        const updatedMessage = payload.new as Message;
+        const campaignId = updatedMessage.campaign_id;
+
+        if (!campaignId) return;
+
+        // Refetch metrics for the main list for accuracy
+        const { data, error } = await supabase
+            .from('messages')
+            .select('status')
+            .eq('campaign_id', campaignId);
+            
+        if (error) {
+            console.error(`Realtime: Failed to refetch metrics for campaign ${campaignId}`, error);
+            return;
+        }
+
+        const typedData = (data as { status: MessageStatus }[]) || [];
+        const newMetrics = {
+            sent: typedData.filter(d => d.status !== 'failed').length,
+            delivered: typedData.filter(d => d.status === 'delivered' || d.status === 'read').length,
+            read: typedData.filter(d => d.status === 'read').length,
+            failed: typedData.filter(d => d.status === 'failed').length
+        };
+
+        // Update main campaigns list using a functional update
+        setCampaigns(prevCampaigns =>
+            prevCampaigns.map(c =>
+                c.id === campaignId ? { ...c, metrics: newMetrics } : c
+            )
+        );
+
+        // If the user is viewing the details of the updated campaign, refetch its data
+        if (campaignDetailsRef.current && campaignDetailsRef.current.id === campaignId) {
+            fetchCampaignDetails(campaignId);
+        }
+    };
 
     const channel = supabase
         .channel('campaign-message-updates')
         .on(
             'postgres_changes',
-            { event: 'UPDATE', schema: 'public', table: 'messages' },
+            { event: 'UPDATE', schema: 'public', table: 'messages', filter: `user_id=eq.${user.id}` },
             (payload) => handleRealtimeMessageUpdate(payload as any)
         )
         .subscribe();
@@ -111,7 +121,7 @@ export const CampaignsProvider: React.FC<{ children: ReactNode }> = ({ children 
     return () => {
         supabase.removeChannel(channel);
     };
-  }, [user, handleRealtimeMessageUpdate]);
+  }, [user, fetchCampaignDetails]);
 
 
   const value = {

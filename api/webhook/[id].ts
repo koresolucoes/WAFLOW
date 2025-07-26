@@ -2,6 +2,8 @@
 
 
 
+
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
 import { getProfileForWebhook } from '../_lib/webhook/profile-handler.js';
@@ -24,7 +26,7 @@ const handlePostRequest = async (req: VercelRequest) => {
                 payload: req.body as unknown as Json,
                 path: req.url
             };
-            await supabaseAdmin.from('webhook_logs').insert(logPayload);
+            await supabaseAdmin.from('webhook_logs').insert(logPayload as any);
         } catch (logError) {
             console.error('[Webhook] Failed to log incoming webhook:', logError);
         }
@@ -56,18 +58,13 @@ const handlePostRequest = async (req: VercelRequest) => {
                 if (value.statuses) {
                     console.log(`[Webhook] Encontrados ${value.statuses.length} status para processar.`);
                     for (const status of value.statuses) {
-                        promises.push(processStatusUpdate(status));
+                        promises.push(processStatusUpdate(status, userId));
                     }
                 }
 
                 // B) Lidar com Mensagens Recebidas
                 if (value.messages) {
                     console.log(`[Webhook] Encontradas ${value.messages.length} mensagens para processar.`);
-                    const incomingPhoneNumberId = value?.metadata?.phone_number_id;
-                    if (profile.meta_phone_number_id !== String(incomingPhoneNumberId)) {
-                        console.warn(`[Webhook] AVISO: O phone_number_id (${incomingPhoneNumberId}) do webhook não corresponde ao configurado para o usuário ${userId}. A mensagem será processada mesmo assim.`);
-                    }
-                    
                     for (const message of value.messages) {
                         console.log(`[Webhook] Enfileirando processamento para a mensagem ${message.id}.`);
                         promises.push(processIncomingMessage(userId, profile, message, value.contacts));

@@ -1,8 +1,8 @@
 import { supabaseAdmin } from '../supabaseAdmin.js';
 import { TablesUpdate } from '../database.types.js';
 
-export async function processStatusUpdate(status: any): Promise<void> {
-    console.log(`[Status Handler] Processing status update for message ${status.id}: ${status.status}`);
+export async function processStatusUpdate(status: any, userId: string): Promise<void> {
+    console.log(`[Status Handler] Processing status update for message ${status.id} for user ${userId}: ${status.status}`);
     try {
         const newStatus = status.status; // 'sent', 'delivered', 'read', 'failed'
         if (!['sent', 'delivered', 'read', 'failed'].includes(newStatus)) {
@@ -31,13 +31,19 @@ export async function processStatusUpdate(status: any): Promise<void> {
             baseUpdate.error_message = `${status.errors[0]?.title} (Code: ${status.errors[0]?.code})`;
         }
 
-        const { error } = await supabaseAdmin
+        const { data, error } = await supabaseAdmin
             .from('messages')
             .update(baseUpdate as any)
-            .eq('meta_message_id', status.id);
+            .eq('meta_message_id', status.id)
+            .eq('user_id', userId)
+            .select('id'); // Add select to get back the updated row ID
 
         if (error) {
             console.error(`[Status Handler] Error updating message table for ${status.id}:`, error.message);
+        } else if (!data || data.length === 0) {
+            console.warn(`[Status Handler] No message found with meta_message_id ${status.id} for user ${userId}. Update was not applied.`);
+        } else {
+            console.log(`[Status Handler] Successfully updated status for message(s): ${data.map((d: any) => d.id).join(', ')}`);
         }
 
     } catch (e: any) {

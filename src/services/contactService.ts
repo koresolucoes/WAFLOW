@@ -1,3 +1,4 @@
+
 import { supabase } from '../lib/supabaseClient';
 import { Contact, EditableContact, ContactWithDetails, Deal, MetaConfig, MessageInsert } from '../types';
 import { TablesInsert, TablesUpdate } from '../types/database.types';
@@ -25,7 +26,7 @@ export const normalizePhoneNumber = (phone: string): string => {
 export const fetchContactDetailsFromDb = async (userId: string, contactId: string): Promise<ContactWithDetails> => {
     const { data: contactData, error: contactError } = await supabase
         .from('contacts')
-        .select('*')
+        .select('id, company, created_at, custom_fields, email, name, phone, tags, user_id')
         .eq('id', contactId)
         .eq('user_id', userId)
         .single();

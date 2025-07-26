@@ -1,3 +1,4 @@
+
 import { supabaseAdmin } from '../supabaseAdmin.js';
 import { Contact, Profile, Json } from '../types.js';
 import { TablesInsert, TablesUpdate } from '../database.types.js';
@@ -25,7 +26,7 @@ export const findOrCreateContactByPhone = async (user_id: string, phone: string,
     
     let { data: contactData, error } = await supabaseAdmin
         .from('contacts')
-        .select('*')
+        .select('id, company, created_at, custom_fields, email, name, phone, tags, user_id')
         .eq('user_id', user_id)
         .eq('phone', normalizedPhone)
         .single();

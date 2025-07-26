@@ -1,3 +1,4 @@
+
 import React, { useContext, useState, useMemo, useEffect } from 'react';
 import { sendTemplatedMessage } from '../../services/meta/messages';
 import { getMetaTemplateById } from '../../services/meta/templates';
@@ -213,7 +214,7 @@ const NewCampaign: React.FC = () => {
                 finalComponents.length > 0 ? finalComponents : undefined
             );
 
-            const resolvedContent = (bodyComponentText.match(/\{\{\d+\}\}/g) || []).reduce((text: string, placeholder: string) => {
+            const resolvedContent = (bodyComponentText.match(/\{\{\d+\}\}/g) || []).reduce((text, placeholder) => {
                 return text.replace(placeholder, resolvePlaceholder(placeholder));
             }, bodyComponentText);
           

@@ -1,3 +1,4 @@
+
 import { supabaseAdmin } from '../../supabaseAdmin.js';
 import { sendTemplatedMessage, sendTextMessage, sendMediaMessage, sendInteractiveMessage } from '../../meta/messages.js';
 import { MessageTemplate, MessageInsert } from '../../types.js';
@@ -80,7 +81,7 @@ export const sendTemplate: ActionHandler = async ({ profile, contact, node, trig
     );
     
     const bodyText = bodyComponent?.text || 'Mensagem de template';
-    const resolvedContent = (bodyText.match(/\{\{\d+\}\}/g) || []).reduce((text: string, placeholder: string) => {
+    const resolvedContent = (bodyText.match(/\{\{\d+\}\}/g) || []).reduce((text, placeholder) => {
         return text.replace(placeholder, resolvePlaceholder(placeholder));
     }, bodyText);
 
