@@ -8,15 +8,27 @@ export const normalizePhoneNumber = (phone: string): string => {
     // 1. Strip all non-numeric characters.
     let digits = phone.replace(/\D/g, '');
 
-    // 2. If it's a local Brazilian number, add the country code.
-    // This handles numbers like (11) 98765-4321 or 3132345678.
-    if (digits.length === 10 || digits.length === 11) {
-        digits = '55' + digits;
+    // 2. Handle local Brazilian numbers (without country code)
+    if (digits.length === 10) { // DDD + 8-digit number, likely a mobile missing the '9'
+        const ddd = digits.substring(0, 2);
+        const number = digits.substring(2);
+        return `55${ddd}9${number}`;
+    }
+    if (digits.length === 11) { // DDD + 9-digit number
+        return `55${digits}`;
+    }
+
+    // 3. Handle numbers with Brazilian country code
+    if (digits.startsWith('55')) {
+        // 55 + DDD + 8-digit number. This is a mobile missing the '9'.
+        if (digits.length === 12) {
+            const ddd = digits.substring(2, 4);
+            const number = digits.substring(4);
+            return `55${ddd}9${number}`;
+        }
     }
     
-    // 3. Return the cleaned number. We don't add the 9th digit here,
-    // assuming inputs are either complete or will be handled by Meta's formatting.
-    // This makes the logic consistent with the backend webhook processor.
+    // 4. Return as is for other cases (already correct, or not a Brazilian mobile)
     return digits;
 };
 
