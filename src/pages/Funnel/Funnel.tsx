@@ -5,10 +5,9 @@ import Button from '../../components/common/Button';
 import PipelineManagerModal from './PipelineManagerModal';
 import DealClosingModal from './DealClosingModal';
 import { FunnelContext } from '../../contexts/providers/FunnelContext';
-import { DealStatus } from '../../types';
 
 const FunnelMetric: React.FC<{ label: string, value: string | number }> = ({ label, value }) => (
-    <div className="text-center">
+    <div className="text-center px-4">
         <p className="text-xs text-slate-400 uppercase tracking-wider">{label}</p>
         <p className="text-xl font-bold text-white">{value}</p>
     </div>
@@ -116,12 +115,12 @@ const Funnel: React.FC = () => {
         }
     };
 
-    if (pipelines.length === 0) {
+    if (pipelines.length === 0 && !isCreating) {
         return (
              <div className="flex flex-col items-center justify-center h-full text-center text-slate-400">
                 <FUNNEL_ICON className="w-16 h-16 mb-4 text-slate-500" />
                 <h2 className="text-2xl text-white font-bold">Nenhum funil de vendas encontrado.</h2>
-                <p className="mt-2 mb-6">Parece que um funil padrão não foi criado para sua conta.</p>
+                <p className="mt-2 mb-6">Crie seu primeiro funil para começar a organizar seus negócios.</p>
                 <Button onClick={handleCreatePipeline} isLoading={isCreating}>
                     Criar Funil Padrão
                 </Button>
@@ -133,7 +132,7 @@ const Funnel: React.FC = () => {
         <>
             <div className="h-full flex flex-col">
                 <header className="flex-shrink-0 p-4 border-b border-slate-700/50 flex flex-col gap-4">
-                    <div className="flex justify-between items-center gap-4 w-full">
+                    <div className="flex justify-between items-center gap-4 w-full flex-wrap">
                         <div className="flex items-center gap-4">
                             <h1 className="text-2xl font-bold text-white">Funil</h1>
                             <select
@@ -146,12 +145,14 @@ const Funnel: React.FC = () => {
                         </div>
                         <Button variant="secondary" onClick={() => setIsManagerOpen(true)}>Gerenciar Funis</Button>
                     </div>
-                    <div className="w-full bg-slate-800/50 p-3 rounded-lg flex items-center justify-around">
-                        <FunnelMetric label="Valor em Aberto" value={pipelineMetrics.openValue} />
-                        <FunnelMetric label="Negócios Abertos" value={pipelineMetrics.openDealsCount} />
-                        <FunnelMetric label="Taxa de Conversão" value={pipelineMetrics.conversionRate} />
-                        <FunnelMetric label="Valor Total" value={pipelineMetrics.totalValue} />
-                    </div>
+                    {activePipeline && (
+                        <div className="w-full bg-slate-800/50 p-3 rounded-lg flex items-center justify-around flex-wrap gap-4">
+                            <FunnelMetric label="Valor em Aberto" value={pipelineMetrics.openValue} />
+                            <FunnelMetric label="Negócios Abertos" value={pipelineMetrics.openDealsCount} />
+                            <FunnelMetric label="Taxa de Conversão" value={pipelineMetrics.conversionRate} />
+                            <FunnelMetric label="Valor Total" value={pipelineMetrics.totalValue} />
+                        </div>
+                    )}
                 </header>
                 <main className="flex-grow flex-1 p-4 md:p-6 overflow-x-auto">
                     <div className="flex gap-6 h-full min-w-max">

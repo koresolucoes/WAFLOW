@@ -50,8 +50,10 @@ export const FunnelProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         const { pipeline, stages: newStages } = await funnelService.createDefaultPipelineInDb(user.id);
         setPipelines(prev => [...prev, pipeline]);
         setStages(prev => [...prev, ...newStages]);
-        setActivePipelineId(pipeline.id);
-    }, [user]);
+        if (!activePipelineId) {
+            setActivePipelineId(pipeline.id);
+        }
+    }, [user, activePipelineId]);
 
     const addPipeline = useCallback(async (name: string) => {
         if (!user) throw new Error("User not authenticated.");
@@ -69,10 +71,10 @@ export const FunnelProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
     const deletePipeline = useCallback(async (id: string) => {
         if (!user) throw new Error("User not authenticated.");
+        const remainingPipelines = pipelines.filter(p => p.id !== id);
         await funnelService.deletePipelineFromDb(id);
         setStages(s => s.filter(stage => stage.pipeline_id !== id));
         setDeals(d => d.filter(deal => deal.pipeline_id !== id));
-        const remainingPipelines = pipelines.filter(p => p.id !== id);
         setPipelines(remainingPipelines);
         if (activePipelineId === id) {
             setActivePipelineId(remainingPipelines.length > 0 ? remainingPipelines[0].id : null);
@@ -89,7 +91,7 @@ export const FunnelProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const updateStage = useCallback(async (id: string, updates: TablesUpdate<'pipeline_stages'>) => {
         if (!user) throw new Error("User not authenticated.");
         const updatedStage = await funnelService.updateStageInDb(id, updates);
-        setStages(s => s.map(stage => stage.id === id ? updatedStage : stage));
+        setStages(s => s.map(stage => stage.id === id ? { ...stage, ...updatedStage } : stage));
     }, [user]);
 
     const deleteStage = useCallback(async (id: string) => {

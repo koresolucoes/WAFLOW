@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+import React, { useState } from 'react';
 import { PipelineStage, DealWithContact } from '../../types';
 import DealCard from './DealCard';
 
@@ -43,7 +43,7 @@ const StageColumn: React.FC<StageColumnProps> = ({ stage, deals, onDragStart, on
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
         >
-            <div className={`p-4 border-b-2 ${stageTypeStyles[stage.type]} flex-shrink-0`}>
+            <div className={`p-4 border-b-4 ${stageTypeStyles[stage.type]} flex-shrink-0`}>
                 <div className="flex justify-between items-center">
                     <h2 className="font-bold text-white truncate">{stage.name}</h2>
                 </div>

@@ -9,7 +9,7 @@ export const addDealToDb = async (dealData: DealInsert): Promise<DealWithContact
 };
 
 export const updateDealInDb = async (dealId: string, updates: TablesUpdate<'deals'>): Promise<DealWithContact> => {
-    const { data, error } = await supabase.from('deals').update(updates).eq('id', dealId).select('*, contacts(id, name)').single();
+    const { data, error } = await supabase.from('deals').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', dealId).select('*, contacts(id, name)').single();
     if (error) throw error;
     return data as DealWithContact;
 };
@@ -28,7 +28,7 @@ export const createDefaultPipelineInDb = async (userId: string): Promise<{ pipel
         { name: 'Perdidos', sort_order: 5, type: 'Perdido' } 
     ];
     const stagesToInsert: TablesInsert<'pipeline_stages'>[] = defaultStages.map(stage => ({ ...stage, pipeline_id: pipeline.id }));
-    const { data: stagesData, error: stagesError } = await supabase.from('pipeline_stages').insert(stagesToInsert).select();
+    const { data: stagesData, error: stagesError } = await supabase.from('pipeline_stages').insert(stagesToInsert).select('*');
 
     if (stagesError || !stagesData) {
         await supabase.from('pipelines').delete().eq('id', pipeline.id);
@@ -44,7 +44,7 @@ export const addPipelineToDb = async (userId: string, name: string): Promise<{ p
 
     const pipeline = pipelineData;
     const stagePayload: TablesInsert<'pipeline_stages'> = { name: 'Nova Etapa', sort_order: 0, pipeline_id: pipeline.id, type: 'Intermediária' };
-    const { data: stageData, error: stageError } = await supabase.from('pipeline_stages').insert(stagePayload).select().single();
+    const { data: stageData, error: stageError } = await supabase.from('pipeline_stages').insert(stagePayload).select('*').single();
     if (stageError || !stageData) throw stageError || new Error("Falha ao criar etapa inicial.");
 
     return { pipeline, stage: stageData as PipelineStage };

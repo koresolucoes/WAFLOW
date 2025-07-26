@@ -92,7 +92,7 @@ export const sendMessageToApi = async (userId: string, contact: Contact, text: s
         sent_at: new Date().toISOString()
     };
     
-    const { data, error } = await supabase.from('messages').insert(messagePayload as any).select().single();
+    const { data, error } = await supabase.from('messages').insert(messagePayload).select().single();
     
     if (error) {
         console.error("Supabase insert error in sendMessageToApi:", error);

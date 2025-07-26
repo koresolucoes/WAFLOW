@@ -3,7 +3,8 @@
 
 import { Database, Json, Enums, Tables, TablesInsert, TablesUpdate } from './database.types';
 import { MetaTemplateComponent } from '../services/meta/types';
-import type { Node as XyNode, Edge, Session, User } from '@xyflow/react';
+import type { Node as XyNode, Edge } from '@xyflow/react';
+import type { Session, User } from '@supabase/supabase-js';
 
 export type Page = 'dashboard' | 'campaigns' | 'templates' | 'template-editor' | 'contacts' | 'new-campaign' | 'profile' | 'settings' | 'auth' | 'campaign-details' | 'automations' | 'automation-editor' | 'funnel' | 'contact-details' | 'inbox' | 'webhook-inspector';
 

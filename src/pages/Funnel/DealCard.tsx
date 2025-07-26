@@ -53,7 +53,7 @@ const DealCard: React.FC<DealCardProps> = ({ deal, onDragStart, isGhost }) => {
                     </div>
                 )}
             </div>
-            <p className="text-sm text-slate-400 mt-1 hover:text-sky-400 hover:underline" onClick={navigateToContact}>
+            <p className="text-sm text-slate-400 mt-1 hover:text-sky-400 hover:underline cursor-pointer" onClick={navigateToContact}>
                 {deal.contacts?.name || 'Contato não encontrado'}
             </p>
             <p className="text-sm font-mono text-green-400 mt-2">

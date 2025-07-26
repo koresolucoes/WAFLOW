@@ -121,7 +121,7 @@ const PipelineManagerModal: React.FC<{ isOpen: boolean; onClose: () => void; }> 
                                 </Button>
                             </div>
                         ))}
-                    </ul>
+                    </div>
                 </div>
                 <form onSubmit={handleAddPipeline} className="border-t border-slate-700 pt-4">
                     <h3 className="text-lg font-semibold text-white mb-2">Criar Novo Funil</h3>
