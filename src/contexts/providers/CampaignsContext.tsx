@@ -1,8 +1,10 @@
+
 import React, { createContext, useState, useCallback, ReactNode, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { Campaign, CampaignWithMetrics, MessageInsert, CampaignWithDetails, CampaignStatus, Message, MessageStatus, MessageWithContact } from '../../types';
 import { useAuthStore } from '../../stores/authStore';
 import { fetchCampaignDetailsFromDb, addCampaignToDb, deleteCampaignFromDb } from '../../services/campaignService';
+import { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 
 interface CampaignsContextType {
   campaigns: CampaignWithMetrics[];
@@ -71,7 +73,8 @@ export const CampaignsProvider: React.FC<{ children: ReactNode }> = ({ children 
   useEffect(() => {
     if (!user) return;
 
-    const handleRealtimeMessageUpdate = async (payload: { new: Message }) => {
+    const handleRealtimeMessageUpdate = async (payload: RealtimePostgresChangesPayload<{ [key: string]: any }>) => {
+        if (payload.eventType !== 'UPDATE') return;
         const updatedMessage = payload.new as Message;
         const campaignId = updatedMessage.campaign_id;
 
@@ -114,7 +117,7 @@ export const CampaignsProvider: React.FC<{ children: ReactNode }> = ({ children 
         .on(
             'postgres_changes',
             { event: 'UPDATE', schema: 'public', table: 'messages', filter: `user_id=eq.${user.id}` },
-            (payload) => handleRealtimeMessageUpdate(payload as any)
+            handleRealtimeMessageUpdate
         )
         .subscribe();
         

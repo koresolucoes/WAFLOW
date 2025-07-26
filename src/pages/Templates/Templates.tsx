@@ -1,6 +1,7 @@
 
+
 import React, { useContext, useState, useMemo } from 'react';
-import { MessageTemplate, TemplateCategory, TemplateStatus } from '../../types';
+import { MessageTemplate, TemplateCategory, TemplateStatus, TablesInsert } from '../../types';
 import { getMetaTemplates } from '../../services/meta/templates';
 import { supabase } from '../../lib/supabaseClient';
 import Card from '../../components/common/Card';
@@ -78,17 +79,17 @@ const Templates: React.FC = () => {
     try {
         const metaTemplates = await getMetaTemplates(metaConfig);
 
-        const templatesToUpsert = metaTemplates.map(mt => ({
+        const templatesToUpsert: TablesInsert<'message_templates'>[] = metaTemplates.map(mt => ({
             meta_id: mt.id,
             user_id: user.id,
             template_name: mt.name,
-            status: mt.status,
-            category: mt.category,
+            status: mt.status as TemplateStatus,
+            category: mt.category as TemplateCategory,
             components: mt.components as unknown as Json,
         }));
         
         if (templatesToUpsert.length > 0) {
-            const { error: upsertError } = await supabase.from('message_templates').upsert(templatesToUpsert as any, { onConflict: 'meta_id, user_id' });
+            const { error: upsertError } = await supabase.from('message_templates').upsert(templatesToUpsert, { onConflict: 'meta_id, user_id' });
             if (upsertError) throw upsertError;
         }
 

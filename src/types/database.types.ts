@@ -609,4 +609,4 @@ export type TablesUpdate<
 
 export type Enums<
   EnumName extends keyof PublicSchema["Enums"]
-> = PublicSchema["Enums"][EnumName
+> = PublicSchema["Enums"][EnumName]
