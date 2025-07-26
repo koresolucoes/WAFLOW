@@ -1,4 +1,5 @@
 import { supabaseAdmin } from '../supabaseAdmin.js';
+import { TablesUpdate } from '../database.types.js';
 
 export async function processStatusUpdate(status: any, userId: string): Promise<void> {
     console.log(`[Status Handler] Processing status update for message ${status.id} for user ${userId}: ${status.status}`);
@@ -11,31 +12,26 @@ export async function processStatusUpdate(status: any, userId: string): Promise<
     
     const timestamp = new Date(parseInt(status.timestamp, 10) * 1000).toISOString();
 
-    const baseUpdate: {
-        status: string;
-        delivered_at?: string;
-        read_at?: string;
-        error_message?: string;
-    } = {
+    const updatePayload: TablesUpdate<'messages'> = {
         status: newStatus,
     };
 
     if (newStatus === 'delivered') {
-        baseUpdate.delivered_at = timestamp;
+        updatePayload.delivered_at = timestamp;
     } else if (newStatus === 'read') {
-        baseUpdate.read_at = timestamp;
+        updatePayload.read_at = timestamp;
         // A message can only be read if it was delivered.
-        baseUpdate.delivered_at = baseUpdate.delivered_at || timestamp; 
+        updatePayload.delivered_at = timestamp; 
     } else if (newStatus === 'failed' && status.errors) {
-        baseUpdate.error_message = `${status.errors[0]?.title} (Code: ${status.errors[0]?.code})`;
+        updatePayload.error_message = `${status.errors[0]?.title} (Code: ${status.errors[0]?.code})`;
     }
 
     const { data, error } = await supabaseAdmin
         .from('messages')
-        .update(baseUpdate as any)
+        .update(updatePayload)
         .eq('meta_message_id', status.id)
         .eq('user_id', userId)
-        .select('id'); // Add select to get back the updated row ID
+        .select('id');
 
     if (error) {
         console.error(`[Status Handler] Error updating message table for ${status.id}:`, error.message);

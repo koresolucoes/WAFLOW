@@ -30,13 +30,11 @@ const handlePostRequest = async (req: VercelRequest) => {
 
         let body: any;
         try {
-            // We assume Meta always sends JSON
             body = JSON.parse(rawBodyBuffer.toString('utf-8'));
         } catch (parseError: any) {
             console.error('[Webhook] Failed to parse request body as JSON:', parseError.message);
-            // Log the raw body if parsing fails for debugging.
             console.error('[Webhook] Raw body content:', rawBodyBuffer.toString('utf-8').substring(0, 500));
-            return; // Stop processing if body is malformed
+            return;
         }
 
 
@@ -47,7 +45,7 @@ const handlePostRequest = async (req: VercelRequest) => {
                 payload: body as unknown as Json,
                 path: req.url
             };
-            await supabaseAdmin.from('webhook_logs').insert(logPayload as any);
+            await supabaseAdmin.from('webhook_logs').insert(logPayload);
         } catch (logError) {
             console.error('[Webhook] Failed to log incoming webhook:', logError);
         }
@@ -66,45 +64,39 @@ const handlePostRequest = async (req: VercelRequest) => {
             return;
         }
 
-        const promises: Promise<void>[] = [];
-        for (const item of entry) {
-            console.log(`[Webhook] Processando item de entrada: ${item.id}`);
-            for (const change of item.changes) {
-                console.log(`[Webhook] Processando alteração de campo: ${change.field}`);
-                if (change.field !== 'messages') continue;
-                
-                const value = change.value;
+        const processingPromises: Promise<any>[] = [];
 
-                // A) Lidar com Atualizações de Status
-                if (value.statuses) {
-                    console.log(`[Webhook] Encontrados ${value.statuses.length} status para processar.`);
+        for (const item of entry) {
+            for (const change of item.changes) {
+                if (change.field !== 'messages' || !change.value) continue;
+                
+                const { value } = change;
+
+                if (value.statuses && Array.isArray(value.statuses)) {
                     for (const status of value.statuses) {
-                        promises.push(processStatusUpdate(status, userId));
+                        processingPromises.push(processStatusUpdate(status, userId));
                     }
                 }
 
-                // B) Lidar com Mensagens Recebidas
-                if (value.messages) {
-                    console.log(`[Webhook] Encontradas ${value.messages.length} mensagens para processar.`);
+                if (value.messages && Array.isArray(value.messages)) {
                     for (const message of value.messages) {
-                        console.log(`[Webhook] Enfileirando processamento para a mensagem ${message.id}.`);
-                        promises.push(processIncomingMessage(userId, message, value.contacts));
+                        processingPromises.push(processIncomingMessage(userId, message, value.contacts));
                     }
                 }
             }
         }
         
-        if (promises.length > 0) {
-             console.log(`[Webhook] Aguardando a conclusão de ${promises.length} promessas.`);
-             const results = await Promise.allSettled(promises);
-             results.forEach(result => {
+        if (processingPromises.length > 0) {
+             console.log(`[Webhook] Aguardando a conclusão de ${processingPromises.length} promessas de processamento.`);
+             const results = await Promise.allSettled(processingPromises);
+             results.forEach((result, index) => {
                  if (result.status === 'rejected') {
-                     console.error('[Webhook] Uma promessa de processamento falhou:', result.reason);
+                     console.error(`[Webhook] A promessa de processamento na posição ${index} falhou:`, result.reason);
                  }
              });
              console.log(`[Webhook] Lote de processamento para o usuário ${userId} concluído.`);
         } else {
-            console.log('[Webhook] Nenhuma promessa de mensagem ou status para processar no payload.');
+            console.log('[Webhook] Nenhum evento de mensagem ou status válido para processar no payload.');
         }
 
     } catch (error: any) {

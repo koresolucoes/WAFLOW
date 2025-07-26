@@ -214,9 +214,11 @@ const NewCampaign: React.FC = () => {
                 finalComponents.length > 0 ? finalComponents : undefined
             );
 
-            const resolvedContent = (bodyComponentText.match(/\{\{\d+\}\}/g) || []).reduce((text: string, placeholder: string) => {
-                return text.replace(placeholder, resolvePlaceholder(placeholder));
-            }, bodyComponentText);
+            let resolvedContent = bodyComponentText;
+            const placeholdersInBody = bodyComponentText.match(/\{\{\d+\}\}/g) || [];
+            for (const placeholder of placeholdersInBody) {
+                resolvedContent = resolvedContent.replace(placeholder, resolvePlaceholder(placeholder));
+            }
           
             messagesToInsert.push({
                 contact_id: contact.id,

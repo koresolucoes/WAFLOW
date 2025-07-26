@@ -1,6 +1,6 @@
 import { supabaseAdmin } from '../supabaseAdmin.js';
 import { Contact, Profile, Json } from '../types.js';
-import { TablesInsert } from '../database.types.js';
+import { TablesInsert, TablesUpdate } from '../database.types.js';
 import { getValueFromPath } from '../automation/helpers.js';
 
 const normalizePhoneNumber = (phone: string): string => {
@@ -34,7 +34,7 @@ export const findOrCreateContactByPhone = async (user_id: string, phone: string,
         const newContactPayload: TablesInsert<'contacts'> = { user_id, phone: normalizedPhone, name, tags: ['new-lead'], custom_fields: null };
         const { data: newContact, error: insertError } = await supabaseAdmin
             .from('contacts')
-            .insert(newContactPayload as any)
+            .insert(newContactPayload)
             .select('*')
             .single();
         if (insertError) {
@@ -87,8 +87,10 @@ export const processWebhookPayloadForContact = async (
     
     if (contact) {
         const newTags = new Set(contact.tags || []);
-        const newCustomFields = { ...(contact.custom_fields as object || {}) };
+        const newCustomFields: { [key: string]: any } = { ...(contact.custom_fields as object || {}) };
         let needsUpdate = false;
+
+        const updatePayload: TablesUpdate<'contacts'> = {};
 
         mappingRules.forEach((rule: any) => {
             if (!rule.source || rule.destination === 'phone') return;
@@ -96,7 +98,7 @@ export const processWebhookPayloadForContact = async (
             if (value === undefined) return;
             
             if (rule.destination === 'name' && contact?.name !== value) {
-                (contact as any).name = value;
+                updatePayload.name = value;
                 needsUpdate = true;
             } else if (rule.destination === 'tag') {
                 const tagValue = String(value);
@@ -107,26 +109,33 @@ export const processWebhookPayloadForContact = async (
                     }
                 }
             } else if (rule.destination === 'custom_field' && rule.destination_key) {
-                if ((newCustomFields as any)[rule.destination_key] !== value) {
-                    (newCustomFields as any)[rule.destination_key] = value;
-                     needsUpdate = true;
+                if (newCustomFields[rule.destination_key] !== value) {
+                    newCustomFields[rule.destination_key] = value;
+                    needsUpdate = true;
                 }
             }
         });
         
         const finalTags = Array.from(newTags);
         if (JSON.stringify(finalTags) !== JSON.stringify(contact.tags || [])) {
-            (contact as any).tags = finalTags;
+            updatePayload.tags = finalTags;
             needsUpdate = true;
         }
-         if (JSON.stringify(newCustomFields) !== JSON.stringify(contact.custom_fields || {})) {
-            (contact as any).custom_fields = newCustomFields as Json;
+
+        const finalCustomFields = newCustomFields as Json;
+        if (JSON.stringify(finalCustomFields) !== JSON.stringify(contact.custom_fields || {})) {
+            updatePayload.custom_fields = finalCustomFields;
             needsUpdate = true;
-         }
+        }
 
         if (needsUpdate) {
-            const { id, user_id, created_at, ...updatePayload} = contact;
-            const { data: updatedContact, error: updateContactError } = await supabaseAdmin.from('contacts').update(updatePayload as any).eq('id', contact.id).select('*').single();
+            const { data: updatedContact, error: updateContactError } = await supabaseAdmin
+                .from('contacts')
+                .update(updatePayload)
+                .eq('id', contact.id)
+                .select('*')
+                .single();
+
             if(updateContactError) {
                 console.error("Webhook trigger: Failed to update contact with data", updateContactError)
             } else if(updatedContact) {

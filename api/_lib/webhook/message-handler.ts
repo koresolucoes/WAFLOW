@@ -37,7 +37,7 @@ export async function processIncomingMessage(
         read_at: new Date().toISOString()
     };
 
-    const { error: insertError } = await supabaseAdmin.from('messages').insert(messagePayload as any);
+    const { error: insertError } = await supabaseAdmin.from('messages').insert(messagePayload);
 
     if (insertError) {
         console.error(`[Message Handler] Failed to insert inbound message for contact ${contact.id}:`, insertError);
