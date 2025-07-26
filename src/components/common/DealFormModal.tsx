@@ -1,5 +1,6 @@
 
-import React, { useState } from 'react';
+
+import React, { useState, useMemo, useEffect } from 'react';
 import { Pipeline, PipelineStage, Deal, DealInsert } from '../../types';
 import Button from './Button';
 import Modal from './Modal';
@@ -15,13 +16,40 @@ interface DealFormModalProps {
 }
 
 const DealFormModal: React.FC<DealFormModalProps> = ({ isOpen, onClose, onSave, pipeline, stages, contactName, deal }) => {
-    const [name, setName] = useState(deal?.name || `Negócio - ${contactName}`);
-    const [value, setValue] = useState(deal?.value || 0);
-    const [stageId, setStageId] = useState(deal?.stage_id || stages.find(s => s.sort_order === 0)?.id || '');
+    const [name, setName] = useState('');
+    const [value, setValue] = useState(0);
+    const [stageId, setStageId] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+
+    // Robustly determine the initial stage ID
+    const initialStageId = useMemo(() => {
+        if (deal?.stage_id) {
+            return deal.stage_id;
+        }
+        if (stages.length > 0) {
+            // Find the stage with the minimum sort_order as the default
+            return stages.reduce((prev, current) => 
+                (prev.sort_order < current.sort_order) ? prev : current
+            ).id;
+        }
+        return '';
+    }, [deal, stages]);
+
+    // Effect to reset form state when the modal is opened
+    useEffect(() => {
+        if (isOpen) {
+            setName(deal?.name || `Negócio - ${contactName}`);
+            setValue(deal?.value || 0);
+            setStageId(initialStageId);
+        }
+    }, [isOpen, deal, contactName, initialStageId]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!stageId) {
+            alert("Por favor, selecione uma etapa para o negócio.");
+            return;
+        }
         setIsLoading(true);
 
         const dealData: Omit<DealInsert, 'user_id' | 'contact_id' > = {
