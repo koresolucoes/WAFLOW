@@ -45,7 +45,7 @@ const handlePostRequest = async (req: VercelRequest) => {
                 payload: body as unknown as Json,
                 path: req.url
             };
-            await supabaseAdmin.from('webhook_logs').insert(logPayload);
+            await supabaseAdmin.from('webhook_logs').insert(logPayload as any);
         } catch (logError) {
             console.error('[Webhook] Failed to log incoming webhook:', logError);
         }

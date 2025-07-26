@@ -1,4 +1,5 @@
 
+
 import { supabaseAdmin } from '../supabaseAdmin.js';
 import { executeAutomation, createDefaultLoggingHooks } from './engine.js';
 import { Automation, Contact, Json } from '../types.js';
@@ -87,7 +88,7 @@ const handleMetaMessageEvent = async (userId: string, contact: Contact, message:
     if (messageBody) {
         const { data: allKeywordTriggers, error } = await supabaseAdmin
             .from('automation_triggers')
-            .select('id, user_id, automation_id, node_id, trigger_type, trigger_key, created_at')
+            .select('*')
             .eq('user_id', userId)
             .eq('trigger_type', 'message_received_with_keyword');
 

@@ -1,5 +1,7 @@
 import { supabaseAdmin } from '../supabaseAdmin.js';
-import { TablesUpdate } from '../database.types.js';
+import { TablesUpdate, Database } from '../database.types.js';
+
+type MessageStatus = Database['public']['Enums']['message_status'];
 
 export async function processStatusUpdate(status: any, userId: string): Promise<void> {
     console.log(`[Status Handler] Processing status update for message ${status.id} for user ${userId}: ${status.status}`);
@@ -13,7 +15,7 @@ export async function processStatusUpdate(status: any, userId: string): Promise<
     const timestamp = new Date(parseInt(status.timestamp, 10) * 1000).toISOString();
 
     const updatePayload: TablesUpdate<'messages'> = {
-        status: newStatus,
+        status: newStatus as MessageStatus,
     };
 
     if (newStatus === 'delivered') {
@@ -28,7 +30,7 @@ export async function processStatusUpdate(status: any, userId: string): Promise<
 
     const { data, error } = await supabaseAdmin
         .from('messages')
-        .update(updatePayload)
+        .update(updatePayload as any)
         .eq('meta_message_id', status.id)
         .eq('user_id', userId)
         .select('id');
