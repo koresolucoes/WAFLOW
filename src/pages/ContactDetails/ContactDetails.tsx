@@ -1,4 +1,3 @@
-
 import React, { useContext, useEffect, useState } from 'react';
 import { Contact, DealInsert, Json } from '../../types';
 import Button from '../../components/common/Button';

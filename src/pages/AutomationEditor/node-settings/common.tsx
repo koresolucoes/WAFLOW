@@ -49,6 +49,7 @@ export const getContextVariables = (nodes: AutomationNode[]) => {
                 { path: 'contact.company', label: 'Empresa do Contato' },
                 { path: 'contact.tags', label: 'Tags do Contato (array)' },
                 { path: 'contact.id', label: 'ID do Contato' },
+                { path: 'contact.custom_fields.sua_chave', label: 'Campo Personalizado (substitua sua_chave)' },
             ],
         }
     ];

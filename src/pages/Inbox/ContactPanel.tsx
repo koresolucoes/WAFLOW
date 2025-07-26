@@ -2,6 +2,7 @@ import React, { useContext, useState, useEffect } from 'react';
 import { Contact, DealInsert } from '../../types';
 import { ContactsContext } from '../../contexts/providers/ContactsContext';
 import { FunnelContext } from '../../contexts/providers/FunnelContext';
+import { CustomFieldsContext } from '../../contexts/providers/CustomFieldsContext';
 import { NavigationContext } from '../../contexts/providers/NavigationContext';
 import { useAuthStore } from '../../stores/authStore';
 import Button from '../../components/common/Button';
@@ -28,6 +29,7 @@ const Tag: React.FC<{ children: React.ReactNode, onRemove: () => void }> = ({ ch
 const ContactPanel: React.FC<{ contactId: string }> = ({ contactId }) => {
     const { contacts, updateContact } = useContext(ContactsContext);
     const { deals, addDeal, pipelines, stages } = useContext(FunnelContext);
+    const { definitions } = useContext(CustomFieldsContext);
     const { setCurrentPage } = useContext(NavigationContext);
     const user = useAuthStore(state => state.user);
 
@@ -114,6 +116,18 @@ const ContactPanel: React.FC<{ contactId: string }> = ({ contactId }) => {
                         <InfoRow label="Empresa" value={contact.company} />
                     </div>
                 </Card>
+
+                 {definitions.length > 0 && (
+                    <Card className="bg-slate-900/50">
+                        <h3 className="text-base font-semibold text-white mb-3">Informações Adicionais</h3>
+                        <div className="space-y-3">
+                            {definitions.map(def => {
+                                const value = (contact.custom_fields as any)?.[def.key];
+                                return <InfoRow key={def.id} label={def.name} value={value} />;
+                            })}
+                        </div>
+                    </Card>
+                )}
 
                 <Card className="bg-slate-900/50">
                     <h3 className="text-base font-semibold text-white mb-3">Tags</h3>
