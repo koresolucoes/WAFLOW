@@ -1,4 +1,3 @@
-
 import { supabase } from '../lib/supabaseClient';
 import { Contact, EditableContact, ContactWithDetails, Deal, MetaConfig, MessageInsert } from '../types';
 import { TablesInsert, TablesUpdate } from '../types/database.types';
@@ -6,20 +5,18 @@ import { sendTextMessage } from './meta/messages';
 
 export const normalizePhoneNumber = (phone: string): string => {
     if (!phone) return '';
+    // 1. Strip all non-numeric characters.
     let digits = phone.replace(/\D/g, '');
-    if (digits.length > 10 && digits.startsWith('0')) {
-        digits = digits.substring(1);
-    }
+
+    // 2. If it's a local Brazilian number, add the country code.
+    // This handles numbers like (11) 98765-4321 or 3132345678.
     if (digits.length === 10 || digits.length === 11) {
         digits = '55' + digits;
     }
-    if (digits.length === 12 && digits.startsWith('55')) {
-        const areaCode = digits.substring(2, 4);
-        const numberPart = digits.substring(4);
-        if (parseInt(areaCode) >= 11) {
-             digits = `55${areaCode}9${numberPart}`;
-        }
-    }
+    
+    // 3. Return the cleaned number. We don't add the 9th digit here,
+    // assuming inputs are either complete or will be handled by Meta's formatting.
+    // This makes the logic consistent with the backend webhook processor.
     return digits;
 };
 
