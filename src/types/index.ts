@@ -1,4 +1,5 @@
 
+
 // Type definitions for Vite environment variables were not being picked up correctly.
 // Removing them to avoid confusion and relying on a local cast where needed.
 
@@ -20,6 +21,8 @@ export type AutomationStatus = Enums<'automation_status'>;
 export type AutomationRunStatus = 'running' | 'success' | 'failed';
 export type AutomationLogStatus = 'success' | 'failed';
 export type CustomFieldType = Enums<'custom_field_type'>;
+export type ActivityType = 'NOTA' | 'TAREFA';
+
 
 // Tipos para os nós do editor de automação
 export type NodeType = 'trigger' | 'action' | 'logic';
@@ -44,6 +47,7 @@ export type AutomationNode = XyNode<AutomationNodeData, string>;
 export type Profile = Database['public']['Tables']['profiles']['Row'];
 export type Contact = Database['public']['Tables']['contacts']['Row'];
 export type CustomFieldDefinition = Database['public']['Tables']['custom_field_definitions']['Row'];
+export type ContactActivity = Database['public']['Tables']['contact_activities']['Row'];
 
 export type MessageTemplate = Omit<Database['public']['Tables']['message_templates']['Row'], 'category' | 'status' | 'components'> & {
     category: TemplateCategory;
@@ -69,7 +73,7 @@ export type Deal = Database['public']['Tables']['deals']['Row'];
 export type WebhookLog = Database['public']['Tables']['webhook_logs']['Row'];
 // As tabelas de Segmento foram removidas no novo schema
 // export type Segment = Database['public']['Tables']['segments']['Row'];
-// export type SegmentRule = Database['public']['Tables']['segment_rules']['Row'];
+// export type SegmentRule = Database['public'['Tables']['segment_rules']['Row'];
 export type AutomationRun = Database['public']['Tables']['automation_runs']['Row'];
 export type AutomationNodeStats = Database['public']['Tables']['automation_node_stats']['Row'];
 export type AutomationNodeLog = Database['public']['Tables']['automation_node_logs']['Row'];
@@ -99,10 +103,17 @@ export interface Conversation {
 
 export interface TimelineEvent {
   id: string;
-  type: 'MESSAGE' | 'AUTOMATION_RUN' | 'DEAL_CREATED';
+  type: 'MESSAGE' | 'AUTOMATION_RUN' | 'DEAL_CREATED' | 'NOTE' | 'TASK';
   timestamp: string;
   data: any;
 }
+
+export type TaskWithContact = ContactActivity & {
+    contacts: {
+        id: string;
+        name: string;
+    } | null;
+};
 
 
 // --- TIPOS DE INSERÇÃO ---
@@ -117,6 +128,7 @@ export interface MessageTemplateInsert extends Omit<Database['public']['Tables']
 
 export type MessageInsert = Database['public']['Tables']['messages']['Insert'];
 export type CustomFieldDefinitionInsert = Database['public']['Tables']['custom_field_definitions']['Insert'];
+export type ContactActivityInsert = Database['public']['Tables']['contact_activities']['Insert'];
 
 export interface AutomationInsert extends Omit<Database['public']['Tables']['automations']['Insert'], 'status' | 'nodes' | 'edges'> {
   user_id: string;
@@ -131,6 +143,8 @@ export type DealInsert = Database['public']['Tables']['deals']['Insert'];
 // Tipos para formulários e operações específicas
 export type EditableContact = Omit<Contact, 'id' | 'user_id' | 'created_at'> & { id?: string };
 export type EditableProfile = Database['public']['Tables']['profiles']['Update'];
+export type ContactActivityUpdate = Database['public']['Tables']['contact_activities']['Update'];
+
 
 // Tipo combinado para o frontend, que inclui métricas calculadas
 export interface CampaignWithMetrics extends Campaign {

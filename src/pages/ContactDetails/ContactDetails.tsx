@@ -4,7 +4,7 @@ import Button from '../../components/common/Button';
 import Card from '../../components/common/Card';
 import { ARROW_LEFT_ICON, PLUS_ICON } from '../../components/icons';
 import AddCustomFieldModal from '../../components/common/AddCustomFieldModal';
-import ContactTimeline from './ContactTimeline';
+import Activities from './Activities';
 import { ContactsContext } from '../../contexts/providers/ContactsContext';
 import { NavigationContext } from '../../contexts/providers/NavigationContext';
 import { CustomFieldsContext } from '../../contexts/providers/CustomFieldsContext';
@@ -25,20 +25,31 @@ const ContactDetails: React.FC = () => {
     const [timelineEvents, setTimelineEvents] = useState<TimelineEvent[]>([]);
     const [isTimelineLoading, setIsTimelineLoading] = useState(true);
 
+    const loadData = async () => {
+        if (pageParams.contactId && user) {
+            setIsTimelineLoading(true);
+            try {
+                const timelineData = await fetchContactTimeline(user.id, pageParams.contactId);
+                setTimelineEvents(timelineData);
+            } catch (error) {
+                console.error("Failed to load timeline:", error);
+            } finally {
+                setIsTimelineLoading(false);
+            }
+        }
+    };
+    
     useEffect(() => {
         const loadDetails = async () => {
-            if (pageParams.contactId && user) {
+            if (pageParams.contactId) {
                 setIsLoading(true);
-                setIsTimelineLoading(true);
                 try {
                     await fetchContactDetails(pageParams.contactId);
-                    const timelineData = await fetchContactTimeline(user.id, pageParams.contactId);
-                    setTimelineEvents(timelineData);
+                    await loadData(); // Load timeline and activities
                 } catch (error) {
-                    console.error("Failed to load contact details or timeline:", error);
+                    console.error("Failed to load contact details:", error);
                 } finally {
                     setIsLoading(false);
-                    setIsTimelineLoading(false);
                 }
             }
         };
@@ -202,7 +213,7 @@ const ContactDetails: React.FC = () => {
 
                     {/* Coluna de Atividades e Negócios */}
                     <div className="lg:col-span-2 space-y-6">
-                        <ContactTimeline events={timelineEvents} isLoading={isTimelineLoading} />
+                        <Activities contactId={pageParams.contactId} onDataChange={loadData} />
                     </div>
                 </div>
             </div>

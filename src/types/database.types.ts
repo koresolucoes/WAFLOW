@@ -187,6 +187,38 @@ export type PublicTables = {
       user_id?: string
     }
   }
+  contact_activities: {
+    Row: {
+      id: string
+      user_id: string
+      contact_id: string
+      created_at: string
+      type: "NOTA" | "TAREFA"
+      content: string
+      due_date: string | null
+      is_completed: boolean
+    }
+    Insert: {
+      id?: string
+      user_id: string
+      contact_id: string
+      created_at?: string
+      type: "NOTA" | "TAREFA"
+      content: string
+      due_date?: string | null
+      is_completed?: boolean
+    }
+    Update: {
+      id?: string
+      user_id?: string
+      contact_id?: string
+      created_at?: string
+      type?: "NOTA" | "TAREFA"
+      content?: string
+      due_date?: string | null
+      is_completed?: boolean
+    }
+  }
   contacts: {
     Row: {
       company: string | null

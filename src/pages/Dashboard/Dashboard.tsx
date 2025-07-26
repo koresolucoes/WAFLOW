@@ -4,6 +4,7 @@ import Card from '../../components/common/Card';
 import { CampaignsContext } from '../../contexts/providers/CampaignsContext';
 import { ContactsContext } from '../../contexts/providers/ContactsContext';
 import { TemplatesContext } from '../../contexts/providers/TemplatesContext';
+import TodaysTasksCard from './TodaysTasksCard';
 
 const StatCard: React.FC<{ title: string; value: string; icon: React.ReactNode; }> = ({ title, value, icon }) => (
     <Card className="flex items-center p-4">
@@ -66,28 +67,32 @@ const Dashboard: React.FC = () => {
         <StatCard title="Taxa de Leitura Média" value={`${readRate}%`} icon={<div className="text-amber-400 w-6 h-6">👁️</div>} />
       </div>
 
-      <Card>
-        <h2 className="text-lg font-semibold text-white mb-4">Desempenho das Últimas Campanhas</h2>
-        {campaigns.length > 0 ? (
-            <ResponsiveContainer width="100%" height={350}>
-                <BarChart data={chartData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                    <XAxis dataKey="name" tick={{ fill: '#94a3b8' }} fontSize={12} interval={0} angle={-20} textAnchor="end" height={60} />
-                    <YAxis tick={{ fill: '#94a3b8' }} />
-                    <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(14, 165, 233, 0.1)' }} />
-                    <Legend />
-                    <Bar dataKey="Destinatários" fill="#0ea5e9" name="Destinatários" />
-                    <Bar dataKey="Entregues" fill="#34d399" name="Entregues" />
-                    <Bar dataKey="Lidas" fill="#f472b6" name="Lidas" />
-                </BarChart>
-            </ResponsiveContainer>
-        ) : (
-            <div className="text-center py-16">
-                 <h3 className="text-lg text-white">Nenhuma campanha foi enviada ainda.</h3>
-                 <p className="text-slate-400 mt-2">Os dados de desempenho aparecerão aqui assim que você enviar sua primeira campanha.</p>
-            </div>
-        )}
-      </Card>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Card className="lg:col-span-2">
+          <h2 className="text-lg font-semibold text-white mb-4">Desempenho das Últimas Campanhas</h2>
+          {campaigns.length > 0 ? (
+              <ResponsiveContainer width="100%" height={350}>
+                  <BarChart data={chartData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                      <XAxis dataKey="name" tick={{ fill: '#94a3b8' }} fontSize={12} interval={0} angle={-20} textAnchor="end" height={60} />
+                      <YAxis tick={{ fill: '#94a3b8' }} />
+                      <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(14, 165, 233, 0.1)' }} />
+                      <Legend />
+                      <Bar dataKey="Destinatários" fill="#0ea5e9" name="Destinatários" />
+                      <Bar dataKey="Entregues" fill="#34d399" name="Entregues" />
+                      <Bar dataKey="Lidas" fill="#f472b6" name="Lidas" />
+                  </BarChart>
+              </ResponsiveContainer>
+          ) : (
+              <div className="text-center py-16">
+                   <h3 className="text-lg text-white">Nenhuma campanha foi enviada ainda.</h3>
+                   <p className="text-slate-400 mt-2">Os dados de desempenho aparecerão aqui assim que você enviar sua primeira campanha.</p>
+              </div>
+          )}
+        </Card>
+        
+        <TodaysTasksCard />
+      </div>
     </div>
   );
 };
