@@ -85,7 +85,6 @@ export interface UnifiedMessage {
     created_at: string;
     type: MessageType;
     status: MessageStatus;
-    sourceTable: 'received_messages' | 'sent_messages';
     template?: MessageTemplate | null;
 }
 

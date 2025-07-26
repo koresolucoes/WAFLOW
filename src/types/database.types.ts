@@ -469,7 +469,6 @@ export type Database = {
           created_at: string
           type: Database["public"]["Enums"]["message_type"]
           status: Database["public"]["Enums"]["message_status"]
-          sourceTable: string
           template: Json
         }[]
       }

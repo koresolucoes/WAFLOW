@@ -58,7 +58,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isPanelOpen, setIsPanelOpen }) 
                         <div className="text-center text-slate-400">Carregando mensagens...</div>
                     ) : (
                         messages.map((msg: UnifiedMessage) => (
-                            <MessageBubble key={msg.id + msg.sourceTable} message={msg} />
+                            <MessageBubble key={msg.id} message={msg} />
                         ))
                     )}
                 </div>

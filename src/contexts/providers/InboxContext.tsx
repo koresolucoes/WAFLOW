@@ -155,7 +155,6 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             created_at: new Date().toISOString(),
             type: 'outbound',
             status: 'pending',
-            sourceTable: 'sent_messages',
         };
 
         setMessages(prev => [...prev, optimisticMessage]);

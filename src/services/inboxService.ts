@@ -10,8 +10,6 @@ export const mapPayloadToUnifiedMessage = (payload: Message): UnifiedMessage => 
         created_at: payload.created_at,
         type: payload.type,
         status: payload.status,
-        // Mantém a compatibilidade com a lógica de UI existente
-        sourceTable: payload.type === 'inbound' ? 'received_messages' : 'sent_messages', 
     };
 };
 
