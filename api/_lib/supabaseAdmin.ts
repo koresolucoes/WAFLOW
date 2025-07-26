@@ -1,5 +1,3 @@
-
-
 import { createClient } from '@supabase/supabase-js';
 import { Database } from './database.types.js';
 
@@ -20,7 +18,7 @@ if (!supabaseUrl || supabaseUrl.trim() === '' || !supabaseServiceKey || supabase
   throw new Error(errorMessage);
 }
 
-console.log('[Supabase Admin] Credentials seem valid. Creating client with a custom fetch timeout.');
+console.log('[Supabase Admin] Credentials seem valid. Creating client with a custom fetch timeout and retry logic.');
 
 const getUrlStringForLogging = (url: RequestInfo | URL): string => {
     if (typeof url === 'string') {
@@ -34,38 +32,48 @@ const getUrlStringForLogging = (url: RequestInfo | URL): string => {
 };
 
 /**
- * A wrapper around the global fetch that adds a reasonable timeout.
+ * A wrapper around the global fetch that adds a timeout and retry logic.
  * This is crucial in serverless environments to prevent functions from hanging
  * on stalled network requests, especially when dealing with "waking up" a free-tier database.
- * The 25-second timeout is generous for a cold start but well within Vercel's execution limits.
  * @param url The request URL.
  * @param options The request options.
+ * @param timeout The timeout in milliseconds for each attempt.
+ * @param retries The total number of attempts to make.
  * @returns A fetch Response promise.
  */
-const fetchWithTimeout = async (
+const fetchWithTimeoutAndRetries = async (
     url: RequestInfo | URL,
     options: RequestInit = {},
-    timeout = 25000 // 25 seconds
+    timeout = 25000, // 25 seconds
+    retries = 3
 ): Promise<Response> => {
-    const controller = new AbortController();
-    const { signal } = controller;
-    
     const urlForLogging = getUrlStringForLogging(url);
+    for (let attempt = 1; attempt <= retries; attempt++) {
+        const controller = new AbortController();
+        const { signal } = controller;
 
-    const timeoutId = setTimeout(() => {
-        console.warn(`[Supabase Admin] Fetch timeout reached after ${timeout}ms for URL: ${urlForLogging}`);
-        controller.abort('Timeout'); // Pass a reason for better debugging
-    }, timeout);
+        const timeoutId = setTimeout(() => {
+            console.warn(`[Supabase Admin] Fetch attempt ${attempt} timed out after ${timeout}ms for URL: ${urlForLogging}`);
+            controller.abort('Timeout');
+        }, timeout);
 
-    try {
-        const response = await fetch(url, { ...options, signal });
-        clearTimeout(timeoutId); // Important: clear the timeout if fetch succeeds
-        return response;
-    } catch (error: any) {
-        clearTimeout(timeoutId); // Clear timeout on error too
-        console.error(`[Supabase Admin] Fetch failed for URL ${urlForLogging}:`, error);
-        throw error;
+        try {
+            const response = await fetch(url, { ...options, signal });
+            clearTimeout(timeoutId);
+            return response;
+        } catch (error: any) {
+            clearTimeout(timeoutId);
+            if (attempt === retries) {
+                console.error(`[Supabase Admin] Fetch failed on final attempt (${attempt}) for URL ${urlForLogging}:`, error);
+                throw error;
+            }
+            console.warn(`[Supabase Admin] Fetch attempt ${attempt} failed for ${urlForLogging}. Retrying in ${attempt}s...`, error.message);
+            // Simple exponential backoff
+            await new Promise(res => setTimeout(res, 1000 * attempt));
+        }
     }
+    // This line should be unreachable if retries > 0, but is required for TypeScript's control flow analysis.
+    throw new Error('Fetch failed after all retries. This should not be reached.');
 };
 
 
@@ -75,10 +83,10 @@ export const supabaseAdmin = createClient<Database>(supabaseUrl, supabaseService
         autoRefreshToken: false,
         persistSession: false,
     },
-    // Add the timeout logic to all fetch requests made by the Supabase client.
+    // Add the timeout and retry logic to all fetch requests made by the Supabase client.
     global: {
-        fetch: (url, options) => fetchWithTimeout(url, options)
+        fetch: (url, options) => fetchWithTimeoutAndRetries(url, options)
     }
 });
 
-console.log('[Supabase Admin] Client created successfully.');
+console.log('[Supabase Admin] Client created successfully with retry logic.');
