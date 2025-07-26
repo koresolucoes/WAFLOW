@@ -155,6 +155,7 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             created_at: new Date().toISOString(),
             type: 'outbound',
             status: 'pending',
+            source: 'direct',
             message_template_id: null,
             replied_to_message_id: null,
         };

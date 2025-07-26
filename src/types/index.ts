@@ -97,6 +97,7 @@ export interface UnifiedMessage {
     created_at: string;
     type: MessageType;
     status: MessageStatus;
+    source: MessageSource;
     template?: MessageTemplate | null;
     message_template_id: string | null;
     replied_to_message_id: string | null;

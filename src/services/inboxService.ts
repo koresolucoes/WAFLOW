@@ -1,4 +1,3 @@
-
 import { supabase } from '../lib/supabaseClient';
 import { Conversation, UnifiedMessage, Contact, MessageInsert, MessageStatus, MetaConfig, Message, TemplateCategory, TemplateStatus, MetaTemplateComponent } from '../types';
 import { sendTextMessage } from './meta/messages';
@@ -11,6 +10,7 @@ export const mapPayloadToUnifiedMessage = (payload: Message): UnifiedMessage => 
         created_at: payload.created_at,
         type: payload.type,
         status: payload.status,
+        source: payload.source,
         message_template_id: payload.message_template_id,
         replied_to_message_id: payload.replied_to_message_id,
     };
@@ -42,13 +42,9 @@ export const fetchMessagesFromDb = async (userId: string, contactId: string): Pr
             created_at,
             type,
             status,
+            source,
             message_template_id,
-            replied_to_message_id,
-            campaigns (
-                message_templates (
-                    *
-                )
-            )
+            replied_to_message_id
         `)
         .eq('user_id', userId)
         .eq('contact_id', contactId)
@@ -59,28 +55,10 @@ export const fetchMessagesFromDb = async (userId: string, contactId: string): Pr
         throw error;
     }
 
-    return (data as any[] || []).map((msg: any) => {
-        const templateData = msg.campaigns?.message_templates;
-        
-        const template = templateData ? {
-            ...templateData,
-            category: templateData.category as TemplateCategory,
-            status: templateData.status as TemplateStatus,
-            components: (templateData.components as unknown as MetaTemplateComponent[]) || []
-        } : null;
-        
-        return {
-            id: msg.id,
-            contact_id: msg.contact_id,
-            content: msg.content,
-            created_at: msg.created_at,
-            type: msg.type,
-            status: msg.status,
-            message_template_id: msg.message_template_id,
-            replied_to_message_id: msg.replied_to_message_id,
-            template: template
-        };
-    });
+    return ((data as any[]) || []).map((msg) => ({
+        ...msg,
+        template: null, // Explicitly null as we are not fetching detailed template info here.
+    }));
 };
 
 
