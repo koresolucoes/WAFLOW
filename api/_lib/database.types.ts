@@ -50,6 +50,7 @@ export type PublicTables = {
       run_id?: string
       status?: string
     }
+    Relationships: []
   }
   automation_node_stats: {
     Row: {
@@ -73,6 +74,7 @@ export type PublicTables = {
       node_id?: string
       success_count?: number
     }
+    Relationships: []
   }
   automation_runs: {
     Row: {
@@ -99,6 +101,7 @@ export type PublicTables = {
       run_at?: string
       status?: string
     }
+    Relationships: []
   }
   automation_triggers: {
     Row: {
@@ -128,6 +131,7 @@ export type PublicTables = {
       trigger_key?: string | null
       created_at?: string
     }
+    Relationships: []
   }
   automations: {
     Row: {
@@ -157,6 +161,7 @@ export type PublicTables = {
       status?: PublicEnums["automation_status"]
       user_id?: string
     }
+    Relationships: []
   }
   campaigns: {
     Row: {
@@ -189,6 +194,7 @@ export type PublicTables = {
       template_id?: string | null
       user_id?: string
     }
+    Relationships: []
   }
   canned_responses: {
     Row: {
@@ -212,6 +218,7 @@ export type PublicTables = {
       shortcut?: string
       user_id?: string
     }
+    Relationships: []
   }
   contact_activities: {
     Row: {
@@ -244,6 +251,7 @@ export type PublicTables = {
       due_date?: string | null
       is_completed?: boolean
     }
+    Relationships: []
   }
   contacts: {
     Row: {
@@ -282,6 +290,7 @@ export type PublicTables = {
       tags?: string[] | null
       user_id?: string
     }
+    Relationships: []
   }
   custom_field_definitions: {
     Row: {
@@ -311,6 +320,7 @@ export type PublicTables = {
       type?: PublicEnums["custom_field_type"]
       user_id?: string
     }
+    Relationships: []
   }
   deals: {
     Row: {
@@ -355,6 +365,7 @@ export type PublicTables = {
       user_id?: string
       value?: number | null
     }
+    Relationships: []
   }
   message_templates: {
     Row: {
@@ -387,6 +398,7 @@ export type PublicTables = {
       template_name?: string
       user_id?: string
     }
+    Relationships: []
   }
   messages: {
     Row: {
@@ -446,6 +458,7 @@ export type PublicTables = {
       type?: PublicEnums["message_type"]
       user_id?: string
     }
+    Relationships: []
   }
   pipeline_stages: {
     Row: {
@@ -472,6 +485,7 @@ export type PublicTables = {
       sort_order?: number
       type?: PublicEnums["stage_type"]
     }
+    Relationships: []
   }
   pipelines: {
     Row: {
@@ -492,6 +506,7 @@ export type PublicTables = {
       name?: string
       user_id?: string
     }
+    Relationships: []
   }
   profiles: {
     Row: {
@@ -536,6 +551,7 @@ export type PublicTables = {
       updated_at?: string | null
       webhook_path_prefix?: string | null
     }
+    Relationships: []
   }
   webhook_logs: {
     Row: {
@@ -562,6 +578,7 @@ export type PublicTables = {
       payload?: Json | null
       path?: string | null
     }
+    Relationships: []
   }
 }
 
