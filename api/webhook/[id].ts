@@ -1,15 +1,18 @@
 
-
-
-
-
-
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
 import { getProfileForWebhook } from '../_lib/webhook/profile-handler.js';
 import { processStatusUpdate } from '../_lib/webhook/status-handler.js';
 import { processIncomingMessage } from '../_lib/webhook/message-handler.js';
 import { TablesInsert, Json } from '../_lib/types.js';
+import { getRawBody } from '../_lib/webhook/parser.js';
+
+// desativa parse Json
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
 
 const handlePostRequest = async (req: VercelRequest) => {
     try {
@@ -18,12 +21,30 @@ const handlePostRequest = async (req: VercelRequest) => {
             console.error("[Webhook] Requisição recebida sem um ID de usuário na URL.");
             return;
         }
+        
+        const rawBodyBuffer = await getRawBody(req);
+        if (rawBodyBuffer.length === 0) {
+            console.warn('[Webhook] Request body is empty.');
+            return; // No body to process
+        }
+
+        let body: any;
+        try {
+            // We assume Meta always sends JSON
+            body = JSON.parse(rawBodyBuffer.toString('utf-8'));
+        } catch (parseError: any) {
+            console.error('[Webhook] Failed to parse request body as JSON:', parseError.message);
+            // Log the raw body if parsing fails for debugging.
+            console.error('[Webhook] Raw body content:', rawBodyBuffer.toString('utf-8').substring(0, 500));
+            return; // Stop processing if body is malformed
+        }
+
 
         try {
             const logPayload: TablesInsert<'webhook_logs'> = {
                 user_id: userId,
                 source: 'meta_message',
-                payload: req.body as unknown as Json,
+                payload: body as unknown as Json,
                 path: req.url
             };
             await supabaseAdmin.from('webhook_logs').insert(logPayload as any);
@@ -39,7 +60,7 @@ const handlePostRequest = async (req: VercelRequest) => {
             return;
         }
 
-        const { entry } = req.body;
+        const { entry } = body;
         if (!entry || !Array.isArray(entry)) {
             console.error("[Webhook] Payload inválido: 'entry' não encontrado ou não é um array.");
             return;
