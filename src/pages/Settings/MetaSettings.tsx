@@ -37,18 +37,33 @@ const MetaSettings: React.FC = () => {
     }, [profile]);
 
     useEffect(() => {
-        // Gera um token seguro e URL-safe para ser usado na verificação do webhook.
-        const generateToken = () => {
-            const array = new Uint8Array(24); // 24 bytes de dados aleatórios
-            window.crypto.getRandomValues(array);
-            // Converte para uma string base64 e a torna segura para URL
-            return btoa(String.fromCharCode.apply(null, Array.from(array)))
-                .replace(/\+/g, '-')
-                .replace(/\//g, '_')
-                .replace(/=/g, '');
+        const ensureVerifyToken = async () => {
+            if (profile && !profile.meta_verify_token) {
+                // Gera um token seguro e URL-safe para ser usado na verificação do webhook.
+                const generateToken = () => {
+                    const array = new Uint8Array(24); // 24 bytes de dados aleatórios
+                    window.crypto.getRandomValues(array);
+                    // Converte para uma string base64 e a torna segura para URL
+                    return btoa(String.fromCharCode.apply(null, Array.from(array)))
+                        .replace(/\+/g, '-')
+                        .replace(/\//g, '_')
+                        .replace(/=/g, '');
+                };
+                const newToken = generateToken();
+                try {
+                    await updateProfile({ meta_verify_token: newToken });
+                    setVerifyToken(newToken);
+                } catch(err) {
+                    console.error("Falha ao salvar novo token de verificação:", err);
+                    setError("Falha ao gerar e salvar o token de verificação. Recarregue a página.");
+                }
+            } else if (profile?.meta_verify_token) {
+                setVerifyToken(profile.meta_verify_token);
+            }
         };
-        setVerifyToken(generateToken());
-    }, []);
+
+        ensureVerifyToken();
+    }, [profile, updateProfile]);
 
     const webhookUrl = user ? `${window.location.origin}/api/webhook/${user.id}` : '';
 
@@ -203,14 +218,10 @@ const MetaSettings: React.FC = () => {
                 </div>
                  <div className="mt-3 text-xs">
                     <p>
-                        <strong>Importante:</strong> Use o <strong>Token de Verificação</strong> gerado acima em <strong>dois lugares</strong>:
+                        <strong>Importante:</strong> O Token de Verificação agora é salvo automaticamente no seu perfil. Use o valor gerado acima no campo "Verify Token" da configuração do seu webhook na Meta.
                     </p>
-                    <ol className="list-decimal list-inside pl-2 mt-1 space-y-1">
-                        <li>No campo "Verify Token" na configuração do seu webhook na Meta.</li>
-                        <li>Como o valor da variável de ambiente <code className="bg-slate-900 px-1 py-0.5 rounded">META_VERIFY_TOKEN</code> no seu projeto na Vercel.</li>
-                    </ol>
                     <p className="mt-2">
-                        Lembre-se também de assinar os campos de webhook <code className="bg-slate-900 px-1 py-0.5 rounded">messages</code> para que tudo funcione corretamente.
+                        A configuração da variável de ambiente <code className="bg-slate-900 px-1 py-0.5 rounded">META_VERIFY_TOKEN</code> não é mais necessária. Lembre-se de assinar os campos de webhook <code className="bg-slate-900 px-1 py-0.5 rounded">messages</code> para que tudo funcione corretamente.
                     </p>
                  </div>
             </InfoCard>

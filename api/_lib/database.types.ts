@@ -6,7 +6,7 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
-export type Database = {
+export interface Database {
   public: {
     Tables: {
       automation_node_logs: {
@@ -382,6 +382,7 @@ export type Database = {
           id: string
           meta_access_token: string | null
           meta_phone_number_id: string | null
+          meta_verify_token: string | null
           meta_waba_id: string | null
           updated_at: string | null
           webhook_path_prefix: string | null
@@ -395,6 +396,7 @@ export type Database = {
           id: string
           meta_access_token?: string | null
           meta_phone_number_id?: string | null
+          meta_verify_token?: string | null
           meta_waba_id?: string | null
           updated_at?: string | null
           webhook_path_prefix?: string | null
@@ -408,6 +410,7 @@ export type Database = {
           id?: string
           meta_access_token?: string | null
           meta_phone_number_id?: string | null
+          meta_verify_token?: string | null
           meta_waba_id?: string | null
           updated_at?: string | null
           webhook_path_prefix?: string | null

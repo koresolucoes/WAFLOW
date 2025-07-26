@@ -1,4 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 // Definindo os tipos aqui para uma função serverless autocontida
 // para evitar problemas de caminho no empacotamento da Vercel.
@@ -10,32 +11,24 @@ interface CompanyProfileData {
   tone: string;
 }
 
-// Assinatura da Serverless Function da Vercel usando Request/Response nativos
-export default async function handler(req: Request) {
+// Assinatura da Serverless Function da Vercel
+export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'POST') {
-        return new Response(JSON.stringify({ message: 'Apenas requisições POST são permitidas' }), {
-            status: 405,
-            headers: { 'Content-Type': 'application/json', 'Allow': 'POST' },
-        });
+        res.setHeader('Allow', 'POST');
+        return res.status(405).json({ message: 'Apenas requisições POST são permitidas' });
     }
 
     try {
         // Verifica a presença da chave de API no servidor
         if (!process.env.API_KEY) {
             console.error("A variável de ambiente API_KEY não está definida.");
-            return new Response(JSON.stringify({ message: 'Erro de configuração do servidor: a variável de ambiente API_KEY não foi encontrada.' }), {
-                status: 500,
-                headers: { 'Content-Type': 'application/json' },
-            });
+            return res.status(500).json({ message: 'Erro de configuração do servidor: a variável de ambiente API_KEY não foi encontrada.' });
         }
 
-        const { profile, campaignGoal } = (await req.json()) as { profile: CompanyProfileData, campaignGoal: string };
+        const { profile, campaignGoal } = req.body as { profile: CompanyProfileData, campaignGoal: string };
 
         if (!profile || !campaignGoal) {
-             return new Response(JSON.stringify({ message: 'Faltando `profile` ou `campaignGoal` no corpo da requisição.' }), {
-                status: 400,
-                headers: { 'Content-Type': 'application/json' },
-            });
+             return res.status(400).json({ message: 'Faltando `profile` ou `campaignGoal` no corpo da requisição.' });
         }
 
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -150,16 +143,10 @@ export default async function handler(req: Request) {
         // Garante que o retorno é o objeto de template, não um objeto aninhado.
         const templateData = parsedData.template || parsedData;
 
-        return new Response(JSON.stringify(templateData), {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' },
-        });
+        return res.status(200).json(templateData);
 
     } catch (error: any) {
         console.error("Erro na função generate-template:", error);
-        return new Response(JSON.stringify({ message: "Falha ao gerar o template com IA.", error: error.message }), {
-            status: 500,
-            headers: { 'Content-Type': 'application/json' },
-        });
+        return res.status(500).json({ message: "Falha ao gerar o template com IA.", error: error.message });
     }
 }

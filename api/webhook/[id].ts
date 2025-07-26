@@ -14,26 +14,38 @@ export const config = {
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-    // 1. Lidar com a Solicitação de Verificação da Meta
+    const { id: pathIdentifier } = req.query;
+
+    // 1. Lidar com a Solicitação de Verificação da Meta (GET)
     if (req.method === 'GET') {
-        const verifyToken = process.env.META_VERIFY_TOKEN;
+        if (typeof pathIdentifier !== 'string' || !pathIdentifier) {
+            console.error("[Webhook VERIFY] Requisição GET recebida sem um identificador na URL.");
+            return res.status(400).send("Bad Request: Missing identifier.");
+        }
+
+        const profile = await getProfileForWebhook(pathIdentifier);
+        if (!profile || !profile.meta_verify_token) {
+            console.error(`[Webhook VERIFY] Perfil ou token de verificação não encontrado para o identificador ${pathIdentifier}.`);
+            return res.status(403).send('Forbidden: Profile or verification token not found.');
+        }
+
+        const verifyTokenFromDb = profile.meta_verify_token;
         const mode = req.query['hub.mode'];
-        const token = req.query['hub.verify_token'];
+        const tokenFromMeta = req.query['hub.verify_token'];
         const challenge = req.query['hub.challenge'];
 
-        if (mode === 'subscribe' && token === verifyToken) {
-            console.log('Webhook verificado com sucesso!');
+        if (mode === 'subscribe' && tokenFromMeta === verifyTokenFromDb) {
+            console.log(`Webhook verificado com sucesso para o usuário ${profile.id}!`);
             return res.status(200).send(challenge);
         } else {
-            console.error('Falha na verificação do webhook. Certifique-se de que META_VERIFY_TOKEN está configurado.');
-            return res.status(403).send('Forbidden');
+            console.error(`Falha na verificação do webhook para o usuário ${profile.id}. Tokens não correspondem.`);
+            return res.status(403).send('Forbidden: Token mismatch.');
         }
     }
 
-    // 2. Lidar com Notificações de Eventos da Meta
+    // 2. Lidar com Notificações de Eventos da Meta (POST)
     if (req.method === 'POST') {
         try {
-            const { id: pathIdentifier } = req.query;
             if (typeof pathIdentifier !== 'string' || !pathIdentifier) {
                 console.error("[Webhook] Requisição recebida sem um identificador na URL.");
                 return res.status(400).send("Bad Request: Missing identifier.");

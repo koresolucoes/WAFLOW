@@ -2,7 +2,7 @@
 import { supabaseAdmin } from '../supabaseAdmin.js';
 import { Profile } from '../types.js';
 
-const PROFILE_COLUMNS = 'id, company_audience, company_description, company_name, company_products, company_tone, meta_access_token, meta_phone_number_id, meta_waba_id, updated_at, webhook_path_prefix';
+const PROFILE_COLUMNS = 'id, company_audience, company_description, company_name, company_products, company_tone, meta_access_token, meta_phone_number_id, meta_waba_id, meta_verify_token, updated_at, webhook_path_prefix';
 
 
 export async function getProfileForWebhook(pathIdentifier: string): Promise<Profile | null> {
