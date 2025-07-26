@@ -1,4 +1,5 @@
 
+
 import { createClient } from '@supabase/supabase-js';
 import { Database } from './database.types.js';
 
@@ -36,7 +37,7 @@ const getUrlStringForLogging = (url: RequestInfo | URL): string => {
  * A wrapper around the global fetch that adds a reasonable timeout.
  * This is crucial in serverless environments to prevent functions from hanging
  * on stalled network requests, especially when dealing with "waking up" a free-tier database.
- * The 15-second timeout is generous for a cold start but well within Vercel's execution limits.
+ * The 25-second timeout is generous for a cold start but well within Vercel's execution limits.
  * @param url The request URL.
  * @param options The request options.
  * @returns A fetch Response promise.
@@ -44,7 +45,7 @@ const getUrlStringForLogging = (url: RequestInfo | URL): string => {
 const fetchWithTimeout = async (
     url: RequestInfo | URL,
     options: RequestInit = {},
-    timeout = 15000 // 15 seconds
+    timeout = 25000 // 25 seconds
 ): Promise<Response> => {
     const controller = new AbortController();
     const { signal } = controller;
