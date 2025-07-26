@@ -1,5 +1,7 @@
 
 
+
+
 import { supabaseAdmin } from '../supabaseAdmin.js';
 import { executeAutomation, createDefaultLoggingHooks } from './engine.js';
 import { Automation, Contact, Json } from '../types.js';
@@ -30,7 +32,7 @@ const dispatchAutomations = async (userId: string, triggers: TriggerInfo[], cont
 
     const { data: automations, error } = await supabaseAdmin
         .from('automations')
-        .select('*')
+        .select('created_at, edges, id, name, nodes, status, user_id')
         .in('id', uniqueAutomationIds);
 
     if (error) {
@@ -88,7 +90,7 @@ const handleMetaMessageEvent = async (userId: string, contact: Contact, message:
     if (messageBody) {
         const { data: allKeywordTriggers, error } = await supabaseAdmin
             .from('automation_triggers')
-            .select('*')
+            .select('id, user_id, automation_id, node_id, trigger_type, trigger_key, created_at')
             .eq('user_id', userId)
             .eq('trigger_type', 'message_received_with_keyword');
 

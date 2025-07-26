@@ -47,7 +47,7 @@ export const fetchContactDetailsFromDb = async (userId: string, contactId: strin
 
 export const addContactToDb = async (userId: string, contact: EditableContact): Promise<Contact> => {
     const payload: TablesInsert<'contacts'> = { ...contact, phone: normalizePhoneNumber(contact.phone), user_id: userId };
-    const { data, error } = await supabase.from('contacts').insert(payload as any).select('*').single();
+    const { data, error } = await supabase.from('contacts').insert(payload).select('*').single();
     if (error) throw error;
     return data;
 };
@@ -64,7 +64,7 @@ export const updateContactInDb = async (userId: string, updatedContact: Contact)
 
     const { data, error } = await supabase
         .from('contacts')
-        .update(updatePayload as any)
+        .update(updatePayload)
         .eq('id', updatedContact.id)
         .eq('user_id', userId)
         .select('*')
@@ -97,7 +97,7 @@ export const importContactsToDb = async (userId: string, newContacts: EditableCo
         return { imported: [], skippedCount };
     }
 
-    const { data, error } = await supabase.from('contacts').insert(contactsToInsert as any).select('*');
+    const { data, error } = await supabase.from('contacts').insert(contactsToInsert).select('*');
     if (error) throw error;
     
     return { imported: (data || []), skippedCount };

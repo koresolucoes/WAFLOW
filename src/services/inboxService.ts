@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabaseClient';
-import { Conversation, UnifiedMessage, Contact, MessageInsert, MessageStatus, MetaConfig, Message } from '../types';
+import { Conversation, UnifiedMessage, Contact, MessageInsert, MessageStatus, MetaConfig, Message, TemplateCategory, TemplateStatus, MetaTemplateComponent } from '../types';
 import { sendTextMessage } from './meta/messages';
 
 export const mapPayloadToUnifiedMessage = (payload: Message): UnifiedMessage => {
@@ -30,13 +30,52 @@ export const fetchConversationsFromDb = async (userId: string): Promise<Conversa
 };
 
 export const fetchMessagesFromDb = async (userId: string, contactId: string): Promise<UnifiedMessage[]> => {
-    const { data, error } = await supabase.rpc('get_unified_message_history', {
-        p_user_id: userId,
-        p_contact_id: contactId
+    const { data, error } = await supabase
+        .from('messages')
+        .select(`
+            id,
+            contact_id,
+            content,
+            created_at,
+            type,
+            status,
+            campaigns (
+                message_templates (
+                    *
+                )
+            )
+        `)
+        .eq('user_id', userId)
+        .eq('contact_id', contactId)
+        .order('created_at', { ascending: true });
+
+    if (error) {
+        console.error("Error fetching messages directly:", error);
+        throw error;
+    }
+
+    return (data || []).map((msg: any) => {
+        const templateData = msg.campaigns?.message_templates;
+        
+        const template = templateData ? {
+            ...templateData,
+            category: templateData.category as TemplateCategory,
+            status: templateData.status as TemplateStatus,
+            components: (templateData.components as unknown as MetaTemplateComponent[]) || []
+        } : null;
+        
+        return {
+            id: msg.id,
+            contact_id: msg.contact_id,
+            content: msg.content,
+            created_at: msg.created_at,
+            type: msg.type,
+            status: msg.status,
+            template: template
+        };
     });
-    if (error) throw error;
-    return (data as any as UnifiedMessage[]) || [];
 };
+
 
 export const sendMessageToApi = async (userId: string, contact: Contact, text: string, metaConfig: MetaConfig): Promise<Message> => {
     const response = await sendTextMessage(metaConfig, contact.phone, text);

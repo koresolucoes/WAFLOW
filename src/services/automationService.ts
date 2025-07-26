@@ -1,5 +1,7 @@
 
 
+
+
 import { supabase } from '../lib/supabaseClient';
 import { Automation, AutomationNode, Edge, AutomationNodeStats, AutomationNodeLog, AutomationStatus, Json } from '../types';
 import { TablesInsert, TablesUpdate, Tables } from '../types/database.types';
@@ -12,7 +14,7 @@ export const createAutomationInDb = async (userId: string): Promise<Automation> 
         nodes: [] as unknown as Json, 
         edges: [] as unknown as Json 
     };
-    const { data, error } = await supabase.from('automations').insert(dbAutomation as any).select('*').single();
+    const { data, error } = await supabase.from('automations').insert(dbAutomation).select('*').single();
     if (error) throw error;
     
     const newAutomationData = data;
@@ -34,7 +36,7 @@ export const updateAutomationInDb = async (userId: string, automation: Automatio
     
     const { data, error } = await supabase
         .from('automations')
-        .update(updatePayload as any)
+        .update(updatePayload)
         .eq('id', automation.id)
         .eq('user_id', userId)
         .select('*')
@@ -62,7 +64,7 @@ export const deleteAutomationFromDb = async (automationId: string): Promise<void
 };
 
 export const fetchStatsForAutomation = async (automationId: string): Promise<Record<string, AutomationNodeStats>> => {
-    const { data, error } = await supabase.from('automation_node_stats').select('*').eq('automation_id', automationId);
+    const { data, error } = await supabase.from('automation_node_stats').select('automation_id, node_id, success_count, error_count, last_run_at').eq('automation_id', automationId);
     if (error) { 
         console.error("Error fetching automation stats:", error); 
         return {}; 
@@ -84,7 +86,7 @@ export const fetchLogsForNode = async (automationId: string, nodeId: string): Pr
     const runIds = (runIdsData || []).map(r => r.id);
     if (runIds.length === 0) return [];
 
-    const { data, error } = await supabase.from('automation_node_logs').select('*').in('run_id', runIds).eq('node_id', nodeId).order('created_at', { ascending: false }).limit(100);
+    const { data, error } = await supabase.from('automation_node_logs').select('id, run_id, node_id, status, details, created_at').in('run_id', runIds).eq('node_id', nodeId).order('created_at', { ascending: false }).limit(100);
     if (error) { 
         console.error("Error fetching node logs:", error); 
         return []; 

@@ -5,6 +5,8 @@
 
 
 
+
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
 import { executeAutomation, createDefaultLoggingHooks } from '../_lib/automation/engine.js';
@@ -33,12 +35,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let profileData: Profile | null = null;
 
     // Robust Profile Lookup: First try by the custom path prefix.
-    const { data: profileByPrefix } = await supabaseAdmin.from('profiles').select('*').eq('webhook_path_prefix', webhookPrefix).maybeSingle();
+    const { data: profileByPrefix } = await supabaseAdmin.from('profiles').select('id, company_audience, company_description, company_name, company_products, company_tone, meta_access_token, meta_phone_number_id, meta_waba_id, updated_at, webhook_path_prefix').eq('webhook_path_prefix', webhookPrefix).maybeSingle();
     if (profileByPrefix) {
         profileData = profileByPrefix;
     } else {
         // As a fallback, check if the prefix was actually a user ID.
-        const { data: profileById } = await supabaseAdmin.from('profiles').select('*').eq('id', webhookPrefix).maybeSingle();
+        const { data: profileById } = await supabaseAdmin.from('profiles').select('id, company_audience, company_description, company_name, company_products, company_tone, meta_access_token, meta_phone_number_id, meta_waba_id, updated_at, webhook_path_prefix').eq('id', webhookPrefix).maybeSingle();
         if (profileById) {
             profileData = profileById;
         }
@@ -49,7 +51,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     const profile = profileData;
 
-    const { data: automationsData, error: automationsError } = await supabaseAdmin.from('automations').select('*').eq('user_id', profile.id).eq('status', 'active');
+    const { data: automationsData, error: automationsError } = await supabaseAdmin.from('automations').select('created_at, edges, id, name, nodes, status, user_id').eq('user_id', profile.id).eq('status', 'active');
     
     if(automationsError || !automationsData) {
          return res.status(500).json({ error: 'Failed to retrieve automations.' });
@@ -95,7 +97,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     payload: { rawBody, query: req.query, headers: cleanHeaders } as unknown as Json,
                     path: req.url,
                 };
-                await supabaseAdmin.from('webhook_logs').insert(logPayload as any);
+                await supabaseAdmin.from('webhook_logs').insert(logPayload);
             } catch (logError) {
                 console.error('[Trigger] Failed to log incoming trigger webhook:', logError);
             }
