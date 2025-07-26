@@ -10,6 +10,7 @@ export type PublicEnums = {
   automation_status: "active" | "paused"
   campaign_status: "Sent" | "Draft" | "Failed" | "Scheduled"
   custom_field_type: "TEXTO" | "NUMERO" | "DATA" | "LISTA"
+  deal_status: "Aberto" | "Ganho" | "Perdido"
   message_source:
     | "campaign"
     | "automation"
@@ -17,6 +18,7 @@ export type PublicEnums = {
     | "inbound_reply"
   message_status: "sent" | "delivered" | "read" | "failed" | "pending"
   message_type: "inbound" | "outbound"
+  stage_type: "Intermediária" | "Ganho" | "Perdido"
   template_category: "MARKETING" | "UTILITY" | "AUTHENTICATION"
   template_status: "APPROVED" | "PENDING" | "REJECTED" | "PAUSED" | "LOCAL"
 }
@@ -285,34 +287,43 @@ export type PublicTables = {
   }
   deals: {
     Row: {
+      closed_at: string | null
+      closing_reason: string | null
       contact_id: string
       created_at: string
       id: string
       name: string
       pipeline_id: string
       stage_id: string
+      status: PublicEnums["deal_status"]
       updated_at: string
       user_id: string
       value: number | null
     }
     Insert: {
+      closed_at?: string | null
+      closing_reason?: string | null
       contact_id: string
       created_at?: string
       id?: string
       name: string
       pipeline_id: string
       stage_id: string
+      status?: PublicEnums["deal_status"]
       updated_at?: string
       user_id: string
       value?: number | null
     }
     Update: {
+      closed_at?: string | null
+      closing_reason?: string | null
       contact_id?: string
       created_at?: string
       id?: string
       name?: string
       pipeline_id?: string
       stage_id?: string
+      status?: PublicEnums["deal_status"]
       updated_at?: string
       user_id?: string
       value?: number | null
@@ -410,6 +421,7 @@ export type PublicTables = {
       name: string
       pipeline_id: string
       sort_order: number
+      type: PublicEnums["stage_type"]
     }
     Insert: {
       created_at?: string
@@ -417,6 +429,7 @@ export type PublicTables = {
       name: string
       pipeline_id: string
       sort_order: number
+      type?: PublicEnums["stage_type"]
     }
     Update: {
       created_at?: string
@@ -424,6 +437,7 @@ export type PublicTables = {
       name?: string
       pipeline_id?: string
       sort_order?: number
+      type?: PublicEnums["stage_type"]
     }
   }
   pipelines: {

@@ -1,12 +1,9 @@
-
-
 // Type definitions for Vite environment variables were not being picked up correctly.
 // Removing them to avoid confusion and relying on a local cast where needed.
 
-import { Session, User } from '@supabase/supabase-js';
 import { Database, Json, Enums, Tables, TablesInsert, TablesUpdate } from './database.types';
 import { MetaTemplateComponent } from '../services/meta/types';
-import type { Node as XyNode, Edge } from '@xyflow/react';
+import type { Node as XyNode, Edge, Session, User } from '@xyflow/react';
 
 export type Page = 'dashboard' | 'campaigns' | 'templates' | 'template-editor' | 'contacts' | 'new-campaign' | 'profile' | 'settings' | 'auth' | 'campaign-details' | 'automations' | 'automation-editor' | 'funnel' | 'contact-details' | 'inbox' | 'webhook-inspector';
 
@@ -22,6 +19,8 @@ export type AutomationRunStatus = 'running' | 'success' | 'failed';
 export type AutomationLogStatus = 'success' | 'failed';
 export type CustomFieldType = Enums<'custom_field_type'>;
 export type ActivityType = 'NOTA' | 'TAREFA';
+export type DealStatus = Enums<'deal_status'>;
+export type StageType = Enums<'stage_type'>;
 
 
 // Tipos para os nós do editor de automação
@@ -68,8 +67,12 @@ export type Automation = Omit<Database['public']['Tables']['automations']['Row']
 };
 
 export type Pipeline = Database['public']['Tables']['pipelines']['Row'];
-export type PipelineStage = Database['public']['Tables']['pipeline_stages']['Row'];
-export type Deal = Database['public']['Tables']['deals']['Row'];
+export type PipelineStage = Omit<Database['public']['Tables']['pipeline_stages']['Row'], 'type'> & {
+    type: StageType;
+};
+export type Deal = Omit<Database['public']['Tables']['deals']['Row'], 'status'> & {
+    status: DealStatus;
+};
 export type WebhookLog = Database['public']['Tables']['webhook_logs']['Row'];
 // As tabelas de Segmento foram removidas no novo schema
 // export type Segment = Database['public']['Tables']['segments']['Row'];

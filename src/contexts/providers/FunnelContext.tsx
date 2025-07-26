@@ -1,10 +1,8 @@
-
-
-
 import React, { createContext, useState, useCallback, ReactNode, useContext } from 'react';
 import { Pipeline, PipelineStage, DealInsert, DealWithContact } from '../../types';
 import { useAuthStore } from '../../stores/authStore';
 import * as funnelService from '../../services/funnelService';
+import { TablesUpdate } from '../../types/database.types';
 
 interface FunnelContextType {
     pipelines: Pipeline[];
@@ -16,13 +14,13 @@ interface FunnelContextType {
     setDeals: React.Dispatch<React.SetStateAction<DealWithContact[]>>;
     setActivePipelineId: (id: string | null) => void;
     addDeal: (dealData: DealInsert) => Promise<void>;
-    updateDealStage: (dealId: string, newStageId: string) => Promise<void>;
+    updateDeal: (dealId: string, updates: TablesUpdate<'deals'>) => Promise<void>;
     createDefaultPipeline: () => Promise<void>;
     addPipeline: (name: string) => Promise<void>;
     updatePipeline: (id: string, name: string) => Promise<void>;
     deletePipeline: (id: string) => Promise<void>;
     addStage: (pipelineId: string) => Promise<void>;
-    updateStage: (id: string, name: string) => Promise<void>;
+    updateStage: (id: string, updates: TablesUpdate<'pipeline_stages'>) => Promise<void>;
     deleteStage: (id: string) => Promise<void>;
 }
 
@@ -41,10 +39,10 @@ export const FunnelProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         setDeals(prev => [newDeal, ...prev]);
     }, [user]);
 
-    const updateDealStage = useCallback(async (dealId: string, newStageId: string) => {
+    const updateDeal = useCallback(async (dealId: string, updates: TablesUpdate<'deals'>) => {
         if (!user) throw new Error("User not authenticated.");
-        const updatedDeal = await funnelService.updateDealStageInDb(dealId, newStageId);
-        setDeals(prev => prev.map(d => d.id === dealId ? updatedDeal : d));
+        const updatedDeal = await funnelService.updateDealInDb(dealId, updates);
+        setDeals(prev => prev.map(d => d.id === dealId ? { ...d, ...updatedDeal } : d));
     }, [user]);
 
     const createDefaultPipeline = useCallback(async () => {
@@ -88,9 +86,9 @@ export const FunnelProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         setStages(prev => [...prev, newStage]);
     }, [user, stages]);
 
-    const updateStage = useCallback(async (id: string, name: string) => {
+    const updateStage = useCallback(async (id: string, updates: TablesUpdate<'pipeline_stages'>) => {
         if (!user) throw new Error("User not authenticated.");
-        const updatedStage = await funnelService.updateStageInDb(id, name);
+        const updatedStage = await funnelService.updateStageInDb(id, updates);
         setStages(s => s.map(stage => stage.id === id ? updatedStage : stage));
     }, [user]);
 
@@ -105,7 +103,7 @@ export const FunnelProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         stages, setStages,
         deals, setDeals,
         activePipelineId, setActivePipelineId,
-        addDeal, updateDealStage, createDefaultPipeline,
+        addDeal, updateDeal, createDefaultPipeline,
         addPipeline, updatePipeline, deletePipeline,
         addStage, updateStage, deleteStage
     };

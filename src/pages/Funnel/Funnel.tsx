@@ -3,17 +3,27 @@ import StageColumn from './StageColumn';
 import { FUNNEL_ICON, PLUS_ICON } from '../../components/icons';
 import Button from '../../components/common/Button';
 import PipelineManagerModal from './PipelineManagerModal';
+import DealClosingModal from './DealClosingModal';
 import { FunnelContext } from '../../contexts/providers/FunnelContext';
+import { DealStatus } from '../../types';
+
+const FunnelMetric: React.FC<{ label: string, value: string | number }> = ({ label, value }) => (
+    <div className="text-center">
+        <p className="text-xs text-slate-400 uppercase tracking-wider">{label}</p>
+        <p className="text-xl font-bold text-white">{value}</p>
+    </div>
+);
 
 const Funnel: React.FC = () => {
     const { 
-        pipelines, stages, deals, updateDealStage, createDefaultPipeline, 
+        pipelines, stages, deals, updateDeal, createDefaultPipeline, 
         activePipelineId, setActivePipelineId, addStage,
     } = useContext(FunnelContext);
 
     const [draggedDealId, setDraggedDealId] = useState<string | null>(null);
     const [isCreating, setIsCreating] = useState(false);
     const [isManagerOpen, setIsManagerOpen] = useState(false);
+    const [closingInfo, setClosingInfo] = useState<{ dealId: string; newStageId: string; status: 'Ganho' | 'Perdido' } | null>(null);
 
     const activePipeline = useMemo(() => {
         return pipelines.find(p => p.id === activePipelineId);
@@ -38,6 +48,25 @@ const Funnel: React.FC = () => {
         });
         return grouped;
     }, [deals, activeStages, activePipelineId]);
+    
+    const pipelineMetrics = useMemo(() => {
+        const relevantDeals = deals.filter(d => d.pipeline_id === activePipelineId);
+        const openDeals = relevantDeals.filter(d => d.status === 'Aberto');
+        const wonDeals = relevantDeals.filter(d => d.status === 'Ganho');
+        const lostDeals = relevantDeals.filter(d => d.status === 'Perdido');
+        
+        const openValue = openDeals.reduce((sum, deal) => sum + (deal.value || 0), 0);
+        const totalValue = relevantDeals.reduce((sum, deal) => sum + (deal.value || 0), 0);
+        const totalClosed = wonDeals.length + lostDeals.length;
+        const conversionRate = totalClosed > 0 ? (wonDeals.length / totalClosed) * 100 : 0;
+        
+        return {
+            openValue: openValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+            totalValue: totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+            openDealsCount: openDeals.length,
+            conversionRate: `${conversionRate.toFixed(1)}%`
+        };
+    }, [deals, activePipelineId]);
 
     const handleDragStart = (dealId: string) => {
         setDraggedDealId(dealId);
@@ -46,11 +75,28 @@ const Funnel: React.FC = () => {
     const handleDrop = (stageId: string) => {
         if (draggedDealId) {
             const deal = deals.find(d => d.id === draggedDealId);
-            if (deal && deal.stage_id !== stageId) {
-                updateDealStage(draggedDealId, stageId);
+            const destStage = stages.find(s => s.id === stageId);
+            if (deal && destStage && deal.stage_id !== stageId) {
+                if (destStage.type === 'Ganho' || destStage.type === 'Perdido') {
+                    setClosingInfo({ dealId: draggedDealId, newStageId: stageId, status: destStage.type });
+                } else {
+                    updateDeal(draggedDealId, { stage_id: stageId, status: 'Aberto', closing_reason: null, closed_at: null });
+                }
             }
         }
         setDraggedDealId(null);
+    };
+    
+    const handleSaveClosingReason = (reason: string) => {
+        if (closingInfo) {
+            updateDeal(closingInfo.dealId, {
+                stage_id: closingInfo.newStageId,
+                status: closingInfo.status,
+                closing_reason: reason,
+                closed_at: new Date().toISOString(),
+            });
+            setClosingInfo(null);
+        }
     };
 
     const handleCreatePipeline = async () => {
@@ -86,18 +132,26 @@ const Funnel: React.FC = () => {
     return (
         <>
             <div className="h-full flex flex-col">
-                <header className="flex-shrink-0 p-4 border-b border-slate-700/50 flex justify-between items-center gap-4">
-                    <div className="flex items-center gap-4">
-                        <h1 className="text-2xl font-bold text-white">Funil</h1>
-                        <select
-                            value={activePipelineId || ''}
-                            onChange={(e) => setActivePipelineId(e.target.value)}
-                            className="bg-slate-700 border border-slate-600 rounded-md p-2 text-white text-sm"
-                        >
-                            {pipelines.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                        </select>
+                <header className="flex-shrink-0 p-4 border-b border-slate-700/50 flex flex-col gap-4">
+                    <div className="flex justify-between items-center gap-4 w-full">
+                        <div className="flex items-center gap-4">
+                            <h1 className="text-2xl font-bold text-white">Funil</h1>
+                            <select
+                                value={activePipelineId || ''}
+                                onChange={(e) => setActivePipelineId(e.target.value)}
+                                className="bg-slate-700 border border-slate-600 rounded-md p-2 text-white text-sm"
+                            >
+                                {pipelines.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                            </select>
+                        </div>
+                        <Button variant="secondary" onClick={() => setIsManagerOpen(true)}>Gerenciar Funis</Button>
                     </div>
-                    <Button variant="secondary" onClick={() => setIsManagerOpen(true)}>Gerenciar Funis</Button>
+                    <div className="w-full bg-slate-800/50 p-3 rounded-lg flex items-center justify-around">
+                        <FunnelMetric label="Valor em Aberto" value={pipelineMetrics.openValue} />
+                        <FunnelMetric label="Negócios Abertos" value={pipelineMetrics.openDealsCount} />
+                        <FunnelMetric label="Taxa de Conversão" value={pipelineMetrics.conversionRate} />
+                        <FunnelMetric label="Valor Total" value={pipelineMetrics.totalValue} />
+                    </div>
                 </header>
                 <main className="flex-grow flex-1 p-4 md:p-6 overflow-x-auto">
                     <div className="flex gap-6 h-full min-w-max">
@@ -121,6 +175,12 @@ const Funnel: React.FC = () => {
                 </main>
             </div>
             <PipelineManagerModal isOpen={isManagerOpen} onClose={() => setIsManagerOpen(false)} />
+            <DealClosingModal
+                isOpen={!!closingInfo}
+                onClose={() => setClosingInfo(null)}
+                onSave={handleSaveClosingReason}
+                status={closingInfo?.status || 'Ganho'}
+            />
         </>
     );
 };

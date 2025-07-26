@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabaseClient';
-import { Session, User, Profile, EditableProfile, MetaConfig } from '../types';
+import type { Session, User } from '@supabase/supabase-js';
+import { Profile, EditableProfile, MetaConfig } from '../types';
 import { getProfile, updateProfileInDb } from '../services/profileService';
 
 interface AuthState {
