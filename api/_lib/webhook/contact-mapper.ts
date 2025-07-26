@@ -1,4 +1,3 @@
-
 import { supabaseAdmin } from '../supabaseAdmin.js';
 import { Contact, Profile, Json } from '../types.js';
 import { TablesInsert, TablesUpdate } from '../database.types.js';
@@ -21,7 +20,7 @@ const normalizePhoneNumber = (phone: string): string => {
     return digits;
 };
 
-export const findOrCreateContactByPhone = async (user_id: string, phone: string, name: string): Promise<{ contact: Contact | null, isNew: boolean }> => {
+export const findOrCreateContactByPhone = async (user_id: string, phone: string, name: string): Promise<{ contact: Contact, isNew: boolean }> => {
     const normalizedPhone = normalizePhoneNumber(phone);
     
     let { data: contactData, error } = await supabaseAdmin
@@ -38,15 +37,21 @@ export const findOrCreateContactByPhone = async (user_id: string, phone: string,
             .insert(newContactPayload as any)
             .select('*')
             .single();
-        if (insertError || !newContact) {
+        if (insertError) {
              console.error("Error creating new contact:", insertError);
-             return { contact: null, isNew: false };
+             throw insertError;
+        }
+        if (!newContact) {
+            throw new Error("Failed to create new contact and retrieve it.");
         }
         return { contact: newContact as Contact, isNew: true };
     } else if (error) {
          console.error("Error finding contact:", error);
-        return { contact: null, isNew: false };
+        throw error;
     }
+    
+    if(!contactData) throw new Error("Contact data is null after query.");
+
     return { contact: contactData as Contact, isNew: false };
 };
 

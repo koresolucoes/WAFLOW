@@ -81,7 +81,7 @@ export const sendTemplate: ActionHandler = async ({ profile, contact, node, trig
     );
     
     const bodyText = bodyComponent?.text || 'Mensagem de template';
-    const resolvedContent = (bodyText.match(/\{\{\d+\}\}/g) || []).reduce((text, placeholder) => {
+    const resolvedContent = (bodyText.match(/\{\{\d+\}\}/g) || []).reduce((text: string, placeholder: string) => {
         return text.replace(placeholder, resolvePlaceholder(placeholder));
     }, bodyText);
 
