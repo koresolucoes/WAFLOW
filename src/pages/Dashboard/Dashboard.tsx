@@ -9,6 +9,7 @@ import { fetchDashboardData, DashboardData } from '../../services/dataService';
 
 import SalesMetrics from './SalesMetrics';
 import AutomationAnalytics from './AutomationAnalytics';
+import CampaignAnalytics from './CampaignAnalytics';
 import ContactGrowth from './ContactGrowth';
 import RecentActivityFeed from './RecentActivityFeed';
 import { CONTACTS_ICON, FUNNEL_ICON, AUTOMATION_ICON } from '../../components/icons';
@@ -107,6 +108,7 @@ const Dashboard: React.FC = () => {
             <ContactGrowth />
           </div>
           <div className="lg:col-span-2 space-y-6">
+            <CampaignAnalytics />
             <AutomationAnalytics data={dashboardData} isLoading={isLoading} />
             <RecentActivityFeed data={dashboardData} isLoading={isLoading} />
           </div>
