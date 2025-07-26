@@ -1,4 +1,5 @@
 
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
 import { getProfileForWebhook } from '../_lib/webhook/profile-handler.js';
@@ -16,16 +17,26 @@ export const config = {
 
 const handlePostRequest = async (req: VercelRequest) => {
     try {
-        const { id: userId } = req.query;
-        if (typeof userId !== 'string' || !userId) {
-            console.error("[Webhook] Requisição recebida sem um ID de usuário na URL.");
+        const { id: pathIdentifier } = req.query; // Renomeado para clareza
+        if (typeof pathIdentifier !== 'string' || !pathIdentifier) {
+            console.error("[Webhook] Requisição recebida sem um identificador na URL.");
+            return;
+        }
+
+        // LÓGICA UNIFICADA: Busca o perfil primeiro, assim como no gatilho de automação.
+        const profile = await getProfileForWebhook(pathIdentifier);
+        if (!profile) {
+            console.error(`[Webhook] Não foi possível recuperar o perfil para o identificador ${pathIdentifier}. Abortando.`);
             return;
         }
         
+        const userId = profile.id; // O ID de usuário real e confirmado
+        console.log(`[Webhook] Perfil encontrado. Processando payload para o usuário: ${userId}`);
+
         const rawBodyBuffer = await getRawBody(req);
         if (rawBodyBuffer.length === 0) {
             console.warn('[Webhook] Request body is empty.');
-            return; // No body to process
+            return;
         }
 
         let body: any;
@@ -37,8 +48,8 @@ const handlePostRequest = async (req: VercelRequest) => {
             return;
         }
 
-
         try {
+            // Log usando o ID de usuário confirmado
             const logPayload: TablesInsert<'webhook_logs'> = {
                 user_id: userId,
                 source: 'meta_message',
@@ -48,14 +59,6 @@ const handlePostRequest = async (req: VercelRequest) => {
             await supabaseAdmin.from('webhook_logs').insert(logPayload as any);
         } catch (logError) {
             console.error('[Webhook] Failed to log incoming webhook:', logError);
-        }
-
-        console.log(`[Webhook] Payload recebido para o usuário: ${userId}`);
-        
-        const profile = await getProfileForWebhook(userId);
-        if (!profile) {
-            console.error(`[Webhook] Não foi possível recuperar o perfil para o usuário ${userId}. Abortando.`);
-            return;
         }
 
         const { entry } = body;
@@ -74,12 +77,14 @@ const handlePostRequest = async (req: VercelRequest) => {
 
                 if (value.statuses && Array.isArray(value.statuses)) {
                     for (const status of value.statuses) {
+                        // Passa o ID de usuário confirmado
                         processingPromises.push(processStatusUpdate(status, userId));
                     }
                 }
 
                 if (value.messages && Array.isArray(value.messages)) {
                     for (const message of value.messages) {
+                        // Passa o ID de usuário confirmado
                         processingPromises.push(processIncomingMessage(userId, message, value.contacts));
                     }
                 }
