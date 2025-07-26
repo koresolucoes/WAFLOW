@@ -1,7 +1,7 @@
 
 import { MetaConfig } from "../types.js";
 import metaApiClient from "./apiClient.js";
-import { MetaMessagePayload } from "./types.js";
+import { MetaMessagePayload, MetaTemplate } from "./types.js";
 
 interface SendMessageResponse {
     messaging_product: 'whatsapp';
@@ -9,12 +9,28 @@ interface SendMessageResponse {
     messages: { id: string }[];
 }
 
+/**
+ * Busca os detalhes de um template específico pelo seu ID da Meta.
+ * @param config - Configuração da API da Meta.
+ * @param templateId - O ID do template na plataforma da Meta (não o ID do banco de dados).
+ * @returns Os detalhes do template, incluindo nome e idioma.
+ */
+export const getMetaTemplateById = async (config: MetaConfig, templateId: string): Promise<Pick<MetaTemplate, 'name' | 'language'>> => {
+    if (!templateId) throw new Error("O ID do template da Meta é necessário.");
+    const response = await metaApiClient<{ name: string; language: string; }>(
+        config,
+        `/${templateId}?fields=name,language`
+    );
+    return { name: response.name, language: response.language };
+};
+
 
 /**
  * Envia uma mensagem de template para um destinatário.
  * @param config - Configuração da API da Meta.
  * @param to - Número de telefone do destinatário no formato internacional (ex: 5511999998888).
  * @param templateName - O nome do template a ser enviado.
+ * @param languageCode - O código do idioma do template (ex: 'pt_BR')
  * @param components - Array de componentes para substituir variáveis no template.
  * @returns A resposta da API da Meta.
  */
@@ -22,6 +38,7 @@ export const sendTemplatedMessage = async (
     config: MetaConfig,
     to: string,
     templateName: string,
+    languageCode: string,
     components?: any[]
 ): Promise<SendMessageResponse> => {
     if (!config.phoneNumberId) throw new Error("ID do Número de Telefone não configurado.");
@@ -35,7 +52,7 @@ export const sendTemplatedMessage = async (
         template: {
             name: templateName,
             language: {
-                code: 'pt_BR'
+                code: languageCode
             },
             components,
         }

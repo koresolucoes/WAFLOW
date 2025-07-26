@@ -1,6 +1,6 @@
 
 import { supabaseAdmin } from '../../supabaseAdmin.js';
-import { sendTemplatedMessage, sendTextMessage, sendMediaMessage, sendInteractiveMessage } from '../../meta/messages.js';
+import { sendTemplatedMessage, sendTextMessage, sendMediaMessage, sendInteractiveMessage, getMetaTemplateById } from '../../meta/messages.js';
 import { MessageTemplate, MessageInsert } from '../../types.js';
 import { ActionHandler } from '../types.js';
 import { getMetaConfig, resolveVariables } from '../helpers.js';
@@ -26,8 +26,15 @@ export const sendTemplate: ActionHandler = async ({ profile, contact, node, trig
     const { data: template, error: templateError } = await supabaseAdmin.from('message_templates').select('*').eq('id', config.template_id).single();
     if (templateError || !template) throw new Error(`Erro ao buscar template: ${templateError?.message || 'Template não encontrado.'}`);
     
+    if (!template.meta_id) {
+        throw new Error(`O template '${template.template_name}' não está sincronizado com a Meta e não pode ser enviado.`);
+    }
+    
     const metaConfig = getMetaConfig(profile);
     const templateTyped = template as unknown as MessageTemplate;
+
+    // Fetch template details from Meta to get correct name and language
+    const metaTemplateDetails = await getMetaTemplateById(metaConfig, template.meta_id);
     
     const finalComponents: any[] = [];
     const context = { contact, trigger };
@@ -76,7 +83,8 @@ export const sendTemplate: ActionHandler = async ({ profile, contact, node, trig
     const response = await sendTemplatedMessage(
        metaConfig, 
        contact.phone, 
-       templateTyped.template_name, 
+       metaTemplateDetails.name,
+       metaTemplateDetails.language,
        finalComponents.length > 0 ? finalComponents : undefined
     );
     
