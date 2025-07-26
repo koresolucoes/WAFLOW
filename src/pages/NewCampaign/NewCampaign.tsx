@@ -214,7 +214,7 @@ const NewCampaign: React.FC = () => {
                 finalComponents.length > 0 ? finalComponents : undefined
             );
 
-            const resolvedContent = (bodyComponentText.match(/\{\{\d+\}\}/g) || []).reduce((text: string, placeholder: string) => {
+            const resolvedContent = (bodyComponentText.match(/\{\{\d+\}\}/g) || []).reduce((text, placeholder) => {
                 return text.replace(placeholder, resolvePlaceholder(placeholder));
             }, bodyComponentText);
           

@@ -2,7 +2,7 @@ import React, { createContext, useState, useCallback, ReactNode, useContext, use
 import { supabase } from '../../lib/supabaseClient';
 import { useAuthStore, useMetaConfig } from '../../stores/authStore';
 import { ContactsContext } from './ContactsContext';
-import { Conversation, UnifiedMessage, Message, MessageStatus } from '../../types';
+import { Conversation, UnifiedMessage, Message, MessageStatus, Contact } from '../../types';
 import * as inboxService from '../../services/inboxService';
 
 interface InboxContextType {
@@ -114,10 +114,16 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                     }
                 });
                 
-                // Update active chat window
+                // Update active chat window, handling optimistic updates
                 if (contactId === activeContactIdRef.current) {
                     if (payload.eventType === 'INSERT') {
-                        setMessages(prev => [...prev, newMessage]);
+                        // Avoid adding duplicates from optimistic updates if the ID is already present
+                        setMessages(prev => {
+                            if (prev.some(m => m.id === newMessage.id)) {
+                                return prev.map(m => m.id === newMessage.id ? newMessage : m);
+                            }
+                            return [...prev, newMessage];
+                        });
                     } else if (payload.eventType === 'UPDATE') {
                         setMessages(prev => prev.map(m => m.id === newMessage.id ? newMessage : m));
                     }
@@ -141,13 +147,34 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         const contact = contacts.find(c => c.id === contactId);
         if (!contact) throw new Error("Contato não encontrado.");
         
+        const optimisticId = `optimistic-${Date.now()}`;
+        const optimisticMessage: UnifiedMessage = {
+            id: optimisticId,
+            contact_id: contactId,
+            content: text,
+            created_at: new Date().toISOString(),
+            type: 'outbound',
+            status: 'pending',
+            sourceTable: 'sent_messages',
+        };
+
+        setMessages(prev => [...prev, optimisticMessage]);
+        
         setIsSending(true);
         try {
-            await inboxService.sendMessageToApi(user.id, contact, text, metaConfig);
-            // Realtime will handle the update
+            const savedMessage = await inboxService.sendMessageToApi(user.id, contact, text, metaConfig);
+            const unifiedSavedMessage = inboxService.mapPayloadToUnifiedMessage(savedMessage);
+            
+            // Replace optimistic message with the real one from DB.
+            setMessages(prev => prev.map(m => m.id === optimisticId ? unifiedSavedMessage : m));
+
         } catch (error: any) {
             console.error("Failed to send message:", error);
-            throw error;
+             // Mark optimistic message as failed
+            setMessages(prev => prev.map(m => 
+                m.id === optimisticId ? { ...m, status: 'failed' } : m
+            ));
+            throw error; // re-throw to be caught by the UI component
         } finally {
             setIsSending(false);
         }

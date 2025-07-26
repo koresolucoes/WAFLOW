@@ -40,7 +40,7 @@ export const fetchMessagesFromDb = async (userId: string, contactId: string): Pr
     return (data as any as UnifiedMessage[]) || [];
 };
 
-export const sendMessageToApi = async (userId: string, contact: Contact, text: string, metaConfig: MetaConfig) => {
+export const sendMessageToApi = async (userId: string, contact: Contact, text: string, metaConfig: MetaConfig): Promise<Message> => {
     const response = await sendTextMessage(metaConfig, contact.phone, text);
     const metaMessageId = response.messages[0].id;
 
@@ -55,6 +55,14 @@ export const sendMessageToApi = async (userId: string, contact: Contact, text: s
         sent_at: new Date().toISOString()
     };
     
-    const { error } = await supabase.from('messages').insert(messagePayload as any);
-    if (error) throw error;
+    const { data, error } = await supabase.from('messages').insert(messagePayload as any).select().single();
+    
+    if (error) {
+        console.error("Supabase insert error in sendMessageToApi:", error);
+        throw error;
+    }
+     if (!data) {
+        throw new Error("A mensagem foi enviada, mas falhou ao ser salva no banco de dados.");
+    }
+    return data as Message;
 };
