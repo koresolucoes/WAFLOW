@@ -180,3 +180,15 @@ export const X_ICON = ({ className }: { className?: string }) => (
         <line x1="6" y1="6" x2="18" y2="18" />
     </svg>
 );
+
+export const ARROW_DOWN_LEFT_ICON = ({ className }: { className?: string }) => (
+    <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M17 7 7 17"/><path d="M17 17H7V7"/>
+    </svg>
+);
+
+export const ARROW_UP_RIGHT_ICON = ({ className }: { className?: string }) => (
+    <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M7 17V7h10"/><path d="m17 7-10 10"/>
+    </svg>
+);

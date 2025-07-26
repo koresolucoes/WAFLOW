@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabaseClient';
-import { Contact, EditableContact, ContactWithDetails, Deal, MetaConfig, MessageInsert } from '../types';
+import { Contact, EditableContact, ContactWithDetails, Deal, MetaConfig, MessageInsert, TimelineEvent } from '../types';
 import { TablesInsert, TablesUpdate } from '../types/database.types';
 import { sendTextMessage } from './meta/messages';
 
@@ -55,6 +55,43 @@ export const fetchContactDetailsFromDb = async (userId: string, contactId: strin
         ...contactData,
         deals: (dealsData as Deal[]) || []
     };
+};
+
+export const fetchContactTimeline = async (userId: string, contactId: string): Promise<TimelineEvent[]> => {
+    const [messagesRes, automationRunsRes, dealsRes] = await Promise.all([
+        supabase.from('messages').select('id, created_at, type, content, source').eq('contact_id', contactId).eq('user_id', userId),
+        supabase.from('automation_runs').select('id, run_at, status, details, automations(name)').eq('contact_id', contactId),
+        supabase.from('deals').select('id, created_at, name, value, pipeline_stages(name)').eq('contact_id', contactId).eq('user_id', userId)
+    ]);
+
+    if (messagesRes.error) console.error("Error fetching timeline messages:", messagesRes.error);
+    if (automationRunsRes.error) console.error("Error fetching timeline automations:", automationRunsRes.error);
+    if (dealsRes.error) console.error("Error fetching timeline deals:", dealsRes.error);
+
+    const events: TimelineEvent[] = [];
+
+    (messagesRes.data || []).forEach(msg => events.push({
+        id: msg.id,
+        type: 'MESSAGE',
+        timestamp: msg.created_at,
+        data: msg
+    }));
+
+    (automationRunsRes.data || []).forEach(run => events.push({
+        id: run.id,
+        type: 'AUTOMATION_RUN',
+        timestamp: run.run_at,
+        data: run
+    }));
+
+    (dealsRes.data || []).forEach(deal => events.push({
+        id: deal.id,
+        type: 'DEAL_CREATED',
+        timestamp: deal.created_at,
+        data: deal
+    }));
+
+    return events.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 };
 
 export const addContactToDb = async (userId: string, contact: EditableContact): Promise<Contact> => {

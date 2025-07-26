@@ -97,6 +97,13 @@ export interface Conversation {
     unread_count: number;
 }
 
+export interface TimelineEvent {
+  id: string;
+  type: 'MESSAGE' | 'AUTOMATION_RUN' | 'DEAL_CREATED';
+  timestamp: string;
+  data: any;
+}
+
 
 // --- TIPOS DE INSERÇÃO ---
 export interface MessageTemplateInsert extends Omit<Database['public']['Tables']['message_templates']['Insert'], 'category' | 'status' | 'components'> {
