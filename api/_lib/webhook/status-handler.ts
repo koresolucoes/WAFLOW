@@ -1,5 +1,4 @@
 import { supabaseAdmin } from '../supabaseAdmin.js';
-import { TablesUpdate } from '../database.types.js';
 
 export async function processStatusUpdate(status: any, userId: string): Promise<void> {
     console.log(`[Status Handler] Processing status update for message ${status.id} for user ${userId}: ${status.status}`);

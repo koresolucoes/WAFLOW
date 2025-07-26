@@ -88,7 +88,7 @@ const handlePostRequest = async (req: VercelRequest) => {
                     console.log(`[Webhook] Encontradas ${value.messages.length} mensagens para processar.`);
                     for (const message of value.messages) {
                         console.log(`[Webhook] Enfileirando processamento para a mensagem ${message.id}.`);
-                        promises.push(processIncomingMessage(userId, profile, message, value.contacts));
+                        promises.push(processIncomingMessage(userId, message, value.contacts));
                     }
                 }
             }
@@ -96,7 +96,12 @@ const handlePostRequest = async (req: VercelRequest) => {
         
         if (promises.length > 0) {
              console.log(`[Webhook] Aguardando a conclusão de ${promises.length} promessas.`);
-             await Promise.all(promises);
+             const results = await Promise.allSettled(promises);
+             results.forEach(result => {
+                 if (result.status === 'rejected') {
+                     console.error('[Webhook] Uma promessa de processamento falhou:', result.reason);
+                 }
+             });
              console.log(`[Webhook] Lote de processamento para o usuário ${userId} concluído.`);
         } else {
             console.log('[Webhook] Nenhuma promessa de mensagem ou status para processar no payload.');

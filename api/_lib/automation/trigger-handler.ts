@@ -1,7 +1,7 @@
 
 import { supabaseAdmin } from '../supabaseAdmin.js';
 import { executeAutomation, createDefaultLoggingHooks } from './engine.js';
-import { Automation, Contact, Json, Profile, Tables } from '../types.js';
+import { Automation, Contact, Json } from '../types.js';
 import { sanitizeAutomation } from './utils.js';
 
 type TriggerInfo = {

@@ -1,12 +1,10 @@
 import { supabaseAdmin } from '../supabaseAdmin.js';
 import { findOrCreateContactByPhone } from './contact-mapper.js';
 import { publishEvent } from '../automation/trigger-handler.js';
-import { Profile } from '../types.js';
 import { TablesInsert } from '../database.types.js';
 
 export async function processIncomingMessage(
     userId: string, 
-    profile: Profile, 
     message: any, 
     contactsPayload: any
 ): Promise<void> {
