@@ -1,7 +1,4 @@
 
-
-
-
 import React, { useContext, Suspense, lazy } from 'react';
 import { useAuthStore } from './stores/authStore';
 import { NavigationContext } from './contexts/providers/NavigationContext';
@@ -18,7 +15,7 @@ const ContactDetails = lazy(() => import('./pages/ContactDetails/ContactDetails'
 const Funnel = lazy(() => import('./pages/Funnel/Funnel'));
 const NewCampaign = lazy(() => import('./pages/NewCampaign/NewCampaign'));
 const CompanyProfile = lazy(() => import('./pages/Profile/CompanyProfile'));
-const MetaSettings = lazy(() => import('./pages/Settings/MetaSettings'));
+const Settings = lazy(() => import('./pages/Settings/Settings'));
 const Automations = lazy(() => import('./pages/Automations/Automations'));
 const AutomationEditor = lazy(() => import('./pages/AutomationEditor/AutomationEditor'));
 const Inbox = lazy(() => import('./pages/Inbox/Inbox'));
@@ -73,7 +70,7 @@ const App: React.FC = () => {
       case 'profile':
         return <CompanyProfile />;
       case 'settings':
-        return <MetaSettings />;
+        return <Settings />;
       case 'webhook-inspector':
         return <WebhookInspector />;
       default:

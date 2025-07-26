@@ -209,6 +209,35 @@ export interface Database {
           user_id?: string
         }
       }
+      custom_field_definitions: {
+        Row: {
+          created_at: string
+          id: string
+          key: string
+          name: string
+          options: string[] | null
+          type: Database["public"]["Enums"]["custom_field_type"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          key: string
+          name: string
+          options?: string[] | null
+          type: Database["public"]["Enums"]["custom_field_type"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          key?: string
+          name?: string
+          options?: string[] | null
+          type?: Database["public"]["Enums"]["custom_field_type"]
+          user_id?: string
+        }
+      }
       deals: {
         Row: {
           contact_id: string
@@ -452,6 +481,7 @@ export interface Database {
     Enums: {
       automation_status: "active" | "paused"
       campaign_status: "Sent" | "Draft" | "Failed" | "Scheduled"
+      custom_field_type: "TEXTO" | "NUMERO" | "DATA" | "LISTA"
       message_source:
         | "campaign"
         | "automation"

@@ -1,3 +1,4 @@
+
 // Type definitions for Vite environment variables were not being picked up correctly.
 // Removing them to avoid confusion and relying on a local cast where needed.
 
@@ -18,6 +19,7 @@ export type MessageSource = Enums<'message_source'>;
 export type AutomationStatus = Enums<'automation_status'>;
 export type AutomationRunStatus = 'running' | 'success' | 'failed';
 export type AutomationLogStatus = 'success' | 'failed';
+export type CustomFieldType = Enums<'custom_field_type'>;
 
 // Tipos para os nós do editor de automação
 export type NodeType = 'trigger' | 'action' | 'logic';
@@ -41,6 +43,7 @@ export type AutomationNode = XyNode<AutomationNodeData, string>;
 // --- Tipos de objetos simples para evitar recursão de TS de tipos gerados ---
 export type Profile = Database['public']['Tables']['profiles']['Row'];
 export type Contact = Database['public']['Tables']['contacts']['Row'];
+export type CustomFieldDefinition = Database['public']['Tables']['custom_field_definitions']['Row'];
 
 export type MessageTemplate = Omit<Database['public']['Tables']['message_templates']['Row'], 'category' | 'status' | 'components'> & {
     category: TemplateCategory;
@@ -106,6 +109,7 @@ export interface MessageTemplateInsert extends Omit<Database['public']['Tables']
 }
 
 export type MessageInsert = Database['public']['Tables']['messages']['Insert'];
+export type CustomFieldDefinitionInsert = Database['public']['Tables']['custom_field_definitions']['Insert'];
 
 export interface AutomationInsert extends Omit<Database['public']['Tables']['automations']['Insert'], 'status' | 'nodes' | 'edges'> {
   user_id: string;

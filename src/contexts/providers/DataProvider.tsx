@@ -1,6 +1,4 @@
 
-
-
 import React, { useContext, useEffect, useState, useCallback, ReactNode } from 'react';
 import { useAuthStore } from '../../stores/authStore';
 import { TemplatesContext } from './TemplatesContext';
@@ -8,6 +6,7 @@ import { ContactsContext } from './ContactsContext';
 import { CampaignsContext } from './CampaignsContext';
 import { AutomationsContext } from './AutomationsContext';
 import { FunnelContext } from './FunnelContext';
+import { CustomFieldsContext } from './CustomFieldsContext';
 import { fetchAllInitialData } from '../../services/dataService';
 
 export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
@@ -17,6 +16,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const { setCampaigns } = useContext(CampaignsContext);
     const { setAutomations } = useContext(AutomationsContext);
     const { setPipelines, setStages, setDeals, setActivePipelineId, activePipelineId } = useContext(FunnelContext);
+    const { setDefinitions } = useContext(CustomFieldsContext);
 
     const [loading, setLoading] = useState(false);
     const [dataLoadedForUser, setDataLoadedForUser] = useState<string | null>(null);
@@ -40,6 +40,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             }
             if (data.stages) setStages(data.stages);
             if (data.deals) setDeals(data.deals);
+            if (data.customFieldDefinitions) setDefinitions(data.customFieldDefinitions);
 
         } catch (err) {
             console.error("A critical error occurred during initial data fetch:", (err as any).message || err);
@@ -47,7 +48,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             setLoading(false);
             setDataLoadedForUser(user.id);
         }
-    }, [user, activePipelineId, setTemplates, setContacts, setCampaigns, setAutomations, setPipelines, setStages, setDeals, setActivePipelineId]);
+    }, [user, activePipelineId, setTemplates, setContacts, setCampaigns, setAutomations, setPipelines, setStages, setDeals, setActivePipelineId, setDefinitions]);
 
     useEffect(() => {
         if (user && user.id !== dataLoadedForUser) {
@@ -59,6 +60,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             setPipelines([]);
             setStages([]);
             setDeals([]);
+            setDefinitions([]);
             setActivePipelineId(null);
             setDataLoadedForUser(null);
 
@@ -72,10 +74,11 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             setPipelines([]);
             setStages([]);
             setDeals([]);
+            setDefinitions([]);
             setActivePipelineId(null);
             setDataLoadedForUser(null);
         }
-    }, [user, dataLoadedForUser, fetchInitialData, setTemplates, setContacts, setCampaigns, setAutomations, setPipelines, setStages, setDeals, setActivePipelineId]);
+    }, [user, dataLoadedForUser, fetchInitialData, setTemplates, setContacts, setCampaigns, setAutomations, setPipelines, setStages, setDeals, setActivePipelineId, setDefinitions]);
 
 
     return <>{children}</>;

@@ -1,19 +1,21 @@
+
 import React, { useContext, useEffect, useState } from 'react';
-import { Contact, DealInsert } from '../../types';
+import { Contact, DealInsert, Json } from '../../types';
 import Button from '../../components/common/Button';
 import Card from '../../components/common/Card';
-import Modal from '../../components/common/Modal';
 import { ARROW_LEFT_ICON, PLUS_ICON } from '../../components/icons';
 import DealFormModal from '../../components/common/DealFormModal';
 import { ContactsContext } from '../../contexts/providers/ContactsContext';
 import { NavigationContext } from '../../contexts/providers/NavigationContext';
 import { FunnelContext } from '../../contexts/providers/FunnelContext';
+import { CustomFieldsContext } from '../../contexts/providers/CustomFieldsContext';
 import { useAuthStore } from '../../stores/authStore';
 
 const ContactDetails: React.FC = () => {
     const { pageParams, setCurrentPage } = useContext(NavigationContext);
     const { contactDetails, fetchContactDetails, updateContact } = useContext(ContactsContext);
     const { addDeal, pipelines, stages } = useContext(FunnelContext);
+    const { definitions } = useContext(CustomFieldsContext);
     const user = useAuthStore(state => state.user);
 
     const [isLoading, setIsLoading] = useState(true);
@@ -47,6 +49,17 @@ const ContactDetails: React.FC = () => {
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
         setLocalContact(prev => prev ? { ...prev, [name]: value } : null);
+    };
+
+    const handleCustomFieldChange = (key: string, value: string | number) => {
+        setLocalContact(prev => {
+            if (!prev) return null;
+            const newCustomFields: Json = {
+                ...(prev.custom_fields as object || {}),
+                [key]: value
+            };
+            return { ...prev, custom_fields: newCustomFields };
+        });
     };
 
     const handleTagInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -156,6 +169,44 @@ const ContactDetails: React.FC = () => {
                             />
                         </div>
                     </Card>
+                     {definitions.length > 0 && (
+                        <Card>
+                            <h2 className="text-lg font-semibold text-white mb-4">Informações Adicionais</h2>
+                            <div className="space-y-4">
+                                {definitions.map(def => {
+                                    const customFields = (localContact.custom_fields || {}) as { [key: string]: any };
+                                    const value = customFields[def.key] ?? '';
+                                    
+                                    const renderInput = () => {
+                                        switch (def.type) {
+                                            case 'NUMERO':
+                                                return <input type="number" value={value} onChange={e => handleCustomFieldChange(def.key, e.target.valueAsNumber || 0)} className="w-full bg-slate-700 p-2 rounded-md" />;
+                                            case 'DATA':
+                                                const dateValue = value ? new Date(value).toISOString().split('T')[0] : '';
+                                                return <input type="date" value={dateValue} onChange={e => handleCustomFieldChange(def.key, e.target.value)} className="w-full bg-slate-700 p-2 rounded-md" />;
+                                            case 'LISTA':
+                                                return (
+                                                    <select value={value} onChange={e => handleCustomFieldChange(def.key, e.target.value)} className="w-full bg-slate-700 p-2 rounded-md">
+                                                        <option value="">Selecione...</option>
+                                                        {def.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                                    </select>
+                                                );
+                                            case 'TEXTO':
+                                            default:
+                                                return <input type="text" value={value} onChange={e => handleCustomFieldChange(def.key, e.target.value)} className="w-full bg-slate-700 p-2 rounded-md" />;
+                                        }
+                                    };
+                                    
+                                    return (
+                                        <div key={def.id}>
+                                            <label className="block text-sm font-medium text-slate-400 mb-1">{def.name}</label>
+                                            {renderInput()}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </Card>
+                    )}
                 </div>
 
                 {/* Coluna de Atividades e Negócios */}

@@ -1,5 +1,6 @@
+
 import { supabase } from '../lib/supabaseClient';
-import { Campaign, CampaignWithMetrics, MessageStatus, TemplateCategory, TemplateStatus, AutomationStatus, Edge, AutomationNode, Contact, MessageTemplate, Automation, Pipeline, PipelineStage, DealWithContact } from '../types';
+import { Campaign, CampaignWithMetrics, MessageStatus, TemplateCategory, TemplateStatus, AutomationStatus, Edge, AutomationNode, Contact, MessageTemplate, Automation, Pipeline, PipelineStage, DealWithContact, CustomFieldDefinition } from '../types';
 import { MetaTemplateComponent } from './meta/types';
 
 const fetchCampaignsWithMetrics = async (campaignsData: Campaign[]): Promise<CampaignWithMetrics[]> => {
@@ -47,7 +48,7 @@ const fetchCampaignsWithMetrics = async (campaignsData: Campaign[]): Promise<Cam
 
 
 export const fetchAllInitialData = async (userId: string) => {
-    const [templatesRes, contactsRes, campaignsRes, automationsRes, pipelinesRes, stagesRes, dealsRes] = await Promise.all([
+    const [templatesRes, contactsRes, campaignsRes, automationsRes, pipelinesRes, stagesRes, dealsRes, customFieldsRes] = await Promise.all([
         supabase.from('message_templates').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
         supabase.from('contacts').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
         supabase.from('campaigns').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
@@ -55,6 +56,7 @@ export const fetchAllInitialData = async (userId: string) => {
         supabase.from('pipelines').select('*').eq('user_id', userId).order('created_at', { ascending: true }),
         supabase.from('pipeline_stages').select('*, pipelines!inner(user_id)').eq('pipelines.user_id', userId),
         supabase.from('deals').select('*, contacts(id, name)').eq('user_id', userId).order('created_at', { ascending: false }),
+        supabase.from('custom_field_definitions').select('*').eq('user_id', userId).order('name', { ascending: true }),
     ]);
 
     if (templatesRes.error) console.error("DataService Error (Templates):", templatesRes.error);
@@ -64,6 +66,7 @@ export const fetchAllInitialData = async (userId: string) => {
     if (pipelinesRes.error) console.error("DataService Error (Pipelines):", pipelinesRes.error);
     if (stagesRes.error) console.error("DataService Error (Stages):", stagesRes.error);
     if (dealsRes.error) console.error("DataService Error (Deals):", dealsRes.error);
+    if (customFieldsRes.error) console.error("DataService Error (CustomFields):", customFieldsRes.error);
 
     // Process Templates
     const templates = (templatesRes.data || []).map(t => ({
@@ -93,5 +96,6 @@ export const fetchAllInitialData = async (userId: string) => {
         pipelines: (pipelinesRes.data || []) as Pipeline[],
         stages: (stagesRes.data || []) as PipelineStage[],
         deals: (dealsRes.data || []) as DealWithContact[],
+        customFieldDefinitions: (customFieldsRes.data || []) as CustomFieldDefinition[],
     };
 };
