@@ -1,11 +1,12 @@
 
+
 import { supabase } from '../lib/supabaseClient';
 import { CustomFieldDefinition, CustomFieldDefinitionInsert } from '../types';
 
 export const addCustomFieldDefinition = async (userId: string, definition: Omit<CustomFieldDefinitionInsert, 'user_id' | 'id' | 'created_at'>): Promise<CustomFieldDefinition> => {
     const { data, error } = await supabase
         .from('custom_field_definitions')
-        .insert({ ...definition, user_id: userId })
+        .insert({ ...definition, user_id: userId } as any)
         .select()
         .single();
     if (error) {

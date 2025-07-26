@@ -1,3 +1,4 @@
+
 import { supabaseAdmin } from '../supabaseAdmin.js';
 import { TablesUpdate, Database } from '../database.types.js';
 
@@ -30,7 +31,7 @@ export async function processStatusUpdate(status: any, userId: string): Promise<
 
     const { data, error } = await supabaseAdmin
         .from('messages')
-        .update(updatePayload)
+        .update(updatePayload as any)
         .eq('meta_message_id', status.id)
         .eq('user_id', userId)
         .select('id');

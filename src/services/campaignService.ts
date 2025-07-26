@@ -1,3 +1,4 @@
+
 import { supabase } from '../lib/supabaseClient';
 import { Campaign, MessageInsert, CampaignWithDetails, MessageWithContact, CampaignStatus, TemplateCategory, TemplateStatus, MessageTemplate } from '../types';
 import { TablesInsert, Tables } from '../types/database.types';
@@ -64,7 +65,7 @@ export const addCampaignToDb = async (
         recipient_count: messages.length,
         status: campaign.status
     };
-    const { data: newCampaignData, error: campaignError } = await supabase.from('campaigns').insert(campaignPayload).select('id, created_at, name, recipient_count, sent_at, status, template_id, user_id').single();
+    const { data: newCampaignData, error: campaignError } = await supabase.from('campaigns').insert(campaignPayload as any).select('id, created_at, name, recipient_count, sent_at, status, template_id, user_id').single();
 
     if (campaignError) throw campaignError;
     const newCampaign = newCampaignData;
@@ -72,7 +73,7 @@ export const addCampaignToDb = async (
 
     if (messages.length > 0) {
         const messagesToInsert = messages.map(msg => ({ ...msg, campaign_id: newCampaign.id, user_id: userId }));
-        const { error: messagesError } = await supabase.from('messages').insert(messagesToInsert);
+        const { error: messagesError } = await supabase.from('messages').insert(messagesToInsert as any);
 
         if (messagesError) {
             // Rollback campaign creation if messages fail

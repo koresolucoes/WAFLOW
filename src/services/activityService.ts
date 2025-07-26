@@ -1,3 +1,4 @@
+
 import { supabase } from '../lib/supabaseClient';
 import { ContactActivity, ContactActivityInsert, ContactActivityUpdate, TaskWithContact } from '../types';
 
@@ -15,7 +16,7 @@ export const fetchActivitiesForContact = async (userId: string, contactId: strin
 export const addActivity = async (activityData: ContactActivityInsert): Promise<ContactActivity> => {
     const { data, error } = await supabase
         .from('contact_activities')
-        .insert(activityData)
+        .insert(activityData as any)
         .select()
         .single();
     if (error) throw error;
@@ -25,7 +26,7 @@ export const addActivity = async (activityData: ContactActivityInsert): Promise<
 export const updateActivity = async (activityId: string, updates: ContactActivityUpdate): Promise<ContactActivity> => {
     const { data, error } = await supabase
         .from('contact_activities')
-        .update(updates)
+        .update(updates as any)
         .eq('id', activityId)
         .select()
         .single();

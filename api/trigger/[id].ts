@@ -1,3 +1,4 @@
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
 import { executeAutomation, createDefaultLoggingHooks } from '../_lib/automation/engine.js';
@@ -29,12 +30,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Robust Profile Lookup: First try by the custom path prefix.
     const { data: profileByPrefix } = await supabaseAdmin.from('profiles').select(PROFILE_COLUMNS).eq('webhook_path_prefix', webhookPrefix).maybeSingle();
     if (profileByPrefix) {
-        profileData = profileByPrefix;
+        profileData = profileByPrefix as Profile;
     } else {
         // As a fallback, check if the prefix was actually a user ID.
         const { data: profileById } = await supabaseAdmin.from('profiles').select(PROFILE_COLUMNS).eq('id', webhookPrefix).maybeSingle();
         if (profileById) {
-            profileData = profileById;
+            profileData = profileById as Profile;
         }
     }
     
@@ -89,7 +90,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     payload: { rawBody, query: req.query, headers: cleanHeaders } as unknown as Json,
                     path: req.url,
                 };
-                await supabaseAdmin.from('webhook_logs').insert(logPayload);
+                await supabaseAdmin.from('webhook_logs').insert(logPayload as any);
             } catch (logError) {
                 console.error('[Trigger] Failed to log incoming trigger webhook:', logError);
             }

@@ -1,3 +1,4 @@
+
 import { supabaseAdmin } from '../supabaseAdmin.js';
 import { Contact, Profile, Json } from '../types.js';
 import { TablesInsert, TablesUpdate } from '../database.types.js';
@@ -46,7 +47,7 @@ export const findOrCreateContactByPhone = async (user_id: string, phone: string,
         const newContactPayload: TablesInsert<'contacts'> = { user_id, phone: normalizedPhone, name, tags: ['new-lead'], custom_fields: null };
         const { data: newContact, error: insertError } = await supabaseAdmin
             .from('contacts')
-            .insert(newContactPayload)
+            .insert(newContactPayload as any)
             .select('company, created_at, custom_fields, email, id, name, phone, tags, user_id')
             .single();
         if (insertError) {
@@ -143,7 +144,7 @@ export const processWebhookPayloadForContact = async (
         if (needsUpdate) {
             const { data: updatedContact, error: updateContactError } = await supabaseAdmin
                 .from('contacts')
-                .update(updatePayload)
+                .update(updatePayload as any)
                 .eq('id', contact.id)
                 .select('company, created_at, custom_fields, email, id, name, phone, tags, user_id')
                 .single();

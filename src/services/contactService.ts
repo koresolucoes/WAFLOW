@@ -1,3 +1,4 @@
+
 import { supabase } from '../lib/supabaseClient';
 import { Contact, EditableContact, ContactWithDetails, Deal, MetaConfig, MessageInsert, TimelineEvent } from '../types';
 import { TablesInsert, TablesUpdate } from '../types/database.types';
@@ -96,7 +97,7 @@ export const fetchContactTimeline = async (userId: string, contactId: string): P
 
 export const addContactToDb = async (userId: string, contact: EditableContact): Promise<Contact> => {
     const payload: TablesInsert<'contacts'> = { ...contact, phone: normalizePhoneNumber(contact.phone), user_id: userId };
-    const { data, error } = await supabase.from('contacts').insert(payload).select('*').single();
+    const { data, error } = await supabase.from('contacts').insert(payload as any).select('*').single();
     if (error) throw error;
     return data;
 };
@@ -113,7 +114,7 @@ export const updateContactInDb = async (userId: string, updatedContact: Contact)
 
     const { data, error } = await supabase
         .from('contacts')
-        .update(updatePayload)
+        .update(updatePayload as any)
         .eq('id', updatedContact.id)
         .eq('user_id', userId)
         .select('*')
@@ -146,7 +147,7 @@ export const importContactsToDb = async (userId: string, newContacts: EditableCo
         return { imported: [], skippedCount };
     }
 
-    const { data, error } = await supabase.from('contacts').insert(contactsToInsert).select('*');
+    const { data, error } = await supabase.from('contacts').insert(contactsToInsert as any).select('*');
     if (error) throw error;
     
     return { imported: (data || []), skippedCount };

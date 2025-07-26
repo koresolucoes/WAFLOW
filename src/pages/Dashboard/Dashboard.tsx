@@ -1,24 +1,36 @@
-import React, { useContext, useMemo } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import Card from '../../components/common/Card';
-import { CampaignsContext } from '../../contexts/providers/CampaignsContext';
-import { ContactsContext } from '../../contexts/providers/ContactsContext';
-import { TemplatesContext } from '../../contexts/providers/TemplatesContext';
-import TodaysTasksCard from './TodaysTasksCard';
 
-const StatCard: React.FC<{ title: string; value: string; icon: React.ReactNode; }> = ({ title, value, icon }) => (
-    <Card className="flex items-center p-4">
-        <div className="p-3 bg-slate-700 rounded-lg">
-            {icon}
+import React, { useContext, useMemo, useState, useEffect } from 'react';
+import Card from '../../components/common/Card';
+import { ContactsContext } from '../../contexts/providers/ContactsContext';
+import { FunnelContext } from '../../contexts/providers/FunnelContext';
+import { AutomationsContext } from '../../contexts/providers/AutomationsContext';
+import { useAuthStore } from '../../stores/authStore';
+import { fetchDashboardData, DashboardData } from '../../services/dataService';
+
+import SalesMetrics from './SalesMetrics';
+import AutomationAnalytics from './AutomationAnalytics';
+import ContactGrowth from './ContactGrowth';
+import RecentActivityFeed from './RecentActivityFeed';
+import { CONTACTS_ICON, FUNNEL_ICON, AUTOMATION_ICON } from '../../components/icons';
+
+const StatCard: React.FC<{ title: string; value: string; icon: React.ReactNode; footer?: string; }> = ({ title, value, icon, footer }) => (
+    <Card className="flex flex-col justify-between p-4">
+        <div>
+            <div className="flex items-start justify-between">
+                <div>
+                    <h3 className="text-sm font-medium text-slate-400">{title}</h3>
+                    <p className="text-2xl font-bold text-white mt-1">{value}</p>
+                </div>
+                <div className="p-3 bg-slate-700 rounded-lg">
+                    {icon}
+                </div>
+            </div>
         </div>
-        <div className="ml-4">
-            <h3 className="text-sm font-medium text-slate-400">{title}</h3>
-            <p className="text-2xl font-bold text-white mt-1">{value}</p>
-        </div>
+        {footer && <p className="text-xs text-slate-500 mt-2">{footer}</p>}
     </Card>
 );
 
-const CustomTooltip = ({ active, payload, label }: any) => {
+export const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
       <div className="bg-slate-700 p-3 rounded-lg border border-slate-600 shadow-xl">
@@ -35,63 +47,69 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 const Dashboard: React.FC = () => {
-  const { campaigns } = useContext(CampaignsContext);
+  const user = useAuthStore(state => state.user);
   const { contacts } = useContext(ContactsContext);
-  const { templates } = useContext(TemplatesContext);
+  const { deals, activePipelineId } = useContext(FunnelContext);
+  const { automations } = useContext(AutomationsContext);
 
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const { totalRecipients, totalRead, readRate } = useMemo(() => {
-    const totalRecipients = campaigns.reduce((acc, c) => acc + c.recipient_count, 0);
-    const totalRead = campaigns.reduce((acc, c) => acc + c.metrics.read, 0);
-    const readRate = totalRecipients > 0 ? ((totalRead / totalRecipients) * 100).toFixed(1) : '0';
-    return { totalRecipients, totalRead, readRate };
-  }, [campaigns]);
+  useEffect(() => {
+    const loadData = async () => {
+        if (user) {
+            setIsLoading(true);
+            try {
+                const data = await fetchDashboardData(user.id);
+                setDashboardData(data);
+            } catch (error) {
+                console.error("Failed to load dashboard data:", error);
+            } finally {
+                setIsLoading(false);
+            }
+        }
+    };
+    loadData();
+  }, [user]);
 
-  const chartData = useMemo(() => {
-    return campaigns.map(c => ({
-        name: c.name,
-        Destinatários: c.recipient_count,
-        Entregues: c.metrics.delivered,
-        Lidas: c.metrics.read,
-    })).slice(0, 10).reverse(); // Show last 10 campaigns in chronological order
-  }, [campaigns]);
+  const mainMetrics = useMemo(() => {
+    const relevantDeals = deals.filter(d => d.pipeline_id === activePipelineId);
+    const openDeals = relevantDeals.filter(d => d.status === 'Aberto');
+    const wonDeals = relevantDeals.filter(d => d.status === 'Ganho');
+    const lostDeals = relevantDeals.filter(d => d.status === 'Perdido');
+    
+    const openValue = openDeals.reduce((sum, deal) => sum + (deal.value || 0), 0);
+    const totalClosed = wonDeals.length + lostDeals.length;
+    const conversionRate = totalClosed > 0 ? (wonDeals.length / totalClosed) * 100 : 0;
+    
+    return {
+        totalContacts: contacts.length.toLocaleString('pt-BR'),
+        openDealsValue: openValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+        conversionRate: `${conversionRate.toFixed(1)}%`,
+        activeAutomations: automations.filter(a => a.status === 'active').length.toLocaleString('pt-BR'),
+    };
+  }, [contacts, deals, automations, activePipelineId]);
 
   return (
     <div className="space-y-8">
-      <h1 className="text-3xl font-bold text-white">Painel</h1>
+      <h1 className="text-3xl font-bold text-white">Dashboard Geral</h1>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard title="Campanhas Enviadas" value={campaigns.length.toLocaleString('pt-BR')} icon={<div className="text-sky-400 w-6 h-6">🚀</div>} />
-        <StatCard title="Contatos Ativos" value={contacts.length.toLocaleString('pt-BR')} icon={<div className="text-green-400 w-6 h-6">👥</div>}/>
-        <StatCard title="Templates Criados" value={templates.length.toLocaleString('pt-BR')} icon={<div className="text-pink-400 w-6 h-6">📄</div>} />
-        <StatCard title="Taxa de Leitura Média" value={`${readRate}%`} icon={<div className="text-amber-400 w-6 h-6">👁️</div>} />
+        <StatCard title="Total de Contatos" value={mainMetrics.totalContacts} icon={<CONTACTS_ICON className="w-6 h-6 text-sky-400" />} />
+        <StatCard title="Negócios em Aberto" value={mainMetrics.openDealsValue} icon={<FUNNEL_ICON className="w-6 h-6 text-green-400" />} />
+        <StatCard title="Taxa de Conversão" value={mainMetrics.conversionRate} icon={<span className="text-amber-400 font-bold text-xl">%</span>} footer="Negócios Ganhos vs. Perdidos" />
+        <StatCard title="Automações Ativas" value={mainMetrics.activeAutomations} icon={<AUTOMATION_ICON className="w-6 h-6 text-pink-400" />} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2">
-          <h2 className="text-lg font-semibold text-white mb-4">Desempenho das Últimas Campanhas</h2>
-          {campaigns.length > 0 ? (
-              <ResponsiveContainer width="100%" height={350}>
-                  <BarChart data={chartData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                      <XAxis dataKey="name" tick={{ fill: '#94a3b8' }} fontSize={12} interval={0} angle={-20} textAnchor="end" height={60} />
-                      <YAxis tick={{ fill: '#94a3b8' }} />
-                      <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(14, 165, 233, 0.1)' }} />
-                      <Legend />
-                      <Bar dataKey="Destinatários" fill="#0ea5e9" name="Destinatários" />
-                      <Bar dataKey="Entregues" fill="#34d399" name="Entregues" />
-                      <Bar dataKey="Lidas" fill="#f472b6" name="Lidas" />
-                  </BarChart>
-              </ResponsiveContainer>
-          ) : (
-              <div className="text-center py-16">
-                   <h3 className="text-lg text-white">Nenhuma campanha foi enviada ainda.</h3>
-                   <p className="text-slate-400 mt-2">Os dados de desempenho aparecerão aqui assim que você enviar sua primeira campanha.</p>
-              </div>
-          )}
-        </Card>
-        
-        <TodaysTasksCard />
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+          <div className="lg:col-span-3 space-y-6">
+            <SalesMetrics />
+            <ContactGrowth />
+          </div>
+          <div className="lg:col-span-2 space-y-6">
+            <AutomationAnalytics data={dashboardData} isLoading={isLoading} />
+            <RecentActivityFeed data={dashboardData} isLoading={isLoading} />
+          </div>
       </div>
     </div>
   );
