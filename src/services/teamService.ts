@@ -18,17 +18,17 @@ export const inviteUserToTeam = async (teamId: string, email: string, role: 'adm
         p_team_id: teamId,
         p_email: email,
         p_role: role
-    } as any);
+    });
     if (error) throw error;
     // A função RPC pode retornar um objeto de erro personalizado.
-    if ((data as any).error) throw new Error((data as any).error);
+    if (data.error) throw new Error(data.error);
     return data;
 };
 
 export const updateTeamMemberRole = async (teamId: string, userId: string, newRole: 'admin' | 'agent'): Promise<void> => {
     const { error } = await supabase
         .from('team_members')
-        .update({ role: newRole } as any)
+        .update({ role: newRole })
         .eq('team_id', teamId)
         .eq('user_id', userId);
     if (error) throw error;

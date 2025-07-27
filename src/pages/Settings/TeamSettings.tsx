@@ -25,8 +25,8 @@ const TeamSettings: React.FC = () => {
         setError(null);
         setInviteMessage(null);
         try {
-            await teamService.inviteUserToTeam(activeTeam.id, inviteEmail, 'agent'); // O papel padrão é 'agent'
-            setInviteMessage(`Convite enviado para ${inviteEmail}. O usuário precisa aceitar o convite por e-mail para se juntar à equipe.`);
+            const result = await teamService.inviteUserToTeam(activeTeam.id, inviteEmail, 'agent'); // O papel padrão é 'agent'
+            setInviteMessage(result.message);
             setInviteEmail('');
             // A lista de membros não é atualizada aqui, pois o usuário precisa aceitar o convite primeiro.
         } catch (err: any) {
@@ -71,7 +71,8 @@ const TeamSettings: React.FC = () => {
         // The team owner always has admin rights
         if (activeTeam.owner_id === user.id) return true;
         // Also check if the user is an admin in the team_members table
-        return members.find(m => m.user_id === user.id)?.role === 'admin';
+        const memberInfo = members.find(m => m.user_id === user.id);
+        return memberInfo?.role === 'admin';
     }, [user, activeTeam, members]);
 
 
@@ -97,7 +98,7 @@ const TeamSettings: React.FC = () => {
                         Convidar
                     </Button>
                 </form>
-                {!canManageTeam && <p className="text-xs text-amber-400 mt-2">Apenas administradores podem convidar novos membros.</p>}
+                {!canManageTeam && <p className="text-xs text-amber-400 mt-2">Apenas proprietários ou administradores podem convidar novos membros.</p>}
             </Card>
 
             <Card>

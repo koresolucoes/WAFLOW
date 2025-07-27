@@ -3,8 +3,8 @@ export type Json =
   | number
   | boolean
   | null
-  | { [key: string]: any }
-  | any[]
+  | { [key: string]: unknown }
+  | unknown[]
 
 export type PublicEnums = {
   automation_status: "active" | "paused"
@@ -801,7 +801,44 @@ export interface Database {
       [key: string]: never
     }
     Functions: {
-      [key: string]: never
+      get_conversations_with_contacts: {
+        Args: {
+          p_team_id: string
+        }
+        Returns: Json
+      }
+      get_members_for_teams: {
+        Args: {
+          p_team_ids: string[]
+        }
+        Returns: Json
+      }
+      get_user_teams_and_profile: {
+        Args: Record<string, never>
+        Returns: Json
+      }
+      increment_node_stat: {
+        Args: {
+          p_automation_id: string
+          p_node_id: string
+          p_status: string
+        }
+        Returns: undefined
+      }
+      invite_team_member: {
+        Args: {
+          p_team_id: string
+          p_email: string
+          p_role: "admin" | "agent"
+        }
+        Returns: Json
+      }
+      sync_automation_triggers: {
+        Args: {
+          automation_id_in: string
+        }
+        Returns: undefined
+      }
     }
     Enums: PublicEnums
     CompositeTypes: {
@@ -838,4 +875,4 @@ export type TablesUpdate<
 
 export type Enums<
   EnumName extends keyof PublicSchema["Enums"]
-> = PublicSchema["Enums"][EnumName]
+> = PublicSchema["Enums"][EnumName
