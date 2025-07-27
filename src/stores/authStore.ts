@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabaseClient';
 import type { Session, User } from '@supabase/auth-js';
 import { Profile, EditableProfile, MetaConfig, Team, TeamMemberWithEmail } from '../types';
 import { getProfile, updateProfileInDb } from '../services/profileService';
+import { getTeamMembersForTeams } from '../services/teamService';
 
 interface AuthState {
   session: Session | null;
@@ -40,8 +41,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (user) {
         set({ loading: true, teamLoading: true });
         
-        // Nova lógica com RPC para buscar perfil e equipes de forma atômica e segura,
-        // contornando problemas de RLS que causam erros 500.
         const { data, error } = await supabase.rpc('get_user_teams_and_profile');
 
         if (error) {
@@ -50,10 +49,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             return;
         }
 
-        const { profile: profileData, teams: teamsData, team_members: teamMembersData } = data as unknown as { profile: Profile | null, teams: Team[] | null, team_members: TeamMemberWithEmail[] | null };
-
+        const { profile: profileData, teams: teamsData } = data as unknown as { profile: Profile | null, teams: Team[] | null };
         let teams = (teamsData || []).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-        const allTeamMembers = teamMembersData || [];
+        
+        let allTeamMembers: TeamMemberWithEmail[] = [];
 
         // Lógica de fallback para usuários existentes que, por algum motivo, não têm uma equipe.
         if (teams.length === 0) {
@@ -70,18 +69,24 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                     throw new Error(`A API de configuração de equipe falhou: ${setupError.message}`);
                 }
 
-                // Após a criação, buscar novamente os dados usando a mesma RPC confiável.
                 const { data: refetchData, error: refetchError } = await supabase.rpc('get_user_teams_and_profile');
                 if (refetchError) throw refetchError;
 
-                const { teams: newTeamsData, team_members: newTeamMembersData } = refetchData as unknown as { teams: Team[] | null, team_members: TeamMemberWithEmail[] | null };
+                const { teams: newTeamsData } = refetchData as unknown as { teams: Team[] | null };
                 teams = (newTeamsData || []).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-                allTeamMembers.push(...(newTeamMembersData || []));
                 console.log(`Equipe padrão criada e obtida com sucesso para o usuário ${user.id}.`);
 
             } catch (creationError) {
                 console.error("Falha na lógica de fallback para criar equipe padrão:", creationError);
-                // Continua sem equipe, a UI mostrará a mensagem correta.
+            }
+        }
+
+        if (teams.length > 0) {
+            try {
+                const teamIds = teams.map(t => t.id);
+                allTeamMembers = await getTeamMembersForTeams(teamIds);
+            } catch(err) {
+                console.error("Não foi possível buscar os membros da equipe, a funcionalidade da equipe pode ser limitada.", err);
             }
         }
         

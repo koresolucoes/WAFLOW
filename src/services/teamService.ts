@@ -1,6 +1,17 @@
 import { supabase } from '../lib/supabaseClient';
 import { TeamMemberWithEmail } from '../types';
 
+export const getTeamMembersForTeams = async (teamIds: string[]): Promise<TeamMemberWithEmail[]> => {
+    // Esta função presume que uma RPC `get_members_for_teams` existe por razões de segurança,
+    // já que buscar e-mails de usuários diretamente do cliente não é possível/seguro.
+    const { data, error } = await supabase.rpc('get_members_for_teams', { p_team_ids: teamIds });
+    if (error) {
+        console.error("Falha ao buscar membros da equipe via RPC:", error);
+        throw error;
+    };
+    return (data as TeamMemberWithEmail[]) || [];
+};
+
 export const inviteUserToTeam = async (teamId: string, email: string, role: 'admin' | 'agent'): Promise<any> => {
     // Presume a existência de uma função RPC `invite_team_member` segura no Supabase.
     const { data, error } = await supabase.rpc('invite_team_member', {

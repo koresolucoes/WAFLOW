@@ -73,7 +73,13 @@ export const fetchStatsForAutomation = async (automationId: string): Promise<Rec
 };
 
 export const fetchLogsForNode = async (automationId: string, nodeId: string): Promise<AutomationNodeLog[]> => {
-    const { data: runIdsData, error: runIdsError } = await supabase.from('automation_runs').select('id').eq('automation_id', automationId);
+    // Ao unir com `automations`, garantimos que a consulta está sujeita à política RLS na tabela de automações,
+    // que deve restringir o acesso à equipe do usuário atual.
+    const { data: runIdsData, error: runIdsError } = await supabase
+        .from('automation_runs')
+        .select('id, automations!inner(id)')
+        .eq('automation_id', automationId);
+        
     if (runIdsError) { 
         console.error('Error fetching run IDs for logs:', runIdsError); 
         return []; 
