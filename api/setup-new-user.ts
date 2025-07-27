@@ -14,9 +14,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(400).json({ message: 'Missing userId or email in request body.' });
         }
 
-        console.log(`[Setup] Iniciando a configuração para o novo utilizador: ${userId} (${email})`);
+        console.log(`[Setup] Iniciando a configuração para o utilizador: ${userId} (${email})`);
+        
+        // Etapa 0: Verificar se o utilizador já possui uma equipa
+        const { data: existingTeam, error: checkError } = await supabaseAdmin
+            .from('teams')
+            .select('id')
+            .eq('owner_id', userId)
+            .limit(1)
+            .maybeSingle();
+
+        if (checkError) {
+            console.error(`[Setup] Erro ao verificar a equipa existente para o utilizador ${userId}:`, checkError);
+            throw checkError;
+        }
+
+        if (existingTeam) {
+            console.log(`[Setup] O utilizador ${userId} já tem uma equipa (ID: ${existingTeam.id}). A garantir a adesão.`);
+            // Garante que o utilizador é membro da sua própria equipa (idempotência)
+            const { error: upsertError } = await supabaseAdmin
+                .from('team_members')
+                .upsert({ team_id: existingTeam.id, user_id: userId, role: 'admin' } as any, { onConflict: 'team_id, user_id' });
+            
+            if (upsertError) {
+                console.error(`[Setup] Erro ao fazer upsert da adesão à equipa para a equipa existente:`, upsertError);
+                throw upsertError;
+            }
+            
+            return res.status(200).json({ message: 'Configuração do utilizador confirmada: a equipa já existe.' });
+        }
+
 
         // Etapa 1: Criar a equipa
+        console.log(`[Setup] Nenhuma equipa encontrada para o utilizador ${userId}. A criar uma nova equipa.`);
         const teamName = `Equipa de ${email.split('@')[0]}`;
         const { data: teamData, error: teamError } = await supabaseAdmin
             .from('teams')

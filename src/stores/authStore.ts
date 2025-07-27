@@ -50,7 +50,36 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             console.error("Error fetching user teams:", teamsData.error);
         }
         
-        const teams = (teamsData.data as unknown as Team[]) || [];
+        let teams = (teamsData.data as unknown as Team[]) || [];
+        
+        // **NOVO**: Se um utilizador autenticado não tiver equipas (por exemplo, um utilizador antigo),
+        // cria uma para ele para garantir a consistência da aplicação.
+        if (teams.length === 0) {
+            console.warn(`O utilizador ${user.id} não tem equipas. A tentar criar uma equipa padrão.`);
+            try {
+                const setupResponse = await fetch('/api/setup-new-user', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId: user.id, email: user.email })
+                });
+
+                if (!setupResponse.ok) {
+                    const setupError = await setupResponse.json();
+                    throw new Error(`A configuração da equipa falhou: ${setupError.message}`);
+                }
+                
+                // Após a criação, busca novamente as equipas.
+                const { data: newTeamsData, error: newTeamsError } = await supabase.from('teams').select('*').order('created_at', { ascending: true });
+                if (newTeamsError) throw newTeamsError;
+                
+                teams = (newTeamsData as unknown as Team[]) || [];
+                console.log(`Equipa padrão criada e obtida com sucesso para o utilizador ${user.id}.`);
+
+            } catch (creationError) {
+                console.error("Falha ao criar equipa padrão para utilizador existente:", creationError);
+                // Procede sem uma equipa, a UI deve lidar com este estado.
+            }
+        }
         
         set({ 
             profile: profileData,
