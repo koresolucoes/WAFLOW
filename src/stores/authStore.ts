@@ -38,24 +38,25 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (user) {
         set({ loading: true, teamLoading: true });
         
-        // Fetch profile and teams in parallel.
-        // The RLS policy on the 'teams' table will ensure only the teams the user is a member of are returned.
-        // This is a cleaner and more robust way to fetch teams than joining from 'team_members', avoiding RLS issues on joins.
-        const [profileData, teamsData] = await Promise.all([
+        const [profileData, teamMembershipsData] = await Promise.all([
             getProfile(user.id),
-            supabase.from('teams').select('*').order('created_at', { ascending: true })
+            // Busca as equipes através da tabela `team_members`, que é mais robusta contra problemas de RLS na tabela `teams`.
+            supabase.from('team_members').select('teams(*)').eq('user_id', user.id)
         ]);
 
-        if (teamsData.error) {
-            console.error("Error fetching user teams:", teamsData.error);
+        if (teamMembershipsData.error) {
+            console.error("Error fetching user teams:", teamMembershipsData.error);
         }
         
-        let teams = (teamsData.data as unknown as Team[]) || [];
-        
-        // **NOVO**: Se um utilizador autenticado não tiver equipas (por exemplo, um utilizador antigo),
+        let teams = ((teamMembershipsData.data as any[]) || [])
+            .map(m => m.teams) // Extrai o objeto da equipe da relação
+            .filter(Boolean) // Remove quaisquer equipes nulas/indefinidas
+            .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()); // Ordena por data de criação
+
+        // Se um usuário autenticado não tiver equipes (por exemplo, um usuário antigo),
         // cria uma para ele para garantir a consistência da aplicação.
         if (teams.length === 0) {
-            console.warn(`O utilizador ${user.id} não tem equipas. A tentar criar uma equipa padrão.`);
+            console.warn(`O usuário ${user.id} não tem equipes. Tentando criar uma equipe padrão.`);
             try {
                 const setupResponse = await fetch('/api/setup-new-user', {
                     method: 'POST',
@@ -65,19 +66,25 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
                 if (!setupResponse.ok) {
                     const setupError = await setupResponse.json();
-                    throw new Error(`A configuração da equipa falhou: ${setupError.message}`);
+                    throw new Error(`A configuração da equipe falhou: ${setupError.message}`);
                 }
                 
-                // Após a criação, busca novamente as equipas.
-                const { data: newTeamsData, error: newTeamsError } = await supabase.from('teams').select('*').order('created_at', { ascending: true });
+                // Após a criação, busca novamente as equipes usando o método correto.
+                const { data: newTeamMemberships, error: newTeamsError } = await supabase
+                    .from('team_members')
+                    .select('teams(*)')
+                    .eq('user_id', user.id);
+
                 if (newTeamsError) throw newTeamsError;
                 
-                teams = (newTeamsData as unknown as Team[]) || [];
-                console.log(`Equipa padrão criada e obtida com sucesso para o utilizador ${user.id}.`);
+                teams = ((newTeamMemberships as any[]) || [])
+                    .map(m => m.teams)
+                    .filter(Boolean)
+                    .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+                console.log(`Equipe padrão criada e obtida com sucesso para o usuário ${user.id}.`);
 
             } catch (creationError) {
-                console.error("Falha ao criar equipa padrão para utilizador existente:", creationError);
-                // Procede sem uma equipa, a UI deve lidar com este estado.
+                console.error("Falha ao criar equipe padrão para usuário existente:", creationError);
             }
         }
         

@@ -6,7 +6,7 @@ export const fetchTeamMembers = async (teamId: string): Promise<TeamMemberWithEm
     const { data, error } = await supabase.rpc('get_team_members', { p_team_id: teamId } as any);
     if (error) {
         console.error("Error fetching team members:", error);
-        throw new Error("Não foi possível carregar os membros da equipa. Verifique se tem permissões e se a função 'get_team_members' está configurada no Supabase.");
+        throw new Error("Não foi possível carregar os membros da equipe. Verifique se tem permissões e se a função 'get_team_members' está configurada no Supabase.");
     }
     return (data as any as TeamMemberWithEmail[]) || [];
 };

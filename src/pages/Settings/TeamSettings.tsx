@@ -42,9 +42,9 @@ const TeamSettings: React.FC = () => {
         setInviteMessage(null);
         try {
             await teamService.inviteUserToTeam(activeTeam.id, inviteEmail, 'agent'); // O papel padrão é 'agent'
-            setInviteMessage(`Convite enviado para ${inviteEmail}. O utilizador precisa de aceitar o convite por e-mail para se juntar à equipa.`);
+            setInviteMessage(`Convite enviado para ${inviteEmail}. O usuário precisa aceitar o convite por e-mail para se juntar à equipe.`);
             setInviteEmail('');
-            // A lista de membros não é atualizada aqui, pois o utilizador precisa de aceitar o convite primeiro.
+            // A lista de membros não é atualizada aqui, pois o usuário precisa aceitar o convite primeiro.
         } catch (err: any) {
             setError(err.message);
         } finally {
@@ -64,7 +64,7 @@ const TeamSettings: React.FC = () => {
     
     const handleRemoveMember = async (userId: string) => {
         if (!activeTeam) return;
-        if (window.confirm("Tem a certeza de que deseja remover este membro da equipa?")) {
+        if (window.confirm("Tem certeza de que deseja remover este membro da equipe?")) {
             try {
                 await teamService.removeTeamMember(activeTeam.id, userId);
                 setMembers(prev => prev.filter(m => m.user_id !== userId));
@@ -75,7 +75,7 @@ const TeamSettings: React.FC = () => {
     };
 
     if (!activeTeam) {
-        return <Card><p className="text-center text-slate-400">Nenhuma equipa ativa selecionada.</p></Card>;
+        return <Card><p className="text-center text-slate-400">Nenhuma equipe ativa selecionada.</p></Card>;
     }
     
     const isOwner = (memberUserId: string) => activeTeam.owner_id === memberUserId;
@@ -86,7 +86,7 @@ const TeamSettings: React.FC = () => {
         <div className="space-y-6">
             <Card>
                 <h2 className="text-lg font-semibold text-white">Convidar Novo Membro</h2>
-                <p className="text-sm text-slate-400 mb-4">Os utilizadores convidados receberão um e-mail para se juntarem à sua equipa.</p>
+                <p className="text-sm text-slate-400 mb-4">Os usuários convidados receberão um e-mail para se juntarem à sua equipe.</p>
                 {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
                 {inviteMessage && <p className="text-green-400 text-sm mb-4">{inviteMessage}</p>}
                 <form onSubmit={handleInvite} className="flex gap-2">
@@ -108,8 +108,8 @@ const TeamSettings: React.FC = () => {
             </Card>
 
             <Card>
-                <h2 className="text-lg font-semibold text-white mb-4">Membros da Equipa ({members.length})</h2>
-                {isLoading ? <p>A carregar membros...</p> : (
+                <h2 className="text-lg font-semibold text-white mb-4">Membros da Equipe ({members.length})</h2>
+                {isLoading ? <p>Carregando membros...</p> : (
                     <div className="bg-slate-900/50 rounded-lg">
                          <ul className="divide-y divide-slate-700/50">
                             {members.map(member => (

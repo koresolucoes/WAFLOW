@@ -21,11 +21,11 @@ const TeamSwitcher: React.FC = () => {
     }, []);
 
     if (teamLoading) {
-        return <div className="text-sm text-slate-400">Carregando equipas...</div>;
+        return <div className="text-sm text-slate-400">Carregando equipes...</div>;
     }
     
     if (!activeTeam) {
-        return <div className="text-sm text-slate-400">Nenhuma equipa encontrada.</div>;
+        return <div className="text-sm text-slate-400">Nenhuma equipe encontrada.</div>;
     }
 
     const switchTeam = (team: Team) => {
