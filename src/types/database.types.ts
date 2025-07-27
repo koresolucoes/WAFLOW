@@ -511,6 +511,7 @@ export type PublicTables = {
       company_name: string | null
       company_products: string | null
       company_tone: string | null
+      dashboard_layout: Json | null
       id: string
       meta_access_token: string | null
       meta_phone_number_id: string | null
@@ -525,6 +526,7 @@ export type PublicTables = {
       company_name?: string | null
       company_products?: string | null
       company_tone?: string | null
+      dashboard_layout?: Json | null
       id: string
       meta_access_token?: string | null
       meta_phone_number_id?: string | null
@@ -539,6 +541,7 @@ export type PublicTables = {
       company_name?: string | null
       company_products?: string | null
       company_tone?: string | null
+      dashboard_layout?: Json | null
       id?: string
       meta_access_token?: string | null
       meta_phone_number_id?: string | null
