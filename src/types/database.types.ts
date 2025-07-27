@@ -130,15 +130,7 @@ export type PublicTables = {
       trigger_key?: string | null
       created_at?: string
     }
-    Relationships: [
-      {
-        foreignKeyName: "automation_triggers_team_id_fkey"
-        columns: ["team_id"]
-        isOneToOne: false
-        referencedRelation: "teams"
-        referencedColumns: ["id"]
-      }
-    ]
+    Relationships: []
   }
   automations: {
     Row: {
@@ -168,15 +160,7 @@ export type PublicTables = {
       status?: PublicEnums["automation_status"]
       team_id?: string
     }
-    Relationships: [
-      {
-        foreignKeyName: "automations_team_id_fkey"
-        columns: ["team_id"]
-        isOneToOne: false
-        referencedRelation: "teams"
-        referencedColumns: ["id"]
-      }
-    ]
+    Relationships: []
   }
   campaigns: {
     Row: {
@@ -209,15 +193,7 @@ export type PublicTables = {
       template_id?: string | null
       team_id?: string
     }
-    Relationships: [
-      {
-        foreignKeyName: "campaigns_team_id_fkey"
-        columns: ["team_id"]
-        isOneToOne: false
-        referencedRelation: "teams"
-        referencedColumns: ["id"]
-      }
-    ]
+    Relationships: []
   }
   canned_responses: {
     Row: {
@@ -241,15 +217,7 @@ export type PublicTables = {
       shortcut?: string
       team_id?: string
     }
-    Relationships: [
-      {
-        foreignKeyName: "canned_responses_team_id_fkey"
-        columns: ["team_id"]
-        isOneToOne: false
-        referencedRelation: "teams"
-        referencedColumns: ["id"]
-      }
-    ]
+    Relationships: []
   }
   contact_activities: {
     Row: {
@@ -282,15 +250,7 @@ export type PublicTables = {
       due_date?: string | null
       is_completed?: boolean
     }
-    Relationships: [
-      {
-        foreignKeyName: "contact_activities_team_id_fkey"
-        columns: ["team_id"]
-        isOneToOne: false
-        referencedRelation: "teams"
-        referencedColumns: ["id"]
-      }
-    ]
+    Relationships: []
   }
   contacts: {
     Row: {
@@ -329,15 +289,7 @@ export type PublicTables = {
       tags?: string[] | null
       team_id?: string
     }
-    Relationships: [
-       {
-        foreignKeyName: "contacts_team_id_fkey"
-        columns: ["team_id"]
-        isOneToOne: false
-        referencedRelation: "teams"
-        referencedColumns: ["id"]
-      }
-    ]
+    Relationships: []
   }
   conversations: {
     Row: {
@@ -367,29 +319,7 @@ export type PublicTables = {
       created_at?: string
       updated_at?: string
     }
-    Relationships: [
-      {
-        foreignKeyName: "conversations_team_id_fkey"
-        columns: ["team_id"]
-        isOneToOne: false
-        referencedRelation: "teams"
-        referencedColumns: ["id"]
-      },
-      {
-        foreignKeyName: "conversations_contact_id_fkey"
-        columns: ["contact_id"]
-        isOneToOne: true
-        referencedRelation: "contacts"
-        referencedColumns: ["id"]
-      },
-      {
-        foreignKeyName: "conversations_assignee_id_fkey"
-        columns: ["assignee_id"]
-        isOneToOne: false
-        referencedRelation: "users"
-        referencedColumns: ["id"]
-      }
-    ]
+    Relationships: []
   }
   custom_field_definitions: {
     Row: {
@@ -419,15 +349,7 @@ export type PublicTables = {
       type?: PublicEnums["custom_field_type"]
       team_id?: string
     }
-    Relationships: [
-      {
-        foreignKeyName: "custom_field_definitions_team_id_fkey"
-        columns: ["team_id"]
-        isOneToOne: false
-        referencedRelation: "teams"
-        referencedColumns: ["id"]
-      }
-    ]
+    Relationships: []
   }
   deals: {
     Row: {
@@ -472,15 +394,7 @@ export type PublicTables = {
       team_id?: string
       value?: number | null
     }
-    Relationships: [
-      {
-        foreignKeyName: "deals_team_id_fkey"
-        columns: ["team_id"]
-        isOneToOne: false
-        referencedRelation: "teams"
-        referencedColumns: ["id"]
-      }
-    ]
+    Relationships: []
   }
   message_templates: {
     Row: {
@@ -513,15 +427,7 @@ export type PublicTables = {
       template_name?: string
       team_id?: string
     }
-    Relationships: [
-      {
-        foreignKeyName: "message_templates_team_id_fkey"
-        columns: ["team_id"]
-        isOneToOne: false
-        referencedRelation: "teams"
-        referencedColumns: ["id"]
-      }
-    ]
+    Relationships: []
   }
   messages: {
     Row: {
@@ -581,15 +487,7 @@ export type PublicTables = {
       type?: PublicEnums["message_type"]
       team_id?: string
     }
-    Relationships: [
-      {
-        foreignKeyName: "messages_team_id_fkey"
-        columns: ["team_id"]
-        isOneToOne: false
-        referencedRelation: "teams"
-        referencedColumns: ["id"]
-      }
-    ]
+    Relationships: []
   }
   pipeline_stages: {
     Row: {
@@ -637,15 +535,7 @@ export type PublicTables = {
       name?: string
       team_id?: string
     }
-    Relationships: [
-       {
-        foreignKeyName: "pipelines_team_id_fkey"
-        columns: ["team_id"]
-        isOneToOne: false
-        referencedRelation: "teams"
-        referencedColumns: ["id"]
-      }
-    ]
+    Relationships: []
   }
   profiles: {
     Row: {
@@ -711,22 +601,7 @@ export type PublicTables = {
       user_id?: string
       role?: "admin" | "agent"
     }
-    Relationships: [
-      {
-        foreignKeyName: "team_members_team_id_fkey"
-        columns: ["team_id"]
-        isOneToOne: false
-        referencedRelation: "teams"
-        referencedColumns: ["id"]
-      },
-      {
-        foreignKeyName: "team_members_user_id_fkey"
-        columns: ["user_id"]
-        isOneToOne: false
-        referencedRelation: "users"
-        referencedColumns: ["id"]
-      }
-    ]
+    Relationships: []
   }
   teams: {
     Row: {
@@ -747,15 +622,7 @@ export type PublicTables = {
       owner_id?: string | null
       created_at?: string
     }
-    Relationships: [
-      {
-        foreignKeyName: "teams_owner_id_fkey"
-        columns: ["owner_id"]
-        isOneToOne: false
-        referencedRelation: "users"
-        referencedColumns: ["id"]
-      }
-    ]
+    Relationships: []
   }
   webhook_logs: {
     Row: {
@@ -782,15 +649,7 @@ export type PublicTables = {
       payload?: Json | null
       path?: string | null
     }
-    Relationships: [
-      {
-        foreignKeyName: "webhook_logs_team_id_fkey"
-        columns: ["team_id"]
-        isOneToOne: false
-        referencedRelation: "teams"
-        referencedColumns: ["id"]
-      }
-    ]
+    Relationships: []
   }
 }
 

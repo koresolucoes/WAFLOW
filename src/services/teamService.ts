@@ -9,7 +9,7 @@ export const getTeamMembersForTeams = async (teamIds: string[]): Promise<TeamMem
         console.error("Falha ao buscar membros da equipe via RPC:", error);
         throw error;
     };
-    return (data as TeamMemberWithEmail[]) || [];
+    return (data as unknown as TeamMemberWithEmail[]) || [];
 };
 
 export const inviteUserToTeam = async (teamId: string, email: string, role: 'admin' | 'agent'): Promise<any> => {
@@ -21,7 +21,7 @@ export const inviteUserToTeam = async (teamId: string, email: string, role: 'adm
     });
     if (error) throw error;
     // A função RPC pode retornar um objeto de erro personalizado.
-    if (data.error) throw new Error(data.error);
+    if ((data as any)?.error) throw new Error((data as any).error);
     return data;
 };
 
