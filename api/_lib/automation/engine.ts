@@ -27,7 +27,7 @@ export const createDefaultLoggingHooks = (automationId: string, contactId: strin
         if (!data) {
             throw new Error('Failed to retrieve automation run ID after creation.');
         }
-        runId = (data as any).id;
+        runId = data.id;
     });
 
     hooks.addHandler('workflowExecuteAfter', async (status, details) => {
@@ -92,7 +92,7 @@ export const executeAutomation = async (
         await hooks.runHook('workflowExecuteAfter', 'failed', errorMessage);
         return;
     }
-    const teamId = (teamData as any).id;
+    const teamId = teamData.id;
 
     const nodesMap = new Map(automation.nodes.map(n => [n.id, n]));
     const edgesMap = new Map();

@@ -4,6 +4,7 @@ import type { Session, User } from '@supabase/auth-js';
 import { Profile, EditableProfile, MetaConfig, Team, TeamMemberWithEmail } from '../types';
 import { getProfile, updateProfileInDb } from '../services/profileService';
 import { getTeamMembersForTeams } from '../services/teamService';
+import type { RealtimeChannel } from '@supabase/realtime-js';
 
 interface AuthState {
   session: Session | null;
@@ -15,9 +16,11 @@ interface AuthState {
   userTeams: Team[];
   allTeamMembers: TeamMemberWithEmail[];
   teamLoading: boolean;
+  teamSubscription: RealtimeChannel | null;
   initializeAuth: () => () => void;
   updateProfile: (profileData: EditableProfile) => Promise<void>;
   setActiveTeam: (team: Team) => void;
+  clearTeamSubscription: () => void;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -30,11 +33,22 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   userTeams: [],
   allTeamMembers: [],
   teamLoading: true,
+  teamSubscription: null,
+
+  clearTeamSubscription: () => {
+    const { teamSubscription } = get();
+    if (teamSubscription) {
+        supabase.removeChannel(teamSubscription);
+        set({ teamSubscription: null });
+    }
+  },
 
   initializeAuth: () => {
     if (get().isInitialized) return () => {};
 
     const handleSession = async (session: Session | null) => {
+      get().clearTeamSubscription();
+
       const user = session?.user ?? null;
       set({ session, user, profile: null, activeTeam: null, userTeams: [], allTeamMembers: [] });
 
@@ -82,12 +96,36 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         }
 
         if (teams.length > 0) {
+            const teamIds = teams.map(t => t.id);
             try {
-                const teamIds = teams.map(t => t.id);
                 allTeamMembers = await getTeamMembersForTeams(teamIds);
             } catch(err) {
                 console.error("Não foi possível buscar os membros da equipe, a funcionalidade da equipe pode ser limitada.", err);
             }
+
+            const channel = supabase.channel(`team-members-changes-${teamIds.join('-')}`)
+                .on(
+                    'postgres_changes',
+                    { event: '*', schema: 'public', table: 'team_members', filter: `team_id=in.(${teamIds.join(',')})` },
+                    async (payload) => {
+                        console.log('Realtime change on team_members detected! Refetching members.', payload);
+                        try {
+                           const updatedMembers = await getTeamMembersForTeams(teamIds);
+                           set({ allTeamMembers: updatedMembers });
+                        } catch (err) {
+                           console.error("Error refetching team members after realtime event:", err);
+                        }
+                    }
+                )
+                .subscribe((status, err) => {
+                    if (status === 'SUBSCRIBED') {
+                        console.log('Subscribed to team_members changes.');
+                    }
+                    if (err) {
+                        console.error('Error subscribing to team_members changes', err);
+                    }
+                });
+            set({ teamSubscription: channel });
         }
         
         set({ 
@@ -119,6 +157,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     return () => {
         subscription.unsubscribe();
+        get().clearTeamSubscription();
     };
   },
 

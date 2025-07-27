@@ -15,7 +15,7 @@ export const fetchCannedResponses = async (teamId: string): Promise<CannedRespon
 export const addCannedResponse = async (teamId: string, response: Omit<CannedResponseInsert, 'team_id' | 'id' | 'created_at'>): Promise<CannedResponse> => {
     const { data, error } = await supabase
         .from('canned_responses')
-        .insert({ ...response, team_id: teamId } as any)
+        .insert({ ...response, team_id: teamId })
         .select()
         .single();
     if (error) throw error;
@@ -25,7 +25,7 @@ export const addCannedResponse = async (teamId: string, response: Omit<CannedRes
 export const updateCannedResponse = async (id: string, updates: TablesUpdate<'canned_responses'>): Promise<CannedResponse> => {
     const { data, error } = await supabase
         .from('canned_responses')
-        .update(updates as any)
+        .update(updates)
         .eq('id', id)
         .select()
         .single();

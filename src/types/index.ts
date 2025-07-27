@@ -1,7 +1,7 @@
 // Type definitions for Vite environment variables were not being picked up correctly.
 // Removing them to avoid confusion and relying on a local cast where needed.
 
-import { Database, Json, Enums, Tables, TablesInsert, TablesUpdate } from './database.types';
+import { Database, Json, Enums } from './database.types';
 import { MetaTemplateComponent } from '../services/meta/types';
 import type { Node as XyNode, Edge } from '@xyflow/react';
 import type { Session, User } from '@supabase/auth-js';
@@ -209,4 +209,4 @@ export interface MetaConfig {
 }
 
 // Tipos de Autenticação
-export type { Session, User, Edge, Json, MetaTemplateComponent, Tables, TablesInsert, TablesUpdate };
+export type { Session, User, Edge, Json, MetaTemplateComponent };

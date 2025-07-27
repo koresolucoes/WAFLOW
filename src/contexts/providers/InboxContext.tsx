@@ -4,7 +4,7 @@ import { useAuthStore, useMetaConfig } from '../../stores/authStore';
 import { ContactsContext } from './ContactsContext';
 import { Conversation, UnifiedMessage, Message, MessageStatus, Contact, TeamMemberWithEmail } from '../../types';
 import * as inboxService from '../../services/inboxService';
-import type { RealtimePostgresChangesPayload } from '@supabase/realtime-js';
+import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 
 interface InboxContextType {
     conversations: Conversation[];
@@ -99,7 +99,7 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         if (user && activeTeam) {
             fetchConversations();
 
-            const handleMessageChange = (payload: RealtimePostgresChangesPayload<Message>) => {
+            const handleMessageChange = (payload: RealtimePostgresChangesPayload<{[key: string]: any}>) => {
                 if (payload.eventType !== 'INSERT' && payload.eventType !== 'UPDATE') return;
 
                 const newMessage = inboxService.mapPayloadToUnifiedMessage(payload.new as Message);
@@ -145,7 +145,7 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 }
             };
 
-            const handleContactChange = (payload: RealtimePostgresChangesPayload<Contact>) => {
+            const handleContactChange = (payload: RealtimePostgresChangesPayload<{[key: string]: any}>) => {
                 if (payload.eventType !== 'UPDATE') return;
                 const updatedContact = payload.new as Contact;
                 console.log('[Inbox] Realtime contact update received:', updatedContact);

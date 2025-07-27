@@ -1,5 +1,6 @@
 import React, { useContext, useState, useMemo } from 'react';
-import { MessageTemplate, TemplateCategory, TemplateStatus, TablesInsert } from '../../types';
+import { MessageTemplate, TemplateCategory, TemplateStatus } from '../../types';
+import type { TablesInsert } from '../../types/database.types';
 import { getMetaTemplates } from '../../services/meta/templates';
 import { supabase } from '../../lib/supabaseClient';
 import Card from '../../components/common/Card';
@@ -87,7 +88,7 @@ const Templates: React.FC = () => {
         }));
         
         if (templatesToUpsert.length > 0) {
-            const { error: upsertError } = await supabase.from('message_templates').upsert(templatesToUpsert as any, { onConflict: 'meta_id, team_id' });
+            const { error: upsertError } = await supabase.from('message_templates').upsert(templatesToUpsert, { onConflict: 'meta_id, team_id' });
             if (upsertError) throw upsertError;
         }
 

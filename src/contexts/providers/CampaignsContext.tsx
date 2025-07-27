@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabaseClient';
 import { Campaign, CampaignWithMetrics, MessageInsert, CampaignWithDetails, CampaignStatus, Message, MessageStatus, MessageWithContact } from '../../types';
 import { useAuthStore } from '../../stores/authStore';
 import { fetchCampaignDetailsFromDb, addCampaignToDb, deleteCampaignFromDb } from '../../services/campaignService';
-import type { RealtimePostgresChangesPayload } from '@supabase/realtime-js';
+import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 
 interface CampaignsContextType {
   campaigns: CampaignWithMetrics[];
@@ -72,7 +72,7 @@ export const CampaignsProvider: React.FC<{ children: ReactNode }> = ({ children 
   useEffect(() => {
     if (!user || !activeTeam) return;
 
-    const handleRealtimeMessageUpdate = async (payload: any) => {
+    const handleRealtimeMessageUpdate = async (payload: RealtimePostgresChangesPayload<{[key: string]: any}>) => {
         if (payload.eventType !== 'UPDATE') return;
         const updatedMessage = payload.new as Message;
         const campaignId = updatedMessage.campaign_id;
@@ -113,10 +113,10 @@ export const CampaignsProvider: React.FC<{ children: ReactNode }> = ({ children 
 
     const channel = supabase
         .channel('campaign-message-updates')
-        .on(
+        .on<Message>(
             'postgres_changes',
             { event: 'UPDATE', schema: 'public', table: 'messages', filter: `team_id=eq.${activeTeam.id}` },
-            handleRealtimeMessageUpdate
+            (payload) => handleRealtimeMessageUpdate(payload)
         )
         .subscribe();
         

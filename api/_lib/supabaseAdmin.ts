@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { Database } from './database.types.js';
+import type { Database } from './database.types.js';
 
 // Enhanced logging for debugging environment variables in the Vercel runtime.
 console.log('[Supabase Admin] Initializing...');
