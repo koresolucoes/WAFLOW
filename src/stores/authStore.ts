@@ -145,7 +145,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         handleSession(session);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+        // Handle session refreshes silently without a full data reload.
+        // This prevents the "page reload" feeling when switching browser tabs.
+        if (event === 'TOKEN_REFRESHED') {
+            set({ session });
+            return;
+        }
+
+        // For actual sign-in/sign-out events, perform the full re-initialization.
         set({ loading: true, profile: null });
         handleSession(session);
     });
