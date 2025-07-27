@@ -13,16 +13,31 @@ export const getTeamMembersForTeams = async (teamIds: string[]): Promise<TeamMem
 };
 
 export const inviteUserToTeam = async (teamId: string, email: string, role: 'admin' | 'agent'): Promise<any> => {
-    // Presume a existência de uma função RPC `invite_team_member` segura no Supabase.
-    const { data, error } = await supabase.rpc('invite_team_member', {
-        p_team_id: teamId,
-        p_email: email,
-        p_role: role
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+        throw new Error("Não autenticado. Por favor, faça login novamente.");
+    }
+
+    const response = await fetch('/api/invite-member', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+            team_id: teamId,
+            email: email,
+            role: role,
+        }),
     });
-    if (error) throw error;
-    // A função RPC pode retornar um objeto de erro personalizado.
-    if ((data as any)?.error) throw new Error((data as any).error);
-    return data;
+
+    const result = await response.json();
+
+    if (!response.ok) {
+        throw new Error(result.error || 'Falha ao convidar membro. Verifique o console para mais detalhes.');
+    }
+
+    return result;
 };
 
 export const updateTeamMemberRole = async (teamId: string, userId: string, newRole: 'admin' | 'agent'): Promise<void> => {
