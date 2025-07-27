@@ -84,11 +84,11 @@ const Templates: React.FC = () => {
             template_name: mt.name,
             status: mt.status as TemplateStatus,
             category: mt.category as TemplateCategory,
-            components: mt.components as Json,
+            components: mt.components as unknown as Json,
         }));
         
         if (templatesToUpsert.length > 0) {
-            const { error: upsertError } = await supabase.from('message_templates').upsert(templatesToUpsert, { onConflict: 'meta_id, team_id' });
+            const { error: upsertError } = await supabase.from('message_templates').upsert(templatesToUpsert as any, { onConflict: 'meta_id, team_id' });
             if (upsertError) throw upsertError;
         }
 

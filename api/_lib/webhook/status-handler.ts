@@ -37,7 +37,7 @@ export async function processStatusUpdate(status: any, userId: string): Promise<
 
     const { data, error } = await supabaseAdmin
         .from('messages')
-        .update(updatePayload)
+        .update(updatePayload as any)
         .eq('meta_message_id', status.id)
         .eq('team_id', teamId)
         .select('id');

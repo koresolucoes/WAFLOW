@@ -60,7 +60,7 @@ const TemplatePreview: React.FC<TemplatePreviewProps> = ({
                 </div>
 
                 {/* Chat background */}
-                <div className="bg-[#0a1014] bg-[url('https://theabbie.github.io/blog/assets/images/posts/21-03-31-whatsapp-bg-dark.png')] bg-cover p-3 min-h-[480px] flex flex-col justify-end">
+                <div className="bg-[#0a1014] bg-[url('https://www.heroscreen.cc/static/media/whats-app-dark-bg.a5027f2f.png')] bg-cover p-3 min-h-[480px] flex flex-col justify-end">
                     <div className='w-full'>
                         {/* Message bubble */}
                         <div className="max-w-[85%] ml-auto bg-[#005c4b] rounded-lg rounded-tr-none p-2 text-white shadow-md mb-2">

@@ -27,7 +27,7 @@ const analyzeAndStoreSentiment = async (messageText: string, contactId: string):
         if (emoji && typeof emoji === 'string') {
             const { error: updateError } = await supabaseAdmin
                 .from('contacts')
-                .update({ sentiment: emoji })
+                .update({ sentiment: emoji } as any)
                 .eq('id', contactId);
             
             if (updateError) {
@@ -81,7 +81,7 @@ export async function processIncomingMessage(
         read_at: new Date().toISOString()
     };
 
-    const { error: insertError } = await supabaseAdmin.from('messages').insert(messagePayload);
+    const { error: insertError } = await supabaseAdmin.from('messages').insert(messagePayload as any);
 
     if (insertError) {
         console.error(`[Message Handler] Failed to insert inbound message for contact ${contact.id}:`, insertError);

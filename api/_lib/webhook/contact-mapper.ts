@@ -46,7 +46,7 @@ export const findOrCreateContactByPhone = async (team_id: string, phone: string,
         const newContactPayload: TablesInsert<'contacts'> = { team_id, phone: normalizedPhone, name, tags: ['new-lead'], custom_fields: null, sentiment: null };
         const { data: newContact, error: insertError } = await supabaseAdmin
             .from('contacts')
-            .insert(newContactPayload)
+            .insert(newContactPayload as any)
             .select('company, created_at, custom_fields, email, id, name, phone, sentiment, tags, team_id')
             .single();
         if (insertError) {
@@ -150,7 +150,7 @@ export const processWebhookPayloadForContact = async (
         if (needsUpdate) {
             const { data: updatedContact, error: updateContactError } = await supabaseAdmin
                 .from('contacts')
-                .update(updatePayload)
+                .update(updatePayload as any)
                 .eq('id', contact.id)
                 .select('company, created_at, custom_fields, email, id, name, phone, sentiment, tags, team_id')
                 .single();

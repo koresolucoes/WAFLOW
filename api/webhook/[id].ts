@@ -83,9 +83,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                         team_id: teamId,
                         source: 'meta_message',
                         payload: body as unknown as Json,
-                        path: req.url,
+                        path: req.url || null,
                     };
-                    await supabaseAdmin.from('webhook_logs').insert(logPayload);
+                    await supabaseAdmin.from('webhook_logs').insert(logPayload as any);
                 }
             } catch (logError) {
                 console.error('[Webhook] Falha ao registrar webhook de entrada:', logError);

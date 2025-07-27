@@ -97,9 +97,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     team_id: teamId,
                     source: 'automation_trigger',
                     payload: { rawBody, query: req.query, headers: cleanHeaders } as unknown as Json,
-                    path: req.url,
+                    path: req.url || null,
                 };
-                await supabaseAdmin.from('webhook_logs').insert(logPayload);
+                await supabaseAdmin.from('webhook_logs').insert(logPayload as any);
             } catch (logError) {
                 console.error('[Trigger] Failed to log incoming trigger webhook:', logError);
             }

@@ -70,7 +70,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isPanelOpen, setIsPanelOpen }) 
                     </div>
                 </header>
 
-                <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-[#0a1014] bg-[url('https://theabbie.github.io/blog/assets/images/posts/21-03-31-whatsapp-bg-dark.png')] bg-cover">
+                <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-[#0a1014] bg-[url('https://www.heroscreen.cc/static/media/whats-app-dark-bg.a5027f2f.png')] bg-cover">
                     <div className="space-y-4">
                         {isLoading ? (
                             <div className="text-center text-slate-400">Carregando mensagens...</div>

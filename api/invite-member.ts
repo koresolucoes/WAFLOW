@@ -75,7 +75,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const { error: insertError } = await supabaseAdmin
             .from('team_members')
-            .upsert({ team_id, user_id: invitedUserId, role }, { onConflict: 'team_id, user_id' });
+            .upsert({ team_id, user_id: invitedUserId, role } as any, { onConflict: 'team_id, user_id' });
 
         if (insertError) {
             throw insertError;

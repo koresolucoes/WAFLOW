@@ -61,7 +61,7 @@ export const inviteUserToTeam = async (teamId: string, email: string, role: 'adm
 export const updateTeamMemberRole = async (teamId: string, userId: string, newRole: 'admin' | 'agent'): Promise<void> => {
     const { error } = await supabase
         .from('team_members')
-        .update({ role: newRole })
+        .update({ role: newRole } as any)
         .eq('team_id', teamId)
         .eq('user_id', userId);
     if (error) throw error;
