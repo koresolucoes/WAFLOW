@@ -41,7 +41,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         // Fetch profile and teams in parallel
         const [profileData, memberTeams] = await Promise.all([
             getProfile(user.id),
-            supabase.from('team_members').select('teams(*)').eq('user_id', user.id)
+            supabase.from('team_members').select('teams!inner(*)').eq('user_id', user.id)
         ]);
         
         const teams = (memberTeams.data?.map(mt => (mt as any).teams).filter(Boolean) as Team[]) || [];
