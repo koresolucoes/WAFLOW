@@ -44,7 +44,13 @@ export const AutomationsProvider: React.FC<{ children: ReactNode }> = ({ childre
                     edges: (Array.isArray(newAutomation.edges) ? newAutomation.edges : []) as unknown as Edge[],
                     status: newAutomation.status as AutomationStatus,
                 };
-                setAutomations(prev => [...prev, sanitized]);
+                setAutomations(prev => {
+                    // Avoid adding duplicates from local updates
+                    if (prev.some(a => a.id === sanitized.id)) {
+                        return prev.map(a => a.id === sanitized.id ? sanitized : a);
+                    }
+                    return [sanitized, ...prev];
+                });
             }
             else if (payload.eventType === 'UPDATE') {
                 const updatedAutomation = payload.new as Tables<'automations'>;
@@ -77,19 +83,30 @@ export const AutomationsProvider: React.FC<{ children: ReactNode }> = ({ childre
     const createAndNavigateToAutomation = useCallback(async () => {
         if (!user || !activeTeam) throw new Error("User or active team not available.");
         const newAutomation = await automationService.createAutomationInDb(activeTeam.id);
+        // Local state update for immediate feedback
+        setAutomations(prev => [newAutomation, ...prev]);
         setCurrentPage('automation-editor', { automationId: newAutomation.id });
     }, [user, activeTeam, setCurrentPage]);
 
     const updateAutomation = useCallback(async (automation: Automation) => {
         if (!user || !activeTeam) throw new Error("User or active team not available.");
         const updated = await automationService.updateAutomationInDb(activeTeam.id, automation);
+        // Local state update for immediate feedback
         setAutomations(prev => prev.map(a => a.id === updated.id ? updated : a));
     }, [user, activeTeam]);
     
     const deleteAutomation = useCallback(async (automationId: string) => {
         if (!user || !activeTeam) throw new Error("User not authenticated.");
-        await automationService.deleteAutomationFromDb(automationId, activeTeam.id);
-        // Realtime handles state update
+        
+        // Local state update for immediate feedback after DB operation
+        try {
+            await automationService.deleteAutomationFromDb(automationId, activeTeam.id);
+            setAutomations(prev => prev.filter(a => a.id !== automationId));
+        } catch (error) {
+            console.error("Failed to delete automation:", error);
+            // Optionally, you could re-fetch or show an error to the user
+            alert("Falha ao excluir a automação. Por favor, tente novamente.");
+        }
     }, [user, activeTeam]);
     
     const fetchAutomationStats = useCallback(async (automationId: string) => {
