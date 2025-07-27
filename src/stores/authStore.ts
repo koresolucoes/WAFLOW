@@ -102,7 +102,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                 console.error("Não foi possível buscar os membros da equipe, a funcionalidade da equipe pode ser limitada.", err);
             }
 
-            const channel = supabase.channel(`team-members-changes-${teamIds.join('-')}`)
+            const channel = supabase.channel(`team-members-changes-${user.id}`)
                 .on(
                     'postgres_changes',
                     { event: '*', schema: 'public', table: 'team_members', filter: `team_id=in.(${teamIds.join(',')})` },
