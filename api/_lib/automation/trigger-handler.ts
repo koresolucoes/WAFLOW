@@ -1,5 +1,5 @@
 import { supabaseAdmin } from '../supabaseAdmin.js';
-import { executeAutomation, createDefaultLoggingHooks } from './engine.js';
+import { executeAutomation } from './engine.js';
 import { Automation, Contact, Json, Profile } from '../types.js';
 import { sanitizeAutomation } from './utils.js';
 
@@ -49,8 +49,7 @@ const dispatchAutomations = async (userId: string, triggers: TriggerInfo[], cont
             }
             const automation = sanitizeAutomation(rawAutomation);
             console.log(`[DISPATCHER] Despachando automação '${automation.name}' (ID: ${automation.id}) a partir do nó ${trigger.node_id}`);
-            const hooks = createDefaultLoggingHooks(automation.id, contact ? contact.id : null);
-            return executeAutomation(automation, contact, trigger.node_id, triggerPayload, hooks, profile);
+            return executeAutomation(automation, contact, trigger.node_id, triggerPayload, profile);
         }
         return Promise.resolve();
     });

@@ -9,7 +9,7 @@ import { ExecutionLifecycleHooks } from './ExecutionLifecycleHooks.js';
  * Creates and configures a default set of lifecycle hooks for logging automation runs.
  * This decouples the logging mechanism from the execution engine itself.
  */
-export const createDefaultLoggingHooks = (automationId: string, contactId: string | null): ExecutionLifecycleHooks => {
+export const createDefaultLoggingHooks = (automationId: string, contactId: string | null, teamId: string): ExecutionLifecycleHooks => {
     const hooks = new ExecutionLifecycleHooks();
     let runId: string | null = null;
 
@@ -17,8 +17,9 @@ export const createDefaultLoggingHooks = (automationId: string, contactId: strin
         const { data, error } = await supabaseAdmin.from('automation_runs').insert({
             automation_id: automationId,
             contact_id: contactId,
+            team_id: teamId,
             status: 'running'
-        }).select('id').single();
+        } as any).select('id').single();
 
         if (error) {
             console.error(`[Execution Logging] Failed to create automation_run record for automation ${automationId}`, error);
@@ -27,7 +28,7 @@ export const createDefaultLoggingHooks = (automationId: string, contactId: strin
         if (!data) {
             throw new Error('Failed to retrieve automation run ID after creation.');
         }
-        runId = data.id;
+        runId = (data as any).id;
     });
 
     hooks.addHandler('workflowExecuteAfter', async (status, details) => {
@@ -46,17 +47,19 @@ export const createDefaultLoggingHooks = (automationId: string, contactId: strin
         const logPayload: TablesInsert<'automation_node_logs'> = {
             run_id: runId,
             node_id: node.id,
+            team_id: teamId,
             status,
             details,
         };
-        await supabaseAdmin.from('automation_node_logs').insert(logPayload);
+        await supabaseAdmin.from('automation_node_logs').insert(logPayload as any);
         
         // Increment the success/error counter for the node
         await supabaseAdmin.rpc('increment_node_stat', {
             p_automation_id: automationId,
             p_node_id: node.id,
             p_status: status,
-        });
+            p_team_id: teamId
+        } as any);
     });
 
     return hooks;
@@ -70,7 +73,6 @@ export const createDefaultLoggingHooks = (automationId: string, contactId: strin
  * @param contact The contact associated with this execution run.
  * @param startNodeId The ID of the node that triggered the execution.
  * @param triggerPayload The data payload from the trigger.
- * @param hooks An instance of ExecutionLifecycleHooks for logging and side effects.
  * @param profile The user's profile, containing API keys and other settings.
  */
 export const executeAutomation = async (
@@ -78,21 +80,13 @@ export const executeAutomation = async (
     contact: Contact | null,
     startNodeId: string,
     triggerPayload: Json | null,
-    hooks: ExecutionLifecycleHooks,
     profile: Profile
 ): Promise<void> => {
     
+    const hooks = createDefaultLoggingHooks(automation.id, contact ? contact.id : null, automation.team_id);
     await hooks.runHook('workflowExecuteBefore');
 
-    const { data: teamData, error: teamError } = await supabaseAdmin.from('teams').select('id').eq('owner_id', profile.id).single();
-
-    if (teamError || !teamData) {
-        const errorMessage = `[Execution Engine] Could not find team for user ${profile.id}. Aborting automation.`;
-        console.error(errorMessage, teamError);
-        await hooks.runHook('workflowExecuteAfter', 'failed', errorMessage);
-        return;
-    }
-    const teamId = teamData.id;
+    const teamId = automation.team_id;
 
     const nodesMap = new Map(automation.nodes.map(n => [n.id, n]));
     const edgesMap = new Map();

@@ -32,6 +32,7 @@ export type PublicTables = {
       node_id: string
       run_id: string
       status: string
+      team_id: string
     }
     Insert: {
       created_at?: string
@@ -40,6 +41,7 @@ export type PublicTables = {
       node_id: string
       run_id: string
       status: string
+      team_id: string
     }
     Update: {
       created_at?: string
@@ -48,6 +50,7 @@ export type PublicTables = {
       node_id?: string
       run_id?: string
       status?: string
+      team_id?: string
     }
   }
   automation_node_stats: {
@@ -57,6 +60,7 @@ export type PublicTables = {
       last_run_at: string | null
       node_id: string
       success_count: number
+      team_id: string
     }
     Insert: {
       automation_id: string
@@ -64,6 +68,7 @@ export type PublicTables = {
       last_run_at?: string | null
       node_id: string
       success_count?: number
+      team_id: string
     }
     Update: {
       automation_id?: string
@@ -71,6 +76,7 @@ export type PublicTables = {
       last_run_at?: string | null
       node_id?: string
       success_count?: number
+      team_id?: string
     }
   }
   automation_runs: {
@@ -81,6 +87,7 @@ export type PublicTables = {
       id: string
       run_at: string
       status: string
+      team_id: string
     }
     Insert: {
       automation_id: string
@@ -89,6 +96,7 @@ export type PublicTables = {
       id?: string
       run_at?: string
       status: string
+      team_id: string
     }
     Update: {
       automation_id?: string
@@ -97,6 +105,7 @@ export type PublicTables = {
       id?: string
       run_at?: string
       status?: string
+      team_id?: string
     }
   }
   automation_triggers: {
@@ -661,6 +670,7 @@ export interface Database {
           p_automation_id: string
           p_node_id: string
           p_status: string
+          p_team_id: string
         }
         Returns: undefined
       }

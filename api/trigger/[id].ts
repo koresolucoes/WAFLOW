@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
-import { executeAutomation, createDefaultLoggingHooks } from '../_lib/automation/engine.js';
+import { executeAutomation } from '../_lib/automation/engine.js';
 import { publishEvent } from '../_lib/automation/trigger-handler.js';
 import { Automation, Profile, Json } from '../_lib/types.js';
 import type { TablesInsert } from '../_lib/database.types.js';
@@ -168,9 +168,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             
             const { contact, isNewContact, newlyAddedTags } = await processWebhookPayloadForContact(profile, fullPayloadForEvent, mappingRules);
             
-            const hooks = createDefaultLoggingHooks(automation.id, contact ? contact.id : null);
             // CRITICAL FIX: Await the execution to ensure completion in the serverless environment.
-            await executeAutomation(automation, contact, nodeId, fullPayloadForEvent, hooks, profile);
+            await executeAutomation(automation, contact, nodeId, fullPayloadForEvent, profile);
             
             // Await side-effect events as well for maximum reliability
             const sideEffectPromises: Promise<void>[] = [];
