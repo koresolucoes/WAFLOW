@@ -4,6 +4,7 @@ import { ContactsContext } from '../../contexts/providers/ContactsContext';
 import { FunnelContext } from '../../contexts/providers/FunnelContext';
 import { CustomFieldsContext } from '../../contexts/providers/CustomFieldsContext';
 import { NavigationContext } from '../../contexts/providers/NavigationContext';
+import { InboxContext } from '../../contexts/providers/InboxContext';
 import { useAuthStore } from '../../stores/authStore';
 import Button from '../../components/common/Button';
 import Card from '../../components/common/Card';
@@ -35,7 +36,8 @@ const ContactPanel: React.FC<{ contactId: string }> = ({ contactId }) => {
     const { definitions } = useContext(CustomFieldsContext);
     const { setCurrentPage } = useContext(NavigationContext);
     const { activitiesForContact, fetchActivitiesForContact, isLoading: isActivitiesLoading } = useContext(ActivityContext);
-    const { activeTeam } = useAuthStore();
+    const { user, activeTeam } = useAuthStore();
+    const { conversations, teamMembers, assignConversation } = useContext(InboxContext);
 
     const [localContact, setLocalContact] = useState<Contact | null>(null);
     const [tagInput, setTagInput] = useState('');
@@ -44,6 +46,7 @@ const ContactPanel: React.FC<{ contactId: string }> = ({ contactId }) => {
     const [isCustomFieldModalOpen, setIsCustomFieldModalOpen] = useState(false);
 
     const contact = contacts.find(c => c.id === contactId);
+    const conversation = conversations.find(c => c.contact.id === contactId);
     
     useEffect(() => {
         setLocalContact(contact || null);
@@ -93,13 +96,18 @@ const ContactPanel: React.FC<{ contactId: string }> = ({ contactId }) => {
     };
 
     const handleSaveDeal = async (dealData: Omit<DealInsert, 'team_id' | 'contact_id' >) => {
-         if (!activeTeam) return;
+         if (!user || !activeTeam) return;
         try {
-            await addDeal({ ...dealData, team_id: activeTeam.id, contact_id: contactId });
+            await addDeal({ ...dealData, contact_id: contactId });
             setIsDealModalOpen(false);
         } catch(err: any) {
             alert(`Erro ao criar negócio: ${err.message}`)
         }
+    };
+
+    const handleAssigneeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const assigneeId = e.target.value === 'null' ? null : e.target.value;
+        assignConversation(contactId, assigneeId);
     };
 
     const hasChanges = JSON.stringify(contact) !== JSON.stringify(localContact);
@@ -124,6 +132,26 @@ const ContactPanel: React.FC<{ contactId: string }> = ({ contactId }) => {
                 </div>
                 
                 <div className="space-y-4">
+                    <Card className="bg-slate-900/50">
+                        <h3 className="text-base font-semibold text-white mb-3">Atribuição</h3>
+                        <div>
+                            <label htmlFor="assignee" className="block text-xs text-slate-400 font-semibold uppercase tracking-wider mb-1">Atribuir a</label>
+                            <select
+                                id="assignee"
+                                value={conversation?.assignee_id || 'null'}
+                                onChange={handleAssigneeChange}
+                                className="w-full bg-slate-700 p-2 rounded-md text-white text-sm"
+                            >
+                                <option value="null">Não atribuído</option>
+                                {teamMembers.map(member => (
+                                    <option key={member.user_id} value={member.user_id}>
+                                        {member.email} {member.user_id === user?.id ? '(Você)' : ''}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    </Card>
+
                     <Card className="bg-slate-900/50">
                         <h3 className="text-base font-semibold text-white mb-3">Informações</h3>
                         <div className="space-y-3">

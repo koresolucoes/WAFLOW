@@ -1,6 +1,3 @@
-
-
-
 import { supabase } from '../lib/supabaseClient';
 import { Pipeline, PipelineStage, DealInsert, DealWithContact, StageType } from '../types';
 import { TablesInsert, TablesUpdate } from '../types/database.types';

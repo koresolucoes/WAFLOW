@@ -1,4 +1,3 @@
-
 import React, { createContext, useState, useCallback, ReactNode, useEffect } from 'react';
 import { CannedResponse, CannedResponseInsert } from '../../types';
 import { useAuthStore } from '../../stores/authStore';
@@ -16,24 +15,24 @@ interface CannedResponsesContextType {
 export const CannedResponsesContext = createContext<CannedResponsesContextType>(null!);
 
 export const CannedResponsesProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    const { activeTeam } = useAuthStore();
+    const { user, activeTeam } = useAuthStore();
     const [responses, setResponses] = useState<CannedResponse[]>([]);
 
     useEffect(() => {
-        if (activeTeam) {
+        if (user && activeTeam) {
             cannedResponseService.fetchCannedResponses(activeTeam.id)
                 .then(setResponses)
                 .catch(err => console.error("Failed to fetch canned responses:", err));
         } else {
             setResponses([]);
         }
-    }, [activeTeam]);
+    }, [user, activeTeam]);
 
     const addResponse = useCallback(async (response: Omit<CannedResponseInsert, 'team_id' | 'id' | 'created_at'>) => {
-        if (!activeTeam) throw new Error("Active team not available.");
+        if (!user || !activeTeam) throw new Error("User or active team not available.");
         const newResponse = await cannedResponseService.addCannedResponse(activeTeam.id, response);
         setResponses(prev => [...prev, newResponse].sort((a, b) => a.shortcut.localeCompare(b.shortcut)));
-    }, [activeTeam]);
+    }, [user, activeTeam]);
 
     const updateResponse = useCallback(async (id: string, updates: TablesUpdate<'canned_responses'>) => {
         const updatedResponse = await cannedResponseService.updateCannedResponse(id, updates);

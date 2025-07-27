@@ -1,6 +1,3 @@
-
-
-
 import { supabase } from '../lib/supabaseClient';
 import { CustomFieldDefinition, CustomFieldDefinitionInsert } from '../types';
 

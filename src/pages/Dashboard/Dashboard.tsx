@@ -70,7 +70,7 @@ const SortableCardWrapper: React.FC<{ id: string; children: React.ReactNode; cla
 };
 
 const Dashboard: React.FC = () => {
-  const { user, profile, updateProfile } = useAuthStore(state => ({ user: state.user, profile: state.profile, updateProfile: state.updateProfile }));
+  const { user, profile, updateProfile, activeTeam } = useAuthStore();
   const { contacts } = useContext(ContactsContext);
   const { deals, activePipelineId } = useContext(FunnelContext);
   const { automations } = useContext(AutomationsContext);
@@ -101,10 +101,10 @@ const Dashboard: React.FC = () => {
 
   useEffect(() => {
     const loadData = async () => {
-        if (user) {
+        if (activeTeam) {
             setIsLoading(true);
             try {
-                const data = await fetchDashboardData(user.id);
+                const data = await fetchDashboardData(activeTeam.id);
                 setDashboardData(data);
             } catch (error) {
                 console.error("Failed to load dashboard data:", error);
@@ -114,7 +114,7 @@ const Dashboard: React.FC = () => {
         }
     };
     loadData();
-  }, [user]);
+  }, [activeTeam]);
 
   const mainMetrics = useMemo(() => {
     const relevantDeals = deals.filter(d => d.pipeline_id === activePipelineId);
@@ -176,7 +176,9 @@ const Dashboard: React.FC = () => {
             const newIndex = items.indexOf(over.id as string);
             const newOrder = arrayMove(items, oldIndex, newIndex);
             // Salva a nova ordem no perfil do usuário de forma assíncrona
-            updateProfile({ dashboard_layout: newOrder });
+            if (user) {
+              updateProfile({ dashboard_layout: newOrder });
+            }
             return newOrder;
         });
     }

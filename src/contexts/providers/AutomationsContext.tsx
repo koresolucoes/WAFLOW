@@ -1,7 +1,3 @@
-
-
-
-
 import React, { createContext, useState, useCallback, ReactNode, useContext, useEffect } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { Automation, AutomationNode, Edge, AutomationNodeStats, AutomationNodeLog, AutomationStatus } from '../../types';
@@ -31,7 +27,7 @@ export const AutomationsProvider: React.FC<{ children: ReactNode }> = ({ childre
     const [automationStats, setAutomationStats] = useState<Record<string, AutomationNodeStats>>({});
 
     useEffect(() => {
-        if (!activeTeam) return;
+        if (!user || !activeTeam) return;
 
         const channel = supabase
         .channel('automations-changes')
@@ -76,40 +72,52 @@ export const AutomationsProvider: React.FC<{ children: ReactNode }> = ({ childre
             supabase.removeChannel(channel);
         }
 
-    }, [activeTeam]);
+    }, [user, activeTeam]);
 
     const createAndNavigateToAutomation = useCallback(async () => {
-        if (!activeTeam) throw new Error("Active team not available.");
+        if (!user || !activeTeam) throw new Error("User or active team not available.");
         const newAutomation = await automationService.createAutomationInDb(activeTeam.id);
         setCurrentPage('automation-editor', { automationId: newAutomation.id });
-    }, [activeTeam, setCurrentPage]);
+    }, [user, activeTeam, setCurrentPage]);
 
     const updateAutomation = useCallback(async (automation: Automation) => {
-        if (!activeTeam) throw new Error("Active team not available.");
+        if (!user || !activeTeam) throw new Error("User or active team not available.");
         const updated = await automationService.updateAutomationInDb(activeTeam.id, automation);
         setAutomations(prev => prev.map(a => a.id === updated.id ? updated : a));
-    }, [activeTeam]);
+    }, [user, activeTeam]);
     
     const deleteAutomation = useCallback(async (automationId: string) => {
-        if (!activeTeam) throw new Error("Active team not available.");
+        if (!user) throw new Error("User not authenticated.");
         await automationService.deleteAutomationFromDb(automationId);
         // Realtime handles state update
-    }, [activeTeam]);
+    }, [user]);
     
     const fetchAutomationStats = useCallback(async (automationId: string) => {
-        if (!activeTeam) return;
+        if (!user) return;
         const statsMap = await automationService.fetchStatsForAutomation(automationId);
         setAutomationStats(prev => ({...prev, ...statsMap}));
-    }, [activeTeam]);
+    }, [user]);
 
     const fetchNodeLogs = useCallback(async (automationId: string, nodeId: string): Promise<AutomationNodeLog[]> => {
-        if (!activeTeam) return [];
+        if (!user) return [];
         return await automationService.fetchLogsForNode(automationId, nodeId);
-    }, [activeTeam]);
+    }, [user]);
 
     const value = {
         automations,
         setAutomations,
         automationStats,
         setAutomationStats,
-        createAnd
+        createAndNavigateToAutomation,
+        updateAutomation,
+        deleteAutomation,
+        fetchAutomationStats,
+        fetchNodeLogs
+    };
+
+    return (
+        <AutomationsContext.Provider value={value}>
+            {children}
+        </AutomationsContext.Provider>
+    )
+};

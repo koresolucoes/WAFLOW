@@ -1,6 +1,3 @@
-
-
-
 import { supabase } from '../lib/supabaseClient';
 import { Automation, AutomationNode, Edge, AutomationNodeStats, AutomationNodeLog, AutomationStatus, Json } from '../types';
 import { TablesInsert, TablesUpdate, Tables } from '../types/database.types';

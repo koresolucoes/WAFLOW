@@ -2,17 +2,19 @@ import React, { createContext, useState, useCallback, ReactNode, useContext, use
 import { supabase } from '../../lib/supabaseClient';
 import { useAuthStore, useMetaConfig } from '../../stores/authStore';
 import { ContactsContext } from './ContactsContext';
-import { Conversation, UnifiedMessage, Message, MessageStatus, Contact } from '../../types';
+import { Conversation, UnifiedMessage, Message, MessageStatus, Contact, TeamMemberWithEmail } from '../../types';
 import * as inboxService from '../../services/inboxService';
+import * as teamService from '../../services/teamService';
 import type { RealtimePostgresChangesPayload } from '@supabase/realtime-js';
 
 interface InboxContextType {
     conversations: Conversation[];
-    setConversations: React.Dispatch<React.SetStateAction<Conversation[]>>;
     messages: UnifiedMessage[];
     activeContactId: string | null;
+    teamMembers: TeamMemberWithEmail[];
     setActiveContactId: (contactId: string | null) => void;
     sendMessage: (contactId: string, text: string) => Promise<void>;
+    assignConversation: (contactId: string, assigneeId: string | null) => Promise<void>;
     isLoading: boolean;
     isSending: boolean;
 }
@@ -20,7 +22,7 @@ interface InboxContextType {
 export const InboxContext = createContext<InboxContextType>(null!);
 
 export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    const { user, activeTeam } = useAuthStore(state => ({ user: state.user, activeTeam: state.activeTeam }));
+    const { user, activeTeam } = useAuthStore();
     const metaConfig = useMetaConfig();
     const { contacts } = useContext(ContactsContext);
 
@@ -29,6 +31,7 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const [activeContactId, setActiveContactId] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [isSending, setIsSending] = useState(false);
+    const [teamMembers, setTeamMembers] = useState<TeamMemberWithEmail[]>([]);
     
     const activeContactIdRef = useRef(activeContactId);
     useEffect(() => {
@@ -42,7 +45,7 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
 
     const fetchConversations = useCallback(async () => {
-        if (!activeTeam) return;
+        if (!user || !activeTeam) return;
         setIsLoading(true);
         try {
             const data = await inboxService.fetchConversationsFromDb(activeTeam.id);
@@ -53,10 +56,20 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         } finally {
             setIsLoading(false);
         }
+    }, [user, activeTeam]);
+
+    useEffect(() => {
+        if (activeTeam) {
+            teamService.fetchTeamMembers(activeTeam.id)
+                .then(setTeamMembers)
+                .catch(err => console.error("InboxContext: Failed to fetch team members", err));
+        } else {
+            setTeamMembers([]);
+        }
     }, [activeTeam]);
     
     const fetchMessages = useCallback(async (contactId: string | null) => {
-        if (!contactId || !activeTeam) {
+        if (!contactId || !user || !activeTeam) {
             setMessages([]);
             return;
         }
@@ -71,7 +84,7 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             setIsLoading(false);
         }
 
-    }, [activeTeam]);
+    }, [user, activeTeam]);
     
     const setActiveContactIdAndMarkRead = (contactId: string | null) => {
         setActiveContactId(contactId);
@@ -90,7 +103,7 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }, [activeContactId, fetchMessages]);
 
     useEffect(() => {
-        if (activeTeam) {
+        if (user && activeTeam) {
             fetchConversations();
 
             const handleMessageChange = (payload: RealtimePostgresChangesPayload<Message>) => {
@@ -115,7 +128,7 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                     } else {
                         const contactDetails = contactsRef.current.find(c => c.id === contactId);
                         if (contactDetails) {
-                             const newConvo: Conversation = { contact: contactDetails, last_message: newMessage, unread_count: 1 };
+                             const newConvo: Conversation = { contact: contactDetails, last_message: newMessage, unread_count: 1, assignee_id: null, assignee_email: null };
                              return [newConvo, ...prev];
                         }
                         fetchConversations(); // Refetch if contact is not in local state
@@ -151,6 +164,23 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                     )
                 );
             };
+
+            const handleConversationChange = (payload: RealtimePostgresChangesPayload<{ [key: string]: any }>) => {
+                if (payload.eventType !== 'INSERT' && payload.eventType !== 'UPDATE') return;
+                const updatedConversation = payload.new as { contact_id: string; assignee_id: string | null; };
+                const updatedAssigneeId = updatedConversation.assignee_id;
+                const contactId = updatedConversation.contact_id;
+                
+                const assigneeEmail = teamMembers.find(m => m.user_id === updatedAssigneeId)?.email || null;
+
+                setConversations(prev =>
+                    prev.map(c =>
+                        c.contact.id === contactId
+                            ? { ...c, assignee_id: updatedAssigneeId, assignee_email: assigneeEmail }
+                            : c
+                    )
+                );
+            };
             
             const messagesChannel = supabase.channel(`messages-channel-${activeTeam.id}`)
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `team_id=eq.${activeTeam.id}` }, handleMessageChange)
@@ -159,16 +189,21 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             const contactsChannel = supabase.channel(`contacts-channel-inbox-${activeTeam.id}`)
                 .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'contacts', filter: `team_id=eq.${activeTeam.id}` }, handleContactChange)
                 .subscribe();
+            
+            const conversationsChannel = supabase.channel(`conversations-channel-${activeTeam.id}`)
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations', filter: `team_id=eq.${activeTeam.id}` }, handleConversationChange)
+                .subscribe();
 
             return () => {
                 supabase.removeChannel(messagesChannel);
                 supabase.removeChannel(contactsChannel);
+                supabase.removeChannel(conversationsChannel);
             }
         }
-    }, [activeTeam, fetchConversations]);
+    }, [user, activeTeam, fetchConversations, teamMembers]);
 
     const sendMessage = useCallback(async (contactId: string, text: string) => {
-        if (!activeTeam) throw new Error("Equipa ativa não disponível.");
+        if (!user || !activeTeam) throw new Error("User or active team not available.");
         if (!metaConfig.accessToken) throw new Error("Configuração da Meta ausente.");
         
         const contact = contacts.find(c => c.id === contactId);
@@ -207,16 +242,23 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         } finally {
             setIsSending(false);
         }
-    }, [activeTeam, metaConfig, contacts]);
+    }, [user, activeTeam, metaConfig, contacts]);
+    
+    const assignConversation = useCallback(async (contactId: string, assigneeId: string | null) => {
+        if (!activeTeam) throw new Error("No active team selected.");
+        await inboxService.assignConversation(activeTeam.id, contactId, assigneeId);
+        // Real-time listener will handle the UI update
+    }, [activeTeam]);
 
 
     const value = {
         conversations,
-        setConversations,
         messages,
         activeContactId,
+        teamMembers,
         setActiveContactId: setActiveContactIdAndMarkRead,
         sendMessage,
+        assignConversation,
         isLoading,
         isSending
     };

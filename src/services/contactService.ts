@@ -1,4 +1,3 @@
-
 import { supabase } from '../lib/supabaseClient';
 import { Contact, EditableContact, ContactWithDetails, Deal, MetaConfig, MessageInsert, TimelineEvent } from '../types';
 import { TablesInsert, TablesUpdate } from '../types/database.types';
@@ -61,7 +60,7 @@ export const fetchContactDetailsFromDb = async (teamId: string, contactId: strin
 export const fetchContactTimeline = async (teamId: string, contactId: string): Promise<TimelineEvent[]> => {
     const [messagesRes, automationRunsRes, dealsRes] = await Promise.all([
         supabase.from('messages').select('id, created_at, type, content, source').eq('contact_id', contactId).eq('team_id', teamId),
-        supabase.from('automation_runs').select('id, run_at, status, details, automations(name)').eq('contact_id', contactId).eq('team_id', teamId),
+        supabase.from('automation_runs').select('id, run_at, status, details, automations!inner(name, team_id)').eq('contact_id', contactId).eq('automations.team_id', teamId),
         supabase.from('deals').select('id, created_at, name, value, pipeline_stages(name)').eq('contact_id', contactId).eq('team_id', teamId)
     ]);
 

@@ -1,4 +1,3 @@
-
 import { create } from 'zustand';
 import { supabase } from '../lib/supabaseClient';
 import type { Session, User } from '@supabase/auth-js';
@@ -13,6 +12,7 @@ interface AuthState {
   isInitialized: boolean;
   activeTeam: Team | null;
   userTeams: Team[];
+  teamLoading: boolean;
   initializeAuth: () => () => void;
   updateProfile: (profileData: EditableProfile) => Promise<void>;
   setActiveTeam: (team: Team) => void;
@@ -26,36 +26,36 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isInitialized: false,
   activeTeam: null,
   userTeams: [],
+  teamLoading: true,
 
   initializeAuth: () => {
     if (get().isInitialized) return () => {};
 
     const handleSession = async (session: Session | null) => {
       const user = session?.user ?? null;
-      set({ session, user, activeTeam: null, userTeams: [] });
+      set({ session, user, profile: null, activeTeam: null, userTeams: [] });
 
       if (user) {
-        try {
-            const [profileData, teamsData] = await Promise.all([
-                getProfile(user.id),
-                supabase.from('team_members').select('teams!inner(*)').eq('user_id', user.id)
-            ]);
-            
-            const teams: Team[] = (teamsData.data?.map(tm => tm.teams) as Team[]) || [];
-            
-            set({ 
-                profile: profileData,
-                userTeams: teams,
-                activeTeam: teams[0] || null, // Define a primeira equipa como ativa
-            });
-        } catch (error) {
-            console.error("Failed to fetch user profile or teams", error);
-            set({ profile: null, userTeams: [], activeTeam: null });
-        } finally {
-            set({ loading: false });
-        }
+        set({ loading: true, teamLoading: true });
+        
+        // Fetch profile and teams in parallel
+        const [profileData, memberTeams] = await Promise.all([
+            getProfile(user.id),
+            supabase.from('team_members').select('teams(*)').eq('user_id', user.id)
+        ]);
+        
+        const teams = (memberTeams.data?.map(mt => (mt as any).teams).filter(Boolean) as Team[]) || [];
+        
+        set({ 
+            profile: profileData,
+            userTeams: teams,
+            activeTeam: teams[0] || null,
+            teamLoading: false,
+            loading: false
+        });
+
       } else {
-        set({ profile: null, userTeams: [], activeTeam: null, loading: false });
+        set({ profile: null, loading: false, teamLoading: false });
       }
     };
 
@@ -66,7 +66,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     // Subscribe to changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-        set({ loading: true, profile: null, activeTeam: null, userTeams: [] });
+        set({ loading: true, profile: null });
         handleSession(session);
     });
 
@@ -85,8 +85,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   setActiveTeam: (team: Team) => {
-    set({ activeTeam: team });
-  },
+      set({ activeTeam: team });
+  }
 }));
 
 // Initialize the listener as soon as the store is imported.

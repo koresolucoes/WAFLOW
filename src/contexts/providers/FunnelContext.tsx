@@ -13,7 +13,7 @@ interface FunnelContextType {
     setStages: React.Dispatch<React.SetStateAction<PipelineStage[]>>;
     setDeals: React.Dispatch<React.SetStateAction<DealWithContact[]>>;
     setActivePipelineId: (id: string | null) => void;
-    addDeal: (dealData: DealInsert) => Promise<void>;
+    addDeal: (dealData: Omit<DealInsert, 'team_id'>) => Promise<void>;
     updateDeal: (dealId: string, updates: TablesUpdate<'deals'>) => Promise<void>;
     createDefaultPipeline: () => Promise<void>;
     addPipeline: (name: string) => Promise<void>;
@@ -27,17 +27,17 @@ interface FunnelContextType {
 export const FunnelContext = createContext<FunnelContextType>(null!);
 
 export const FunnelProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    const user = useAuthStore(state => state.user);
+    const { user, activeTeam } = useAuthStore();
     const [pipelines, setPipelines] = useState<Pipeline[]>([]);
     const [stages, setStages] = useState<PipelineStage[]>([]);
     const [deals, setDeals] = useState<DealWithContact[]>([]);
     const [activePipelineId, setActivePipelineId] = useState<string | null>(null);
     
-    const addDeal = useCallback(async (dealData: DealInsert) => {
-        if (!user) throw new Error("User not authenticated.");
-        const newDeal = await funnelService.addDealToDb(dealData);
+    const addDeal = useCallback(async (dealData: Omit<DealInsert, 'team_id'>) => {
+        if (!user || !activeTeam) throw new Error("User or active team not available.");
+        const newDeal = await funnelService.addDealToDb({ ...dealData, team_id: activeTeam.id });
         setDeals(prev => [newDeal, ...prev]);
-    }, [user]);
+    }, [user, activeTeam]);
 
     const updateDeal = useCallback(async (dealId: string, updates: TablesUpdate<'deals'>) => {
         if (!user) throw new Error("User not authenticated.");
@@ -46,22 +46,22 @@ export const FunnelProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }, [user]);
 
     const createDefaultPipeline = useCallback(async () => {
-        if (!user) throw new Error("User not authenticated.");
-        const { pipeline, stages: newStages } = await funnelService.createDefaultPipelineInDb(user.id);
+        if (!user || !activeTeam) throw new Error("User or active team not available.");
+        const { pipeline, stages: newStages } = await funnelService.createDefaultPipelineInDb(activeTeam.id);
         setPipelines(prev => [...prev, pipeline]);
         setStages(prev => [...prev, ...newStages]);
         if (!activePipelineId) {
             setActivePipelineId(pipeline.id);
         }
-    }, [user, activePipelineId]);
+    }, [user, activeTeam, activePipelineId]);
 
     const addPipeline = useCallback(async (name: string) => {
-        if (!user) throw new Error("User not authenticated.");
-        const { pipeline, stage } = await funnelService.addPipelineToDb(user.id, name);
+        if (!user || !activeTeam) throw new Error("User or active team not available.");
+        const { pipeline, stage } = await funnelService.addPipelineToDb(activeTeam.id, name);
         setPipelines(p => [...p, pipeline]);
         setStages(s => [...s, stage]);
         setActivePipelineId(pipeline.id);
-    }, [user]);
+    }, [user, activeTeam]);
 
     const updatePipeline = useCallback(async (id: string, name: string) => {
         if (!user) throw new Error("User not authenticated.");

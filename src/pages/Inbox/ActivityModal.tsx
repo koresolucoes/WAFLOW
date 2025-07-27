@@ -14,7 +14,7 @@ interface ActivityModalProps {
 
 const ActivityModal: React.FC<ActivityModalProps> = ({ isOpen, onClose, type, contactId }) => {
     const { addActivity } = useContext(ActivityContext);
-    const { activeTeam } = useAuthStore();
+    const user = useAuthStore(state => state.user);
     const [content, setContent] = useState('');
     const [dueDate, setDueDate] = useState('');
     const [isSaving, setIsSaving] = useState(false);
@@ -28,11 +28,10 @@ const ActivityModal: React.FC<ActivityModalProps> = ({ isOpen, onClose, type, co
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!content.trim() || (type === 'TAREFA' && !dueDate) || !activeTeam) return;
+        if (!content.trim() || (type === 'TAREFA' && !dueDate) || !user) return;
 
         setIsSaving(true);
-        const payload: ContactActivityInsert = {
-            team_id: activeTeam.id,
+        const payload: Omit<ContactActivityInsert, 'team_id'> = {
             contact_id: contactId,
             type,
             content: content.trim(),

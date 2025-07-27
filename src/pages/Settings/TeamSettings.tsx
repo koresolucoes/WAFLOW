@@ -1,73 +1,94 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback, useContext } from 'react';
 import { useAuthStore } from '../../stores/authStore';
+import * as teamService from '../../services/teamService';
+import { TeamMemberWithEmail } from '../../types';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
-import { supabase } from '../../lib/supabaseClient';
+import { USER_PLUS_ICON, TRASH_ICON } from '../../components/icons';
 
 const TeamSettings: React.FC = () => {
     const { activeTeam, user } = useAuthStore();
-    const [inviteEmail, setInviteEmail] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
+    const [members, setMembers] = useState<TeamMemberWithEmail[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [message, setMessage] = useState<string | null>(null);
+    const [inviteEmail, setInviteEmail] = useState('');
+    const [isInviting, setIsInviting] = useState(false);
+    const [inviteMessage, setInviteMessage] = useState<string | null>(null);
 
-    // Placeholder for team members - in a real app, this would be fetched
-    const [members, setMembers] = useState([
-        { id: user?.id, email: user?.email, role: 'admin' }
-    ]);
-
-    const handleInvite = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!inviteEmail.trim() || !activeTeam) return;
-
+    const loadMembers = useCallback(async () => {
+        if (!activeTeam) return;
         setIsLoading(true);
         setError(null);
-        setMessage(null);
-
         try {
-            // This requires an RLS policy allowing admins to insert into team_members
-            // and potentially a server-side function to handle the invitation flow.
-            // For now, we simulate the client-side part of the invitation.
-            const { data, error: inviteError } = await supabase.auth.admin.inviteUserByEmail(
-                inviteEmail,
-                { data: { team_id_to_join: activeTeam.id, role: 'agent' } }
-            );
-
-            if (inviteError) throw inviteError;
-            
-            setMessage(`Convite enviado para ${inviteEmail}. O utilizador precisa de aceitar o convite para se juntar à equipa.`);
-            setInviteEmail('');
-
+            const memberData = await teamService.fetchTeamMembers(activeTeam.id);
+            setMembers(memberData);
         } catch (err: any) {
-            setError(err.message || 'Falha ao enviar convite.');
+            setError(err.message);
         } finally {
             setIsLoading(false);
         }
+    }, [activeTeam]);
+
+    useEffect(() => {
+        loadMembers();
+    }, [loadMembers]);
+
+    const handleInvite = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!activeTeam || !inviteEmail.trim()) return;
+        
+        setIsInviting(true);
+        setError(null);
+        setInviteMessage(null);
+        try {
+            await teamService.inviteUserToTeam(activeTeam.id, inviteEmail, 'agent'); // O papel padrão é 'agent'
+            setInviteMessage(`Convite enviado para ${inviteEmail}. O utilizador precisa de aceitar o convite por e-mail para se juntar à equipa.`);
+            setInviteEmail('');
+            // A lista de membros não é atualizada aqui, pois o utilizador precisa de aceitar o convite primeiro.
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setIsInviting(false);
+        }
     };
+
+    const handleRoleChange = async (userId: string, newRole: 'admin' | 'agent') => {
+        if (!activeTeam) return;
+        try {
+            await teamService.updateTeamMemberRole(activeTeam.id, userId, newRole);
+            setMembers(prev => prev.map(m => m.user_id === userId ? { ...m, role: newRole } : m));
+        } catch (err: any) {
+            alert(`Erro ao atualizar função: ${err.message}`);
+        }
+    };
+    
+    const handleRemoveMember = async (userId: string) => {
+        if (!activeTeam) return;
+        if (window.confirm("Tem a certeza de que deseja remover este membro da equipa?")) {
+            try {
+                await teamService.removeTeamMember(activeTeam.id, userId);
+                setMembers(prev => prev.filter(m => m.user_id !== userId));
+            } catch (err: any) {
+                alert(`Erro ao remover membro: ${err.message}`);
+            }
+        }
+    };
+
+    if (!activeTeam) {
+        return <Card><p className="text-center text-slate-400">Nenhuma equipa ativa selecionada.</p></Card>;
+    }
+    
+    const isOwner = (memberUserId: string) => activeTeam.owner_id === memberUserId;
+    const isCurrentUserAdmin = members.find(m => m.user_id === user?.id)?.role === 'admin';
+
 
     return (
         <div className="space-y-6">
             <Card>
-                <h2 className="text-lg font-semibold text-white mb-4">Gerir Membros da Equipa</h2>
-                <div className="bg-slate-900/50 rounded-lg divide-y divide-slate-700/50">
-                    {members.map(member => (
-                        <div key={member.id} className="p-3 flex justify-between items-center">
-                            <div>
-                                <p className="font-semibold text-white">{member.email}</p>
-                                <p className="text-xs text-slate-400 capitalize">{member.role}</p>
-                            </div>
-                            {/* Placeholder for role changing/removing */}
-                            <Button variant="secondary" size="sm" disabled>Gerir</Button>
-                        </div>
-                    ))}
-                </div>
-            </Card>
-
-            <Card>
-                <h2 className="text-lg font-semibold text-white mb-4">Convidar Novo Membro</h2>
-                {error && <p className="text-red-400 text-sm mb-2">{error}</p>}
-                {message && <p className="text-green-400 text-sm mb-2">{message}</p>}
+                <h2 className="text-lg font-semibold text-white">Convidar Novo Membro</h2>
+                <p className="text-sm text-slate-400 mb-4">Os utilizadores convidados receberão um e-mail para se juntarem à sua equipa.</p>
+                {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
+                {inviteMessage && <p className="text-green-400 text-sm mb-4">{inviteMessage}</p>}
                 <form onSubmit={handleInvite} className="flex gap-2">
                     <input
                         type="email"
@@ -76,9 +97,52 @@ const TeamSettings: React.FC = () => {
                         placeholder="email@exemplo.com"
                         className="w-full bg-slate-700 p-2 rounded-md text-white"
                         required
+                        disabled={!isCurrentUserAdmin}
                     />
-                    <Button type="submit" variant="primary" isLoading={isLoading}>Convidar</Button>
+                    <Button type="submit" variant="primary" isLoading={isInviting} disabled={!isCurrentUserAdmin}>
+                        <USER_PLUS_ICON className="w-5 h-5 mr-2" />
+                        Convidar
+                    </Button>
                 </form>
+                {!isCurrentUserAdmin && <p className="text-xs text-amber-400 mt-2">Apenas administradores podem convidar novos membros.</p>}
+            </Card>
+
+            <Card>
+                <h2 className="text-lg font-semibold text-white mb-4">Membros da Equipa ({members.length})</h2>
+                {isLoading ? <p>A carregar membros...</p> : (
+                    <div className="bg-slate-900/50 rounded-lg">
+                         <ul className="divide-y divide-slate-700/50">
+                            {members.map(member => (
+                                <li key={member.user_id} className="p-3 flex justify-between items-center">
+                                    <div>
+                                        <p className="font-semibold text-white">{member.email}</p>
+                                        <p className="text-xs text-slate-400">{isOwner(member.user_id) ? 'Proprietário' : member.role === 'admin' ? 'Admin' : 'Agente'}</p>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <select
+                                            value={member.role}
+                                            onChange={(e) => handleRoleChange(member.user_id, e.target.value as 'admin' | 'agent')}
+                                            disabled={isOwner(member.user_id) || !isCurrentUserAdmin}
+                                            className="bg-slate-700 text-white text-xs p-1 rounded-md disabled:opacity-50"
+                                        >
+                                            <option value="admin">Admin</option>
+                                            <option value="agent">Agente</option>
+                                        </select>
+                                        <Button
+                                            variant="ghost" size="sm"
+                                            onClick={() => handleRemoveMember(member.user_id)}
+                                            disabled={isOwner(member.user_id) || !isCurrentUserAdmin}
+                                            className="text-red-400 hover:bg-red-500/10"
+                                            title={isOwner(member.user_id) ? "O proprietário não pode ser removido." : "Remover membro"}
+                                        >
+                                            <TRASH_ICON className="w-4 h-4" />
+                                        </Button>
+                                    </div>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
             </Card>
         </div>
     );

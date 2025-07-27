@@ -18,7 +18,7 @@ const ContactDetails: React.FC = () => {
     const { contactDetails, fetchContactDetails, updateContact } = useContext(ContactsContext);
     const { definitions } = useContext(CustomFieldsContext);
     const { deals, addDeal, pipelines, stages } = useContext(FunnelContext);
-    const { user, activeTeam } = useAuthStore(state => ({ user: state.user, activeTeam: state.activeTeam }));
+    const { user, activeTeam } = useAuthStore();
 
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
@@ -112,9 +112,9 @@ const ContactDetails: React.FC = () => {
     };
 
     const handleSaveDeal = async (dealData: Omit<DealInsert, 'team_id' | 'contact_id' >) => {
-        if (!activeTeam || !pageParams.contactId) return;
+        if (!user || !pageParams.contactId) return;
         try {
-            await addDeal({ ...dealData, team_id: activeTeam.id, contact_id: pageParams.contactId });
+            await addDeal({ ...dealData, contact_id: pageParams.contactId });
             setIsDealModalOpen(false);
         } catch (err: any) {
             alert(`Erro ao criar negócio: ${err.message}`);

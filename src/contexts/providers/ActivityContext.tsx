@@ -8,7 +8,7 @@ interface ActivityContextType {
     todaysTasks: TaskWithContact[];
     isLoading: boolean;
     fetchActivitiesForContact: (contactId: string) => Promise<void>;
-    addActivity: (activityData: ContactActivityInsert) => Promise<ContactActivity | null>;
+    addActivity: (activityData: Omit<ContactActivityInsert, 'team_id'>) => Promise<ContactActivity | null>;
     updateActivity: (activityId: string, updates: ContactActivityUpdate) => Promise<ContactActivity | null>;
     deleteActivity: (activityId: string) => Promise<void>;
 }
@@ -16,27 +16,27 @@ interface ActivityContextType {
 export const ActivityContext = createContext<ActivityContextType>(null!);
 
 export const ActivityProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    const { activeTeam } = useAuthStore();
+    const { user, activeTeam } = useAuthStore();
     const [activitiesForContact, setActivitiesForContact] = useState<ContactActivity[]>([]);
     const [todaysTasks, setTodaysTasks] = useState<TaskWithContact[]>([]);
     const [isLoading, setIsLoading] = useState(false);
 
     const fetchTodaysTasks = useCallback(async () => {
-        if (!activeTeam) return;
+        if (!user || !activeTeam) return;
         try {
             const tasks = await activityService.fetchTodaysTasks(activeTeam.id);
             setTodaysTasks(tasks);
         } catch (error) {
             console.error("Failed to fetch today's tasks:", error);
         }
-    }, [activeTeam]);
+    }, [user, activeTeam]);
     
     useEffect(() => {
         fetchTodaysTasks();
     }, [fetchTodaysTasks]);
 
     const fetchActivitiesForContact = useCallback(async (contactId: string) => {
-        if (!activeTeam) return;
+        if (!user || !activeTeam) return;
         setIsLoading(true);
         try {
             const activities = await activityService.fetchActivitiesForContact(activeTeam.id, contactId);
@@ -47,11 +47,11 @@ export const ActivityProvider: React.FC<{ children: ReactNode }> = ({ children }
         } finally {
             setIsLoading(false);
         }
-    }, [activeTeam]);
+    }, [user, activeTeam]);
 
-    const addActivity = useCallback(async (activityData: ContactActivityInsert): Promise<ContactActivity | null> => {
-        if (!activeTeam) throw new Error("Active team not available.");
-        const newActivity = await activityService.addActivity(activityData);
+    const addActivity = useCallback(async (activityData: Omit<ContactActivityInsert, 'team_id'>): Promise<ContactActivity | null> => {
+        if (!user || !activeTeam) throw new Error("User or active team not available.");
+        const newActivity = await activityService.addActivity({ ...activityData, team_id: activeTeam.id });
         if(newActivity.contact_id === (activitiesForContact[0]?.contact_id || null)) {
             setActivitiesForContact(prev => [newActivity, ...prev]);
         }
@@ -59,7 +59,7 @@ export const ActivityProvider: React.FC<{ children: ReactNode }> = ({ children }
             fetchTodaysTasks(); // Refresh dashboard tasks
         }
         return newActivity;
-    }, [activitiesForContact, fetchTodaysTasks]);
+    }, [user, activeTeam, activitiesForContact, fetchTodaysTasks]);
 
     const updateActivity = useCallback(async (activityId: string, updates: ContactActivityUpdate): Promise<ContactActivity | null> => {
         const updatedActivity = await activityService.updateActivity(activityId, updates);

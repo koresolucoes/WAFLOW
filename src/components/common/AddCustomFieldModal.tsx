@@ -3,18 +3,16 @@ import { CustomFieldsContext } from '../../contexts/providers/CustomFieldsContex
 import { CustomFieldDefinitionInsert } from '../../types';
 import Modal from './Modal';
 import Button from './Button';
-import { useAuthStore } from '../../stores/authStore';
 
 interface AddCustomFieldModalProps {
     isOpen: boolean;
     onClose: () => void;
 }
 
-type EditableDefinition = Omit<CustomFieldDefinitionInsert, 'id' | 'created_at'>;
+type EditableDefinition = Omit<CustomFieldDefinitionInsert, 'id' | 'team_id' | 'created_at'>;
 
 const AddCustomFieldModal: React.FC<AddCustomFieldModalProps> = ({ isOpen, onClose }) => {
     const { addDefinition } = useContext(CustomFieldsContext);
-    const { activeTeam } = useAuthStore();
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [formData, setFormData] = useState<EditableDefinition>({
@@ -22,7 +20,6 @@ const AddCustomFieldModal: React.FC<AddCustomFieldModalProps> = ({ isOpen, onClo
         key: '',
         type: 'TEXTO',
         options: null,
-        team_id: activeTeam?.id || ''
     });
 
     const slugify = (text: string) =>
@@ -46,7 +43,7 @@ const AddCustomFieldModal: React.FC<AddCustomFieldModalProps> = ({ isOpen, onClo
 
     const handleOpen = () => {
         setError(null);
-        setFormData({ name: '', key: '', type: 'TEXTO', options: null, team_id: activeTeam?.id || '' });
+        setFormData({ name: '', key: '', type: 'TEXTO', options: null });
     };
 
     // Effect to reset form when modal opens
@@ -54,7 +51,7 @@ const AddCustomFieldModal: React.FC<AddCustomFieldModalProps> = ({ isOpen, onClo
         if (isOpen) {
             handleOpen();
         }
-    }, [isOpen, activeTeam]);
+    }, [isOpen]);
 
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -67,14 +64,13 @@ const AddCustomFieldModal: React.FC<AddCustomFieldModalProps> = ({ isOpen, onClo
         setError(null);
         
         try {
-            const definitionToSave: Omit<CustomFieldDefinitionInsert, 'id' | 'created_at'> = {
+            const definitionToSave: Omit<CustomFieldDefinitionInsert, 'team_id' | 'id' | 'created_at'> = {
                 name: formData.name,
                 key: formData.key,
                 type: formData.type,
-                options: formData.type === 'LISTA' ? formData.options?.toString().split(',').map(o => o.trim()).filter(Boolean) || [] : null,
-                team_id: formData.team_id,
+                options: formData.type === 'LISTA' ? formData.options?.toString().split(',').map(o => o.trim()).filter(Boolean) || [] : null
             };
-            await addDefinition(definitionToSave as any);
+            await addDefinition(definitionToSave);
             onClose();
         } catch (err: any) {
             setError(err.message);

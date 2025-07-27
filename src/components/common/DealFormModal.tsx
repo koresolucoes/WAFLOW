@@ -1,6 +1,3 @@
-
-
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { Pipeline, PipelineStage, Deal, DealInsert } from '../../types';
 import Button from './Button';

@@ -22,7 +22,7 @@ export type CustomFieldType = Enums<'custom_field_type'>;
 export type ActivityType = 'NOTA' | 'TAREFA';
 export type DealStatus = Enums<'deal_status'>;
 export type StageType = Enums<'stage_type'>;
-export type Team = Database['public']['Tables']['teams']['Row'];
+
 
 // Tipos para os nós do editor de automação
 export type NodeType = 'trigger' | 'action' | 'logic';
@@ -45,6 +45,8 @@ export type AutomationNode = XyNode<AutomationNodeData, string>;
 
 // --- Tipos de objetos simples para evitar recursão de TS de tipos gerados ---
 export type Profile = Database['public']['Tables']['profiles']['Row'];
+export type Team = Database['public']['Tables']['teams']['Row'];
+export type TeamMember = Database['public']['Tables']['team_members']['Row'];
 export type Contact = Database['public']['Tables']['contacts']['Row'];
 export type CustomFieldDefinition = Database['public']['Tables']['custom_field_definitions']['Row'];
 export type ContactActivity = Database['public']['Tables']['contact_activities']['Row'];
@@ -108,6 +110,8 @@ export interface Conversation {
     contact: Contact;
     last_message: UnifiedMessage;
     unread_count: number;
+    assignee_id: string | null;
+    assignee_email: string | null;
 }
 
 export interface TimelineEvent {
@@ -122,6 +126,12 @@ export type TaskWithContact = ContactActivity & {
         id: string;
         name: string;
     } | null;
+};
+
+export type TeamMemberWithEmail = {
+  user_id: string;
+  role: 'admin' | 'agent';
+  email: string;
 };
 
 
@@ -151,7 +161,7 @@ export interface AutomationInsert extends Omit<Database['public']['Tables']['aut
 export type DealInsert = Database['public']['Tables']['deals']['Insert'];
 
 // Tipos para formulários e operações específicas
-export type EditableContact = Omit<Contact, 'id' | 'created_at'> & { id?: string };
+export type EditableContact = Omit<Contact, 'id' | 'team_id' | 'created_at'> & { id?: string };
 export type EditableProfile = Database['public']['Tables']['profiles']['Update'];
 export type ContactActivityUpdate = Database['public']['Tables']['contact_activities']['Update'];
 

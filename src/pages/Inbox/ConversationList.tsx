@@ -1,5 +1,6 @@
 import React, { useContext, useState, useMemo } from 'react';
 import { InboxContext } from '../../contexts/providers/InboxContext';
+import { useAuthStore } from '../../stores/authStore';
 import { Conversation } from '../../types';
 
 const ConversationListItem: React.FC<{ conversation: Conversation; isActive: boolean; onClick: () => void; }> = ({ conversation, isActive, onClick }) => {
@@ -31,11 +32,21 @@ const ConversationListItem: React.FC<{ conversation: Conversation; isActive: boo
             onClick={onClick}
             className={`flex items-center p-3 cursor-pointer transition-colors duration-150 rounded-lg ${isActive ? 'bg-slate-700/80' : 'hover:bg-slate-800/50'}`}
         >
-            <img
-                className="h-11 w-11 rounded-full object-cover flex-shrink-0"
-                src={`https://api.dicebear.com/8.x/initials/svg?seed=${conversation.contact.name}`}
-                alt="Avatar"
-            />
+            <div className="relative flex-shrink-0">
+                <img
+                    className="h-11 w-11 rounded-full object-cover"
+                    src={`https://api.dicebear.com/8.x/initials/svg?seed=${conversation.contact.name}`}
+                    alt="Avatar"
+                />
+                {conversation.assignee_email && (
+                     <img
+                        className="absolute -bottom-1 -right-1 h-5 w-5 rounded-full object-cover border-2 border-slate-800"
+                        src={`https://api.dicebear.com/8.x/initials/svg?seed=${conversation.assignee_email}`}
+                        alt="Assignee Avatar"
+                        title={`Atribuído a: ${conversation.assignee_email}`}
+                    />
+                )}
+            </div>
             <div className="flex-grow ml-3 overflow-hidden">
                 <div className="flex justify-between items-center">
                     <h3 className="font-semibold text-white truncate flex items-center">
@@ -75,22 +86,22 @@ const FilterButton: React.FC<{ label: string; isActive: boolean; onClick: () => 
 
 const ConversationList: React.FC = () => {
     const { conversations, activeContactId, setActiveContactId, isLoading } = useContext(InboxContext);
+    const { user } = useAuthStore();
     const [searchTerm, setSearchTerm] = useState('');
-    const [filter, setFilter] = useState<'all' | 'unread'>('all');
+    const [filter, setFilter] = useState<'all' | 'mine' | 'unassigned'>('all');
 
     const filteredConversations = useMemo(() => {
         return conversations
             .filter(conv => {
-                if (filter === 'unread') {
-                    return conv.unread_count > 0;
-                }
-                return true;
+                if (filter === 'mine') return conv.assignee_id === user?.id;
+                if (filter === 'unassigned') return conv.assignee_id === null;
+                return true; // 'all'
             })
             .filter(conv => {
                 if (searchTerm.trim() === '') return true;
                 return conv.contact.name.toLowerCase().includes(searchTerm.toLowerCase());
             });
-    }, [conversations, searchTerm, filter]);
+    }, [conversations, searchTerm, filter, user]);
     
     return (
         <aside className="w-96 flex-shrink-0 bg-slate-800/10 border-r border-slate-700/50 flex flex-col">
@@ -104,7 +115,8 @@ const ConversationList: React.FC = () => {
                 />
                 <div className="flex items-center gap-2">
                     <FilterButton label="Todas" isActive={filter === 'all'} onClick={() => setFilter('all')} />
-                    <FilterButton label="Não Lidas" isActive={filter === 'unread'} onClick={() => setFilter('unread')} />
+                    <FilterButton label="Minhas" isActive={filter === 'mine'} onClick={() => setFilter('mine')} />
+                    <FilterButton label="Não Atribuídas" isActive={filter === 'unassigned'} onClick={() => setFilter('unassigned')} />
                 </div>
             </div>
             <ul className="flex-grow overflow-y-auto px-2">

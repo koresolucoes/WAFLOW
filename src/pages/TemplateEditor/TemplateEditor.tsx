@@ -1,7 +1,3 @@
-
-
-
-
 import React, { useState, useContext, useMemo } from 'react';
 import { generateTemplateWithAI } from '../../services/geminiService';
 import Card from '../../components/common/Card';
@@ -14,12 +10,12 @@ import { TemplatesContext } from '../../contexts/providers/TemplatesContext';
 import { NavigationContext } from '../../contexts/providers/NavigationContext';
 import { useAuthStore, useMetaConfig } from '../../stores/authStore';
 
-type EditableTemplate = Omit<MessageTemplateInsert, 'id' | 'created_at' | 'status' | 'meta_id'>;
+type EditableTemplate = Omit<MessageTemplateInsert, 'id' | 'team_id' | 'created_at' | 'status' | 'meta_id'>;
 
 const TemplateEditor: React.FC = () => {
   const { createTemplate } = useContext(TemplatesContext);
   const { setCurrentPage } = useContext(NavigationContext);
-  const { profile, activeTeam } = useAuthStore(state => ({ profile: state.profile, activeTeam: state.activeTeam }));
+  const profile = useAuthStore(state => state.profile);
   const metaConfig = useMetaConfig();
 
   const [campaignGoal, setCampaignGoal] = useState('');
@@ -27,7 +23,6 @@ const TemplateEditor: React.FC = () => {
     template_name: '',
     category: 'MARKETING',
     components: [{ type: 'BODY', text: '' }],
-    team_id: activeTeam?.id || ''
   });
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -40,7 +35,7 @@ const TemplateEditor: React.FC = () => {
   const buttonsComponent = useMemo(() => template.components.find(c => c.type === 'BUTTONS'), [template.components]);
 
   const handleGenerate = async () => {
-    if (!campaignGoal || !profile || !activeTeam) {
+    if (!campaignGoal || !profile) {
       setError('Por favor, descreva o objetivo da campanha e certifique-se de que seu perfil está carregado.');
       return;
     }
@@ -62,7 +57,6 @@ const TemplateEditor: React.FC = () => {
           template_name,
           category: category.toUpperCase() as MessageTemplate['category'],
           components,
-          team_id: activeTeam.id,
       });
     } catch (err: any) {
       setError(err.message || 'Ocorreu um erro inesperado ao gerar com IA.');

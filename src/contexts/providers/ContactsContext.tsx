@@ -1,4 +1,3 @@
-
 import React, { createContext, useState, useCallback, ReactNode, useMemo } from 'react';
 import { Contact, EditableContact, ContactWithDetails } from '../../types';
 import { useAuthStore, useMetaConfig } from '../../stores/authStore';
@@ -21,7 +20,7 @@ interface ContactsContextType {
 export const ContactsContext = createContext<ContactsContextType>(null!);
 
 export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    const { user, activeTeam } = useAuthStore(state => ({ user: state.user, activeTeam: state.activeTeam }));
+    const { user, activeTeam } = useAuthStore();
     const metaConfig = useMetaConfig();
     const [contacts, setContacts] = useState<Contact[]>([]);
     const [contactDetails, setContactDetails] = useState<ContactWithDetails | null>(null);
@@ -45,6 +44,8 @@ export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }
         setContacts(prev => [newContact, ...prev]);
         
         // Post-DB side effect
+        // Note: The run-trigger API needs adjustment for multi-tenancy if it hasn't been already.
+        // Assuming it can derive the team from the user for now.
         fetch('/api/run-trigger', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -72,6 +73,7 @@ export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }
         const addedTags = newTags.filter(tag => !oldTags.has(tag));
 
         if (addedTags.length > 0) {
+            // Note: The run-trigger API needs adjustment for multi-tenancy.
             fetch('/api/run-trigger', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -106,7 +108,7 @@ export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }
     }, [user, activeTeam, contacts]);
     
     const sendDirectMessages = useCallback(async (message: string, recipients: Contact[]) => {
-        if (!user || !activeTeam) throw new Error("Usuário ou equipa ativa não disponível.");
+        if (!user || !activeTeam) throw new Error("User or active team not available.");
         if (!metaConfig.accessToken || !metaConfig.phoneNumberId) throw new Error("Configuração da Meta ausente.");
         await contactService.sendDirectMessagesFromApi(metaConfig, activeTeam.id, message, recipients);
     }, [user, activeTeam, metaConfig]);

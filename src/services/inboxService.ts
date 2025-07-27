@@ -1,6 +1,3 @@
-
-
-
 import { supabase } from '../lib/supabaseClient';
 import { Conversation, UnifiedMessage, Contact, MessageInsert, MessageStatus, MetaConfig, Message, TemplateCategory, TemplateStatus, MetaTemplateComponent } from '../types';
 import { sendTextMessage } from './meta/messages';
@@ -29,7 +26,9 @@ export const fetchConversationsFromDb = async (teamId: string): Promise<Conversa
         return (data as any[]).map(item => ({
             contact: item.contact_details as Contact,
             last_message: item.last_message as UnifiedMessage,
-            unread_count: item.unread_count
+            unread_count: item.unread_count,
+            assignee_id: item.assignee_id,
+            assignee_email: item.assignee_email,
         }));
     }
     return [];
@@ -80,4 +79,24 @@ export const sendMessageToApi = async (teamId: string, contact: Contact, text: s
         throw new Error("A mensagem foi enviada, mas falhou ao ser salva no banco de dados.");
     }
     return data as unknown as Message;
+};
+
+export const assignConversation = async (teamId: string, contactId: string, assigneeId: string | null): Promise<void> => {
+    // This will create a conversation record if it doesn't exist, or update the assignee if it does.
+    const { error } = await supabase
+        .from('conversations')
+        .upsert(
+            { 
+                team_id: teamId,
+                contact_id: contactId,
+                assignee_id: assigneeId,
+                updated_at: new Date().toISOString() 
+            },
+            { onConflict: 'contact_id' } // Based on the user-provided schema
+        );
+
+    if (error) {
+        console.error("Error assigning conversation:", error);
+        throw error;
+    }
 };

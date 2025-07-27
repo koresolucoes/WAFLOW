@@ -1,17 +1,15 @@
-
-
 import { supabase } from '../lib/supabaseClient';
 import { Campaign, MessageInsert, CampaignWithDetails, MessageWithContact, CampaignStatus, TemplateCategory, TemplateStatus, MessageTemplate } from '../types';
 import { TablesInsert, Tables } from '../types/database.types';
 import { MetaTemplateComponent } from './meta/types';
 
 
-export const fetchCampaignDetailsFromDb = async (userId: string, campaignId: string): Promise<CampaignWithDetails> => {
+export const fetchCampaignDetailsFromDb = async (teamId: string, campaignId: string): Promise<CampaignWithDetails> => {
     const { data: campaignData, error: campaignError } = await supabase
         .from('campaigns')
         .select('*, message_templates(*)')
         .eq('id', campaignId)
-        .eq('user_id', userId)
+        .eq('team_id', teamId)
         .single();
         
     if (campaignError || !campaignData) {
@@ -53,27 +51,27 @@ export const fetchCampaignDetailsFromDb = async (userId: string, campaignId: str
 };
 
 export const addCampaignToDb = async (
-    userId: string, 
-    campaign: Omit<Campaign, 'id' | 'user_id' | 'sent_at' | 'created_at' | 'recipient_count' | 'status'> & { status: CampaignStatus }, 
-    messages: Omit<MessageInsert, 'campaign_id' | 'user_id'>[]
+    teamId: string, 
+    campaign: Omit<Campaign, 'id' | 'team_id' | 'sent_at' | 'created_at' | 'recipient_count' | 'status'> & { status: CampaignStatus }, 
+    messages: Omit<MessageInsert, 'campaign_id' | 'team_id'>[]
 ): Promise<Campaign> => {
      const now = new Date().toISOString();
     const campaignPayload: TablesInsert<'campaigns'> = {
         ...campaign,
-        user_id: userId,
+        team_id: teamId,
         created_at: now,
         sent_at: campaign.status === 'Sent' ? now : undefined,
         recipient_count: messages.length,
         status: campaign.status
     };
-    const { data: newCampaignData, error: campaignError } = await supabase.from('campaigns').insert(campaignPayload).select('id, created_at, name, recipient_count, sent_at, status, template_id, user_id').single();
+    const { data: newCampaignData, error: campaignError } = await supabase.from('campaigns').insert(campaignPayload).select('id, created_at, name, recipient_count, sent_at, status, template_id, team_id').single();
 
     if (campaignError) throw campaignError;
     const newCampaign = newCampaignData as any;
     if (!newCampaign) throw new Error("Failed to create campaign.");
 
     if (messages.length > 0) {
-        const messagesToInsert = messages.map(msg => ({ ...msg, campaign_id: newCampaign.id, user_id: userId }));
+        const messagesToInsert = messages.map(msg => ({ ...msg, campaign_id: newCampaign.id, team_id: teamId }));
         const { error: messagesError } = await supabase.from('messages').insert(messagesToInsert);
 
         if (messagesError) {
@@ -87,7 +85,7 @@ export const addCampaignToDb = async (
 };
 
 
-export const deleteCampaignFromDb = async (userId: string, campaignId: string): Promise<void> => {
+export const deleteCampaignFromDb = async (teamId: string, campaignId: string): Promise<void> => {
      const { error: messagesError } = await supabase
         .from('messages')
         .delete()
@@ -99,7 +97,7 @@ export const deleteCampaignFromDb = async (userId: string, campaignId: string): 
         .from('campaigns')
         .delete()
         .eq('id', campaignId)
-        .eq('user_id', userId);
+        .eq('team_id', teamId);
 
     if (campaignError) throw campaignError;
 };

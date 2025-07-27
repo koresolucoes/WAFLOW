@@ -33,7 +33,6 @@ export type PublicTables = {
       node_id: string
       run_id: string
       status: string
-      team_id: string
     }
     Insert: {
       created_at?: string
@@ -42,7 +41,6 @@ export type PublicTables = {
       node_id: string
       run_id: string
       status: string
-      team_id: string
     }
     Update: {
       created_at?: string
@@ -51,17 +49,8 @@ export type PublicTables = {
       node_id?: string
       run_id?: string
       status?: string
-      team_id?: string
     }
-    Relationships: [
-      {
-        foreignKeyName: "automation_node_logs_team_id_fkey"
-        columns: ["team_id"]
-        isOneToOne: false
-        referencedRelation: "teams"
-        referencedColumns: ["id"]
-      },
-    ]
+    Relationships: []
   }
   automation_node_stats: {
     Row: {
@@ -70,7 +59,6 @@ export type PublicTables = {
       last_run_at: string | null
       node_id: string
       success_count: number
-      team_id: string
     }
     Insert: {
       automation_id: string
@@ -78,7 +66,6 @@ export type PublicTables = {
       last_run_at?: string | null
       node_id: string
       success_count?: number
-      team_id: string
     }
     Update: {
       automation_id?: string
@@ -86,17 +73,8 @@ export type PublicTables = {
       last_run_at?: string | null
       node_id?: string
       success_count?: number
-      team_id?: string
     }
-    Relationships: [
-      {
-        foreignKeyName: "automation_node_stats_team_id_fkey"
-        columns: ["team_id"]
-        isOneToOne: false
-        referencedRelation: "teams"
-        referencedColumns: ["id"]
-      },
-    ]
+    Relationships: []
   }
   automation_runs: {
     Row: {
@@ -106,7 +84,6 @@ export type PublicTables = {
       id: string
       run_at: string
       status: string
-      team_id: string
     }
     Insert: {
       automation_id: string
@@ -115,7 +92,6 @@ export type PublicTables = {
       id?: string
       run_at?: string
       status: string
-      team_id: string
     }
     Update: {
       automation_id?: string
@@ -124,16 +100,45 @@ export type PublicTables = {
       id?: string
       run_at?: string
       status?: string
+    }
+    Relationships: []
+  }
+  automation_triggers: {
+    Row: {
+      id: string
+      team_id: string
+      automation_id: string
+      node_id: string
+      trigger_type: string
+      trigger_key: string | null
+      created_at: string
+    }
+    Insert: {
+      id?: string
+      team_id: string
+      automation_id: string
+      node_id: string
+      trigger_type: string
+      trigger_key?: string | null
+      created_at?: string
+    }
+    Update: {
+      id?: string
       team_id?: string
+      automation_id?: string
+      node_id?: string
+      trigger_type?: string
+      trigger_key?: string | null
+      created_at?: string
     }
     Relationships: [
       {
-        foreignKeyName: "automation_runs_team_id_fkey"
+        foreignKeyName: "automation_triggers_team_id_fkey"
         columns: ["team_id"]
         isOneToOne: false
         referencedRelation: "teams"
         referencedColumns: ["id"]
-      },
+      }
     ]
   }
   automations: {
@@ -171,7 +176,7 @@ export type PublicTables = {
         isOneToOne: false
         referencedRelation: "teams"
         referencedColumns: ["id"]
-      },
+      }
     ]
   }
   campaigns: {
@@ -212,7 +217,7 @@ export type PublicTables = {
         isOneToOne: false
         referencedRelation: "teams"
         referencedColumns: ["id"]
-      },
+      }
     ]
   }
   canned_responses: {
@@ -244,7 +249,7 @@ export type PublicTables = {
         isOneToOne: false
         referencedRelation: "teams"
         referencedColumns: ["id"]
-      },
+      }
     ]
   }
   contact_activities: {
@@ -285,7 +290,7 @@ export type PublicTables = {
         isOneToOne: false
         referencedRelation: "teams"
         referencedColumns: ["id"]
-      },
+      }
     ]
   }
   contacts: {
@@ -326,13 +331,13 @@ export type PublicTables = {
       team_id?: string
     }
     Relationships: [
-      {
+       {
         foreignKeyName: "contacts_team_id_fkey"
         columns: ["team_id"]
         isOneToOne: false
         referencedRelation: "teams"
         referencedColumns: ["id"]
-      },
+      }
     ]
   }
   conversations: {
@@ -384,7 +389,7 @@ export type PublicTables = {
         isOneToOne: false
         referencedRelation: "users"
         referencedColumns: ["id"]
-      },
+      }
     ]
   }
   custom_field_definitions: {
@@ -422,7 +427,7 @@ export type PublicTables = {
         isOneToOne: false
         referencedRelation: "teams"
         referencedColumns: ["id"]
-      },
+      }
     ]
   }
   deals: {
@@ -475,7 +480,7 @@ export type PublicTables = {
         isOneToOne: false
         referencedRelation: "teams"
         referencedColumns: ["id"]
-      },
+      }
     ]
   }
   message_templates: {
@@ -516,7 +521,7 @@ export type PublicTables = {
         isOneToOne: false
         referencedRelation: "teams"
         referencedColumns: ["id"]
-      },
+      }
     ]
   }
   messages: {
@@ -584,7 +589,7 @@ export type PublicTables = {
         isOneToOne: false
         referencedRelation: "teams"
         referencedColumns: ["id"]
-      },
+      }
     ]
   }
   pipeline_stages: {
@@ -634,13 +639,13 @@ export type PublicTables = {
       team_id?: string
     }
     Relationships: [
-      {
+       {
         foreignKeyName: "pipelines_team_id_fkey"
         columns: ["team_id"]
         isOneToOne: false
         referencedRelation: "teams"
         referencedColumns: ["id"]
-      },
+      }
     ]
   }
   profiles: {
@@ -696,19 +701,16 @@ export type PublicTables = {
       team_id: string
       user_id: string
       role: "admin" | "agent"
-      created_at: string
     }
     Insert: {
       team_id: string
       user_id: string
-      role: "admin" | "agent"
-      created_at?: string
+      role?: "admin" | "agent"
     }
     Update: {
       team_id?: string
       user_id?: string
       role?: "admin" | "agent"
-      created_at?: string
     }
     Relationships: [
       {
@@ -724,7 +726,7 @@ export type PublicTables = {
         isOneToOne: false
         referencedRelation: "users"
         referencedColumns: ["id"]
-      },
+      }
     ]
   }
   teams: {
@@ -753,7 +755,7 @@ export type PublicTables = {
         isOneToOne: false
         referencedRelation: "users"
         referencedColumns: ["id"]
-      },
+      }
     ]
   }
   webhook_logs: {
@@ -788,7 +790,7 @@ export type PublicTables = {
         isOneToOne: false
         referencedRelation: "teams"
         referencedColumns: ["id"]
-      },
+      }
     ]
   }
 }

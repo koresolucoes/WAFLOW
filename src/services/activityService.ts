@@ -1,6 +1,3 @@
-
-
-
 import { supabase } from '../lib/supabaseClient';
 import { ContactActivity, ContactActivityInsert, ContactActivityUpdate, TaskWithContact } from '../types';
 

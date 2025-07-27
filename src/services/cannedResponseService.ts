@@ -1,6 +1,3 @@
-
-
-
 import { supabase } from '../lib/supabaseClient';
 import { CannedResponse, CannedResponseInsert } from '../types';
 import { TablesUpdate } from '../types/database.types';

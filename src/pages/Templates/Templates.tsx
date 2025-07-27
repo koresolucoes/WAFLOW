@@ -1,8 +1,3 @@
-
-
-
-
-
 import React, { useContext, useState, useMemo } from 'react';
 import { MessageTemplate, TemplateCategory, TemplateStatus, TablesInsert } from '../../types';
 import { getMetaTemplates } from '../../services/meta/templates';
@@ -61,7 +56,7 @@ const TemplateCard: React.FC<{ template: MessageTemplate; onUse: () => void }> =
 const Templates: React.FC = () => {
   const { templates, setTemplates } = useContext(TemplatesContext);
   const { setCurrentPage } = useContext(NavigationContext);
-  const { user, activeTeam } = useAuthStore(state => ({ user: state.user, activeTeam: state.activeTeam }));
+  const { user, activeTeam } = useAuthStore();
   const metaConfig = useMetaConfig();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -73,7 +68,7 @@ const Templates: React.FC = () => {
 
   const handleSync = async () => {
     if (!metaConfig.wabaId || !metaConfig.accessToken || !user || !activeTeam) {
-        setError("Por favor, configure suas credenciais da Meta na página de Configurações.");
+        setError("Por favor, configure suas credenciais da Meta na página de Configurações e verifique se uma equipa está ativa.");
         return;
     }
     setIsLoading(true);
