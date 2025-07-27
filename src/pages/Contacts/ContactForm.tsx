@@ -17,6 +17,7 @@ const ContactForm: React.FC<ContactFormProps> = ({ contact, onSave, onCancel, is
     company: '',
     tags: [],
     custom_fields: null,
+    sentiment: null,
   });
   const [tagInput, setTagInput] = useState('');
 
@@ -29,7 +30,7 @@ const ContactForm: React.FC<ContactFormProps> = ({ contact, onSave, onCancel, is
         company: contact.company || ''
       });
     } else {
-      setFormData({ name: '', phone: '', email: '', company: '', tags: [], custom_fields: null });
+      setFormData({ name: '', phone: '', email: '', company: '', tags: [], custom_fields: null, sentiment: null });
     }
   }, [contact]);
 

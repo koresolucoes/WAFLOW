@@ -3,6 +3,44 @@ import { findOrCreateContactByPhone } from './contact-mapper.js';
 import { publishEvent } from '../automation/trigger-handler.js';
 import { TablesInsert } from '../database.types.js';
 
+const analyzeAndStoreSentiment = async (messageText: string, contactId: string): Promise<void> => {
+    // Evita analisar mensagens muito curtas ou não textuais
+    if (!messageText || messageText.trim().length < 5 || messageText.startsWith('[')) {
+        return;
+    }
+
+    try {
+        const host = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000';
+        const response = await fetch(`${host}/api/analyze-sentiment`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ messageText }),
+        });
+
+        if (!response.ok) {
+            const errorBody = await response.text();
+            throw new Error(`Sentiment analysis API failed with status ${response.status}: ${errorBody}`);
+        }
+
+        const { emoji } = await response.json();
+
+        if (emoji && typeof emoji === 'string') {
+            const { error: updateError } = await supabaseAdmin
+                .from('contacts')
+                .update({ sentiment: emoji })
+                .eq('id', contactId);
+            
+            if (updateError) {
+                console.error(`[Message Handler] Failed to update sentiment for contact ${contactId}:`, updateError);
+            } else {
+                console.log(`[Message Handler] Updated sentiment for contact ${contactId} to ${emoji}`);
+            }
+        }
+    } catch (error) {
+        console.error(`[Message Handler] Sentiment analysis process failed for contact ${contactId}:`, error);
+    }
+};
+
 export async function processIncomingMessage(
     userId: string, 
     message: any, 
@@ -12,7 +50,6 @@ export async function processIncomingMessage(
     const { contact, isNew } = await findOrCreateContactByPhone(userId, message.from, contactName);
 
     if (!contact) {
-        // Error is thrown inside findOrCreateContactByPhone, so this is a safeguard.
         console.error(`[Message Handler] Could not find or create contact for phone ${message.from}. Aborting message processing.`);
         return;
     }
@@ -33,7 +70,7 @@ export async function processIncomingMessage(
         content: messageBody,
         type: 'inbound',
         source: 'inbound_reply',
-        status: 'read', // Inbound messages are implicitly read by the system
+        status: 'read', 
         read_at: new Date().toISOString()
     };
 
@@ -41,12 +78,15 @@ export async function processIncomingMessage(
 
     if (insertError) {
         console.error(`[Message Handler] Failed to insert inbound message for contact ${contact.id}:`, insertError);
-        throw insertError; // Propagate the error
+        throw insertError;
     }
 
-    console.log(`[Message Handler] Message from ${contact.name} saved. Firing automation events.`);
+    console.log(`[Message Handler] Message from ${contact.name} saved. Firing automation and sentiment analysis events.`);
 
-    // Publish events for automations and other side effects
+    if (message.type === 'text') {
+        await analyzeAndStoreSentiment(messageBody, contact.id); 
+    }
+
     await publishEvent('message_received', userId, { contact, message });
     if (isNew) {
         await publishEvent('contact_created', userId, { contact });

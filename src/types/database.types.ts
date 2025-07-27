@@ -261,6 +261,7 @@ export type PublicTables = {
       id: string
       name: string
       phone: string
+      sentiment: string | null
       tags: string[] | null
       user_id: string
     }
@@ -272,6 +273,7 @@ export type PublicTables = {
       id?: string
       name: string
       phone: string
+      sentiment?: string | null
       tags?: string[] | null
       user_id: string
     }
@@ -283,6 +285,7 @@ export type PublicTables = {
       id?: string
       name?: string
       phone?: string
+      sentiment?: string | null
       tags?: string[] | null
       user_id?: string
     }

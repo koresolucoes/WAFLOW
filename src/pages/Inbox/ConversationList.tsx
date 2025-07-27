@@ -38,7 +38,10 @@ const ConversationListItem: React.FC<{ conversation: Conversation; isActive: boo
             />
             <div className="flex-grow ml-3 overflow-hidden">
                 <div className="flex justify-between items-center">
-                    <h3 className="font-semibold text-white truncate">{conversation.contact.name}</h3>
+                    <h3 className="font-semibold text-white truncate flex items-center">
+                       {conversation.contact.sentiment && <span className="mr-1.5 text-lg">{conversation.contact.sentiment}</span>}
+                       <span className="truncate">{conversation.contact.name}</span>
+                    </h3>
                     {conversation.last_message && (
                         <p className="text-xs text-slate-400 flex-shrink-0">
                             {formatTime(conversation.last_message.created_at)}
