@@ -129,6 +129,7 @@ export type TaskWithContact = ContactActivity & {
 };
 
 export type TeamMemberWithEmail = {
+  team_id: string;
   user_id: string;
   role: 'admin' | 'agent';
   email: string;

@@ -1,10 +1,9 @@
-import React, { createContext, useState, useCallback, ReactNode, useContext, useEffect, useRef } from 'react';
+import React, { createContext, useState, useCallback, ReactNode, useContext, useEffect, useRef, useMemo } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuthStore, useMetaConfig } from '../../stores/authStore';
 import { ContactsContext } from './ContactsContext';
 import { Conversation, UnifiedMessage, Message, MessageStatus, Contact, TeamMemberWithEmail } from '../../types';
 import * as inboxService from '../../services/inboxService';
-import * as teamService from '../../services/teamService';
 import type { RealtimePostgresChangesPayload } from '@supabase/realtime-js';
 
 interface InboxContextType {
@@ -22,7 +21,7 @@ interface InboxContextType {
 export const InboxContext = createContext<InboxContextType>(null!);
 
 export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    const { user, activeTeam } = useAuthStore();
+    const { user, activeTeam, allTeamMembers } = useAuthStore();
     const metaConfig = useMetaConfig();
     const { contacts } = useContext(ContactsContext);
 
@@ -31,7 +30,6 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const [activeContactId, setActiveContactId] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [isSending, setIsSending] = useState(false);
-    const [teamMembers, setTeamMembers] = useState<TeamMemberWithEmail[]>([]);
     
     const activeContactIdRef = useRef(activeContactId);
     useEffect(() => {
@@ -42,6 +40,11 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     useEffect(() => {
         contactsRef.current = contacts;
     }, [contacts]);
+    
+    const teamMembers = useMemo(() => {
+        if (!activeTeam) return [];
+        return allTeamMembers.filter(m => m.team_id === activeTeam.id);
+    }, [allTeamMembers, activeTeam]);
 
 
     const fetchConversations = useCallback(async () => {
@@ -57,16 +60,6 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             setIsLoading(false);
         }
     }, [user, activeTeam]);
-
-    useEffect(() => {
-        if (activeTeam) {
-            teamService.fetchTeamMembers(activeTeam.id)
-                .then(setTeamMembers)
-                .catch(err => console.error("InboxContext: Failed to fetch team members", err));
-        } else {
-            setTeamMembers([]);
-        }
-    }, [activeTeam]);
     
     const fetchMessages = useCallback(async (contactId: string | null) => {
         if (!contactId || !user || !activeTeam) {

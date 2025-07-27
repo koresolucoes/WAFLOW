@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabaseClient';
 import type { Session, User } from '@supabase/auth-js';
-import { Profile, EditableProfile, MetaConfig, Team } from '../types';
+import { Profile, EditableProfile, MetaConfig, Team, TeamMemberWithEmail } from '../types';
 import { getProfile, updateProfileInDb } from '../services/profileService';
 
 interface AuthState {
@@ -12,6 +12,7 @@ interface AuthState {
   isInitialized: boolean;
   activeTeam: Team | null;
   userTeams: Team[];
+  allTeamMembers: TeamMemberWithEmail[];
   teamLoading: boolean;
   initializeAuth: () => () => void;
   updateProfile: (profileData: EditableProfile) => Promise<void>;
@@ -26,6 +27,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isInitialized: false,
   activeTeam: null,
   userTeams: [],
+  allTeamMembers: [],
   teamLoading: true,
 
   initializeAuth: () => {
@@ -33,7 +35,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     const handleSession = async (session: Session | null) => {
       const user = session?.user ?? null;
-      set({ session, user, profile: null, activeTeam: null, userTeams: [] });
+      set({ session, user, profile: null, activeTeam: null, userTeams: [], allTeamMembers: [] });
 
       if (user) {
         set({ loading: true, teamLoading: true });
@@ -48,9 +50,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             return;
         }
 
-        const { profile: profileData, teams: teamsData } = data as unknown as { profile: Profile | null, teams: Team[] | null };
+        const { profile: profileData, teams: teamsData, team_members: teamMembersData } = data as unknown as { profile: Profile | null, teams: Team[] | null, team_members: TeamMemberWithEmail[] | null };
 
         let teams = (teamsData || []).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+        const allTeamMembers = teamMembersData || [];
 
         // Lógica de fallback para usuários existentes que, por algum motivo, não têm uma equipe.
         if (teams.length === 0) {
@@ -71,8 +74,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                 const { data: refetchData, error: refetchError } = await supabase.rpc('get_user_teams_and_profile');
                 if (refetchError) throw refetchError;
 
-                const { teams: newTeamsData } = refetchData as unknown as { teams: Team[] | null };
+                const { teams: newTeamsData, team_members: newTeamMembersData } = refetchData as unknown as { teams: Team[] | null, team_members: TeamMemberWithEmail[] | null };
                 teams = (newTeamsData || []).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+                allTeamMembers.push(...(newTeamMembersData || []));
                 console.log(`Equipe padrão criada e obtida com sucesso para o usuário ${user.id}.`);
 
             } catch (creationError) {
@@ -84,6 +88,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         set({ 
             profile: profileData,
             userTeams: teams,
+            allTeamMembers,
             activeTeam: teams[0] || null,
             teamLoading: false,
             loading: false
