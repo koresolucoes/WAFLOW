@@ -4,6 +4,7 @@ import { useAuthStore, useMetaConfig } from '../../stores/authStore';
 import { ContactsContext } from './ContactsContext';
 import { Conversation, UnifiedMessage, Message, MessageStatus, Contact } from '../../types';
 import * as inboxService from '../../services/inboxService';
+import { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 
 interface InboxContextType {
     conversations: Conversation[];
@@ -32,6 +33,11 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     useEffect(() => {
         activeContactIdRef.current = activeContactId;
     }, [activeContactId]);
+
+    const contactsRef = useRef(contacts);
+    useEffect(() => {
+        contactsRef.current = contacts;
+    }, [contacts]);
 
 
     const fetchConversations = useCallback(async () => {
@@ -86,7 +92,9 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         if (user) {
             fetchConversations();
 
-            const handleMessageChange = (payload: { new: Message, eventType: string }) => {
+            const handleMessageChange = (payload: RealtimePostgresChangesPayload<Message>) => {
+                if (payload.eventType !== 'INSERT' && payload.eventType !== 'UPDATE') return;
+
                 const newMessage = inboxService.mapPayloadToUnifiedMessage(payload.new);
                 const contactId = newMessage.contact_id;
                 
@@ -104,7 +112,7 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                         const otherConvos = prev.filter(c => c.contact.id !== contactId);
                         return [updatedConvo, ...otherConvos];
                     } else {
-                        const contactDetails = contacts.find(c => c.id === contactId);
+                        const contactDetails = contactsRef.current.find(c => c.id === contactId);
                         if (contactDetails) {
                              const newConvo: Conversation = { contact: contactDetails, last_message: newMessage, unread_count: 1 };
                              return [newConvo, ...prev];
@@ -131,14 +139,14 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             };
             
             const messagesChannel = supabase.channel(`messages-channel-${user.id}`)
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `user_id=eq.${user.id}` }, handleMessageChange as any)
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `user_id=eq.${user.id}` }, handleMessageChange)
                 .subscribe();
             
             return () => {
                 supabase.removeChannel(messagesChannel);
             }
         }
-    }, [user, contacts, fetchConversations]);
+    }, [user, fetchConversations]);
 
     const sendMessage = useCallback(async (contactId: string, text: string) => {
         if (!user) throw new Error("Usuário não autenticado.");
