@@ -22,7 +22,7 @@ export type CustomFieldType = Enums<'custom_field_type'>;
 export type ActivityType = 'NOTA' | 'TAREFA';
 export type DealStatus = Enums<'deal_status'>;
 export type StageType = Enums<'stage_type'>;
-
+export type Team = Database['public']['Tables']['teams']['Row'];
 
 // Tipos para os nós do editor de automação
 export type NodeType = 'trigger' | 'action' | 'logic';
@@ -127,7 +127,7 @@ export type TaskWithContact = ContactActivity & {
 
 // --- TIPOS DE INSERÇÃO ---
 export interface MessageTemplateInsert extends Omit<Database['public']['Tables']['message_templates']['Insert'], 'category' | 'status' | 'components'> {
-    user_id: string;
+    team_id: string;
     template_name: string;
     category: TemplateCategory;
     status?: TemplateStatus;
@@ -141,7 +141,7 @@ export type ContactActivityInsert = Database['public']['Tables']['contact_activi
 export type CannedResponseInsert = Database['public']['Tables']['canned_responses']['Insert'];
 
 export interface AutomationInsert extends Omit<Database['public']['Tables']['automations']['Insert'], 'status' | 'nodes' | 'edges'> {
-  user_id: string;
+  team_id: string;
   name: string;
   status: AutomationStatus;
   nodes: AutomationNode[];
@@ -151,7 +151,7 @@ export interface AutomationInsert extends Omit<Database['public']['Tables']['aut
 export type DealInsert = Database['public']['Tables']['deals']['Insert'];
 
 // Tipos para formulários e operações específicas
-export type EditableContact = Omit<Contact, 'id' | 'user_id' | 'created_at'> & { id?: string };
+export type EditableContact = Omit<Contact, 'id' | 'created_at'> & { id?: string };
 export type EditableProfile = Database['public']['Tables']['profiles']['Update'];
 export type ContactActivityUpdate = Database['public']['Tables']['contact_activities']['Update'];
 

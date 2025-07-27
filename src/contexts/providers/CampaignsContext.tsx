@@ -1,6 +1,8 @@
 
 
 
+
+
 import React, { createContext, useState, useCallback, ReactNode, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { Campaign, CampaignWithMetrics, MessageInsert, CampaignWithDetails, CampaignStatus, Message, MessageStatus, MessageWithContact } from '../../types';
@@ -13,7 +15,7 @@ interface CampaignsContextType {
   campaignDetails: CampaignWithDetails | null;
   setCampaigns: React.Dispatch<React.SetStateAction<CampaignWithMetrics[]>>;
   setCampaignDetails: React.Dispatch<React.SetStateAction<CampaignWithDetails | null>>;
-  addCampaign: (campaign: Omit<Campaign, 'id' | 'user_id' | 'sent_at' | 'created_at' | 'recipient_count' | 'status'> & { status: CampaignStatus }, messages: Omit<MessageInsert, 'campaign_id' | 'user_id'>[]) => Promise<void>;
+  addCampaign: (campaign: Omit<Campaign, 'id' | 'sent_at' | 'created_at' | 'recipient_count' | 'status'> & { status: CampaignStatus }, messages: Omit<MessageInsert, 'campaign_id'>[]) => Promise<void>;
   fetchCampaignDetails: (campaignId: string) => Promise<void>;
   deleteCampaign: (campaignId: string) => Promise<void>;
 }
@@ -21,7 +23,7 @@ interface CampaignsContextType {
 export const CampaignsContext = createContext<CampaignsContextType>(null!);
 
 export const CampaignsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const user = useAuthStore(state => state.user);
+  const { user, activeTeam } = useAuthStore(state => ({ user: state.user, activeTeam: state.activeTeam }));
   const [campaigns, setCampaigns] = useState<CampaignWithMetrics[]>([]);
   const [campaignDetails, setCampaignDetails] = useState<CampaignWithDetails | null>(null);
 
@@ -32,20 +34,20 @@ export const CampaignsProvider: React.FC<{ children: ReactNode }> = ({ children 
   }, [campaignDetails]);
 
   const fetchCampaignDetails = useCallback(async (campaignId: string) => {
-    if (!user) return;
+    if (!activeTeam) return;
     try {
-        const details = await fetchCampaignDetailsFromDb(user.id, campaignId);
+        const details = await fetchCampaignDetailsFromDb(activeTeam.id, campaignId);
         setCampaignDetails(details);
     } catch (err) {
         console.error("Error in Campaign Context fetching details:", (err as any).message || err);
         throw err;
     }
-  }, [user]);
+  }, [activeTeam]);
   
-  const addCampaign = useCallback(async (campaign: Omit<Campaign, 'id' | 'user_id' | 'sent_at' | 'created_at' | 'recipient_count' | 'status'> & {status: CampaignStatus}, messages: Omit<MessageInsert, 'campaign_id' | 'user_id'>[]) => {
-    if (!user) throw new Error("User not authenticated.");
+  const addCampaign = useCallback(async (campaign: Omit<Campaign, 'id' | 'sent_at' | 'created_at' | 'recipient_count' | 'status'> & {status: CampaignStatus}, messages: Omit<MessageInsert, 'campaign_id'>[]) => {
+    if (!activeTeam) throw new Error("Active team not available.");
     
-    const newCampaign = await addCampaignToDb(user.id, campaign, messages);
+    const newCampaign = await addCampaignToDb(activeTeam.id, campaign, messages);
     const sentCount = messages.filter(m => m.status !== 'failed').length;
 
     const newCampaignWithMetrics: CampaignWithMetrics = {
@@ -58,22 +60,22 @@ export const CampaignsProvider: React.FC<{ children: ReactNode }> = ({ children 
         }
     };
     setCampaigns(prev => [newCampaignWithMetrics, ...prev]);
-  }, [user]);
+  }, [activeTeam]);
 
   const deleteCampaign = useCallback(async (campaignId: string) => {
-    if (!user) throw new Error("User not authenticated.");
+    if (!activeTeam) throw new Error("Active team not available.");
 
-    await deleteCampaignFromDb(user.id, campaignId);
+    await deleteCampaignFromDb(activeTeam.id, campaignId);
 
     setCampaigns(prev => prev.filter(c => c.id !== campaignId));
     if (campaignDetails?.id === campaignId) {
         setCampaignDetails(null);
     }
-  }, [user, campaignDetails]);
+  }, [activeTeam, campaignDetails]);
 
 
   useEffect(() => {
-    if (!user) return;
+    if (!activeTeam) return;
 
     const handleRealtimeMessageUpdate = async (payload: RealtimePostgresChangesPayload<{ [key: string]: any }>) => {
         if (payload.eventType !== 'UPDATE') return;
@@ -118,7 +120,7 @@ export const CampaignsProvider: React.FC<{ children: ReactNode }> = ({ children 
         .channel('campaign-message-updates')
         .on(
             'postgres_changes',
-            { event: 'UPDATE', schema: 'public', table: 'messages', filter: `user_id=eq.${user.id}` },
+            { event: 'UPDATE', schema: 'public', table: 'messages', filter: `team_id=eq.${activeTeam.id}` },
             handleRealtimeMessageUpdate
         )
         .subscribe();
@@ -126,7 +128,7 @@ export const CampaignsProvider: React.FC<{ children: ReactNode }> = ({ children 
     return () => {
         supabase.removeChannel(channel);
     };
-  }, [user, fetchCampaignDetails]);
+  }, [activeTeam, fetchCampaignDetails]);
 
 
   const value = {

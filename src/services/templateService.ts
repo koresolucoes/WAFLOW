@@ -1,5 +1,6 @@
 
 
+
 import { supabase } from '../lib/supabaseClient';
 import { MessageTemplate, MessageTemplateInsert, MetaConfig, TemplateCategory, TemplateStatus } from '../types';
 import { TablesInsert, Json } from '../types/database.types';
@@ -31,8 +32,8 @@ const addTemplateToDb = async (template: MessageTemplateInsert): Promise<Message
 
 export const createTemplateOnMetaAndDb = async (
     metaConfig: MetaConfig,
-    templateData: Omit<MessageTemplateInsert, 'id' | 'user_id' | 'created_at' | 'status' | 'meta_id'>,
-    userId: string
+    templateData: Omit<MessageTemplateInsert, 'id' | 'created_at' | 'status' | 'meta_id'>,
+    teamId: string
 ): Promise<MessageTemplate> => {
     // 1. Create on Meta platform
     const metaResult = await createMetaTemplate(metaConfig, {
@@ -44,7 +45,7 @@ export const createTemplateOnMetaAndDb = async (
     // 2. Prepare for our DB
     const templateForDb: MessageTemplateInsert = {
         ...templateData,
-        user_id: userId,
+        team_id: teamId,
         meta_id: metaResult.id,
         status: 'PENDING'
     };

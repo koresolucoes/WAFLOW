@@ -1,5 +1,6 @@
 
 
+
 import { supabase } from '../lib/supabaseClient';
 import { Pipeline, PipelineStage, DealInsert, DealWithContact, StageType } from '../types';
 import { TablesInsert, TablesUpdate } from '../types/database.types';
@@ -16,8 +17,8 @@ export const updateDealInDb = async (dealId: string, updates: TablesUpdate<'deal
     return data as unknown as DealWithContact;
 };
 
-export const createDefaultPipelineInDb = async (userId: string): Promise<{ pipeline: Pipeline, stages: PipelineStage[] }> => {
-    const { data: pipelineData, error: pipelineError } = await supabase.from('pipelines').insert({ user_id: userId, name: 'Funil de Vendas Padrão' }).select('*').single();
+export const createDefaultPipelineInDb = async (teamId: string): Promise<{ pipeline: Pipeline, stages: PipelineStage[] }> => {
+    const { data: pipelineData, error: pipelineError } = await supabase.from('pipelines').insert({ team_id: teamId, name: 'Funil de Vendas Padrão' }).select('*').single();
     if (pipelineError || !pipelineData) throw pipelineError || new Error("Falha ao criar funil.");
     
     const pipeline = pipelineData as unknown as Pipeline;
@@ -40,8 +41,8 @@ export const createDefaultPipelineInDb = async (userId: string): Promise<{ pipel
     return { pipeline, stages: stagesData as unknown as PipelineStage[] };
 };
 
-export const addPipelineToDb = async (userId: string, name: string): Promise<{ pipeline: Pipeline, stage: PipelineStage }> => {
-    const { data: pipelineData, error } = await supabase.from('pipelines').insert({ user_id: userId, name }).select('*').single();
+export const addPipelineToDb = async (teamId: string, name: string): Promise<{ pipeline: Pipeline, stage: PipelineStage }> => {
+    const { data: pipelineData, error } = await supabase.from('pipelines').insert({ team_id: teamId, name }).select('*').single();
     if (error || !pipelineData) throw error || new Error("Falha ao criar funil.");
 
     const pipeline = pipelineData as unknown as Pipeline;

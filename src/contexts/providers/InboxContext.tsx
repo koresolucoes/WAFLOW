@@ -8,6 +8,7 @@ import type { RealtimePostgresChangesPayload } from '@supabase/realtime-js';
 
 interface InboxContextType {
     conversations: Conversation[];
+    setConversations: React.Dispatch<React.SetStateAction<Conversation[]>>;
     messages: UnifiedMessage[];
     activeContactId: string | null;
     setActiveContactId: (contactId: string | null) => void;
@@ -19,7 +20,7 @@ interface InboxContextType {
 export const InboxContext = createContext<InboxContextType>(null!);
 
 export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    const user = useAuthStore(state => state.user);
+    const { user, activeTeam } = useAuthStore(state => ({ user: state.user, activeTeam: state.activeTeam }));
     const metaConfig = useMetaConfig();
     const { contacts } = useContext(ContactsContext);
 
@@ -41,10 +42,10 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
 
     const fetchConversations = useCallback(async () => {
-        if (!user) return;
+        if (!activeTeam) return;
         setIsLoading(true);
         try {
-            const data = await inboxService.fetchConversationsFromDb(user.id);
+            const data = await inboxService.fetchConversationsFromDb(activeTeam.id);
             setConversations(data);
         } catch (error) {
             console.error("Error fetching conversations:", error);
@@ -52,16 +53,16 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         } finally {
             setIsLoading(false);
         }
-    }, [user]);
+    }, [activeTeam]);
     
     const fetchMessages = useCallback(async (contactId: string | null) => {
-        if (!contactId || !user) {
+        if (!contactId || !activeTeam) {
             setMessages([]);
             return;
         }
         setIsLoading(true);
         try {
-            const data = await inboxService.fetchMessagesFromDb(user.id, contactId);
+            const data = await inboxService.fetchMessagesFromDb(activeTeam.id, contactId);
             setMessages(data);
         } catch (error) {
             console.error(`Error fetching messages for contact ${contactId}:`, error);
@@ -70,7 +71,7 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             setIsLoading(false);
         }
 
-    }, [user]);
+    }, [activeTeam]);
     
     const setActiveContactIdAndMarkRead = (contactId: string | null) => {
         setActiveContactId(contactId);
@@ -89,7 +90,7 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }, [activeContactId, fetchMessages]);
 
     useEffect(() => {
-        if (user) {
+        if (activeTeam) {
             fetchConversations();
 
             const handleMessageChange = (payload: RealtimePostgresChangesPayload<Message>) => {
@@ -151,12 +152,12 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 );
             };
             
-            const messagesChannel = supabase.channel(`messages-channel-${user.id}`)
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `user_id=eq.${user.id}` }, handleMessageChange)
+            const messagesChannel = supabase.channel(`messages-channel-${activeTeam.id}`)
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `team_id=eq.${activeTeam.id}` }, handleMessageChange)
                 .subscribe();
             
-            const contactsChannel = supabase.channel(`contacts-channel-inbox-${user.id}`)
-                .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'contacts', filter: `user_id=eq.${user.id}` }, handleContactChange)
+            const contactsChannel = supabase.channel(`contacts-channel-inbox-${activeTeam.id}`)
+                .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'contacts', filter: `team_id=eq.${activeTeam.id}` }, handleContactChange)
                 .subscribe();
 
             return () => {
@@ -164,10 +165,10 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 supabase.removeChannel(contactsChannel);
             }
         }
-    }, [user, fetchConversations]);
+    }, [activeTeam, fetchConversations]);
 
     const sendMessage = useCallback(async (contactId: string, text: string) => {
-        if (!user) throw new Error("Usuário não autenticado.");
+        if (!activeTeam) throw new Error("Equipa ativa não disponível.");
         if (!metaConfig.accessToken) throw new Error("Configuração da Meta ausente.");
         
         const contact = contacts.find(c => c.id === contactId);
@@ -190,7 +191,7 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         
         setIsSending(true);
         try {
-            const savedMessage = await inboxService.sendMessageToApi(user.id, contact, text, metaConfig);
+            const savedMessage = await inboxService.sendMessageToApi(activeTeam.id, contact, text, metaConfig);
             const unifiedSavedMessage = inboxService.mapPayloadToUnifiedMessage(savedMessage);
             
             // Replace optimistic message with the real one from DB.
@@ -206,11 +207,12 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         } finally {
             setIsSending(false);
         }
-    }, [user, metaConfig, contacts]);
+    }, [activeTeam, metaConfig, contacts]);
 
 
     const value = {
         conversations,
+        setConversations,
         messages,
         activeContactId,
         setActiveContactId: setActiveContactIdAndMarkRead,

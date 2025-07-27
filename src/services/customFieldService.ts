@@ -1,12 +1,13 @@
 
 
+
 import { supabase } from '../lib/supabaseClient';
 import { CustomFieldDefinition, CustomFieldDefinitionInsert } from '../types';
 
-export const addCustomFieldDefinition = async (userId: string, definition: Omit<CustomFieldDefinitionInsert, 'user_id' | 'id' | 'created_at'>): Promise<CustomFieldDefinition> => {
+export const addCustomFieldDefinition = async (teamId: string, definition: Omit<CustomFieldDefinitionInsert, 'team_id' | 'id' | 'created_at'>): Promise<CustomFieldDefinition> => {
     const { data, error } = await supabase
         .from('custom_field_definitions')
-        .insert({ ...definition, user_id: userId } as any)
+        .insert({ ...definition, team_id: teamId } as any)
         .select()
         .single();
     if (error) {
@@ -18,11 +19,11 @@ export const addCustomFieldDefinition = async (userId: string, definition: Omit<
     return data as unknown as CustomFieldDefinition;
 };
 
-export const deleteCustomFieldDefinition = async (id: string, userId: string): Promise<void> => {
+export const deleteCustomFieldDefinition = async (id: string, teamId: string): Promise<void> => {
     const { error } = await supabase
         .from('custom_field_definitions')
         .delete()
         .eq('id', id)
-        .eq('user_id', userId);
+        .eq('team_id', teamId);
     if (error) throw error;
 };

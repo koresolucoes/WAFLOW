@@ -8,7 +8,7 @@ import { TablesUpdate } from '../../types/database.types';
 interface CannedResponsesContextType {
     responses: CannedResponse[];
     setResponses: React.Dispatch<React.SetStateAction<CannedResponse[]>>;
-    addResponse: (response: Omit<CannedResponseInsert, 'user_id' | 'id' | 'created_at'>) => Promise<void>;
+    addResponse: (response: Omit<CannedResponseInsert, 'team_id' | 'id' | 'created_at'>) => Promise<void>;
     updateResponse: (id: string, updates: TablesUpdate<'canned_responses'>) => Promise<void>;
     deleteResponse: (id: string) => Promise<void>;
 }
@@ -16,24 +16,24 @@ interface CannedResponsesContextType {
 export const CannedResponsesContext = createContext<CannedResponsesContextType>(null!);
 
 export const CannedResponsesProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    const user = useAuthStore(state => state.user);
+    const { activeTeam } = useAuthStore();
     const [responses, setResponses] = useState<CannedResponse[]>([]);
 
     useEffect(() => {
-        if (user) {
-            cannedResponseService.fetchCannedResponses(user.id)
+        if (activeTeam) {
+            cannedResponseService.fetchCannedResponses(activeTeam.id)
                 .then(setResponses)
                 .catch(err => console.error("Failed to fetch canned responses:", err));
         } else {
             setResponses([]);
         }
-    }, [user]);
+    }, [activeTeam]);
 
-    const addResponse = useCallback(async (response: Omit<CannedResponseInsert, 'user_id' | 'id' | 'created_at'>) => {
-        if (!user) throw new Error("User not authenticated.");
-        const newResponse = await cannedResponseService.addCannedResponse(user.id, response);
+    const addResponse = useCallback(async (response: Omit<CannedResponseInsert, 'team_id' | 'id' | 'created_at'>) => {
+        if (!activeTeam) throw new Error("Active team not available.");
+        const newResponse = await cannedResponseService.addCannedResponse(activeTeam.id, response);
         setResponses(prev => [...prev, newResponse].sort((a, b) => a.shortcut.localeCompare(b.shortcut)));
-    }, [user]);
+    }, [activeTeam]);
 
     const updateResponse = useCallback(async (id: string, updates: TablesUpdate<'canned_responses'>) => {
         const updatedResponse = await cannedResponseService.updateCannedResponse(id, updates);

@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { Pipeline, PipelineStage, Deal, DealInsert } from '../../types';
 import Button from './Button';
@@ -8,7 +9,7 @@ import Modal from './Modal';
 interface DealFormModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSave: (deal: Omit<DealInsert, 'user_id' | 'contact_id' >) => void;
+    onSave: (deal: Omit<DealInsert, 'team_id' | 'contact_id' >) => void;
     pipeline: Pipeline;
     stages: PipelineStage[];
     contactName: string;
@@ -52,7 +53,7 @@ const DealFormModal: React.FC<DealFormModalProps> = ({ isOpen, onClose, onSave, 
         }
         setIsLoading(true);
 
-        const dealData: Omit<DealInsert, 'user_id' | 'contact_id' > = {
+        const dealData: Omit<DealInsert, 'team_id' | 'contact_id' > = {
             name,
             value,
             stage_id: stageId,

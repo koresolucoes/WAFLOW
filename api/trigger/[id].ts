@@ -1,5 +1,7 @@
 
 
+
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
 import { executeAutomation, createDefaultLoggingHooks } from '../_lib/automation/engine.js';
@@ -47,8 +49,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(404).json({ error: `Profile not found for webhook prefix or ID: "${webhookPrefix}"` });
     }
     const profile = profileData;
+    
+    // Find the team for this user to locate the correct automations
+    const { data: teamMember } = await supabaseAdmin.from('team_members').select('team_id').eq('user_id', profile.id).limit(1).single();
+    if (!teamMember) {
+        return res.status(404).json({ error: 'Team not found for this user.' });
+    }
+    const teamId = teamMember.team_id;
 
-    const { data: automationsData, error: automationsError } = await supabaseAdmin.from('automations').select('created_at, edges, id, name, nodes, status, user_id').eq('user_id', profile.id).eq('status', 'active');
+
+    const { data: automationsData, error: automationsError } = await supabaseAdmin.from('automations').select('created_at, edges, id, name, nodes, status, team_id').eq('team_id', teamId).eq('status', 'active');
     
     if(automationsError || !automationsData) {
          return res.status(500).json({ error: 'Failed to retrieve automations.' });
@@ -89,7 +99,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 }
                 
                 const logPayload: TablesInsert<'webhook_logs'> = {
-                    user_id: profile.id,
+                    team_id: teamId,
                     source: 'automation_trigger',
                     payload: { rawBody, query: req.query, headers: cleanHeaders } as unknown as Json,
                     path: req.url,
@@ -161,9 +171,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         try {
             const fullPayloadForEvent = { ...structuredPayload, body: eventBody };
             
-            const { contact, isNewContact, newlyAddedTags } = await processWebhookPayloadForContact(profile, fullPayloadForEvent, mappingRules);
+            const { contact, isNewContact, newlyAddedTags } = await processWebhookPayloadForContact(profile, teamId, fullPayloadForEvent, mappingRules);
             
-            const hooks = createDefaultLoggingHooks(automation.id, contact ? contact.id : null);
+            const hooks = createDefaultLoggingHooks(automation.id, teamId, contact ? contact.id : null);
             // CRITICAL FIX: Await the execution to ensure completion in the serverless environment.
             await executeAutomation(automation, contact, nodeId, fullPayloadForEvent, hooks, profile);
             
@@ -171,10 +181,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const sideEffectPromises: Promise<void>[] = [];
             if (contact) {
                 if (isNewContact) {
-                    sideEffectPromises.push(publishEvent('contact_created', profile.id, { contact }));
+                    sideEffectPromises.push(publishEvent('contact_created', teamId, { contact }));
                 }
                 newlyAddedTags.forEach(tag => {
-                    sideEffectPromises.push(publishEvent('tag_added', profile.id, { contact, tag }));
+                    sideEffectPromises.push(publishEvent('tag_added', teamId, { contact, tag }));
                 });
             }
             await Promise.all(sideEffectPromises);

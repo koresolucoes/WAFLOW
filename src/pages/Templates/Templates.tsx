@@ -2,6 +2,7 @@
 
 
 
+
 import React, { useContext, useState, useMemo } from 'react';
 import { MessageTemplate, TemplateCategory, TemplateStatus, TablesInsert } from '../../types';
 import { getMetaTemplates } from '../../services/meta/templates';
@@ -60,7 +61,7 @@ const TemplateCard: React.FC<{ template: MessageTemplate; onUse: () => void }> =
 const Templates: React.FC = () => {
   const { templates, setTemplates } = useContext(TemplatesContext);
   const { setCurrentPage } = useContext(NavigationContext);
-  const user = useAuthStore(state => state.user);
+  const { user, activeTeam } = useAuthStore(state => ({ user: state.user, activeTeam: state.activeTeam }));
   const metaConfig = useMetaConfig();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -71,7 +72,7 @@ const Templates: React.FC = () => {
   };
 
   const handleSync = async () => {
-    if (!metaConfig.wabaId || !metaConfig.accessToken || !user) {
+    if (!metaConfig.wabaId || !metaConfig.accessToken || !user || !activeTeam) {
         setError("Por favor, configure suas credenciais da Meta na página de Configurações.");
         return;
     }
@@ -83,7 +84,7 @@ const Templates: React.FC = () => {
 
         const templatesToUpsert: TablesInsert<'message_templates'>[] = metaTemplates.map(mt => ({
             meta_id: mt.id,
-            user_id: user.id,
+            team_id: activeTeam.id,
             template_name: mt.name,
             status: mt.status as TemplateStatus,
             category: mt.category as TemplateCategory,
@@ -91,14 +92,14 @@ const Templates: React.FC = () => {
         }));
         
         if (templatesToUpsert.length > 0) {
-            const { error: upsertError } = await supabase.from('message_templates').upsert(templatesToUpsert, { onConflict: 'meta_id, user_id' });
+            const { error: upsertError } = await supabase.from('message_templates').upsert(templatesToUpsert, { onConflict: 'meta_id, team_id' });
             if (upsertError) throw upsertError;
         }
 
         const { data: dbTemplates, error: refetchError } = await supabase
             .from('message_templates')
-            .select('id, meta_id, user_id, template_name, status, category, components, created_at')
-            .eq('user_id', user.id)
+            .select('id, meta_id, team_id, template_name, status, category, components, created_at')
+            .eq('team_id', activeTeam.id)
             .order('created_at', { ascending: false });
 
         if (refetchError) throw refetchError;

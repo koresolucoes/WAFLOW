@@ -18,7 +18,7 @@ const ContactDetails: React.FC = () => {
     const { contactDetails, fetchContactDetails, updateContact } = useContext(ContactsContext);
     const { definitions } = useContext(CustomFieldsContext);
     const { deals, addDeal, pipelines, stages } = useContext(FunnelContext);
-    const user = useAuthStore(state => state.user);
+    const { user, activeTeam } = useAuthStore(state => ({ user: state.user, activeTeam: state.activeTeam }));
 
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
@@ -30,10 +30,10 @@ const ContactDetails: React.FC = () => {
     const [isTimelineLoading, setIsTimelineLoading] = useState(true);
 
     const loadData = async () => {
-        if (pageParams.contactId && user) {
+        if (pageParams.contactId && activeTeam) {
             setIsTimelineLoading(true);
             try {
-                const timelineData = await fetchContactTimeline(user.id, pageParams.contactId);
+                const timelineData = await fetchContactTimeline(activeTeam.id, pageParams.contactId);
                 setTimelineEvents(timelineData);
             } catch (error) {
                 console.error("Failed to load timeline:", error);
@@ -58,7 +58,7 @@ const ContactDetails: React.FC = () => {
             }
         };
         loadDetails();
-    }, [pageParams.contactId, fetchContactDetails, user]);
+    }, [pageParams.contactId, fetchContactDetails, activeTeam]);
 
     useEffect(() => {
         if (contactDetails) {
@@ -111,10 +111,10 @@ const ContactDetails: React.FC = () => {
         }
     };
 
-    const handleSaveDeal = async (dealData: Omit<DealInsert, 'user_id' | 'contact_id' >) => {
-        if (!user || !pageParams.contactId) return;
+    const handleSaveDeal = async (dealData: Omit<DealInsert, 'team_id' | 'contact_id' >) => {
+        if (!activeTeam || !pageParams.contactId) return;
         try {
-            await addDeal({ ...dealData, user_id: user.id, contact_id: pageParams.contactId });
+            await addDeal({ ...dealData, team_id: activeTeam.id, contact_id: pageParams.contactId });
             setIsDealModalOpen(false);
         } catch (err: any) {
             alert(`Erro ao criar negócio: ${err.message}`);

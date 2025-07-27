@@ -1,6 +1,7 @@
 
 
 
+
 import React, { createContext, useState, useCallback, ReactNode, useContext, useEffect } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { Automation, AutomationNode, Edge, AutomationNodeStats, AutomationNodeLog, AutomationStatus } from '../../types';
@@ -24,19 +25,19 @@ interface AutomationsContextType {
 export const AutomationsContext = createContext<AutomationsContextType>(null!);
 
 export const AutomationsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    const user = useAuthStore(state => state.user);
+    const { user, activeTeam } = useAuthStore();
     const { setCurrentPage } = useContext(NavigationContext);
     const [automations, setAutomations] = useState<Automation[]>([]);
     const [automationStats, setAutomationStats] = useState<Record<string, AutomationNodeStats>>({});
 
     useEffect(() => {
-        if (!user) return;
+        if (!activeTeam) return;
 
         const channel = supabase
         .channel('automations-changes')
         .on(
             'postgres_changes',
-            { event: '*', schema: 'public', table: 'automations', filter: `user_id=eq.${user.id}` },
+            { event: '*', schema: 'public', table: 'automations', filter: `team_id=eq.${activeTeam.id}` },
             (payload) => {
             console.log('Realtime automation change received!', payload);
             if (payload.eventType === 'INSERT') {
@@ -75,52 +76,40 @@ export const AutomationsProvider: React.FC<{ children: ReactNode }> = ({ childre
             supabase.removeChannel(channel);
         }
 
-    }, [user]);
+    }, [activeTeam]);
 
     const createAndNavigateToAutomation = useCallback(async () => {
-        if (!user) throw new Error("User not authenticated.");
-        const newAutomation = await automationService.createAutomationInDb(user.id);
+        if (!activeTeam) throw new Error("Active team not available.");
+        const newAutomation = await automationService.createAutomationInDb(activeTeam.id);
         setCurrentPage('automation-editor', { automationId: newAutomation.id });
-    }, [user, setCurrentPage]);
+    }, [activeTeam, setCurrentPage]);
 
     const updateAutomation = useCallback(async (automation: Automation) => {
-        if (!user) throw new Error("User not authenticated.");
-        const updated = await automationService.updateAutomationInDb(user.id, automation);
+        if (!activeTeam) throw new Error("Active team not available.");
+        const updated = await automationService.updateAutomationInDb(activeTeam.id, automation);
         setAutomations(prev => prev.map(a => a.id === updated.id ? updated : a));
-    }, [user]);
+    }, [activeTeam]);
     
     const deleteAutomation = useCallback(async (automationId: string) => {
-        if (!user) throw new Error("User not authenticated.");
+        if (!activeTeam) throw new Error("Active team not available.");
         await automationService.deleteAutomationFromDb(automationId);
         // Realtime handles state update
-    }, [user]);
+    }, [activeTeam]);
     
     const fetchAutomationStats = useCallback(async (automationId: string) => {
-        if (!user) return;
+        if (!activeTeam) return;
         const statsMap = await automationService.fetchStatsForAutomation(automationId);
         setAutomationStats(prev => ({...prev, ...statsMap}));
-    }, [user]);
+    }, [activeTeam]);
 
     const fetchNodeLogs = useCallback(async (automationId: string, nodeId: string): Promise<AutomationNodeLog[]> => {
-        if (!user) return [];
+        if (!activeTeam) return [];
         return await automationService.fetchLogsForNode(automationId, nodeId);
-    }, [user]);
+    }, [activeTeam]);
 
     const value = {
         automations,
         setAutomations,
         automationStats,
         setAutomationStats,
-        createAndNavigateToAutomation,
-        updateAutomation,
-        deleteAutomation,
-        fetchAutomationStats,
-        fetchNodeLogs
-    };
-
-    return (
-        <AutomationsContext.Provider value={value}>
-            {children}
-        </AutomationsContext.Provider>
-    )
-};
+        createAnd

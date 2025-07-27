@@ -1,7 +1,9 @@
+
 import React from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import Button from '../common/Button';
 import { useAuthStore } from '../../stores/authStore';
+import TeamSwitcher from './TeamSwitcher';
 
 const Header: React.FC = () => {
   const user = useAuthStore(state => state.user);
@@ -11,7 +13,8 @@ const Header: React.FC = () => {
   };
 
   return (
-    <header className="flex-shrink-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-end p-4 border-b border-slate-700/50">
+    <header className="flex-shrink-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-between p-4 border-b border-slate-700/50">
+      <TeamSwitcher />
       <div className="flex items-center space-x-4">
         <span className="text-sm font-medium text-slate-300">{user?.email}</span>
         <img

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { EditableContact } from '../../types';
 import Button from '../../components/common/Button';
+import { useAuthStore } from '../../stores/authStore';
 
 interface ContactFormProps {
   contact?: EditableContact;
@@ -10,6 +11,7 @@ interface ContactFormProps {
 }
 
 const ContactForm: React.FC<ContactFormProps> = ({ contact, onSave, onCancel, isLoading = false }) => {
+  const { activeTeam } = useAuthStore();
   const [formData, setFormData] = useState<EditableContact & { tags: string[] }>({
     name: '',
     phone: '',
@@ -18,6 +20,7 @@ const ContactForm: React.FC<ContactFormProps> = ({ contact, onSave, onCancel, is
     tags: [],
     custom_fields: null,
     sentiment: null,
+    team_id: activeTeam?.id || ''
   });
   const [tagInput, setTagInput] = useState('');
 
@@ -30,9 +33,9 @@ const ContactForm: React.FC<ContactFormProps> = ({ contact, onSave, onCancel, is
         company: contact.company || ''
       });
     } else {
-      setFormData({ name: '', phone: '', email: '', company: '', tags: [], custom_fields: null, sentiment: null });
+      setFormData({ name: '', phone: '', email: '', company: '', tags: [], custom_fields: null, sentiment: null, team_id: activeTeam?.id || '' });
     }
-  }, [contact]);
+  }, [contact, activeTeam]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -63,6 +66,10 @@ const ContactForm: React.FC<ContactFormProps> = ({ contact, onSave, onCancel, is
     if (!formData.name || !formData.phone) {
       alert("Nome e telefone são obrigatórios.");
       return;
+    }
+    if (!formData.team_id) {
+        alert("Erro: ID da equipa não encontrado. Por favor, recarregue a página.");
+        return;
     }
     onSave(formData);
   };

@@ -35,7 +35,7 @@ const ContactPanel: React.FC<{ contactId: string }> = ({ contactId }) => {
     const { definitions } = useContext(CustomFieldsContext);
     const { setCurrentPage } = useContext(NavigationContext);
     const { activitiesForContact, fetchActivitiesForContact, isLoading: isActivitiesLoading } = useContext(ActivityContext);
-    const user = useAuthStore(state => state.user);
+    const { activeTeam } = useAuthStore();
 
     const [localContact, setLocalContact] = useState<Contact | null>(null);
     const [tagInput, setTagInput] = useState('');
@@ -92,10 +92,10 @@ const ContactPanel: React.FC<{ contactId: string }> = ({ contactId }) => {
         }
     };
 
-    const handleSaveDeal = async (dealData: Omit<DealInsert, 'user_id' | 'contact_id' >) => {
-         if (!user) return;
+    const handleSaveDeal = async (dealData: Omit<DealInsert, 'team_id' | 'contact_id' >) => {
+         if (!activeTeam) return;
         try {
-            await addDeal({ ...dealData, user_id: user.id, contact_id: contactId });
+            await addDeal({ ...dealData, team_id: activeTeam.id, contact_id: contactId });
             setIsDealModalOpen(false);
         } catch(err: any) {
             alert(`Erro ao criar negócio: ${err.message}`)

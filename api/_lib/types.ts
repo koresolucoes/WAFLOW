@@ -78,4 +78,5 @@ export interface ActionContext {
     trigger: Json | null;
     node: AutomationNode;
     automationId: string;
+    teamId: string;
 }

@@ -1,9 +1,9 @@
 
-
 import React, { useState } from 'react';
 import MetaApiSettings from './MetaApiSettings';
 import CustomFieldsSettings from './CustomFieldsSettings';
 import CannedResponsesSettings from './CannedResponsesSettings';
+import TeamSettings from './TeamSettings';
 
 const TabButton = ({ label, isActive, onClick }: { label: string, isActive: boolean, onClick: () => void }) => (
     <button
@@ -29,11 +29,13 @@ const Settings: React.FC = () => {
                     <TabButton label="API da Meta & Webhooks" isActive={activeTab === 'meta'} onClick={() => setActiveTab('meta')} />
                     <TabButton label="Campos Personalizados" isActive={activeTab === 'custom'} onClick={() => setActiveTab('custom')} />
                     <TabButton label="Respostas Rápidas" isActive={activeTab === 'canned'} onClick={() => setActiveTab('canned')} />
+                    <TabButton label="Equipa" isActive={activeTab === 'team'} onClick={() => setActiveTab('team')} />
                 </div>
                 <div className="pt-6">
                     {activeTab === 'meta' && <MetaApiSettings />}
                     {activeTab === 'custom' && <CustomFieldsSettings />}
                     {activeTab === 'canned' && <CannedResponsesSettings />}
+                    {activeTab === 'team' && <TeamSettings />}
                 </div>
             </div>
         </div>

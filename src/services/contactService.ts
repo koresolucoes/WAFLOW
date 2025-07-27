@@ -1,5 +1,4 @@
 
-
 import { supabase } from '../lib/supabaseClient';
 import { Contact, EditableContact, ContactWithDetails, Deal, MetaConfig, MessageInsert, TimelineEvent } from '../types';
 import { TablesInsert, TablesUpdate } from '../types/database.types';
@@ -34,12 +33,12 @@ export const normalizePhoneNumber = (phone: string): string => {
     return digits;
 };
 
-export const fetchContactDetailsFromDb = async (userId: string, contactId: string): Promise<ContactWithDetails> => {
+export const fetchContactDetailsFromDb = async (teamId: string, contactId: string): Promise<ContactWithDetails> => {
     const { data: contactData, error: contactError } = await supabase
         .from('contacts')
-        .select('id, company, created_at, custom_fields, email, name, phone, tags, user_id')
+        .select('id, company, created_at, custom_fields, email, name, phone, tags, team_id')
         .eq('id', contactId)
-        .eq('user_id', userId)
+        .eq('team_id', teamId)
         .single();
 
     if (contactError || !contactData) {
@@ -59,11 +58,11 @@ export const fetchContactDetailsFromDb = async (userId: string, contactId: strin
     };
 };
 
-export const fetchContactTimeline = async (userId: string, contactId: string): Promise<TimelineEvent[]> => {
+export const fetchContactTimeline = async (teamId: string, contactId: string): Promise<TimelineEvent[]> => {
     const [messagesRes, automationRunsRes, dealsRes] = await Promise.all([
-        supabase.from('messages').select('id, created_at, type, content, source').eq('contact_id', contactId).eq('user_id', userId),
-        supabase.from('automation_runs').select('id, run_at, status, details, automations(name)').eq('contact_id', contactId),
-        supabase.from('deals').select('id, created_at, name, value, pipeline_stages(name)').eq('contact_id', contactId).eq('user_id', userId)
+        supabase.from('messages').select('id, created_at, type, content, source').eq('contact_id', contactId).eq('team_id', teamId),
+        supabase.from('automation_runs').select('id, run_at, status, details, automations(name)').eq('contact_id', contactId).eq('team_id', teamId),
+        supabase.from('deals').select('id, created_at, name, value, pipeline_stages(name)').eq('contact_id', contactId).eq('team_id', teamId)
     ]);
 
     if (messagesRes.error) console.error("Error fetching timeline messages:", messagesRes.error);
@@ -96,14 +95,14 @@ export const fetchContactTimeline = async (userId: string, contactId: string): P
     return events.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 };
 
-export const addContactToDb = async (userId: string, contact: EditableContact): Promise<Contact> => {
-    const payload: TablesInsert<'contacts'> = { ...contact, phone: normalizePhoneNumber(contact.phone), user_id: userId };
+export const addContactToDb = async (teamId: string, contact: EditableContact): Promise<Contact> => {
+    const payload: TablesInsert<'contacts'> = { ...contact, phone: normalizePhoneNumber(contact.phone), team_id: teamId };
     const { data, error } = await supabase.from('contacts').insert(payload).select('*').single();
     if (error) throw error;
     return data as unknown as Contact;
 };
 
-export const updateContactInDb = async (userId: string, updatedContact: Contact): Promise<Contact> => {
+export const updateContactInDb = async (teamId: string, updatedContact: Contact): Promise<Contact> => {
     const updatePayload: TablesUpdate<'contacts'> = {
         name: updatedContact.name,
         phone: normalizePhoneNumber(updatedContact.phone),
@@ -117,7 +116,7 @@ export const updateContactInDb = async (userId: string, updatedContact: Contact)
         .from('contacts')
         .update(updatePayload)
         .eq('id', updatedContact.id)
-        .eq('user_id', userId)
+        .eq('team_id', teamId)
         .select('*')
         .single();
 
@@ -125,19 +124,19 @@ export const updateContactInDb = async (userId: string, updatedContact: Contact)
     return data as unknown as Contact;
 };
 
-export const deleteContactFromDb = async (userId: string, contactId: string): Promise<void> => {
-    const { error } = await supabase.from('contacts').delete().eq('id', contactId).eq('user_id', userId);
+export const deleteContactFromDb = async (teamId: string, contactId: string): Promise<void> => {
+    const { error } = await supabase.from('contacts').delete().eq('id', contactId).eq('team_id', teamId);
     if (error) throw error;
 };
 
-export const importContactsToDb = async (userId: string, newContacts: EditableContact[], existingPhones: Set<string>): Promise<{ imported: Contact[]; skippedCount: number }> => {
+export const importContactsToDb = async (teamId: string, newContacts: EditableContact[], existingPhones: Set<string>): Promise<{ imported: Contact[]; skippedCount: number }> => {
     const contactsToInsert: TablesInsert<'contacts'>[] = [];
     let skippedCount = 0;
     
     newContacts.forEach(contact => {
         const sanitizedPhone = normalizePhoneNumber(contact.phone);
         if (sanitizedPhone && !existingPhones.has(sanitizedPhone)) {
-            contactsToInsert.push({ ...contact, phone: sanitizedPhone, user_id: userId, custom_fields: contact.custom_fields || null });
+            contactsToInsert.push({ ...contact, phone: sanitizedPhone, team_id: teamId, custom_fields: contact.custom_fields || null });
             existingPhones.add(sanitizedPhone);
         } else {
             skippedCount++;
@@ -154,13 +153,13 @@ export const importContactsToDb = async (userId: string, newContacts: EditableCo
     return { imported: (data as unknown as Contact[] || []), skippedCount };
 };
 
-export const sendDirectMessagesFromApi = async (metaConfig: MetaConfig, userId: string, message: string, recipients: Contact[]): Promise<void> => {
+export const sendDirectMessagesFromApi = async (metaConfig: MetaConfig, teamId: string, message: string, recipients: Contact[]): Promise<void> => {
     const messagesToInsert: MessageInsert[] = [];
     const promises = recipients.map(contact => (async () => {
         try {
             const response = await sendTextMessage(metaConfig, contact.phone, message);
             messagesToInsert.push({
-                user_id: userId,
+                team_id: teamId,
                 contact_id: contact.id,
                 content: message,
                 meta_message_id: response.messages[0].id,
@@ -172,7 +171,7 @@ export const sendDirectMessagesFromApi = async (metaConfig: MetaConfig, userId: 
         } catch (err: any) {
             console.error(`Falha ao enviar mensagem direta para ${contact.name}: ${err.message}`);
             messagesToInsert.push({
-                user_id: userId,
+                team_id: teamId,
                 contact_id: contact.id,
                 content: message,
                 status: 'failed',

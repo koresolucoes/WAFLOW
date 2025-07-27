@@ -1,12 +1,13 @@
 
 
+
 import { supabase } from '../lib/supabaseClient';
 import { Automation, AutomationNode, Edge, AutomationNodeStats, AutomationNodeLog, AutomationStatus, Json } from '../types';
 import { TablesInsert, TablesUpdate, Tables } from '../types/database.types';
 
-export const createAutomationInDb = async (userId: string): Promise<Automation> => {
+export const createAutomationInDb = async (teamId: string): Promise<Automation> => {
     const dbAutomation: TablesInsert<'automations'> = { 
-        user_id: userId, 
+        team_id: teamId, 
         name: 'Nova Automação (Rascunho)', 
         status: 'paused', 
         nodes: [] as unknown as Json, 
@@ -24,7 +25,7 @@ export const createAutomationInDb = async (userId: string): Promise<Automation> 
     };
 };
 
-export const updateAutomationInDb = async (userId: string, automation: Automation): Promise<Automation> => {
+export const updateAutomationInDb = async (teamId: string, automation: Automation): Promise<Automation> => {
     const updatePayload: TablesUpdate<'automations'> = { 
         name: automation.name, 
         status: automation.status, 
@@ -36,7 +37,7 @@ export const updateAutomationInDb = async (userId: string, automation: Automatio
         .from('automations')
         .update(updatePayload)
         .eq('id', automation.id)
-        .eq('user_id', userId)
+        .eq('team_id', teamId)
         .select('*')
         .single();
 

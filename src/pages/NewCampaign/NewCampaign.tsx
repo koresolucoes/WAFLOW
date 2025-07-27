@@ -1,4 +1,5 @@
 
+
 import React, { useContext, useState, useMemo, useEffect } from 'react';
 import { sendTemplatedMessage } from '../../services/meta/messages';
 import { getMetaTemplateById } from '../../services/meta/templates';
@@ -11,7 +12,7 @@ import { TemplatesContext } from '../../contexts/providers/TemplatesContext';
 import { ContactsContext } from '../../contexts/providers/ContactsContext';
 import { CampaignsContext } from '../../contexts/providers/CampaignsContext';
 import { NavigationContext } from '../../contexts/providers/NavigationContext';
-import { useMetaConfig } from '../../stores/authStore';
+import { useAuthStore, useMetaConfig } from '../../stores/authStore';
 
 interface SendResult {
     success: boolean;
@@ -24,6 +25,7 @@ const NewCampaign: React.FC = () => {
   const { contacts } = useContext(ContactsContext);
   const { addCampaign } = useContext(CampaignsContext);
   const { pageParams, setCurrentPage } = useContext(NavigationContext);
+  const { activeTeam } = useAuthStore();
   const metaConfig = useMetaConfig();
   
   const [campaignName, setCampaignName] = useState('');
@@ -131,7 +133,7 @@ const NewCampaign: React.FC = () => {
 
   const handleLaunch = async () => {
     setIsConfirmModalOpen(false);
-    if (!template || !metaConfig.phoneNumberId || !metaConfig.accessToken) {
+    if (!template || !metaConfig.phoneNumberId || !metaConfig.accessToken || !activeTeam) {
       setError("Configuração ou template inválido. Tente novamente.");
       return;
     }
@@ -152,7 +154,7 @@ const NewCampaign: React.FC = () => {
           throw new Error(`Falha ao verificar o template na Meta: ${err.message}. Certifique-se de que o template existe e está aprovado.`);
       }
         
-      const messagesToInsert: Omit<MessageInsert, 'campaign_id' | 'user_id'>[] = [];
+      const messagesToInsert: Omit<MessageInsert, 'campaign_id' | 'team_id'>[] = [];
       const bodyComponentText = template.components.find(c => c.type === 'BODY')?.text || '';
       
       const promises = recipients.map(contact => (async () => {
@@ -249,13 +251,15 @@ const NewCampaign: React.FC = () => {
 
       const successCount = results.filter(r => r.success).length;
       if (successCount > 0 || messagesToInsert.length > 0) {
+          const messagesWithTeam = messagesToInsert.map(m => ({ ...m, team_id: activeTeam.id }));
           await addCampaign(
             {
               name: campaignName,
               template_id: template.id,
               status: 'Sent',
+              team_id: activeTeam.id
             },
-            messagesToInsert
+            messagesWithTeam
           );
       } else {
         throw new Error("Falha total no envio. Nenhuma mensagem pôde ser processada. Verifique os erros e a configuração da Meta.");

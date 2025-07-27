@@ -1,7 +1,7 @@
 
 
 import { supabase } from '../lib/supabaseClient';
-import { Campaign, CampaignWithMetrics, MessageStatus, TemplateCategory, TemplateStatus, AutomationStatus, Edge, AutomationNode, Contact, MessageTemplate, Automation, Pipeline, PipelineStage, DealWithContact, CustomFieldDefinition } from '../types';
+import { Campaign, CampaignWithMetrics, TemplateCategory, TemplateStatus, AutomationStatus, Edge, AutomationNode, Contact, MessageTemplate, Automation, Pipeline, PipelineStage, DealWithContact, CustomFieldDefinition, Conversation, UnifiedMessage } from '../types';
 import { MetaTemplateComponent } from './meta/types';
 
 const fetchCampaignsWithMetrics = async (campaignsData: Campaign[]): Promise<CampaignWithMetrics[]> => {
@@ -48,16 +48,17 @@ const fetchCampaignsWithMetrics = async (campaignsData: Campaign[]): Promise<Cam
 };
 
 
-export const fetchAllInitialData = async (userId: string) => {
-    const [templatesRes, contactsRes, campaignsRes, automationsRes, pipelinesRes, stagesRes, dealsRes, customFieldsRes] = await Promise.all([
-        supabase.from('message_templates').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
-        supabase.from('contacts').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
-        supabase.from('campaigns').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
-        supabase.from('automations').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
-        supabase.from('pipelines').select('*').eq('user_id', userId).order('created_at', { ascending: true }),
-        supabase.from('pipeline_stages').select('*, pipelines!inner(user_id)').eq('pipelines.user_id', userId),
-        supabase.from('deals').select('*, contacts(id, name)').eq('user_id', userId).order('created_at', { ascending: false }),
-        supabase.from('custom_field_definitions').select('*').eq('user_id', userId).order('name', { ascending: true }),
+export const fetchAllInitialData = async (teamId: string) => {
+    const [templatesRes, contactsRes, campaignsRes, automationsRes, pipelinesRes, stagesRes, dealsRes, customFieldsRes, conversationsRes] = await Promise.all([
+        supabase.from('message_templates').select('*').eq('team_id', teamId).order('created_at', { ascending: false }),
+        supabase.from('contacts').select('*').eq('team_id', teamId).order('created_at', { ascending: false }),
+        supabase.from('campaigns').select('*').eq('team_id', teamId).order('created_at', { ascending: false }),
+        supabase.from('automations').select('*').eq('team_id', teamId).order('created_at', { ascending: false }),
+        supabase.from('pipelines').select('*').eq('team_id', teamId).order('created_at', { ascending: true }),
+        supabase.from('pipeline_stages').select('*, pipelines!inner(team_id)').eq('pipelines.team_id', teamId),
+        supabase.from('deals').select('*, contacts(id, name)').eq('team_id', teamId).order('created_at', { ascending: false }),
+        supabase.from('custom_field_definitions').select('*').eq('team_id', teamId).order('name', { ascending: true }),
+        supabase.rpc('get_conversations_with_contacts', { p_team_id: teamId })
     ]);
 
     if (templatesRes.error) console.error("DataService Error (Templates):", templatesRes.error);
@@ -68,6 +69,7 @@ export const fetchAllInitialData = async (userId: string) => {
     if (stagesRes.error) console.error("DataService Error (Stages):", stagesRes.error);
     if (dealsRes.error) console.error("DataService Error (Deals):", dealsRes.error);
     if (customFieldsRes.error) console.error("DataService Error (CustomFields):", customFieldsRes.error);
+    if (conversationsRes.error) console.error("DataService Error (Conversations):", conversationsRes.error);
 
     // Process Templates
     const templates = ((templatesRes.data as any[]) || []).map(t => ({
@@ -89,6 +91,12 @@ export const fetchAllInitialData = async (userId: string) => {
     // Process Campaigns
     const campaigns = await fetchCampaignsWithMetrics((campaignsRes.data as unknown as Campaign[]) || []);
 
+    const conversations = ((conversationsRes.data as any[]) || []).map(item => ({
+        contact: item.contact_details as Contact,
+        last_message: item.last_message as UnifiedMessage,
+        unread_count: item.unread_count,
+    }));
+
     return {
         templates,
         contacts: (contactsRes.data as unknown as Contact[]) || [],
@@ -98,6 +106,7 @@ export const fetchAllInitialData = async (userId: string) => {
         stages: (stagesRes.data as unknown as PipelineStage[]) || [],
         deals: (dealsRes.data as unknown as DealWithContact[]) || [],
         customFieldDefinitions: (customFieldsRes.data as unknown as CustomFieldDefinition[]) || [],
+        conversations
     };
 };
 
@@ -126,16 +135,16 @@ export type DashboardData = {
 };
 
 // Nova função para buscar dados agregados para o dashboard
-export const fetchDashboardData = async (userId: string): Promise<DashboardData> => {
+export const fetchDashboardData = async (teamId: string): Promise<DashboardData> => {
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
     // Busca agregada de execuções de automação
     const [automationRunsRes, contactsRes, campaignsRes, dealsRes] = await Promise.all([
-        supabase.from('automation_runs').select('id, status, automation_id, automations(name)', { count: 'exact' }).eq('automations.user_id', userId).gte('run_at', sevenDaysAgo.toISOString()),
-        supabase.from('contacts').select('id, name, created_at').eq('user_id', userId).order('created_at', { ascending: false }).limit(10),
-        supabase.from('campaigns').select('id, name, sent_at').eq('user_id', userId).not('sent_at', 'is', null).order('sent_at', { ascending: false }).limit(10),
-        supabase.from('deals').select('id, name, value, closed_at, status').eq('user_id', userId).in('status', ['Ganho', 'Perdido']).not('closed_at', 'is', null).order('closed_at', { ascending: false }).limit(10),
+        supabase.from('automation_runs').select('id, status, automation_id, automations(name)', { count: 'exact' }).eq('team_id', teamId).gte('run_at', sevenDaysAgo.toISOString()),
+        supabase.from('contacts').select('id, name, created_at').eq('team_id', teamId).order('created_at', { ascending: false }).limit(10),
+        supabase.from('campaigns').select('id, name, sent_at').eq('team_id', teamId).not('sent_at', 'is', null).order('sent_at', { ascending: false }).limit(10),
+        supabase.from('deals').select('id, name, value, closed_at, status').eq('team_id', teamId).in('status', ['Ganho', 'Perdido']).not('closed_at', 'is', null).order('closed_at', { ascending: false }).limit(10),
     ]);
 
     if (automationRunsRes.error) console.error("Dashboard Data Error (Automation Runs):", automationRunsRes.error);

@@ -1,3 +1,4 @@
+
 import React, { createContext, useState, useCallback, ReactNode, useMemo } from 'react';
 import { Contact, EditableContact, ContactWithDetails } from '../../types';
 import { useAuthStore, useMetaConfig } from '../../stores/authStore';
@@ -20,27 +21,27 @@ interface ContactsContextType {
 export const ContactsContext = createContext<ContactsContextType>(null!);
 
 export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    const user = useAuthStore(state => state.user);
+    const { user, activeTeam } = useAuthStore(state => ({ user: state.user, activeTeam: state.activeTeam }));
     const metaConfig = useMetaConfig();
     const [contacts, setContacts] = useState<Contact[]>([]);
     const [contactDetails, setContactDetails] = useState<ContactWithDetails | null>(null);
 
     const fetchContactDetails = useCallback(async (contactId: string) => {
-        if (!user) return;
+        if (!user || !activeTeam) return;
         setContactDetails(null);
         try {
-            const details = await contactService.fetchContactDetailsFromDb(user.id, contactId);
+            const details = await contactService.fetchContactDetailsFromDb(activeTeam.id, contactId);
             setContactDetails(details);
         } catch (err) {
             console.error("Error fetching contact details:", (err as any).message || err);
             throw err;
         }
-    }, [user]);
+    }, [user, activeTeam]);
 
     const addContact = useCallback(async (contact: EditableContact) => {
-        if (!user) throw new Error("User not authenticated.");
+        if (!user || !activeTeam) throw new Error("User or active team not available.");
         
-        const newContact = await contactService.addContactToDb(user.id, contact);
+        const newContact = await contactService.addContactToDb(activeTeam.id, contact);
         setContacts(prev => [newContact, ...prev]);
         
         // Post-DB side effect
@@ -50,16 +51,16 @@ export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }
             body: JSON.stringify({ eventType: 'contact_created', userId: user.id, contactId: newContact.id })
         }).catch(err => console.error("Failed to call contact_created trigger API", err));
 
-    }, [user]);
+    }, [user, activeTeam]);
   
     const updateContact = useCallback(async (updatedContact: Contact) => {
-        if (!user) throw new Error("User not authenticated.");
+        if (!user || !activeTeam) throw new Error("User or active team not available.");
         
         const oldContact = (contactDetails && contactDetails.id === updatedContact.id)
             ? contactDetails
             : contacts.find(c => c.id === updatedContact.id);
 
-        const newContact = await contactService.updateContactInDb(user.id, updatedContact);
+        const newContact = await contactService.updateContactInDb(activeTeam.id, updatedContact);
         setContacts(prev => prev.map(c => c.id === newContact.id ? newContact : c));
         
         if(contactDetails?.id === newContact.id) {
@@ -77,19 +78,19 @@ export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }
                 body: JSON.stringify({ eventType: 'tags_added', userId: user.id, contactId: newContact.id, data: { addedTags } })
             }).catch(err => console.error("Failed to call tags_added trigger API", err));
         }
-    }, [user, contacts, contactDetails]);
+    }, [user, activeTeam, contacts, contactDetails]);
 
     const deleteContact = useCallback(async (contactId: string) => {
-        if (!user) throw new Error("User not authenticated.");
-        await contactService.deleteContactFromDb(user.id, contactId);
+        if (!user || !activeTeam) throw new Error("User or active team not available.");
+        await contactService.deleteContactFromDb(activeTeam.id, contactId);
         setContacts(prev => prev.filter(c => c.id !== contactId));
-    }, [user]);
+    }, [user, activeTeam]);
     
     const importContacts = useCallback(async (newContacts: EditableContact[]): Promise<{ importedCount: number; skippedCount: number }> => {
-        if (!user) throw new Error("User not authenticated.");
+        if (!user || !activeTeam) throw new Error("User or active team not available.");
         
         const existingPhones = new Set(contacts.map(c => contactService.normalizePhoneNumber(c.phone)));
-        const { imported, skippedCount } = await contactService.importContactsToDb(user.id, newContacts, existingPhones);
+        const { imported, skippedCount } = await contactService.importContactsToDb(activeTeam.id, newContacts, existingPhones);
         
         if (imported.length > 0) {
             setContacts(prev => [...imported, ...prev].sort((a,b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()));
@@ -102,13 +103,13 @@ export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }
             }
         }
         return { importedCount: imported.length, skippedCount };
-    }, [user, contacts]);
+    }, [user, activeTeam, contacts]);
     
     const sendDirectMessages = useCallback(async (message: string, recipients: Contact[]) => {
-        if (!user) throw new Error("Usuário não autenticado.");
+        if (!user || !activeTeam) throw new Error("Usuário ou equipa ativa não disponível.");
         if (!metaConfig.accessToken || !metaConfig.phoneNumberId) throw new Error("Configuração da Meta ausente.");
-        await contactService.sendDirectMessagesFromApi(metaConfig, user.id, message, recipients);
-    }, [user, metaConfig]);
+        await contactService.sendDirectMessagesFromApi(metaConfig, activeTeam.id, message, recipients);
+    }, [user, activeTeam, metaConfig]);
 
     const allTags = useMemo(() => {
         const tagsSet = new Set<string>();

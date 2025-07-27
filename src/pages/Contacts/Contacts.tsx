@@ -8,6 +8,7 @@ import { PLUS_ICON, TRASH_ICON, CONTACTS_ICON, UPLOAD_ICON, FILE_TEXT_ICON, SEND
 import { ContactsContext } from '../../contexts/providers/ContactsContext';
 import { NavigationContext } from '../../contexts/providers/NavigationContext';
 import DirectMessageModal from './DirectMessageModal';
+import { useAuthStore } from '../../stores/authStore';
 
 const Tag: React.FC<{ children: React.ReactNode }> = ({ children }) => (
     <span className="mr-2 mb-2 inline-block px-2 py-1 text-xs font-semibold rounded-full bg-sky-500/20 text-sky-400">
@@ -40,6 +41,7 @@ const ContactRow: React.FC<{ contact: Contact; onViewDetails: () => void; onDele
 const Contacts: React.FC = () => {
     const { contacts, addContact, deleteContact, importContacts, sendDirectMessages } = useContext(ContactsContext);
     const { setCurrentPage } = useContext(NavigationContext);
+    const { activeTeam } = useAuthStore();
     const [isFormModalOpen, setIsFormModalOpen] = useState(false);
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [isDirectMessageModalOpen, setIsDirectMessageModalOpen] = useState(false);
@@ -84,7 +86,7 @@ const Contacts: React.FC = () => {
 
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
-        if (!file) return;
+        if (!file || !activeTeam) return;
         setIsLoading(true);
 
         const reader = new FileReader();
@@ -99,7 +101,7 @@ const Contacts: React.FC = () => {
                 const [name, phone, email, company, tagsStr] = lines[i].split(',');
                 if (name && phone) {
                     const tags = tagsStr ? tagsStr.trim().split(';').map(t => t.trim()).filter(Boolean) : [];
-                    newContacts.push({ name: name.trim(), phone: phone.trim(), email: email?.trim() || '', company: company?.trim() || '', tags, custom_fields: null, sentiment: null });
+                    newContacts.push({ name: name.trim(), phone: phone.trim(), email: email?.trim() || '', company: company?.trim() || '', tags, custom_fields: null, sentiment: null, team_id: activeTeam.id });
                 }
             }
 

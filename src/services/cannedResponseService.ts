@@ -1,23 +1,24 @@
 
 
+
 import { supabase } from '../lib/supabaseClient';
 import { CannedResponse, CannedResponseInsert } from '../types';
 import { TablesUpdate } from '../types/database.types';
 
-export const fetchCannedResponses = async (userId: string): Promise<CannedResponse[]> => {
+export const fetchCannedResponses = async (teamId: string): Promise<CannedResponse[]> => {
     const { data, error } = await supabase
         .from('canned_responses')
         .select('*')
-        .eq('user_id', userId)
+        .eq('team_id', teamId)
         .order('shortcut', { ascending: true });
     if (error) throw error;
     return data as unknown as CannedResponse[] || [];
 };
 
-export const addCannedResponse = async (userId: string, response: Omit<CannedResponseInsert, 'user_id' | 'id' | 'created_at'>): Promise<CannedResponse> => {
+export const addCannedResponse = async (teamId: string, response: Omit<CannedResponseInsert, 'team_id' | 'id' | 'created_at'>): Promise<CannedResponse> => {
     const { data, error } = await supabase
         .from('canned_responses')
-        .insert({ ...response, user_id: userId })
+        .insert({ ...response, team_id: teamId })
         .select()
         .single();
     if (error) throw error;

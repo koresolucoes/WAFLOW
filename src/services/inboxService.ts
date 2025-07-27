@@ -1,5 +1,6 @@
 
 
+
 import { supabase } from '../lib/supabaseClient';
 import { Conversation, UnifiedMessage, Contact, MessageInsert, MessageStatus, MetaConfig, Message, TemplateCategory, TemplateStatus, MetaTemplateComponent } from '../types';
 import { sendTextMessage } from './meta/messages';
@@ -18,8 +19,8 @@ export const mapPayloadToUnifiedMessage = (payload: Message): UnifiedMessage => 
     };
 };
 
-export const fetchConversationsFromDb = async (userId: string): Promise<Conversation[]> => {
-    const { data, error } = await supabase.rpc('get_conversations_with_contacts', { p_user_id: userId });
+export const fetchConversationsFromDb = async (teamId: string): Promise<Conversation[]> => {
+    const { data, error } = await supabase.rpc('get_conversations_with_contacts', { p_team_id: teamId });
     if (error) {
         console.error("Error fetching conversations:", error);
         throw error;
@@ -34,11 +35,11 @@ export const fetchConversationsFromDb = async (userId: string): Promise<Conversa
     return [];
 };
 
-export const fetchMessagesFromDb = async (userId: string, contactId: string): Promise<UnifiedMessage[]> => {
+export const fetchMessagesFromDb = async (teamId: string, contactId: string): Promise<UnifiedMessage[]> => {
     const { data, error } = await supabase
         .from('messages')
         .select('*')
-        .eq('user_id', userId)
+        .eq('team_id', teamId)
         .eq('contact_id', contactId)
         .order('created_at', { ascending: true });
 
@@ -54,12 +55,12 @@ export const fetchMessagesFromDb = async (userId: string, contactId: string): Pr
 };
 
 
-export const sendMessageToApi = async (userId: string, contact: Contact, text: string, metaConfig: MetaConfig): Promise<Message> => {
+export const sendMessageToApi = async (teamId: string, contact: Contact, text: string, metaConfig: MetaConfig): Promise<Message> => {
     const response = await sendTextMessage(metaConfig, contact.phone, text);
     const metaMessageId = response.messages[0].id;
 
     const messagePayload: MessageInsert = { 
-        user_id: userId, 
+        team_id: teamId, 
         contact_id: contact.id, 
         content: text, 
         meta_message_id: metaMessageId, 
