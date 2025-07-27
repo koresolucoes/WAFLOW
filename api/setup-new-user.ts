@@ -30,11 +30,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         if (existingTeam) {
-            console.log(`[Setup] O usuário ${userId} já tem uma equipe (ID: ${(existingTeam as any).id}). Garantindo a adesão.`);
+            console.log(`[Setup] O usuário ${userId} já tem uma equipe (ID: ${existingTeam.id}). Garantindo a adesão.`);
             // Garante que o usuário é membro da sua própria equipe (idempotência)
             const { error: upsertError } = await supabaseAdmin
                 .from('team_members')
-                .upsert({ team_id: (existingTeam as any).id, user_id: userId, role: 'admin' } as any, { onConflict: 'team_id, user_id' });
+                .upsert({ team_id: existingTeam.id, user_id: userId, role: 'admin' }, { onConflict: 'team_id, user_id' });
             
             if (upsertError) {
                 console.error(`[Setup] Erro ao fazer upsert da adesão à equipe para a equipe existente:`, upsertError);
@@ -53,7 +53,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             .insert({
                 name: teamName,
                 owner_id: userId,
-            } as any)
+            })
             .select('id')
             .single();
 
@@ -62,7 +62,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             throw teamError;
         }
 
-        const teamId = (teamData as any).id;
+        const teamId = teamData.id;
         console.log(`[Setup] Equipe criada com sucesso (ID: ${teamId})`);
 
         // Etapa 2: Adicionar o usuário como membro administrador da equipe
@@ -72,7 +72,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 team_id: teamId,
                 user_id: userId,
                 role: 'admin',
-            } as any);
+            });
 
         if (memberError) {
             console.error(`[Setup] Erro ao adicionar o usuário ${userId} à equipe ${teamId}:`, memberError);

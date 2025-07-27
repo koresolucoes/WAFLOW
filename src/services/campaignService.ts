@@ -64,7 +64,7 @@ export const addCampaignToDb = async (
         recipient_count: messages.length,
         status: campaign.status
     };
-    const { data: newCampaignData, error: campaignError } = await supabase.from('campaigns').insert(campaignPayload as any).select('id, created_at, name, recipient_count, sent_at, status, template_id, team_id').single();
+    const { data: newCampaignData, error: campaignError } = await supabase.from('campaigns').insert(campaignPayload).select('id, created_at, name, recipient_count, sent_at, status, template_id, team_id').single();
 
     if (campaignError) throw campaignError;
     const newCampaign = newCampaignData as any;
@@ -72,7 +72,7 @@ export const addCampaignToDb = async (
 
     if (messages.length > 0) {
         const messagesToInsert = messages.map(msg => ({ ...msg, campaign_id: newCampaign.id, team_id: teamId }));
-        const { error: messagesError } = await supabase.from('messages').insert(messagesToInsert as any);
+        const { error: messagesError } = await supabase.from('messages').insert(messagesToInsert);
 
         if (messagesError) {
             // Rollback campaign creation if messages fail

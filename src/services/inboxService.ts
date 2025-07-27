@@ -69,7 +69,7 @@ export const sendMessageToApi = async (teamId: string, contact: Contact, text: s
         sent_at: new Date().toISOString()
     };
     
-    const { data, error } = await supabase.from('messages').insert(messagePayload as any).select().single();
+    const { data, error } = await supabase.from('messages').insert(messagePayload).select().single();
     
     if (error) {
         console.error("Supabase insert error in sendMessageToApi:", error);
@@ -122,7 +122,7 @@ export const assignConversation = async (teamId: string, contactId: string, assi
                 assignee_id: assigneeId,
                 status: 'open', // Definir um estado padrão para novas conversações
                 updated_at: new Date().toISOString()
-            } as any);
+            });
 
         if (insertError) {
             console.error("Erro ao inserir nova conversação:", insertError);

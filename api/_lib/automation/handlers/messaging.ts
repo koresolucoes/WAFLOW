@@ -6,7 +6,7 @@ import { ActionHandler } from '../types.js';
 import { getMetaConfig, resolveVariables } from '../helpers.js';
 
 const logSentMessage = async (payload: Omit<MessageInsert, 'team_id'>, teamId: string) => {
-    const { error } = await supabaseAdmin.from('messages').insert({ ...payload, team_id: teamId } as any);
+    const { error } = await supabaseAdmin.from('messages').insert({ ...payload, team_id: teamId });
     if (error) {
         // Log the error but don't throw, as the message was already sent to Meta.
         // This prevents the automation from failing if only the DB logging fails.

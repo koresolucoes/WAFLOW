@@ -146,14 +146,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-        // Handle session refreshes silently without a full data reload.
-        // This prevents the "page reload" feeling when switching browser tabs.
-        if (event === 'TOKEN_REFRESHED') {
+        const currentUser = get().user;
+
+        // When the tab is refocused, Supabase might fire SIGNED_IN or TOKEN_REFRESHED.
+        // If the user is the same, we just update the session silently without triggering a full data reload.
+        // This prevents the loading screen from flashing on every tab switch.
+        if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && currentUser && session?.user?.id === currentUser.id) {
             set({ session });
             return;
         }
 
-        // For actual sign-in/sign-out events, perform the full re-initialization.
+        // For actual sign-in (first time), sign-out, or user change events, perform the full re-initialization.
         set({ loading: true, profile: null });
         handleSession(session);
     });

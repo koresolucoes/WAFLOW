@@ -19,7 +19,7 @@ export const createDefaultLoggingHooks = (automationId: string, contactId: strin
             contact_id: contactId,
             team_id: teamId,
             status: 'running'
-        } as any).select('id').single();
+        }).select('id').single();
 
         if (error) {
             console.error(`[Execution Logging] Failed to create automation_run record for automation ${automationId}`, error);
@@ -33,7 +33,7 @@ export const createDefaultLoggingHooks = (automationId: string, contactId: strin
 
     hooks.addHandler('workflowExecuteAfter', async (status, details) => {
         if (!runId) return;
-        await supabaseAdmin.from('automation_runs').update({ status, details } as any).eq('id', runId);
+        await supabaseAdmin.from('automation_runs').update({ status, details }).eq('id', runId);
     });
 
     hooks.addHandler('nodeExecuteBefore', async (_node) => {
@@ -51,7 +51,7 @@ export const createDefaultLoggingHooks = (automationId: string, contactId: strin
             status,
             details,
         };
-        await supabaseAdmin.from('automation_node_logs').insert(logPayload as any);
+        await supabaseAdmin.from('automation_node_logs').insert(logPayload);
         
         // Increment the success/error counter for the node
         await supabaseAdmin.rpc('increment_node_stat', {
@@ -59,7 +59,7 @@ export const createDefaultLoggingHooks = (automationId: string, contactId: strin
             p_node_id: node.id,
             p_status: status,
             p_team_id: teamId
-        } as any);
+        });
     });
 
     return hooks;

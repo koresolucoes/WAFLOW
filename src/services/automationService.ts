@@ -40,7 +40,7 @@ export const updateAutomationInDb = async (teamId: string, automation: Automatio
 
     if (error) throw error;
 
-    const { error: rpcError } = await supabase.rpc('sync_automation_triggers', { automation_id_in: automation.id } as any);
+    const { error: rpcError } = await supabase.rpc('sync_automation_triggers', { automation_id_in: automation.id });
     if (rpcError) {
         console.error("Falha ao sincronizar gatilhos de automação:", rpcError);
     }

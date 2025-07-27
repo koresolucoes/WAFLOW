@@ -1,5 +1,3 @@
-
-
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
 import { getProfileForWebhook } from '../_lib/webhook/profile-handler.js';
@@ -87,7 +85,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                         payload: body as unknown as Json,
                         path: req.url,
                     };
-                    await supabaseAdmin.from('webhook_logs').insert(logPayload as any);
+                    await supabaseAdmin.from('webhook_logs').insert(logPayload);
                 }
             } catch (logError) {
                 console.error('[Webhook] Falha ao registrar webhook de entrada:', logError);
