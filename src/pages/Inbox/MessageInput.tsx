@@ -1,9 +1,11 @@
 import React, { useState, useContext, useMemo, useEffect, useRef } from 'react';
 import { InboxContext } from '../../contexts/providers/InboxContext';
 import { CannedResponsesContext } from '../../contexts/providers/CannedResponsesContext';
-import { SEND_ICON } from '../../components/icons';
+import { SEND_ICON, SPARKLES_ICON } from '../../components/icons';
 import Button from '../../components/common/Button';
 import { CannedResponse } from '../../types';
+import { useAuthStore } from '../../stores/authStore';
+import { generateReplyWithAI } from '../../services/geminiService';
 
 interface MessageInputProps {
     contactId: string;
@@ -11,13 +13,15 @@ interface MessageInputProps {
 
 const MessageInput: React.FC<MessageInputProps> = ({ contactId }) => {
     const [text, setText] = useState('');
-    const { sendMessage, isSending } = useContext(InboxContext);
+    const { sendMessage, isSending, messages } = useContext(InboxContext);
     const { responses } = useContext(CannedResponsesContext);
+    const profile = useAuthStore(state => state.profile);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
     const [showPicker, setShowPicker] = useState(false);
     const [pickerQuery, setPickerQuery] = useState('');
     const [activeIndex, setActiveIndex] = useState(0);
+    const [isGenerating, setIsGenerating] = useState(false);
 
     const filteredResponses = useMemo(() => {
         if (!pickerQuery) return [];
@@ -39,6 +43,31 @@ const MessageInput: React.FC<MessageInputProps> = ({ contactId }) => {
             } catch (error: any) {
                 alert(`Erro ao enviar mensagem: ${error.message}`);
             }
+        }
+    };
+    
+    const handleGenerateReply = async () => {
+        if (!text.trim() || !profile) return;
+        setIsGenerating(true);
+        try {
+            const companyProfileForAI = {
+                name: profile.company_name,
+                description: profile.company_description,
+                products: profile.company_products,
+                audience: profile.company_audience,
+                tone: profile.company_tone,
+            };
+            const conversationHistory = messages
+                .slice(-5) // Get last 5 messages for context
+                .map(m => ({ type: m.type, content: m.content }));
+
+            const reply = await generateReplyWithAI(text, companyProfileForAI, conversationHistory);
+            setText(reply);
+        } catch (error: any) {
+            alert(`Erro ao gerar resposta com IA: ${error.message}`);
+        } finally {
+            setIsGenerating(false);
+            textareaRef.current?.focus();
         }
     };
 
@@ -135,7 +164,7 @@ const MessageInput: React.FC<MessageInputProps> = ({ contactId }) => {
                     value={text}
                     onChange={handleTextChange}
                     onKeyDown={handleKeyDown}
-                    placeholder="Digite uma mensagem ou '/' para respostas rápidas..."
+                    placeholder="Escreva uma instrução para a IA ou sua mensagem... Pressione '/' para respostas rápidas"
                     className="flex-1 bg-slate-700 border-slate-600 rounded-xl p-2.5 text-white placeholder-slate-400 resize-none focus:ring-2 focus:ring-sky-500 focus:outline-none w-full"
                     rows={1}
                     style={{ maxHeight: '120px' }}
@@ -143,11 +172,24 @@ const MessageInput: React.FC<MessageInputProps> = ({ contactId }) => {
             </div>
 
             <Button
+                type="button"
+                variant="secondary"
+                className="w-12 h-12 rounded-full flex-shrink-0"
+                onClick={handleGenerateReply}
+                isLoading={isGenerating}
+                disabled={!text.trim() || isSending}
+                title="Gerar resposta com IA"
+            >
+                {!isGenerating && <SPARKLES_ICON className="w-5 h-5" />}
+            </Button>
+            
+            <Button
                 type="submit"
                 variant="primary"
                 className="w-12 h-12 rounded-full flex-shrink-0"
                 isLoading={isSending}
-                disabled={!text.trim()}
+                disabled={!text.trim() || isGenerating}
+                title="Enviar Mensagem"
             >
                 {!isSending && <SEND_ICON className="w-5 h-5" />}
             </Button>
