@@ -1,3 +1,4 @@
+
 import { supabase } from '../lib/supabaseClient';
 import { Conversation, UnifiedMessage, Contact, MessageInsert, MessageStatus, MetaConfig, Message, TemplateCategory, TemplateStatus, MetaTemplateComponent } from '../types';
 import { sendTextMessage } from './meta/messages';
@@ -35,7 +36,7 @@ export const fetchConversationsFromDb = async (userId: string): Promise<Conversa
 export const fetchMessagesFromDb = async (userId: string, contactId: string): Promise<UnifiedMessage[]> => {
     const { data, error } = await supabase
         .from('messages')
-        .select('id,contact_id,content,created_at,type,status,source,message_template_id,replied_to_message_id')
+        .select('*')
         .eq('user_id', userId)
         .eq('contact_id', contactId)
         .order('created_at', { ascending: true });
