@@ -38,13 +38,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (user) {
         set({ loading: true, teamLoading: true });
         
-        // Fetch profile and teams in parallel
-        const [profileData, memberTeams] = await Promise.all([
+        // Fetch profile and teams in parallel.
+        // The RLS policy on the 'teams' table will ensure only the teams the user is a member of are returned.
+        // This is a cleaner and more robust way to fetch teams than joining from 'team_members', avoiding RLS issues on joins.
+        const [profileData, teamsData] = await Promise.all([
             getProfile(user.id),
-            supabase.from('team_members').select('teams!inner(*)').eq('user_id', user.id)
+            supabase.from('teams').select('*').order('created_at', { ascending: true })
         ]);
+
+        if (teamsData.error) {
+            console.error("Error fetching user teams:", teamsData.error);
+        }
         
-        const teams = (memberTeams.data?.map(mt => (mt as any).teams).filter(Boolean) as Team[]) || [];
+        const teams = (teamsData.data as Team[]) || [];
         
         set({ 
             profile: profileData,
