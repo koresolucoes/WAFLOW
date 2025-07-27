@@ -16,7 +16,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         console.log(`[Setup] Iniciando a configuração para o utilizador: ${userId} (${email})`);
         
-        // Etapa 0: Verificar se o utilizador já possui uma equipa
+        // Etapa 0: Verificar se o utilizador já possui uma equipa para tornar a função idempotente.
         const { data: existingTeam, error: checkError } = await supabaseAdmin
             .from('teams')
             .select('id')
