@@ -1,6 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { PipelineStage, DealWithContact } from '../../types';
 import DealCard from './DealCard';
+import { FunnelContext } from '../../contexts/providers/FunnelContext';
+import { TRASH_ICON } from '../../components/icons';
+import Button from '../../components/common/Button';
 
 interface StageColumnProps {
     stage: PipelineStage;
@@ -11,7 +14,29 @@ interface StageColumnProps {
 }
 
 const StageColumn: React.FC<StageColumnProps> = ({ stage, deals, onDragStart, onDrop, draggedDealId }) => {
+    const { updateStage, deleteStage } = useContext(FunnelContext);
+    const [isEditing, setIsEditing] = useState(false);
+    const [name, setName] = useState(stage.name);
     const [isDragOver, setIsDragOver] = useState(false);
+
+    const handleNameBlur = () => {
+        setIsEditing(false);
+        if (name.trim() && name !== stage.name) {
+            updateStage(stage.id, { name: name.trim() });
+        } else {
+            setName(stage.name);
+        }
+    };
+    
+    const handleDelete = () => {
+        if (deals.length > 0) {
+            alert(`Não é possível excluir a etapa "${stage.name}" porque ela contém ${deals.length} negócio(s). Por favor, mova os negócios para outra etapa antes de excluir.`);
+            return;
+        }
+        if (window.confirm(`Tem certeza de que deseja excluir a etapa "${stage.name}"?`)) {
+            deleteStage(stage.id);
+        }
+    };
 
     const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
         e.preventDefault();
@@ -43,9 +68,30 @@ const StageColumn: React.FC<StageColumnProps> = ({ stage, deals, onDragStart, on
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
         >
-            <div className={`p-4 border-b-4 ${stageTypeStyles[stage.type]} flex-shrink-0`}>
+            <div className={`p-4 border-b-4 ${stageTypeStyles[stage.type]} flex-shrink-0 group`}>
                 <div className="flex justify-between items-center">
-                    <h2 className="font-bold text-white truncate">{stage.name}</h2>
+                    {isEditing ? (
+                        <input
+                            type="text"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            onBlur={handleNameBlur}
+                            onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
+                            autoFocus
+                            className="bg-slate-700 text-white font-bold p-1 rounded-md w-full focus:outline-none focus:ring-2 focus:ring-sky-500"
+                        />
+                    ) : (
+                        <h2 onClick={() => setIsEditing(true)} className="font-bold text-white truncate cursor-pointer" title="Clique para editar">{stage.name}</h2>
+                    )}
+                     <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={handleDelete} 
+                        className="text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity ml-2"
+                        title="Excluir etapa"
+                    >
+                        <TRASH_ICON className="w-4 h-4" />
+                    </Button>
                 </div>
                 <p className="text-xs text-slate-400 mt-1">
                     {deals.length} negócios • {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalValue)}

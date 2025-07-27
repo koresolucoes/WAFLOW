@@ -3,8 +3,8 @@ export type Json =
   | number
   | boolean
   | null
-  | { [key: string]: unknown }
-  | unknown[]
+  | { [key: string]: any }
+  | any[]
 
 export type PublicEnums = {
   automation_status: "active" | "paused"
