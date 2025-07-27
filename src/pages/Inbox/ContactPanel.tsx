@@ -161,7 +161,7 @@ const ContactPanel: React.FC<{ contactId: string }> = ({ contactId }) => {
                             onChange={e => setTagInput(e.target.value)}
                             onKeyDown={handleTagInputKeyDown}
                             placeholder="Adicionar tag..."
-                            className="w-full mt-2 bg-slate-700 border border-slate-600 rounded-md p-1.5 text-sm text-white"
+                            className="w-full mt-2 bg-slate-700 border border-slate-600 rounded-lg p-1.5 text-sm text-white"
                         />
                     </Card>
                     
@@ -192,7 +192,7 @@ const ContactPanel: React.FC<{ contactId: string }> = ({ contactId }) => {
                             {contactDeals.map(deal => {
                                     const stage = stages.find(s => s.id === deal.stage_id);
                                     return (
-                                        <li key={deal.id} className="p-2 bg-slate-800 rounded-md">
+                                        <li key={deal.id} className="p-2 bg-slate-800 rounded-lg">
                                             <p className="font-semibold text-white text-sm truncate">{deal.name}</p>
                                             <div className="flex justify-between items-center text-xs mt-1">
                                                 <span className="font-mono text-green-400">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(deal.value || 0)}</span>

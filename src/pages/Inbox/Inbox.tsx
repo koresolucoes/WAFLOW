@@ -10,11 +10,11 @@ const Inbox: React.FC = () => {
     const [isPanelOpen, setIsPanelOpen] = useState(true);
 
     return (
-        <div className="h-full flex flex-col bg-slate-900">
-            <header className="flex-shrink-0 p-4 border-b border-slate-700/50">
-                <h1 className="text-2xl font-bold text-white">Caixa de Entrada</h1>
+        <div className="h-full flex flex-col">
+            <header className="flex-shrink-0 px-6 py-4">
+                <h1 className="text-3xl font-bold text-white">Caixa de Entrada</h1>
             </header>
-            <main className="flex-grow flex-1 flex overflow-hidden">
+            <main className="flex-grow flex-1 flex overflow-hidden bg-slate-800/50 rounded-xl border border-slate-700/50">
                 <ConversationList />
                 <div className="flex-1 flex overflow-hidden">
                     {activeContactId ? (

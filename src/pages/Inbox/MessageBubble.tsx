@@ -49,7 +49,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
     
     return (
         <div className={`flex ${isOutbound ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-md md:max-w-lg lg:max-w-xl rounded-lg p-2 text-white shadow-md ${bubbleClasses}`}>
+            <div className={`max-w-md md:max-w-lg lg:max-w-xl rounded-xl p-2 text-white shadow-md ${bubbleClasses}`}>
                  <p className="text-sm break-words whitespace-pre-wrap">
                     {message.content}
                 </p>

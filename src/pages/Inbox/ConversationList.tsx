@@ -29,7 +29,7 @@ const ConversationListItem: React.FC<{ conversation: Conversation; isActive: boo
     return (
         <li
             onClick={onClick}
-            className={`flex items-center p-3 cursor-pointer transition-colors duration-150 ${isActive ? 'bg-slate-700/80' : 'hover:bg-slate-800'}`}
+            className={`flex items-center p-3 cursor-pointer transition-colors duration-150 rounded-lg ${isActive ? 'bg-slate-700/80' : 'hover:bg-slate-800/50'}`}
         >
             <img
                 className="h-11 w-11 rounded-full object-cover flex-shrink-0"
@@ -90,21 +90,21 @@ const ConversationList: React.FC = () => {
     }, [conversations, searchTerm, filter]);
     
     return (
-        <aside className="w-96 flex-shrink-0 bg-slate-800/50 border-r border-slate-700/50 flex flex-col">
-            <div className="p-4 border-b border-slate-700/50 space-y-3">
+        <aside className="w-96 flex-shrink-0 bg-slate-800/10 border-r border-slate-700/50 flex flex-col">
+            <div className="p-4 space-y-3">
                 <input
                     type="search"
                     placeholder="Pesquisar..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full bg-slate-700 border-slate-600 rounded-md p-2 text-sm text-white placeholder-slate-400"
+                    className="w-full bg-slate-700 border-slate-600 rounded-lg p-2 text-sm text-white placeholder-slate-400"
                 />
                 <div className="flex items-center gap-2">
                     <FilterButton label="Todas" isActive={filter === 'all'} onClick={() => setFilter('all')} />
                     <FilterButton label="Não Lidas" isActive={filter === 'unread'} onClick={() => setFilter('unread')} />
                 </div>
             </div>
-            <ul className="flex-grow overflow-y-auto">
+            <ul className="flex-grow overflow-y-auto px-2">
                  {isLoading && conversations.length === 0 ? (
                     <div className="p-4 text-center text-slate-400">Carregando conversas...</div>
                 ) : filteredConversations.length === 0 ? (

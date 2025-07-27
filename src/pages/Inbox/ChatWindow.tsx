@@ -41,7 +41,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isPanelOpen, setIsPanelOpen }) 
     return (
         <>
             <section className="flex-1 flex flex-col bg-slate-900 overflow-hidden">
-                <header className="flex-shrink-0 flex items-center p-3 border-b border-slate-700/50 bg-slate-800/50">
+                <header className="flex-shrink-0 flex items-center p-3 border-b border-slate-700/50 bg-slate-800">
                     <img
                         className="h-10 w-10 rounded-full object-cover"
                         src={`https://api.dicebear.com/8.x/initials/svg?seed=${activeContact.name}`}
@@ -52,17 +52,17 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isPanelOpen, setIsPanelOpen }) 
                         <p className="text-sm text-slate-400 font-mono">{activeContact.phone}</p>
                     </div>
                      <div className="ml-auto flex items-center gap-2">
-                        <Button variant="ghost" size="sm" onClick={() => handleOpenActivityModal('NOTA')} title="Adicionar Nota">
+                        <Button variant="ghost" size="sm" onClick={() => handleOpenActivityModal('NOTA')} title="Adicionar Nota" className="rounded-full w-10 h-10">
                             <NOTE_ICON className="w-5 h-5" />
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={() => handleOpenActivityModal('TAREFA')} title="Adicionar Tarefa">
+                        <Button variant="ghost" size="sm" onClick={() => handleOpenActivityModal('TAREFA')} title="Adicionar Tarefa" className="rounded-full w-10 h-10">
                             <CALENDAR_ICON className="w-5 h-5" />
                         </Button>
                         <Button 
                             variant="ghost" 
                             size="sm" 
                             onClick={() => setIsPanelOpen(!isPanelOpen)}
-                            className={`${isPanelOpen ? 'bg-slate-700' : ''}`}
+                            className={`rounded-full w-10 h-10 ${isPanelOpen ? 'bg-slate-700' : ''}`}
                             title={isPanelOpen ? 'Ocultar Detalhes' : 'Mostrar Detalhes'}
                         >
                             <INFO_ICON className="w-5 h-5" />

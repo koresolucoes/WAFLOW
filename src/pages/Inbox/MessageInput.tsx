@@ -107,17 +107,17 @@ const MessageInput: React.FC<MessageInputProps> = ({ contactId }) => {
     return (
         <form
             onSubmit={handleSend}
-            className="flex-shrink-0 p-3 bg-slate-800 border-t border-slate-700/50 flex items-start gap-3"
+            className="flex-shrink-0 p-3 bg-slate-800 flex items-start gap-3"
         >
             <div className="relative flex-1">
                 {showPicker && filteredResponses.length > 0 && (
-                    <div className="absolute bottom-full left-0 w-full mb-2 bg-slate-700 rounded-lg shadow-lg max-h-48 overflow-y-auto z-10 p-2 border border-slate-600">
+                    <div className="absolute bottom-full left-0 w-full mb-2 bg-slate-700 rounded-xl shadow-lg max-h-48 overflow-y-auto z-10 p-2 border border-slate-600">
                         <ul>
                             {filteredResponses.map((res, index) => (
                                 <li key={res.id}>
                                     <button
                                         type="button"
-                                        className={`w-full text-left p-2 rounded-md flex justify-between items-center ${activeIndex === index ? 'bg-sky-500/30' : 'hover:bg-slate-600/50'}`}
+                                        className={`w-full text-left p-2 rounded-lg flex justify-between items-center ${activeIndex === index ? 'bg-sky-500/30' : 'hover:bg-slate-600/50'}`}
                                         onMouseDown={(e) => { e.preventDefault(); handleSelectResponse(res); }}
                                     >
                                         <div className="overflow-hidden">
@@ -136,7 +136,7 @@ const MessageInput: React.FC<MessageInputProps> = ({ contactId }) => {
                     onChange={handleTextChange}
                     onKeyDown={handleKeyDown}
                     placeholder="Digite uma mensagem ou '/' para respostas rápidas..."
-                    className="flex-1 bg-slate-700 border-slate-600 rounded-lg p-2.5 text-white placeholder-slate-400 resize-none focus:ring-2 focus:ring-sky-500 focus:outline-none w-full"
+                    className="flex-1 bg-slate-700 border-slate-600 rounded-xl p-2.5 text-white placeholder-slate-400 resize-none focus:ring-2 focus:ring-sky-500 focus:outline-none w-full"
                     rows={1}
                     style={{ maxHeight: '120px' }}
                 />
