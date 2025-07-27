@@ -87,10 +87,10 @@ export const AutomationsProvider: React.FC<{ children: ReactNode }> = ({ childre
     }, [user, activeTeam]);
     
     const deleteAutomation = useCallback(async (automationId: string) => {
-        if (!user) throw new Error("User not authenticated.");
-        await automationService.deleteAutomationFromDb(automationId);
+        if (!user || !activeTeam) throw new Error("User not authenticated.");
+        await automationService.deleteAutomationFromDb(automationId, activeTeam.id);
         // Realtime handles state update
-    }, [user]);
+    }, [user, activeTeam]);
     
     const fetchAutomationStats = useCallback(async (automationId: string) => {
         if (!user) return;

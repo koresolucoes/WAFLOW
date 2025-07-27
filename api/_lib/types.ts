@@ -2,6 +2,7 @@ import { Json as DbJson, Database, Enums, Tables, TablesInsert, TablesUpdate } f
 import { MetaTemplateComponent } from './meta/types.js';
 
 export type Json = DbJson;
+export type { TablesInsert, TablesUpdate };
 
 // --- Backend-safe Flow Types ---
 export interface BackendNode<T = any> {

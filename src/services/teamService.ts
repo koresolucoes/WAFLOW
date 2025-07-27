@@ -5,7 +5,7 @@ export const getTeamMembersForTeams = async (teamIds: string[]): Promise<TeamMem
     if (teamIds.length === 0) {
         return [];
     }
-    // The previous RPC call was failing. Replaced with a secure serverless function.
+    
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
         throw new Error("Not authenticated");

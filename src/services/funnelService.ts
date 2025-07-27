@@ -8,8 +8,8 @@ export const addDealToDb = async (dealData: DealInsert): Promise<DealWithContact
     return data as unknown as DealWithContact;
 };
 
-export const updateDealInDb = async (dealId: string, updates: TablesUpdate<'deals'>): Promise<DealWithContact> => {
-    const { data, error } = await supabase.from('deals').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', dealId).select('*, contacts(id, name)').single();
+export const updateDealInDb = async (dealId: string, teamId: string, updates: TablesUpdate<'deals'>): Promise<DealWithContact> => {
+    const { data, error } = await supabase.from('deals').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', dealId).eq('team_id', teamId).select('*, contacts(id, name)').single();
     if (error) throw error;
     return data as unknown as DealWithContact;
 };
@@ -50,14 +50,14 @@ export const addPipelineToDb = async (teamId: string, name: string): Promise<{ p
     return { pipeline, stage: stageData as unknown as PipelineStage };
 };
 
-export const updatePipelineInDb = async (id: string, name: string): Promise<Pipeline> => {
-    const { data, error } = await supabase.from('pipelines').update({ name }).eq('id', id).select('*').single();
+export const updatePipelineInDb = async (id: string, teamId: string, name: string): Promise<Pipeline> => {
+    const { data, error } = await supabase.from('pipelines').update({ name }).eq('id', id).eq('team_id', teamId).select('*').single();
     if (error || !data) throw error || new Error("Falha ao renomear funil.");
     return data as unknown as Pipeline;
 };
 
-export const deletePipelineFromDb = async (id: string): Promise<void> => {
-    const { error } = await supabase.from('pipelines').delete().eq('id', id);
+export const deletePipelineFromDb = async (id: string, teamId: string): Promise<void> => {
+    const { error } = await supabase.from('pipelines').delete().eq('id', id).eq('team_id', teamId);
     if (error) throw error;
 };
 

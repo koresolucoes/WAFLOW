@@ -89,7 +89,8 @@ export const deleteCampaignFromDb = async (teamId: string, campaignId: string): 
      const { error: messagesError } = await supabase
         .from('messages')
         .delete()
-        .eq('campaign_id', campaignId);
+        .eq('campaign_id', campaignId)
+        .eq('team_id', teamId);
     
     if (messagesError) throw messagesError;
 

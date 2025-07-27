@@ -20,15 +20,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                         <AutomationsProvider>
                             <FunnelProvider>
                                 <CannedResponsesProvider>
-                                    <InboxProvider>
-                                        <CustomFieldsProvider>
-                                            <ActivityProvider>
+                                    <CustomFieldsProvider>
+                                        <ActivityProvider>
+                                            <InboxProvider>
                                                 <DataProvider>
                                                     {children}
                                                 </DataProvider>
-                                            </ActivityProvider>
-                                        </CustomFieldsProvider>
-                                    </InboxProvider>
+                                            </InboxProvider>
+                                        </ActivityProvider>
+                                    </CustomFieldsProvider>
                                 </CannedResponsesProvider>
                             </FunnelProvider>
                         </AutomationsProvider>

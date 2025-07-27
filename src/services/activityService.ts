@@ -22,22 +22,24 @@ export const addActivity = async (activityData: ContactActivityInsert): Promise<
     return data as unknown as ContactActivity;
 };
 
-export const updateActivity = async (activityId: string, updates: ContactActivityUpdate): Promise<ContactActivity> => {
+export const updateActivity = async (activityId: string, teamId: string, updates: ContactActivityUpdate): Promise<ContactActivity> => {
     const { data, error } = await supabase
         .from('contact_activities')
         .update(updates)
         .eq('id', activityId)
+        .eq('team_id', teamId)
         .select()
         .single();
     if (error) throw error;
     return data as unknown as ContactActivity;
 };
 
-export const deleteActivity = async (activityId: string): Promise<void> => {
+export const deleteActivity = async (activityId: string, teamId: string): Promise<void> => {
     const { error } = await supabase
         .from('contact_activities')
         .delete()
-        .eq('id', activityId);
+        .eq('id', activityId)
+        .eq('team_id', teamId);
     if (error) throw error;
 };
 

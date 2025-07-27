@@ -11,6 +11,7 @@ interface ActivityContextType {
     addActivity: (activityData: Omit<ContactActivityInsert, 'team_id'>) => Promise<ContactActivity | null>;
     updateActivity: (activityId: string, updates: ContactActivityUpdate) => Promise<ContactActivity | null>;
     deleteActivity: (activityId: string) => Promise<void>;
+    fetchTodaysTasks: () => Promise<void>;
 }
 
 export const ActivityContext = createContext<ActivityContextType>(null!);
@@ -22,7 +23,10 @@ export const ActivityProvider: React.FC<{ children: ReactNode }> = ({ children }
     const [isLoading, setIsLoading] = useState(false);
 
     const fetchTodaysTasks = useCallback(async () => {
-        if (!user || !activeTeam) return;
+        if (!user || !activeTeam) {
+            setTodaysTasks([]);
+            return;
+        };
         try {
             const tasks = await activityService.fetchTodaysTasks(activeTeam.id);
             setTodaysTasks(tasks);
@@ -32,8 +36,10 @@ export const ActivityProvider: React.FC<{ children: ReactNode }> = ({ children }
     }, [user, activeTeam]);
     
     useEffect(() => {
-        fetchTodaysTasks();
-    }, [fetchTodaysTasks]);
+        if(activeTeam) {
+          fetchTodaysTasks();
+        }
+    }, [fetchTodaysTasks, activeTeam]);
 
     const fetchActivitiesForContact = useCallback(async (contactId: string) => {
         if (!user || !activeTeam) return;
@@ -62,17 +68,19 @@ export const ActivityProvider: React.FC<{ children: ReactNode }> = ({ children }
     }, [user, activeTeam, activitiesForContact, fetchTodaysTasks]);
 
     const updateActivity = useCallback(async (activityId: string, updates: ContactActivityUpdate): Promise<ContactActivity | null> => {
-        const updatedActivity = await activityService.updateActivity(activityId, updates);
+        if (!user || !activeTeam) throw new Error("User or active team not available.");
+        const updatedActivity = await activityService.updateActivity(activityId, activeTeam.id, updates);
         setActivitiesForContact(prev => prev.map(a => a.id === activityId ? { ...a, ...updates } : a));
         fetchTodaysTasks(); // Refresh dashboard tasks
         return updatedActivity;
-    }, [fetchTodaysTasks]);
+    }, [user, activeTeam, fetchTodaysTasks]);
     
     const deleteActivity = useCallback(async (activityId: string) => {
-        await activityService.deleteActivity(activityId);
+        if (!user || !activeTeam) throw new Error("User or active team not available.");
+        await activityService.deleteActivity(activityId, activeTeam.id);
         setActivitiesForContact(prev => prev.filter(a => a.id !== activityId));
         fetchTodaysTasks(); // Refresh dashboard tasks
-    }, [fetchTodaysTasks]);
+    }, [user, activeTeam, fetchTodaysTasks]);
 
     const value = {
         activitiesForContact,
@@ -81,7 +89,8 @@ export const ActivityProvider: React.FC<{ children: ReactNode }> = ({ children }
         fetchActivitiesForContact,
         addActivity,
         updateActivity,
-        deleteActivity
+        deleteActivity,
+        fetchTodaysTasks,
     };
 
     return (

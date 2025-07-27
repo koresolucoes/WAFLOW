@@ -16,6 +16,8 @@ interface InboxContextType {
     assignConversation: (contactId: string, assigneeId: string | null) => Promise<void>;
     isLoading: boolean;
     isSending: boolean;
+    fetchConversations: () => Promise<void>;
+    setMessages: React.Dispatch<React.SetStateAction<UnifiedMessage[]>>;
 }
 
 export const InboxContext = createContext<InboxContextType>(null!);
@@ -272,7 +274,9 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         sendMessage,
         assignConversation,
         isLoading,
-        isSending
+        isSending,
+        fetchConversations,
+        setMessages
     };
 
     return (

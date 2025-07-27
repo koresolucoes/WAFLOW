@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { supabase } from '../lib/supabaseClient';
 import type { Session, User } from '@supabase/auth-js';
 import { Profile, EditableProfile, MetaConfig, Team, TeamMemberWithEmail } from '../types';
-import { getProfile, updateProfileInDb } from '../services/profileService';
+import { updateProfileInDb } from '../services/profileService';
 import { getTeamMembersForTeams } from '../services/teamService';
 import type { RealtimeChannel } from '@supabase/realtime-js';
 
@@ -68,7 +68,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         
         let allTeamMembers: TeamMemberWithEmail[] = [];
 
-        // Lógica de fallback para usuários existentes que, por algum motivo, não têm uma equipe.
         if (teams.length === 0) {
             console.warn(`O usuário ${user.id} não possui equipes. Acionando a criação da equipe padrão via API.`);
             try {
@@ -142,12 +141,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
     };
 
-    // Initial check
     supabase.auth.getSession().then(({ data: { session } }) => {
         handleSession(session);
     });
 
-    // Subscribe to changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
         set({ loading: true, profile: null });
         handleSession(session);
@@ -173,10 +170,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   }
 }));
 
-// Initialize the listener as soon as the store is imported.
 useAuthStore.getState().initializeAuth();
 
-// Selector for derived state like metaConfig
 export const useMetaConfig = (): MetaConfig => {
     return useAuthStore(state => ({
         accessToken: state.profile?.meta_access_token || '',

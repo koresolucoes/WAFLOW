@@ -14,7 +14,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(400).json({ error: 'Missing team_ids array in request body.' });
         }
 
-        // 1. Authenticate user from JWT
         const authHeader = req.headers.authorization;
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
             return res.status(401).json({ error: 'Authorization header is missing or malformed.' });
@@ -25,8 +24,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (userError || !user) {
             return res.status(401).json({ error: 'Unauthorized' });
         }
-
-        // 2. Verify user is a member of ALL requested teams to prevent data leakage
+        
         const { count, error: membershipError } = await supabaseAdmin
             .from('team_members')
             .select('*', { count: 'exact', head: true })
@@ -39,7 +37,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(403).json({ error: 'Access denied to one or more teams.' });
         }
 
-        // 3. Fetch all members for the validated teams
         const { data: members, error: membersError } = await supabaseAdmin
             .from('team_members')
             .select('team_id, user_id, role')
@@ -53,7 +50,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const userIds = [...new Set(members.map(m => m.user_id))];
 
-        // 4. Fetch user details (including email) from auth.users
         const { data: usersData, error: usersError } = await supabaseAdmin.auth.admin.listUsers({
              page: 1,
              perPage: 1000,
@@ -64,12 +60,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const relevantUsers = usersData.users.filter((u: User) => userIds.includes(u.id));
         const usersById = new Map(relevantUsers.map((u: User) => [u.id, u]));
         
-        // 5. Combine data and return
         const result = members.map(member => ({
             team_id: member.team_id,
             user_id: member.user_id,
             role: member.role,
-            email: usersById.get(member.user_id)?.email || 'Email não encontrado'
+            email: (usersById.get(member.user_id) as User | undefined)?.email || 'Email não encontrado'
         }));
         
         return res.status(200).json(result);

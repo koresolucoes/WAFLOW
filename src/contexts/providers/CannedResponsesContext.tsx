@@ -18,16 +18,6 @@ export const CannedResponsesProvider: React.FC<{ children: ReactNode }> = ({ chi
     const { user, activeTeam } = useAuthStore();
     const [responses, setResponses] = useState<CannedResponse[]>([]);
 
-    useEffect(() => {
-        if (user && activeTeam) {
-            cannedResponseService.fetchCannedResponses(activeTeam.id)
-                .then(setResponses)
-                .catch(err => console.error("Failed to fetch canned responses:", err));
-        } else {
-            setResponses([]);
-        }
-    }, [user, activeTeam]);
-
     const addResponse = useCallback(async (response: Omit<CannedResponseInsert, 'team_id' | 'id' | 'created_at'>) => {
         if (!user || !activeTeam) throw new Error("User or active team not available.");
         const newResponse = await cannedResponseService.addCannedResponse(activeTeam.id, response);
@@ -35,14 +25,16 @@ export const CannedResponsesProvider: React.FC<{ children: ReactNode }> = ({ chi
     }, [user, activeTeam]);
 
     const updateResponse = useCallback(async (id: string, updates: TablesUpdate<'canned_responses'>) => {
-        const updatedResponse = await cannedResponseService.updateCannedResponse(id, updates);
+        if (!user || !activeTeam) throw new Error("User or active team not available.");
+        const updatedResponse = await cannedResponseService.updateCannedResponse(id, activeTeam.id, updates);
         setResponses(prev => prev.map(r => r.id === id ? updatedResponse : r).sort((a, b) => a.shortcut.localeCompare(b.shortcut)));
-    }, []);
+    }, [user, activeTeam]);
     
     const deleteResponse = useCallback(async (id: string) => {
-        await cannedResponseService.deleteCannedResponse(id);
+        if (!user || !activeTeam) throw new Error("User or active team not available.");
+        await cannedResponseService.deleteCannedResponse(id, activeTeam.id);
         setResponses(prev => prev.filter(r => r.id !== id));
-    }, []);
+    }, [user, activeTeam]);
 
     const value = {
         responses,

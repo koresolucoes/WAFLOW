@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '../../supabaseAdmin.js';
-import { sendTemplatedMessage, sendTextMessage, sendMediaMessage, sendInteractiveMessage, getMetaTemplateById } from '../../meta/messages.js';
+import { sendTemplatedMessage, sendTextMessage, sendMediaMessage, sendInteractiveMessage } from '../../meta/messages.js';
+import { getMetaTemplateById } from '../../meta/templates.js';
 import { MessageTemplate, MessageInsert } from '../../types.js';
 import { ActionHandler } from '../types.js';
 import { getMetaConfig, resolveVariables } from '../helpers.js';

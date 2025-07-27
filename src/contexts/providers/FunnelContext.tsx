@@ -40,10 +40,10 @@ export const FunnelProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }, [user, activeTeam]);
 
     const updateDeal = useCallback(async (dealId: string, updates: TablesUpdate<'deals'>) => {
-        if (!user) throw new Error("User not authenticated.");
-        const updatedDeal = await funnelService.updateDealInDb(dealId, updates);
+        if (!user || !activeTeam) throw new Error("User not authenticated.");
+        const updatedDeal = await funnelService.updateDealInDb(dealId, activeTeam.id, updates);
         setDeals(prev => prev.map(d => d.id === dealId ? { ...d, ...updatedDeal } : d));
-    }, [user]);
+    }, [user, activeTeam]);
 
     const createDefaultPipeline = useCallback(async () => {
         if (!user || !activeTeam) throw new Error("User or active team not available.");
@@ -64,22 +64,22 @@ export const FunnelProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }, [user, activeTeam]);
 
     const updatePipeline = useCallback(async (id: string, name: string) => {
-        if (!user) throw new Error("User not authenticated.");
-        const updatedPipeline = await funnelService.updatePipelineInDb(id, name);
+        if (!user || !activeTeam) throw new Error("User not authenticated.");
+        const updatedPipeline = await funnelService.updatePipelineInDb(id, activeTeam.id, name);
         setPipelines(p => p.map(pl => pl.id === id ? updatedPipeline : pl));
-    }, [user]);
+    }, [user, activeTeam]);
 
     const deletePipeline = useCallback(async (id: string) => {
-        if (!user) throw new Error("User not authenticated.");
+        if (!user || !activeTeam) throw new Error("User not authenticated.");
         const remainingPipelines = pipelines.filter(p => p.id !== id);
-        await funnelService.deletePipelineFromDb(id);
+        await funnelService.deletePipelineFromDb(id, activeTeam.id);
         setStages(s => s.filter(stage => stage.pipeline_id !== id));
         setDeals(d => d.filter(deal => deal.pipeline_id !== id));
         setPipelines(remainingPipelines);
         if (activePipelineId === id) {
             setActivePipelineId(remainingPipelines.length > 0 ? remainingPipelines[0].id : null);
         }
-    }, [user, pipelines, activePipelineId]);
+    }, [user, activeTeam, pipelines, activePipelineId]);
 
     const addStage = useCallback(async (pipelineId: string) => {
         if (!user) throw new Error("User not authenticated.");

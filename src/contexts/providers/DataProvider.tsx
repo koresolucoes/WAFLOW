@@ -8,6 +8,8 @@ import { FunnelContext } from './FunnelContext';
 import { CustomFieldsContext } from './CustomFieldsContext';
 import { CannedResponsesContext } from './CannedResponsesContext';
 import { fetchAllInitialData } from '../../services/dataService';
+import { InboxContext } from './InboxContext';
+import { ActivityContext } from './ActivityContext';
 
 export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const { user, activeTeam } = useAuthStore();
@@ -18,6 +20,10 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const { setPipelines, setStages, setDeals, setActivePipelineId } = useContext(FunnelContext);
     const { setDefinitions } = useContext(CustomFieldsContext);
     const { setResponses } = useContext(CannedResponsesContext);
+    // Adicionado para limpar ao trocar de equipe
+    const { fetchConversations, setMessages } = useContext(InboxContext);
+    const { fetchTodaysTasks } = useContext(ActivityContext);
+
 
     const [loading, setLoading] = useState(false);
     const [dataLoadedForTeam, setDataLoadedForTeam] = useState<string | null>(null);
@@ -33,8 +39,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setDeals([]);
         setDefinitions([]);
         setResponses([]);
+        setMessages([]);
         setActivePipelineId(null);
-    }, [setTemplates, setContacts, setCampaigns, setAutomations, setPipelines, setStages, setDeals, setDefinitions, setResponses, setActivePipelineId]);
+    }, [setTemplates, setContacts, setCampaigns, setAutomations, setPipelines, setStages, setDeals, setDefinitions, setResponses, setMessages, setActivePipelineId]);
     
     const fetchInitialData = useCallback(async (teamId: string) => {
         if (!user || !teamId) return;
@@ -44,7 +51,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         try {
             const data = await fetchAllInitialData(teamId);
             
-            // Ensure we only set data for the currently active team
             if (teamId === currentTeamIdRef.current) {
                 if (data.templates) setTemplates(data.templates);
                 if (data.contacts) setContacts(data.contacts);
@@ -63,6 +69,10 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 if (data.customFieldDefinitions) setDefinitions(data.customFieldDefinitions);
                 if (data.cannedResponses) setResponses(data.cannedResponses);
 
+                // Carrega dados específicos adicionais
+                fetchConversations();
+                fetchTodaysTasks();
+
                 setDataLoadedForTeam(teamId);
             }
 
@@ -73,7 +83,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 setLoading(false);
             }
         }
-    }, [user, setTemplates, setContacts, setCampaigns, setAutomations, setPipelines, setStages, setDeals, setActivePipelineId, setDefinitions, setResponses]);
+    }, [user, setTemplates, setContacts, setCampaigns, setAutomations, setPipelines, setStages, setDeals, setActivePipelineId, setDefinitions, setResponses, fetchConversations, fetchTodaysTasks]);
 
     useEffect(() => {
         if (!user) {

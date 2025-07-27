@@ -57,24 +57,8 @@ const Auth: React.FC = () => {
             }
         });
         if (error) throw error;
-        if (!data.user) {
-            throw new Error("O registo foi bem-sucedido, mas não foram retornados dados do utilizador.");
-        }
-        
-        // **NOVO**: Chamar a função serverless para configurar a equipa
-        const setupResponse = await fetch('/api/setup-new-user', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: data.user.id, email: data.user.email })
-        });
-
-        if (!setupResponse.ok) {
-            // Se a configuração falhar, informa o utilizador. O registo já aconteceu.
-            // O ideal seria ter uma transação, mas isto é uma boa prática para serverless.
-            const setupError = await setupResponse.json();
-            throw new Error(`O registo foi bem-sucedido, mas a configuração inicial da equipa falhou: ${setupError.message}. Por favor, contacte o suporte.`);
-        }
-
+        // The database trigger 'handle_new_user' will automatically create the profile,
+        // team, and team membership. No API call is needed from the client.
         setMessage("Cadastro realizado! Verifique seu e-mail para confirmar a conta.");
       }
     } catch (err: any) {

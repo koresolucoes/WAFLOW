@@ -22,21 +22,23 @@ export const addCannedResponse = async (teamId: string, response: Omit<CannedRes
     return data as unknown as CannedResponse;
 };
 
-export const updateCannedResponse = async (id: string, updates: TablesUpdate<'canned_responses'>): Promise<CannedResponse> => {
+export const updateCannedResponse = async (id: string, teamId: string, updates: TablesUpdate<'canned_responses'>): Promise<CannedResponse> => {
     const { data, error } = await supabase
         .from('canned_responses')
         .update(updates)
         .eq('id', id)
+        .eq('team_id', teamId)
         .select()
         .single();
     if (error) throw error;
     return data as unknown as CannedResponse;
 };
 
-export const deleteCannedResponse = async (id: string): Promise<void> => {
+export const deleteCannedResponse = async (id: string, teamId: string): Promise<void> => {
     const { error } = await supabase
         .from('canned_responses')
         .delete()
-        .eq('id', id);
+        .eq('id', id)
+        .eq('team_id', teamId);
     if (error) throw error;
 };

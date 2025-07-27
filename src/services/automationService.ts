@@ -54,8 +54,8 @@ export const updateAutomationInDb = async (teamId: string, automation: Automatio
     };
 };
 
-export const deleteAutomationFromDb = async (automationId: string): Promise<void> => {
-    const { error } = await supabase.from('automations').delete().eq('id', automationId);
+export const deleteAutomationFromDb = async (automationId: string, teamId: string): Promise<void> => {
+    const { error } = await supabase.from('automations').delete().eq('id', automationId).eq('team_id', teamId);
     if (error) throw error;
 };
 
@@ -73,11 +73,11 @@ export const fetchStatsForAutomation = async (automationId: string): Promise<Rec
 };
 
 export const fetchLogsForNode = async (automationId: string, nodeId: string): Promise<AutomationNodeLog[]> => {
-    // Ao unir com `automations`, garantimos que a consulta está sujeita à política RLS na tabela de automações,
-    // que deve restringir o acesso à equipe do usuário atual.
+    // A política RLS em `automation_runs` (is_team_member(team_id)) garante que apenas os
+    // dados da equipe correta sejam retornados. Não é necessário um join explícito para segurança.
     const { data: runIdsData, error: runIdsError } = await supabase
         .from('automation_runs')
-        .select('id, automations!inner(id)')
+        .select('id')
         .eq('automation_id', automationId);
         
     if (runIdsError) { 
@@ -88,7 +88,15 @@ export const fetchLogsForNode = async (automationId: string, nodeId: string): Pr
     const runIds = ((runIdsData || []) as any[]).map(r => r.id);
     if (runIds.length === 0) return [];
 
-    const { data, error } = await supabase.from('automation_node_logs').select('id, run_id, node_id, status, details, created_at').in('run_id', runIds).eq('node_id', nodeId).order('created_at', { ascending: false }).limit(100);
+    // A política RLS em `automation_node_logs` também protege esta consulta.
+    const { data, error } = await supabase
+        .from('automation_node_logs')
+        .select('id, run_id, node_id, status, details, created_at')
+        .in('run_id', runIds)
+        .eq('node_id', nodeId)
+        .order('created_at', { ascending: false })
+        .limit(100);
+
     if (error) { 
         console.error("Error fetching node logs:", error); 
         return []; 

@@ -649,37 +649,7 @@ export interface Database {
       [key: string]: never
     }
     Functions: {
-      get_conversations_with_contacts: {
-        Args: {
-          p_team_id: string
-        }
-        Returns: Json
-      }
-      get_members_for_teams: {
-        Args: {
-          p_team_ids: string[]
-        }
-        Returns: Json
-      }
-      get_user_teams_and_profile: {
-        Args: Record<string, never>
-        Returns: Json
-      }
-      increment_node_stat: {
-        Args: {
-          p_automation_id: string
-          p_node_id: string
-          p_status: string
-          p_team_id: string
-        }
-        Returns: undefined
-      }
-      sync_automation_triggers: {
-        Args: {
-          automation_id_in: string
-        }
-        Returns: undefined
-      }
+      [key: string]: never
     }
     Enums: PublicEnums
     CompositeTypes: {
