@@ -1,10 +1,11 @@
+
 export type Json =
   | string
   | number
   | boolean
   | null
-  | { [key: string]: Json | undefined }
-  | Json[]
+  | { [key: string]: any }
+  | any[]
 
 export type PublicEnums = {
   automation_status: "active" | "paused"
@@ -514,6 +515,7 @@ export type PublicTables = {
       company_name: string | null
       company_products: string | null
       company_tone: string | null
+      dashboard_layout: Json | null
       id: string
       meta_access_token: string | null
       meta_phone_number_id: string | null
@@ -528,6 +530,7 @@ export type PublicTables = {
       company_name?: string | null
       company_products?: string | null
       company_tone?: string | null
+      dashboard_layout?: Json | null
       id: string
       meta_access_token?: string | null
       meta_phone_number_id?: string | null
@@ -542,6 +545,7 @@ export type PublicTables = {
       company_name?: string | null
       company_products?: string | null
       company_tone?: string | null
+      dashboard_layout?: Json | null
       id?: string
       meta_access_token?: string | null
       meta_phone_number_id?: string | null

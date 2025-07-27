@@ -1,4 +1,5 @@
 
+
 import { supabase } from '../lib/supabaseClient';
 import { MessageTemplate, MessageTemplateInsert, MetaConfig, TemplateCategory, TemplateStatus } from '../types';
 import { TablesInsert, Json } from '../types/database.types';
@@ -13,7 +14,7 @@ const addTemplateToDb = async (template: MessageTemplateInsert): Promise<Message
     
     const { data, error } = await supabase
       .from('message_templates')
-      .insert(dbTemplate as any)
+      .insert(dbTemplate)
       .select()
       .single();
 

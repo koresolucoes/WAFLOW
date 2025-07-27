@@ -6,7 +6,7 @@ import { ActionHandler } from '../types.js';
 import { getMetaConfig, resolveVariables } from '../helpers.js';
 
 const logSentMessage = async (payload: Omit<MessageInsert, 'user_id'>, userId: string) => {
-    const { error } = await supabaseAdmin.from('messages').insert({ ...payload, user_id: userId } as any);
+    const { error } = await supabaseAdmin.from('messages').insert({ ...payload, user_id: userId });
     if (error) {
         // Log the error but don't throw, as the message was already sent to Meta.
         // This prevents the automation from failing if only the DB logging fails.
@@ -24,7 +24,8 @@ export const sendTemplate: ActionHandler = async ({ profile, contact, node, trig
     }
 
     const { data: template, error: templateError } = await supabaseAdmin.from('message_templates').select('*').eq('id', config.template_id).single();
-    if (templateError || !template) throw new Error(`Erro ao buscar template: ${templateError?.message || 'Template não encontrado.'}`);
+    if (templateError) throw templateError;
+    if (!template) throw new Error(`Template com ID ${config.template_id} não encontrado.`);
     
     if (!(template as any).meta_id) {
         throw new Error(`O template '${template.template_name}' não está sincronizado com a Meta e não pode ser enviado.`);

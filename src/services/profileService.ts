@@ -19,7 +19,7 @@ export const getProfile = async (userId: string): Promise<Profile | null> => {
 export const updateProfileInDb = async (userId: string, profileData: EditableProfile): Promise<Profile> => {
     const { data, error } = await supabase
         .from('profiles')
-        .update(profileData as any)
+        .update(profileData)
         .eq('id', userId)
         .select('*')
         .single();

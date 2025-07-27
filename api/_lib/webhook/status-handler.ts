@@ -32,7 +32,7 @@ export async function processStatusUpdate(status: any, userId: string): Promise<
 
     const { data, error } = await supabaseAdmin
         .from('messages')
-        .update(updatePayload as any)
+        .update(updatePayload)
         .eq('meta_message_id', status.id)
         .eq('user_id', userId)
         .select('id');

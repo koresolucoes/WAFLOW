@@ -39,17 +39,17 @@ export const findOrCreateContactByPhone = async (user_id: string, phone: string,
     
     let { data: contactData, error } = await supabaseAdmin
         .from('contacts')
-        .select('company, created_at, custom_fields, email, id, name, phone, tags, user_id')
+        .select('company, created_at, custom_fields, email, id, name, phone, sentiment, tags, user_id')
         .eq('user_id', user_id)
         .eq('phone', normalizedPhone)
         .single();
 
     if (error && error.code === 'PGRST116') { // Not found
-        const newContactPayload: TablesInsert<'contacts'> = { user_id, phone: normalizedPhone, name, tags: ['new-lead'], custom_fields: null };
+        const newContactPayload: TablesInsert<'contacts'> = { user_id, phone: normalizedPhone, name, tags: ['new-lead'], custom_fields: null, sentiment: null };
         const { data: newContact, error: insertError } = await supabaseAdmin
             .from('contacts')
-            .insert(newContactPayload as any)
-            .select('company, created_at, custom_fields, email, id, name, phone, tags, user_id')
+            .insert(newContactPayload)
+            .select('company, created_at, custom_fields, email, id, name, phone, sentiment, tags, user_id')
             .single();
         if (insertError) {
              console.error("Error creating new contact:", insertError);
@@ -145,9 +145,9 @@ export const processWebhookPayloadForContact = async (
         if (needsUpdate) {
             const { data: updatedContact, error: updateContactError } = await supabaseAdmin
                 .from('contacts')
-                .update(updatePayload as any)
+                .update(updatePayload)
                 .eq('id', contact.id)
-                .select('company, created_at, custom_fields, email, id, name, phone, tags, user_id')
+                .select('company, created_at, custom_fields, email, id, name, phone, sentiment, tags, user_id')
                 .single();
 
             if(updateContactError) {

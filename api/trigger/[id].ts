@@ -1,4 +1,5 @@
 
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
 import { executeAutomation, createDefaultLoggingHooks } from '../_lib/automation/engine.js';
@@ -25,7 +26,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const nodeId = rawId.substring(separatorIndex + separator.length);
 
     let profileData: Profile | null = null;
-    const PROFILE_COLUMNS = 'id, company_audience, company_description, company_name, company_products, company_tone, meta_access_token, meta_phone_number_id, meta_waba_id, meta_verify_token, updated_at, webhook_path_prefix';
+    const PROFILE_COLUMNS = 'id, company_audience, company_description, company_name, company_products, company_tone, meta_access_token, meta_phone_number_id, meta_waba_id, meta_verify_token, updated_at, webhook_path_prefix, dashboard_layout';
 
     // Robust Profile Lookup: First try by the custom path prefix.
     const { data: profileByPrefix, error: prefixError } = await supabaseAdmin.from('profiles').select(PROFILE_COLUMNS).eq('webhook_path_prefix', webhookPrefix).maybeSingle();

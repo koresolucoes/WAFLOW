@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabaseClient';
-import type { Session, User } from '@supabase/supabase-js';
+import type { Session, User } from '@supabase/auth-js';
 import { Profile, EditableProfile, MetaConfig } from '../types';
 import { getProfile, updateProfileInDb } from '../services/profileService';
 

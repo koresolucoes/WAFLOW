@@ -1,11 +1,12 @@
 
 
+
 import React, { createContext, useState, useCallback, ReactNode, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { Campaign, CampaignWithMetrics, MessageInsert, CampaignWithDetails, CampaignStatus, Message, MessageStatus, MessageWithContact } from '../../types';
 import { useAuthStore } from '../../stores/authStore';
 import { fetchCampaignDetailsFromDb, addCampaignToDb, deleteCampaignFromDb } from '../../services/campaignService';
-import { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
+import type { RealtimePostgresChangesPayload } from '@supabase/realtime-js';
 
 interface CampaignsContextType {
   campaigns: CampaignWithMetrics[];

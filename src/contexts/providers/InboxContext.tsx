@@ -4,7 +4,7 @@ import { useAuthStore, useMetaConfig } from '../../stores/authStore';
 import { ContactsContext } from './ContactsContext';
 import { Conversation, UnifiedMessage, Message, MessageStatus, Contact } from '../../types';
 import * as inboxService from '../../services/inboxService';
-import { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
+import type { RealtimePostgresChangesPayload } from '@supabase/realtime-js';
 
 interface InboxContextType {
     conversations: Conversation[];
@@ -95,7 +95,7 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             const handleMessageChange = (payload: RealtimePostgresChangesPayload<Message>) => {
                 if (payload.eventType !== 'INSERT' && payload.eventType !== 'UPDATE') return;
 
-                const newMessage = inboxService.mapPayloadToUnifiedMessage(payload.new);
+                const newMessage = inboxService.mapPayloadToUnifiedMessage(payload.new as Message);
                 const contactId = newMessage.contact_id;
                 
                 // Update conversation list
@@ -137,13 +137,31 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                     }
                 }
             };
+
+            const handleContactChange = (payload: RealtimePostgresChangesPayload<Contact>) => {
+                if (payload.eventType !== 'UPDATE') return;
+                const updatedContact = payload.new as Contact;
+                console.log('[Inbox] Realtime contact update received:', updatedContact);
+                setConversations(prev =>
+                    prev.map(c =>
+                        c.contact.id === updatedContact.id
+                            ? { ...c, contact: updatedContact }
+                            : c
+                    )
+                );
+            };
             
             const messagesChannel = supabase.channel(`messages-channel-${user.id}`)
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `user_id=eq.${user.id}` }, handleMessageChange)
                 .subscribe();
             
+            const contactsChannel = supabase.channel(`contacts-channel-inbox-${user.id}`)
+                .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'contacts', filter: `user_id=eq.${user.id}` }, handleContactChange)
+                .subscribe();
+
             return () => {
                 supabase.removeChannel(messagesChannel);
+                supabase.removeChannel(contactsChannel);
             }
         }
     }, [user, fetchConversations]);

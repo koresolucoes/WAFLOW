@@ -1,4 +1,5 @@
 
+
 import { supabase } from '../lib/supabaseClient';
 import { Conversation, UnifiedMessage, Contact, MessageInsert, MessageStatus, MetaConfig, Message, TemplateCategory, TemplateStatus, MetaTemplateComponent } from '../types';
 import { sendTextMessage } from './meta/messages';
@@ -18,7 +19,7 @@ export const mapPayloadToUnifiedMessage = (payload: Message): UnifiedMessage => 
 };
 
 export const fetchConversationsFromDb = async (userId: string): Promise<Conversation[]> => {
-    const { data, error } = await supabase.rpc('get_conversations_with_contacts', { p_user_id: userId } as any);
+    const { data, error } = await supabase.rpc('get_conversations_with_contacts', { p_user_id: userId });
     if (error) {
         console.error("Error fetching conversations:", error);
         throw error;
@@ -68,7 +69,7 @@ export const sendMessageToApi = async (userId: string, contact: Contact, text: s
         sent_at: new Date().toISOString()
     };
     
-    const { data, error } = await supabase.from('messages').insert(messagePayload as any).select().single();
+    const { data, error } = await supabase.from('messages').insert(messagePayload).select().single();
     
     if (error) {
         console.error("Supabase insert error in sendMessageToApi:", error);
