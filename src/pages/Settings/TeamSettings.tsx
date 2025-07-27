@@ -65,7 +65,14 @@ const TeamSettings: React.FC = () => {
     }
     
     const isOwner = (memberUserId: string) => activeTeam.owner_id === memberUserId;
-    const isCurrentUserAdmin = members.find(m => m.user_id === user?.id)?.role === 'admin';
+
+    const canManageTeam = useMemo(() => {
+        if (!user || !activeTeam) return false;
+        // The team owner always has admin rights
+        if (activeTeam.owner_id === user.id) return true;
+        // Also check if the user is an admin in the team_members table
+        return members.find(m => m.user_id === user.id)?.role === 'admin';
+    }, [user, activeTeam, members]);
 
 
     return (
@@ -83,14 +90,14 @@ const TeamSettings: React.FC = () => {
                         placeholder="email@exemplo.com"
                         className="w-full bg-slate-700 p-2 rounded-md text-white"
                         required
-                        disabled={!isCurrentUserAdmin}
+                        disabled={!canManageTeam}
                     />
-                    <Button type="submit" variant="primary" isLoading={isInviting} disabled={!isCurrentUserAdmin}>
+                    <Button type="submit" variant="primary" isLoading={isInviting} disabled={!canManageTeam}>
                         <USER_PLUS_ICON className="w-5 h-5 mr-2" />
                         Convidar
                     </Button>
                 </form>
-                {!isCurrentUserAdmin && <p className="text-xs text-amber-400 mt-2">Apenas administradores podem convidar novos membros.</p>}
+                {!canManageTeam && <p className="text-xs text-amber-400 mt-2">Apenas administradores podem convidar novos membros.</p>}
             </Card>
 
             <Card>
@@ -108,7 +115,7 @@ const TeamSettings: React.FC = () => {
                                         <select
                                             value={member.role}
                                             onChange={(e) => handleRoleChange(member.user_id, e.target.value as 'admin' | 'agent')}
-                                            disabled={isOwner(member.user_id) || !isCurrentUserAdmin}
+                                            disabled={isOwner(member.user_id) || !canManageTeam}
                                             className="bg-slate-700 text-white text-xs p-1 rounded-md disabled:opacity-50"
                                         >
                                             <option value="admin">Admin</option>
@@ -117,7 +124,7 @@ const TeamSettings: React.FC = () => {
                                         <Button
                                             variant="ghost" size="sm"
                                             onClick={() => handleRemoveMember(member.user_id)}
-                                            disabled={isOwner(member.user_id) || !isCurrentUserAdmin}
+                                            disabled={isOwner(member.user_id) || !canManageTeam}
                                             className="text-red-400 hover:bg-red-500/10"
                                             title={isOwner(member.user_id) ? "O proprietário não pode ser removido." : "Remover membro"}
                                         >
