@@ -1,4 +1,3 @@
-
 <div align="center">
   <br />
   <p>
@@ -89,9 +88,6 @@ SUPABASE_SERVICE_ROLE_KEY=YOUR_SUPABASE_SERVICE_ROLE_SECRET
 # Google Gemini AI
 API_KEY=YOUR_GEMINI_API_KEY
 
-# Meta Webhook Verification
-META_VERIFY_TOKEN=CREATE_A_STRONG_RANDOM_STRING
-
 # hCaptcha
 VITE_HCAPTCHA_SITEKEY=YOUR_HCAPTCHA_SITE_KEY
 HCAPTCHA_SECRET=YOUR_HCAPTCHA_SECRET_KEY
@@ -112,7 +108,7 @@ HCAPTCHA_SECRET=YOUR_HCAPTCHA_SECRET_KEY
 5.  Set the **Callback URL** to:
     `https://<YOUR_VERCEL_URL>/api/webhook/<YOUR_SUPABASE_USER_ID>`
     *   You can find your Supabase User ID in the `auth.users` table after you sign up for the first time.
-6.  Set the **Verify token** to the `META_VERIFY_TOKEN` you created in your environment variables.
+6.  Set the **Verify token** to a secure, random string that you will save in your profile settings within the app.
 7.  Click **Verify and save**.
 8.  In the same section, click **Manage** and subscribe to the `messages` webhook field. This is crucial for receiving message status updates and replies.
 

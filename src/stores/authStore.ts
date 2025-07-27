@@ -50,7 +50,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             console.error("Error fetching user teams:", teamsData.error);
         }
         
-        const teams = (teamsData.data as Team[]) || [];
+        const teams = (teamsData.data as unknown as Team[]) || [];
         
         set({ 
             profile: profileData,

@@ -1,7 +1,3 @@
-
-
-
-
 import React, { ReactNode } from 'react';
 import { NavigationProvider } from './providers/NavigationContext';
 import { DataProvider } from './providers/DataProvider';

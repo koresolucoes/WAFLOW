@@ -1,5 +1,3 @@
-
-
 import { supabaseAdmin } from '../supabaseAdmin.js';
 import { executeAutomation, createDefaultLoggingHooks } from './engine.js';
 import { Automation, Contact, Json, Profile } from '../types.js';
@@ -32,7 +30,7 @@ const dispatchAutomations = async (userId: string, triggers: TriggerInfo[], cont
 
     const { data: automations, error } = await supabaseAdmin
         .from('automations')
-        .select('created_at, edges, id, name, nodes, status, user_id')
+        .select('created_at, edges, id, name, nodes, status, team_id')
         .in('id', uniqueAutomationIds);
 
     if (error) {
@@ -70,13 +68,20 @@ const handleMetaMessageEvent = async (userId: string, contact: Contact, message:
     
     console.log(`[HANDLER] Processing Meta message event for contact ${contact.id}. Body: "${messageBody}", Button: "${buttonPayload}"`);
 
+    const { data: teamData, error: teamError } = await supabaseAdmin.from('teams').select('id').eq('owner_id', userId).single();
+    if (teamError || !teamData) {
+        console.error(`[HANDLER] Could not find team for user ${userId} in MetaMessageEvent. Aborting.`);
+        return;
+    }
+    const teamId = teamData.id;
+
     const matchingTriggers: TriggerInfo[] = [];
 
     if (buttonPayload) {
         const { data: buttonTriggers, error } = await supabaseAdmin
             .from('automation_triggers')
             .select('automation_id, node_id')
-            .eq('user_id', userId)
+            .eq('team_id', teamId)
             .eq('trigger_type', 'button_clicked')
             .eq('trigger_key', buttonPayload);
         
@@ -90,8 +95,8 @@ const handleMetaMessageEvent = async (userId: string, contact: Contact, message:
     if (messageBody) {
         const { data: allKeywordTriggers, error } = await supabaseAdmin
             .from('automation_triggers')
-            .select('id, user_id, automation_id, node_id, trigger_type, trigger_key, created_at')
-            .eq('user_id', userId)
+            .select('id, team_id, automation_id, node_id, trigger_type, trigger_key, created_at')
+            .eq('team_id', teamId)
             .eq('trigger_type', 'message_received_with_keyword');
 
         if (error) {
@@ -117,10 +122,18 @@ const handleMetaMessageEvent = async (userId: string, contact: Contact, message:
 
 const handleNewContactEvent = async (userId: string, contact: Contact) => {
     console.log(`[HANDLER] Processing new_contact event for contact ${contact.id}`);
+
+    const { data: teamData, error: teamError } = await supabaseAdmin.from('teams').select('id').eq('owner_id', userId).single();
+    if (teamError || !teamData) {
+        console.error(`[HANDLER] Could not find team for user ${userId} in NewContactEvent. Aborting.`);
+        return;
+    }
+    const teamId = teamData.id;
+
     const { data: triggers, error } = await supabaseAdmin
         .from('automation_triggers')
         .select('automation_id, node_id')
-        .eq('user_id', userId)
+        .eq('team_id', teamId)
         .eq('trigger_type', 'new_contact');
         
     if (error) {
@@ -136,10 +149,18 @@ const handleNewContactEvent = async (userId: string, contact: Contact) => {
 
 export const handleTagAddedEvent = async (userId: string, contact: Contact, addedTag: string) => {
     console.log(`[HANDLER] Processing tag_added event for contact ${contact.id}. Tag: "${addedTag}"`);
+
+    const { data: teamData, error: teamError } = await supabaseAdmin.from('teams').select('id').eq('owner_id', userId).single();
+    if (teamError || !teamData) {
+        console.error(`[HANDLER] Could not find team for user ${userId} in TagAddedEvent. Aborting.`);
+        return;
+    }
+    const teamId = teamData.id;
+
     const { data: triggers, error } = await supabaseAdmin
         .from('automation_triggers')
         .select('automation_id, node_id')
-        .eq('user_id', userId)
+        .eq('team_id', teamId)
         .eq('trigger_type', 'new_contact_with_tag')
         .ilike('trigger_key', addedTag);
         

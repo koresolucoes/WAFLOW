@@ -1,5 +1,3 @@
-
-
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
 import { executeAutomation, createDefaultLoggingHooks } from '../_lib/automation/engine.js';
@@ -48,7 +46,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     const profile = profileData;
 
-    const { data: automationsData, error: automationsError } = await supabaseAdmin.from('automations').select('created_at, edges, id, name, nodes, status, user_id').eq('user_id', profile.id).eq('status', 'active');
+    const { data: teamData, error: teamError } = await supabaseAdmin.from('teams').select('id').eq('owner_id', profile.id).single();
+    if (teamError || !teamData) {
+        return res.status(404).json({ error: `Team not found for user ${profile.id}` });
+    }
+    const teamId = teamData.id;
+
+    const { data: automationsData, error: automationsError } = await supabaseAdmin.from('automations').select('created_at, edges, id, name, nodes, status, team_id').eq('team_id', teamId).eq('status', 'active');
     
     if(automationsError || !automationsData) {
          return res.status(500).json({ error: 'Failed to retrieve automations.' });
@@ -89,7 +93,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 }
                 
                 const logPayload: TablesInsert<'webhook_logs'> = {
-                    user_id: profile.id,
+                    team_id: teamId,
                     source: 'automation_trigger',
                     payload: { rawBody, query: req.query, headers: cleanHeaders } as unknown as Json,
                     path: req.url,

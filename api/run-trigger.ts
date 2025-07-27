@@ -14,7 +14,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ error: 'Missing required fields: eventType, userId, contactId' });
     }
     
-    const { data: contactData, error } = await supabaseAdmin.from('contacts').select('*').eq('id', contactId).eq('user_id', userId).single();
+    const { data: teamData, error: teamError } = await supabaseAdmin.from('teams').select('id').eq('owner_id', userId).single();
+    if (teamError || !teamData) {
+        return res.status(404).json({ error: `Team not found for user ${userId}` });
+    }
+    const teamId = teamData.id;
+
+    const { data: contactData, error } = await supabaseAdmin.from('contacts').select('*').eq('id', contactId).eq('team_id', teamId).single();
     if (error || !contactData) {
         return res.status(404).json({ error: 'Contact not found or access denied.' });
     }

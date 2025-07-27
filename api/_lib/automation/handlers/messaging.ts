@@ -1,12 +1,11 @@
-
 import { supabaseAdmin } from '../../supabaseAdmin.js';
 import { sendTemplatedMessage, sendTextMessage, sendMediaMessage, sendInteractiveMessage, getMetaTemplateById } from '../../meta/messages.js';
 import { MessageTemplate, MessageInsert } from '../../types.js';
 import { ActionHandler } from '../types.js';
 import { getMetaConfig, resolveVariables } from '../helpers.js';
 
-const logSentMessage = async (payload: Omit<MessageInsert, 'user_id'>, userId: string) => {
-    const { error } = await supabaseAdmin.from('messages').insert({ ...payload, user_id: userId });
+const logSentMessage = async (payload: Omit<MessageInsert, 'team_id'>, teamId: string) => {
+    const { error } = await supabaseAdmin.from('messages').insert({ ...payload, team_id: teamId } as any);
     if (error) {
         // Log the error but don't throw, as the message was already sent to Meta.
         // This prevents the automation from failing if only the DB logging fails.
@@ -14,7 +13,7 @@ const logSentMessage = async (payload: Omit<MessageInsert, 'user_id'>, userId: s
     }
 };
 
-export const sendTemplate: ActionHandler = async ({ profile, contact, node, trigger, automationId }) => {
+export const sendTemplate: ActionHandler = async ({ profile, contact, node, trigger, automationId, teamId }) => {
     if (!contact) {
         throw new Error('Ação "Enviar Template" requer um contato. A automação foi iniciada por um gatilho que não fornece um contato.');
     }
@@ -28,7 +27,7 @@ export const sendTemplate: ActionHandler = async ({ profile, contact, node, trig
     if (!template) throw new Error(`Template com ID ${config.template_id} não encontrado.`);
     
     if (!(template as any).meta_id) {
-        throw new Error(`O template '${template.template_name}' não está sincronizado com a Meta e não pode ser enviado.`);
+        throw new Error(`O template '${(template as any).template_name}' não está sincronizado com a Meta e não pode ser enviado.`);
     }
     
     const metaConfig = getMetaConfig(profile);
@@ -105,13 +104,13 @@ export const sendTemplate: ActionHandler = async ({ profile, contact, node, trig
         source: 'automation',
         type: 'outbound',
         sent_at: new Date().toISOString()
-    }, profile.id);
+    }, teamId);
 
 
     return { details: `Template '${templateTyped.template_name}' enviado para ${contact.name}.` };
 };
 
-export const sendTextMessageAction: ActionHandler = async ({ profile, contact, node, trigger, automationId }) => {
+export const sendTextMessageAction: ActionHandler = async ({ profile, contact, node, trigger, automationId, teamId }) => {
     if (!contact) {
         throw new Error('Ação "Enviar Texto Simples" requer um contato.');
     }
@@ -130,14 +129,14 @@ export const sendTextMessageAction: ActionHandler = async ({ profile, contact, n
             source: 'automation',
             type: 'outbound',
             sent_at: new Date().toISOString()
-        }, profile.id);
+        }, teamId);
 
         return { details: `Mensagem de texto enviada para ${contact.name}.` };
     }
     throw new Error('O texto da mensagem não está configurado.');
 };
 
-export const sendMediaAction: ActionHandler = async ({ profile, contact, node, trigger, automationId }) => {
+export const sendMediaAction: ActionHandler = async ({ profile, contact, node, trigger, automationId, teamId }) => {
     if (!contact) {
         throw new Error('Ação "Enviar Mídia" requer um contato.');
     }
@@ -157,14 +156,14 @@ export const sendMediaAction: ActionHandler = async ({ profile, contact, node, t
             source: 'automation',
             type: 'outbound',
             sent_at: new Date().toISOString()
-        }, profile.id);
+        }, teamId);
 
         return { details: `Mídia (${config.media_type}) enviada para ${contact.name}.` };
     }
     throw new Error('URL da mídia ou tipo não estão configurados.');
 };
 
-export const sendInteractiveMessageAction: ActionHandler = async ({ profile, contact, node, trigger, automationId }) => {
+export const sendInteractiveMessageAction: ActionHandler = async ({ profile, contact, node, trigger, automationId, teamId }) => {
     if (!contact) {
         throw new Error('Ação "Enviar Mensagem Interativa" requer um contato.');
     }
@@ -184,7 +183,7 @@ export const sendInteractiveMessageAction: ActionHandler = async ({ profile, con
             source: 'automation',
             type: 'outbound',
             sent_at: new Date().toISOString()
-        }, profile.id);
+        }, teamId);
 
          return { details: `Mensagem interativa enviada para ${contact.name}.` };
     }

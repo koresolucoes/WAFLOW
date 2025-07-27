@@ -1,5 +1,3 @@
-
-
 import React, { useState, useRef } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { ZAPFLOW_AI_LOGO } from '../../components/icons';
@@ -48,7 +46,7 @@ const Auth: React.FC = () => {
         });
         if (error) throw error;
       } else {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
             email,
             password,
             options: {
@@ -59,6 +57,24 @@ const Auth: React.FC = () => {
             }
         });
         if (error) throw error;
+        if (!data.user) {
+            throw new Error("O registo foi bem-sucedido, mas não foram retornados dados do utilizador.");
+        }
+        
+        // **NOVO**: Chamar a função serverless para configurar a equipa
+        const setupResponse = await fetch('/api/setup-new-user', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: data.user.id, email: data.user.email })
+        });
+
+        if (!setupResponse.ok) {
+            // Se a configuração falhar, informa o utilizador. O registo já aconteceu.
+            // O ideal seria ter uma transação, mas isto é uma boa prática para serverless.
+            const setupError = await setupResponse.json();
+            throw new Error(`O registo foi bem-sucedido, mas a configuração inicial da equipa falhou: ${setupError.message}. Por favor, contacte o suporte.`);
+        }
+
         setMessage("Cadastro realizado! Verifique seu e-mail para confirmar a conta.");
       }
     } catch (err: any) {

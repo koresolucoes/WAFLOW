@@ -27,7 +27,7 @@ const analyzeAndStoreSentiment = async (messageText: string, contactId: string):
         if (emoji && typeof emoji === 'string') {
             const { error: updateError } = await supabaseAdmin
                 .from('contacts')
-                .update({ sentiment: emoji })
+                .update({ sentiment: emoji } as any)
                 .eq('id', contactId);
             
             if (updateError) {
@@ -46,8 +46,15 @@ export async function processIncomingMessage(
     message: any, 
     contactsPayload: any
 ): Promise<void> {
+    const { data: teamData, error: teamError } = await supabaseAdmin.from('teams').select('id').eq('owner_id', userId).single();
+    if (teamError || !teamData) {
+        console.error(`[Message Handler] Could not find team for user ${userId}. Aborting message processing.`);
+        return;
+    }
+    const teamId = teamData.id;
+
     const contactName = contactsPayload?.[0]?.profile?.name || 'Contato via WhatsApp';
-    const { contact, isNew } = await findOrCreateContactByPhone(userId, message.from, contactName);
+    const { contact, isNew } = await findOrCreateContactByPhone(teamId, message.from, contactName);
 
     if (!contact) {
         console.error(`[Message Handler] Could not find or create contact for phone ${message.from}. Aborting message processing.`);
@@ -64,7 +71,7 @@ export async function processIncomingMessage(
     }
 
     const messagePayload: TablesInsert<'messages'> = {
-        user_id: userId,
+        team_id: teamId,
         contact_id: contact.id,
         meta_message_id: message.id,
         content: messageBody,

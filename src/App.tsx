@@ -1,7 +1,3 @@
-
-
-
-
 import React, { useContext, Suspense, lazy } from 'react';
 import { useAuthStore } from './stores/authStore';
 import { NavigationContext } from './contexts/providers/NavigationContext';

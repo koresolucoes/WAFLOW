@@ -17,7 +17,7 @@ export const mapPayloadToUnifiedMessage = (payload: Message): UnifiedMessage => 
 };
 
 export const fetchConversationsFromDb = async (teamId: string): Promise<Conversation[]> => {
-    const { data, error } = await supabase.rpc('get_conversations_with_contacts', { p_team_id: teamId });
+    const { data, error } = await supabase.rpc('get_conversations_with_contacts', { p_team_id: teamId } as any);
     if (error) {
         console.error("Error fetching conversations:", error);
         throw error;
@@ -69,7 +69,7 @@ export const sendMessageToApi = async (teamId: string, contact: Contact, text: s
         sent_at: new Date().toISOString()
     };
     
-    const { data, error } = await supabase.from('messages').insert(messagePayload).select().single();
+    const { data, error } = await supabase.from('messages').insert(messagePayload as any).select().single();
     
     if (error) {
         console.error("Supabase insert error in sendMessageToApi:", error);
@@ -91,8 +91,8 @@ export const assignConversation = async (teamId: string, contactId: string, assi
                 contact_id: contactId,
                 assignee_id: assigneeId,
                 updated_at: new Date().toISOString() 
-            },
-            { onConflict: 'contact_id' } // Based on the user-provided schema
+            } as any,
+            { onConflict: 'team_id, contact_id' }
         );
 
     if (error) {

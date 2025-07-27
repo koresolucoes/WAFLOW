@@ -1,5 +1,3 @@
-
-
 import { supabaseAdmin } from '../supabaseAdmin.js';
 import { Contact, Profile, Json } from '../types.js';
 import { TablesInsert, TablesUpdate } from '../database.types.js';
@@ -34,22 +32,22 @@ const normalizePhoneNumber = (phone: string): string => {
     return digits;
 };
 
-export const findOrCreateContactByPhone = async (user_id: string, phone: string, name: string): Promise<{ contact: Contact, isNew: boolean }> => {
+export const findOrCreateContactByPhone = async (team_id: string, phone: string, name: string): Promise<{ contact: Contact, isNew: boolean }> => {
     const normalizedPhone = normalizePhoneNumber(phone);
     
     let { data: contactData, error } = await supabaseAdmin
         .from('contacts')
-        .select('company, created_at, custom_fields, email, id, name, phone, sentiment, tags, user_id')
-        .eq('user_id', user_id)
+        .select('company, created_at, custom_fields, email, id, name, phone, sentiment, tags, team_id')
+        .eq('team_id', team_id)
         .eq('phone', normalizedPhone)
         .single();
 
     if (error && error.code === 'PGRST116') { // Not found
-        const newContactPayload: TablesInsert<'contacts'> = { user_id, phone: normalizedPhone, name, tags: ['new-lead'], custom_fields: null, sentiment: null };
+        const newContactPayload: TablesInsert<'contacts'> = { team_id, phone: normalizedPhone, name, tags: ['new-lead'], custom_fields: null, sentiment: null };
         const { data: newContact, error: insertError } = await supabaseAdmin
             .from('contacts')
-            .insert(newContactPayload)
-            .select('company, created_at, custom_fields, email, id, name, phone, sentiment, tags, user_id')
+            .insert(newContactPayload as any)
+            .select('company, created_at, custom_fields, email, id, name, phone, sentiment, tags, team_id')
             .single();
         if (insertError) {
              console.error("Error creating new contact:", insertError);
@@ -79,6 +77,13 @@ export const processWebhookPayloadForContact = async (
     let originalTags = new Set<string>();
     const newlyAddedTags = new Set<string>();
 
+    const { data: teamData, error: teamError } = await supabaseAdmin.from('teams').select('id').eq('owner_id', profile.id).single();
+    if (teamError || !teamData) {
+        console.error(`[Contact Mapper] Team not found for user ${profile.id}`);
+        return { contact: null, isNewContact: false, newlyAddedTags: new Set() };
+    }
+    const teamId = teamData.id;
+
     const phoneRule = mappingRules.find((m: any) => m.destination === 'phone');
 
     if (phoneRule && phoneRule.source) {
@@ -89,7 +94,7 @@ export const processWebhookPayloadForContact = async (
             // Use the findOrCreate logic which normalizes the number
             const nameRule = mappingRules.find((m: any) => m.destination === 'name');
             const name = getValueFromPath(fullPayloadForEvent, nameRule?.source) || 'New Webhook Lead';
-            const { contact: foundOrCreatedContact, isNew } = await findOrCreateContactByPhone(profile.id, phone, name);
+            const { contact: foundOrCreatedContact, isNew } = await findOrCreateContactByPhone(teamId, phone, name);
             
             contact = foundOrCreatedContact;
             isNewContact = isNew;
@@ -145,9 +150,9 @@ export const processWebhookPayloadForContact = async (
         if (needsUpdate) {
             const { data: updatedContact, error: updateContactError } = await supabaseAdmin
                 .from('contacts')
-                .update(updatePayload)
+                .update(updatePayload as any)
                 .eq('id', contact.id)
-                .select('company, created_at, custom_fields, email, id, name, phone, sentiment, tags, user_id')
+                .select('company, created_at, custom_fields, email, id, name, phone, sentiment, tags, team_id')
                 .single();
 
             if(updateContactError) {

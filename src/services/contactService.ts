@@ -96,7 +96,7 @@ export const fetchContactTimeline = async (teamId: string, contactId: string): P
 
 export const addContactToDb = async (teamId: string, contact: EditableContact): Promise<Contact> => {
     const payload: TablesInsert<'contacts'> = { ...contact, phone: normalizePhoneNumber(contact.phone), team_id: teamId };
-    const { data, error } = await supabase.from('contacts').insert(payload).select('*').single();
+    const { data, error } = await supabase.from('contacts').insert(payload as any).select('*').single();
     if (error) throw error;
     return data as unknown as Contact;
 };
@@ -113,7 +113,7 @@ export const updateContactInDb = async (teamId: string, updatedContact: Contact)
 
     const { data, error } = await supabase
         .from('contacts')
-        .update(updatePayload)
+        .update(updatePayload as any)
         .eq('id', updatedContact.id)
         .eq('team_id', teamId)
         .select('*')
@@ -146,7 +146,7 @@ export const importContactsToDb = async (teamId: string, newContacts: EditableCo
         return { imported: [], skippedCount };
     }
 
-    const { data, error } = await supabase.from('contacts').insert(contactsToInsert).select('*');
+    const { data, error } = await supabase.from('contacts').insert(contactsToInsert as any).select('*');
     if (error) throw error;
     
     return { imported: (data as unknown as Contact[] || []), skippedCount };
@@ -184,7 +184,7 @@ export const sendDirectMessagesFromApi = async (metaConfig: MetaConfig, teamId: 
     await Promise.all(promises);
 
     if (messagesToInsert.length > 0) {
-        const { error } = await supabase.from('messages').insert(messagesToInsert);
+        const { error } = await supabase.from('messages').insert(messagesToInsert as any);
         if (error) {
             console.error("Falha ao salvar registros de mensagens diretas enviadas:", error);
             // Don't throw here, as some messages might have been sent successfully
