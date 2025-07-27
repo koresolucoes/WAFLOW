@@ -33,7 +33,7 @@ export const createDefaultLoggingHooks = (automationId: string, contactId: strin
 
     hooks.addHandler('workflowExecuteAfter', async (status, details) => {
         if (!runId) return;
-        await supabaseAdmin.from('automation_runs').update({ status, details }).eq('id', runId);
+        await supabaseAdmin.from('automation_runs').update({ status, details } as any).eq('id', runId);
     });
 
     hooks.addHandler('nodeExecuteBefore', async (_node) => {

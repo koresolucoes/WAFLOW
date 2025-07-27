@@ -54,14 +54,19 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         setIsLoading(true);
         try {
             const data = await inboxService.fetchConversationsFromDb(activeTeam.id);
-            setConversations(data);
+            const membersMap = new Map(teamMembers.map(m => [m.user_id, m.email]));
+            const conversationsWithCorrectAssignee = data.map(convo => ({
+                ...convo,
+                assignee_email: convo.assignee_id ? (membersMap.get(convo.assignee_id) || null) : null
+            }));
+            setConversations(conversationsWithCorrectAssignee);
         } catch (error) {
             console.error("Error fetching conversations:", error);
             setConversations([]);
         } finally {
             setIsLoading(false);
         }
-    }, [user, activeTeam]);
+    }, [user, activeTeam, teamMembers]);
     
     const fetchMessages = useCallback(async (contactId: string | null) => {
         if (!contactId || !user || !activeTeam) {
