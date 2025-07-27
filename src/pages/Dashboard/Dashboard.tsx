@@ -12,6 +12,7 @@ import AutomationAnalytics from './AutomationAnalytics';
 import CampaignAnalytics from './CampaignAnalytics';
 import ContactGrowth from './ContactGrowth';
 import RecentActivityFeed from './RecentActivityFeed';
+import TodaysTasksCard from './TodaysTasksCard';
 import { CONTACTS_ICON, FUNNEL_ICON, AUTOMATION_ICON } from '../../components/icons';
 
 const StatCard: React.FC<{ title: string; value: string; icon: React.ReactNode; footer?: string; }> = ({ title, value, icon, footer }) => (
@@ -108,6 +109,7 @@ const Dashboard: React.FC = () => {
             <ContactGrowth />
           </div>
           <div className="lg:col-span-2 space-y-6">
+            <TodaysTasksCard />
             <CampaignAnalytics />
             <AutomationAnalytics data={dashboardData} isLoading={isLoading} />
             <RecentActivityFeed data={dashboardData} isLoading={isLoading} />
