@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuthStore } from '../../stores/authStore';
@@ -7,18 +8,18 @@ import Card from '../../components/common/Card';
 import JsonTreeView from '../AutomationEditor/node-settings/JsonTreeView';
 
 const WebhookInspector: React.FC = () => {
-    const user = useAuthStore(state => state.user);
+    const { user, activeTeam } = useAuthStore();
     const [logs, setLogs] = useState<WebhookLog[]>([]);
     const [selectedLog, setSelectedLog] = useState<WebhookLog | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
     const fetchLogs = useCallback(async () => {
-        if (!user) return;
+        if (!user || !activeTeam) return;
         setIsLoading(true);
         const { data, error } = await supabase
             .from('webhook_logs')
             .select('*')
-            .eq('user_id', user.id)
+            .eq('team_id', activeTeam.id)
             .order('created_at', { ascending: false })
             .limit(50);
         if (error) {
@@ -27,19 +28,19 @@ const WebhookInspector: React.FC = () => {
             setLogs(data as unknown as WebhookLog[]);
         }
         setIsLoading(false);
-    }, [user]);
+    }, [user, activeTeam]);
 
     useEffect(() => {
         fetchLogs();
     }, [fetchLogs]);
 
     useEffect(() => {
-        if (!user) return;
+        if (!user || !activeTeam) return;
         const channel = supabase
             .channel('webhook-logs-channel')
             .on(
                 'postgres_changes',
-                { event: 'INSERT', schema: 'public', table: 'webhook_logs', filter: `user_id=eq.${user.id}` },
+                { event: 'INSERT', schema: 'public', table: 'webhook_logs', filter: `team_id=eq.${activeTeam.id}` },
                 (payload) => {
                     const newLog = payload.new as WebhookLog;
                     setLogs(prev => [newLog, ...prev]);
@@ -50,7 +51,7 @@ const WebhookInspector: React.FC = () => {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [user]);
+    }, [user, activeTeam]);
 
     const handleSelectLog = (log: WebhookLog) => {
         setSelectedLog(log.id === selectedLog?.id ? null : log);

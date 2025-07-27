@@ -76,13 +76,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
 
             try {
-                const logPayload: TablesInsert<'webhook_logs'> = {
-                    user_id: userId,
-                    source: 'meta_message',
-                    payload: body as unknown as Json,
-                    path: req.url
-                };
-                await supabaseAdmin.from('webhook_logs').insert(logPayload as any);
+                const { data: teamData, error: teamError } = await supabaseAdmin.from('teams').select('id').eq('owner_id', userId).single();
+                if (teamError || !teamData) {
+                    console.error(`[Webhook] Could not find team for user ${userId}, webhook event will not be logged.`);
+                } else {
+                    const teamId = teamData.id;
+                    const logPayload: TablesInsert<'webhook_logs'> = {
+                        team_id: teamId,
+                        source: 'meta_message',
+                        payload: body as unknown as Json,
+                        path: req.url,
+                    };
+                    await supabaseAdmin.from('webhook_logs').insert(logPayload as any);
+                }
             } catch (logError) {
                 console.error('[Webhook] Falha ao registrar webhook de entrada:', logError);
             }
