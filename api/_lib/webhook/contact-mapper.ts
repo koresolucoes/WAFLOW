@@ -82,7 +82,7 @@ export const processWebhookPayloadForContact = async (
         console.error(`[Contact Mapper] Team not found for user ${profile.id}`);
         return { contact: null, isNewContact: false, newlyAddedTags: new Set() };
     }
-    const teamId = teamData.id;
+    const teamId = (teamData as any).id;
 
     const phoneRule = mappingRules.find((m: any) => m.destination === 'phone');
 

@@ -30,11 +30,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         if (existingTeam) {
-            console.log(`[Setup] O utilizador ${userId} já tem uma equipa (ID: ${existingTeam.id}). A garantir a adesão.`);
+            console.log(`[Setup] O utilizador ${userId} já tem uma equipa (ID: ${(existingTeam as any).id}). A garantir a adesão.`);
             // Garante que o utilizador é membro da sua própria equipa (idempotência)
             const { error: upsertError } = await supabaseAdmin
                 .from('team_members')
-                .upsert({ team_id: existingTeam.id, user_id: userId, role: 'admin' } as any, { onConflict: 'team_id, user_id' });
+                .upsert({ team_id: (existingTeam as any).id, user_id: userId, role: 'admin' } as any, { onConflict: 'team_id, user_id' });
             
             if (upsertError) {
                 console.error(`[Setup] Erro ao fazer upsert da adesão à equipa para a equipa existente:`, upsertError);

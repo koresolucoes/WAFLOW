@@ -51,7 +51,7 @@ export async function processIncomingMessage(
         console.error(`[Message Handler] Could not find team for user ${userId}. Aborting message processing.`);
         return;
     }
-    const teamId = teamData.id;
+    const teamId = (teamData as any).id;
 
     const contactName = contactsPayload?.[0]?.profile?.name || 'Contato via WhatsApp';
     const { contact, isNew } = await findOrCreateContactByPhone(teamId, message.from, contactName);

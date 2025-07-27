@@ -73,7 +73,7 @@ const handleMetaMessageEvent = async (userId: string, contact: Contact, message:
         console.error(`[HANDLER] Could not find team for user ${userId} in MetaMessageEvent. Aborting.`);
         return;
     }
-    const teamId = teamData.id;
+    const teamId = (teamData as any).id;
 
     const matchingTriggers: TriggerInfo[] = [];
 
@@ -128,7 +128,7 @@ const handleNewContactEvent = async (userId: string, contact: Contact) => {
         console.error(`[HANDLER] Could not find team for user ${userId} in NewContactEvent. Aborting.`);
         return;
     }
-    const teamId = teamData.id;
+    const teamId = (teamData as any).id;
 
     const { data: triggers, error } = await supabaseAdmin
         .from('automation_triggers')
@@ -155,7 +155,7 @@ export const handleTagAddedEvent = async (userId: string, contact: Contact, adde
         console.error(`[HANDLER] Could not find team for user ${userId} in TagAddedEvent. Aborting.`);
         return;
     }
-    const teamId = teamData.id;
+    const teamId = (teamData as any).id;
 
     const { data: triggers, error } = await supabaseAdmin
         .from('automation_triggers')

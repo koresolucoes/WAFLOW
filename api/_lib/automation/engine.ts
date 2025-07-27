@@ -92,7 +92,7 @@ export const executeAutomation = async (
         await hooks.runHook('workflowExecuteAfter', 'failed', errorMessage);
         return;
     }
-    const teamId = teamData.id;
+    const teamId = (teamData as any).id;
 
     const nodesMap = new Map(automation.nodes.map(n => [n.id, n]));
     const edgesMap = new Map();

@@ -80,7 +80,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 if (teamError || !teamData) {
                     console.error(`[Webhook] Could not find team for user ${userId}, webhook event will not be logged.`);
                 } else {
-                    const teamId = teamData.id;
+                    const teamId = (teamData as any).id;
                     const logPayload: TablesInsert<'webhook_logs'> = {
                         team_id: teamId,
                         source: 'meta_message',

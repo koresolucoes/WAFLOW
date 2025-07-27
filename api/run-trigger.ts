@@ -18,7 +18,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (teamError || !teamData) {
         return res.status(404).json({ error: `Team not found for user ${userId}` });
     }
-    const teamId = teamData.id;
+    const teamId = (teamData as any).id;
 
     const { data: contactData, error } = await supabaseAdmin.from('contacts').select('*').eq('id', contactId).eq('team_id', teamId).single();
     if (error || !contactData) {

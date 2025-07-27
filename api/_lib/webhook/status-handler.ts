@@ -11,7 +11,7 @@ export async function processStatusUpdate(status: any, userId: string): Promise<
         console.error(`[Status Handler] Could not find team for user ${userId}. Aborting status update.`);
         return;
     }
-    const teamId = teamData.id;
+    const teamId = (teamData as any).id;
 
     const newStatus = status.status; // 'sent', 'delivered', 'read', 'failed'
     if (!['sent', 'delivered', 'read', 'failed'].includes(newStatus)) {
