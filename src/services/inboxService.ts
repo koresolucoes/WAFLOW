@@ -82,21 +82,51 @@ export const sendMessageToApi = async (teamId: string, contact: Contact, text: s
 };
 
 export const assignConversation = async (teamId: string, contactId: string, assigneeId: string | null): Promise<void> => {
-    // This will create a conversation record if it doesn't exist, or update the assignee if it does.
-    const { error } = await supabase
+    // A chamada upsert estava a falhar devido à falta de uma restrição única na tabela.
+    // Substituído por um padrão manual de seleção-inserção/atualização.
+
+    // 1. Verificar se existe um registo de conversação para este contacto e equipa.
+    const { data: existingConversation, error: selectError } = await supabase
         .from('conversations')
-        .upsert(
-            { 
+        .select('id')
+        .eq('team_id', teamId)
+        .eq('contact_id', contactId)
+        .maybeSingle();
+
+    if (selectError) {
+        console.error("Erro ao encontrar a conversação existente:", selectError);
+        throw selectError;
+    }
+
+    if (existingConversation) {
+        // 2a. Se existir uma conversação, atualizar o seu responsável.
+        const { error: updateError } = await supabase
+            .from('conversations')
+            .update({ 
+                assignee_id: assigneeId, 
+                updated_at: new Date().toISOString() 
+            })
+            .eq('id', existingConversation.id);
+
+        if (updateError) {
+            console.error("Erro ao atualizar o responsável pela conversação:", updateError);
+            throw updateError;
+        }
+    } else {
+        // 2b. Se não existir nenhuma conversação, criar uma nova.
+        const { error: insertError } = await supabase
+            .from('conversations')
+            .insert({
                 team_id: teamId,
                 contact_id: contactId,
                 assignee_id: assigneeId,
-                updated_at: new Date().toISOString() 
-            } as any,
-            { onConflict: 'team_id, contact_id' }
-        );
+                status: 'open', // Definir um estado padrão para novas conversações
+                updated_at: new Date().toISOString()
+            } as any);
 
-    if (error) {
-        console.error("Error assigning conversation:", error);
-        throw error;
+        if (insertError) {
+            console.error("Erro ao inserir nova conversação:", insertError);
+            throw insertError;
+        }
     }
 };

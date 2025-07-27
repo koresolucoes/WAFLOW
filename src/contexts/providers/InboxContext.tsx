@@ -239,9 +239,28 @@ export const InboxProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     
     const assignConversation = useCallback(async (contactId: string, assigneeId: string | null) => {
         if (!activeTeam) throw new Error("No active team selected.");
-        await inboxService.assignConversation(activeTeam.id, contactId, assigneeId);
-        // Real-time listener will handle the UI update
-    }, [activeTeam]);
+
+        // Optimistic UI update for instant feedback
+        const assigneeEmail = teamMembers.find(m => m.user_id === assigneeId)?.email || null;
+        setConversations(prev =>
+            prev.map(c =>
+                c.contact.id === contactId
+                    ? { ...c, assignee_id: assigneeId, assignee_email: assigneeEmail }
+                    : c
+            )
+        );
+
+        try {
+            await inboxService.assignConversation(activeTeam.id, contactId, assigneeId);
+            // On success, the real-time listener will eventually confirm the change, overwriting the optimistic one.
+        } catch (error) {
+            console.error("Failed to assign conversation, reverting via refetch.", error);
+            // Revert on error by refetching the source of truth.
+            fetchConversations();
+            // Rethrow the error so the calling component can notify the user.
+            throw error;
+        }
+    }, [activeTeam, teamMembers, fetchConversations]);
 
 
     const value = {

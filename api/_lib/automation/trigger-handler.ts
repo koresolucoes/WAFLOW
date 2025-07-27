@@ -59,15 +59,20 @@ const dispatchAutomations = async (userId: string, triggers: TriggerInfo[], cont
 };
 
 const handleMetaMessageEvent = async (userId: string, contact: Contact, message: any) => {
-    const messageBody = message.type === 'text' 
-        ? message.text.body.toLowerCase() 
-        : '';
-    const buttonPayload = message.type === 'interactive' && message.interactive.type === 'button_reply' 
-        ? message.interactive.button_reply.id 
-        : undefined;
+    // 1. Extract relevant data from the message payload
+    const messageType = message.type;
+    const messageBody = messageType === 'text' ? (message.text?.body || '').toLowerCase() : '';
     
-    console.log(`[HANDLER] Processing Meta message event for contact ${contact.id}. Body: "${messageBody}", Button: "${buttonPayload}"`);
+    let buttonPayload: string | undefined;
+    if (messageType === 'interactive' && message.interactive?.type === 'button_reply') {
+        buttonPayload = message.interactive.button_reply.id;
+    } else if (messageType === 'button') {
+        buttonPayload = message.button?.payload;
+    }
+    
+    console.log(`[HANDLER] Processing Meta message event for contact ${contact.id}. Type: ${messageType}, Body: "${messageBody}", Button Payload: "${buttonPayload}"`);
 
+    // 2. Get Team ID
     const { data: teamData, error: teamError } = await supabaseAdmin.from('teams').select('id').eq('owner_id', userId).single();
     if (teamError || !teamData) {
         console.error(`[HANDLER] Could not find team for user ${userId} in MetaMessageEvent. Aborting.`);
@@ -77,6 +82,7 @@ const handleMetaMessageEvent = async (userId: string, contact: Contact, message:
 
     const matchingTriggers: TriggerInfo[] = [];
 
+    // 3. Check for Button Click Triggers
     if (buttonPayload) {
         const { data: buttonTriggers, error } = await supabaseAdmin
             .from('automation_triggers')
@@ -85,38 +91,45 @@ const handleMetaMessageEvent = async (userId: string, contact: Contact, message:
             .eq('trigger_type', 'button_clicked')
             .eq('trigger_key', buttonPayload);
         
-        if (error) console.error("[HANDLER] Erro ao buscar gatilhos de botão:", error);
-        else if (buttonTriggers) {
-            console.log(`[HANDLER] Found ${buttonTriggers.length} matching button triggers.`);
-            matchingTriggers.push(...(buttonTriggers as unknown as TriggerInfo[]));
+        if (error) {
+            console.error("[HANDLER] Error fetching button triggers:", error);
+        } else if (buttonTriggers && buttonTriggers.length > 0) {
+            console.log(`[HANDLER] Found ${buttonTriggers.length} matching button triggers for payload "${buttonPayload}".`);
+            matchingTriggers.push(...(buttonTriggers as TriggerInfo[]));
         }
     }
 
-    if (messageBody) {
+    // 4. Check for Keyword Triggers (ONLY for text messages)
+    if (messageType === 'text' && messageBody) {
         const { data: allKeywordTriggers, error } = await supabaseAdmin
             .from('automation_triggers')
-            .select('id, team_id, automation_id, node_id, trigger_type, trigger_key, created_at')
+            .select('automation_id, node_id, trigger_key')
             .eq('team_id', teamId)
             .eq('trigger_type', 'message_received_with_keyword');
 
         if (error) {
-            console.error("[HANDLER] Erro ao buscar gatilhos de palavra-chave:", error);
+            console.error("[HANDLER] Error fetching keyword triggers:", error);
         } else if (allKeywordTriggers) {
-            console.log(`[HANDLER] Verificando ${allKeywordTriggers.length} gatilhos de palavra-chave para a mensagem: "${messageBody}"`);
-            for (const trigger of (allKeywordTriggers as any[])) {
-                if (trigger.trigger_key && typeof trigger.trigger_key === 'string' && messageBody.includes(trigger.trigger_key.toLowerCase())) {
-                    console.log(`[HANDLER] Correspondência encontrada! Palavra-chave: "${trigger.trigger_key}". Despachando automação ${trigger.automation_id}`);
+            console.log(`[HANDLER] Checking ${allKeywordTriggers.length} keyword triggers for message: "${messageBody}"`);
+            for (const trigger of allKeywordTriggers) {
+                const keyword = trigger.trigger_key;
+                if (keyword && typeof keyword === 'string' && messageBody.includes(keyword.toLowerCase())) {
+                    console.log(`[HANDLER] Match found! Keyword: "${keyword}". Dispatching automation ${trigger.automation_id}`);
                     matchingTriggers.push({ automation_id: trigger.automation_id, node_id: trigger.node_id });
                 }
             }
         }
     }
     
+    // 5. Dispatch if matches found
     if (matchingTriggers.length > 0) {
+       // Using a Set to ensure unique automations are dispatched if multiple keywords/buttons match
+       const uniqueTriggers = Array.from(new Map(matchingTriggers.map(item => [item.node_id, item])).values());
+       console.log(`[HANDLER] Dispatching ${uniqueTriggers.length} unique automations.`);
        const triggerData = { type: 'meta_message', payload: message };
-       await dispatchAutomations(userId, matchingTriggers, contact, triggerData);
+       await dispatchAutomations(userId, uniqueTriggers, contact, triggerData);
     } else {
-        console.log('[HANDLER] Nenhum gatilho de automação correspondente encontrado para esta mensagem.');
+        console.log('[HANDLER] No matching automation triggers found for this message.');
     }
 };
 

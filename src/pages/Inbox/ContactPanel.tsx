@@ -105,9 +105,13 @@ const ContactPanel: React.FC<{ contactId: string }> = ({ contactId }) => {
         }
     };
 
-    const handleAssigneeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const handleAssigneeChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
         const assigneeId = e.target.value === 'null' ? null : e.target.value;
-        assignConversation(contactId, assigneeId);
+        try {
+            await assignConversation(contactId, assigneeId);
+        } catch (error) {
+            alert(`Falha ao atribuir a conversa: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+        }
     };
 
     const hasChanges = JSON.stringify(contact) !== JSON.stringify(localContact);
