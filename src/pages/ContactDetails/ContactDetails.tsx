@@ -8,18 +8,22 @@ import Activities from './Activities';
 import { ContactsContext } from '../../contexts/providers/ContactsContext';
 import { NavigationContext } from '../../contexts/providers/NavigationContext';
 import { CustomFieldsContext } from '../../contexts/providers/CustomFieldsContext';
+import { FunnelContext } from '../../contexts/providers/FunnelContext';
 import { useAuthStore } from '../../stores/authStore';
 import { fetchContactTimeline } from '../../services/contactService';
+import DealFormModal from '../../components/common/DealFormModal';
 
 const ContactDetails: React.FC = () => {
     const { pageParams, setCurrentPage } = useContext(NavigationContext);
     const { contactDetails, fetchContactDetails, updateContact } = useContext(ContactsContext);
     const { definitions } = useContext(CustomFieldsContext);
+    const { deals, addDeal, pipelines, stages } = useContext(FunnelContext);
     const user = useAuthStore(state => state.user);
 
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [isCustomFieldModalOpen, setIsCustomFieldModalOpen] = useState(false);
+    const [isDealModalOpen, setIsDealModalOpen] = useState(false);
     const [localContact, setLocalContact] = useState<Contact | null>(null);
     const [tagInput, setTagInput] = useState('');
     const [timelineEvents, setTimelineEvents] = useState<TimelineEvent[]>([]);
@@ -107,8 +111,21 @@ const ContactDetails: React.FC = () => {
         }
     };
 
+    const handleSaveDeal = async (dealData: Omit<DealInsert, 'user_id' | 'contact_id' >) => {
+        if (!user || !pageParams.contactId) return;
+        try {
+            await addDeal({ ...dealData, user_id: user.id, contact_id: pageParams.contactId });
+            setIsDealModalOpen(false);
+        } catch (err: any) {
+            alert(`Erro ao criar negócio: ${err.message}`);
+        }
+    };
+
     if (isLoading) return <div className="text-center text-white">Carregando detalhes do contato...</div>;
     if (!contactDetails || !localContact) return <div className="text-center text-white">Contato não encontrado.</div>;
+
+    const contactDeals = deals.filter(d => d.contact_id === contactDetails.id);
+    const defaultPipeline = pipelines[0];
 
     return (
         <>
@@ -214,6 +231,38 @@ const ContactDetails: React.FC = () => {
                     {/* Coluna de Atividades e Negócios */}
                     <div className="lg:col-span-2 space-y-6">
                         <Activities contactId={pageParams.contactId} onDataChange={loadData} />
+                        <Card>
+                            <div className="flex justify-between items-center mb-4">
+                                <h2 className="text-lg font-semibold text-white">Negócios</h2>
+                                <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={() => setIsDealModalOpen(true)}
+                                    disabled={!defaultPipeline}
+                                    title={!defaultPipeline ? "Crie um funil de vendas na página 'Funil' para poder adicionar negócios." : "Adicionar Novo Negócio"}
+                                >
+                                    <PLUS_ICON className="w-4 h-4 mr-1" /> Novo Negócio
+                                </Button>
+                            </div>
+                            <div className="space-y-3">
+                                {contactDeals.length > 0 ? (
+                                    contactDeals.map(deal => {
+                                        const stage = stages.find(s => s.id === deal.stage_id);
+                                        return (
+                                            <div key={deal.id} className="p-3 bg-slate-900/50 rounded-lg">
+                                                <p className="font-semibold text-white truncate">{deal.name}</p>
+                                                <div className="flex justify-between items-center text-sm mt-1">
+                                                    <span className="font-mono text-green-400">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(deal.value || 0)}</span>
+                                                    <span className="px-2 py-0.5 text-xs rounded-full bg-indigo-500/20 text-indigo-300">{stage?.name || '-'}</span>
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                ) : (
+                                    <p className="text-center text-slate-400 py-4">Nenhum negócio associado a este contato.</p>
+                                )}
+                            </div>
+                        </Card>
                     </div>
                 </div>
             </div>
@@ -222,6 +271,17 @@ const ContactDetails: React.FC = () => {
                 isOpen={isCustomFieldModalOpen}
                 onClose={() => setIsCustomFieldModalOpen(false)}
             />
+
+            {defaultPipeline && (
+                <DealFormModal
+                    isOpen={isDealModalOpen}
+                    onClose={() => setIsDealModalOpen(false)}
+                    onSave={handleSaveDeal}
+                    pipeline={defaultPipeline}
+                    stages={stages.filter(s => s.pipeline_id === defaultPipeline.id)}
+                    contactName={contactDetails.name}
+                />
+            )}
         </>
     );
 };
