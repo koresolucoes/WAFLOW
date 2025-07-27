@@ -35,17 +35,7 @@ export const fetchConversationsFromDb = async (userId: string): Promise<Conversa
 export const fetchMessagesFromDb = async (userId: string, contactId: string): Promise<UnifiedMessage[]> => {
     const { data, error } = await supabase
         .from('messages')
-        .select(`
-            id,
-            contact_id,
-            content,
-            created_at,
-            type,
-            status,
-            source,
-            message_template_id,
-            replied_to_message_id
-        `)
+        .select('id,contact_id,content,created_at,type,status,source,message_template_id,replied_to_message_id')
         .eq('user_id', userId)
         .eq('contact_id', contactId)
         .order('created_at', { ascending: true });
