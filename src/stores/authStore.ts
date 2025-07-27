@@ -38,25 +38,23 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (user) {
         set({ loading: true, teamLoading: true });
         
-        const [profileData, teamMembershipsData] = await Promise.all([
-            getProfile(user.id),
-            // Busca as equipes através da tabela `team_members`, que é mais robusta contra problemas de RLS na tabela `teams`.
-            supabase.from('team_members').select('teams(*)').eq('user_id', user.id)
-        ]);
+        // Nova lógica com RPC para buscar perfil e equipes de forma atômica e segura,
+        // contornando problemas de RLS que causam erros 500.
+        const { data, error } = await supabase.rpc('get_user_teams_and_profile');
 
-        if (teamMembershipsData.error) {
-            console.error("Error fetching user teams:", teamMembershipsData.error);
+        if (error) {
+            console.error("Erro crítico ao buscar perfil e equipes via RPC. Verifique se a função 'get_user_teams_and_profile' existe e tem permissões (SECURITY DEFINER).", error);
+            set({ loading: false, teamLoading: false });
+            return;
         }
-        
-        let teams = ((teamMembershipsData.data as any[]) || [])
-            .map(m => m.teams) // Extrai o objeto da equipe da relação
-            .filter(Boolean) // Remove quaisquer equipes nulas/indefinidas
-            .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()); // Ordena por data de criação
 
-        // Se um usuário autenticado não tiver equipes (por exemplo, um usuário antigo),
-        // cria uma para ele para garantir a consistência da aplicação.
+        const { profile: profileData, teams: teamsData } = data as unknown as { profile: Profile | null, teams: Team[] | null };
+
+        let teams = (teamsData || []).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
+        // Lógica de fallback para usuários existentes que, por algum motivo, não têm uma equipe.
         if (teams.length === 0) {
-            console.warn(`O usuário ${user.id} não tem equipes. Tentando criar uma equipe padrão.`);
+            console.warn(`O usuário ${user.id} não possui equipes. Acionando a criação da equipe padrão via API.`);
             try {
                 const setupResponse = await fetch('/api/setup-new-user', {
                     method: 'POST',
@@ -66,25 +64,20 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
                 if (!setupResponse.ok) {
                     const setupError = await setupResponse.json();
-                    throw new Error(`A configuração da equipe falhou: ${setupError.message}`);
+                    throw new Error(`A API de configuração de equipe falhou: ${setupError.message}`);
                 }
-                
-                // Após a criação, busca novamente as equipes usando o método correto.
-                const { data: newTeamMemberships, error: newTeamsError } = await supabase
-                    .from('team_members')
-                    .select('teams(*)')
-                    .eq('user_id', user.id);
 
-                if (newTeamsError) throw newTeamsError;
-                
-                teams = ((newTeamMemberships as any[]) || [])
-                    .map(m => m.teams)
-                    .filter(Boolean)
-                    .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+                // Após a criação, buscar novamente os dados usando a mesma RPC confiável.
+                const { data: refetchData, error: refetchError } = await supabase.rpc('get_user_teams_and_profile');
+                if (refetchError) throw refetchError;
+
+                const { teams: newTeamsData } = refetchData as unknown as { teams: Team[] | null };
+                teams = (newTeamsData || []).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
                 console.log(`Equipe padrão criada e obtida com sucesso para o usuário ${user.id}.`);
 
             } catch (creationError) {
-                console.error("Falha ao criar equipe padrão para usuário existente:", creationError);
+                console.error("Falha na lógica de fallback para criar equipe padrão:", creationError);
+                // Continua sem equipe, a UI mostrará a mensagem correta.
             }
         }
         

@@ -72,7 +72,7 @@ export const CampaignsProvider: React.FC<{ children: ReactNode }> = ({ children 
   useEffect(() => {
     if (!user || !activeTeam) return;
 
-    const handleRealtimeMessageUpdate = async (payload: RealtimePostgresChangesPayload<{ [key: string]: any }>) => {
+    const handleRealtimeMessageUpdate = async (payload: any) => {
         if (payload.eventType !== 'UPDATE') return;
         const updatedMessage = payload.new as Message;
         const campaignId = updatedMessage.campaign_id;
