@@ -196,6 +196,10 @@ const NewCampaign: React.FC = () => {
         
         {error && <Card className="border-l-4 border-red-500"><p className="text-red-400">{error}</p></Card>}
 
+        <InfoCard variant="warning">
+            <strong>Atenção:</strong> No plano Hobby da Vercel, as campanhas são processadas <strong>uma vez ao dia</strong> (à meia-noite). Para envios mais frequentes, considere fazer o upgrade do seu plano na Vercel.
+        </InfoCard>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
           <Card className="space-y-6">
             <div>

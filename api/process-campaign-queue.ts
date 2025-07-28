@@ -117,8 +117,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const throttleRate = campaign.throttle_rate || 60;
         
         try {
-            const jobsStrings = await redis.rpop(queueKey, throttleRate);
-            if (!jobsStrings || jobsStrings.length === 0) {
+            const rawJobs = await redis.rpop(queueKey, throttleRate);
+            if (!rawJobs || rawJobs.length === 0) {
                 // Fila vazia, verificar se a campanha terminou
                 const queueLength = await redis.llen(queueKey);
                 if (queueLength === 0) {
@@ -127,6 +127,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 }
                 continue;
             }
+
+            const jobsStrings = Array.isArray(rawJobs) ? rawJobs : [rawJobs];
 
             const jobs: CampaignJob[] = jobsStrings.map(j => JSON.parse(j as string));
             console.log(`[WORKER] Processing ${jobs.length} jobs for campaign ${campaign.id}`);
