@@ -22,6 +22,7 @@ import * as inboxService from '../services/inboxService';
 import * as activityService from '../services/activityService';
 import { fetchAllInitialData } from '../services/dataService';
 import { TablesUpdate } from '../types/database.types';
+import { useUiStore } from './uiStore';
 
 interface AuthState {
   // Auth
@@ -35,10 +36,11 @@ interface AuthState {
   allTeamMembers: TeamMemberWithEmail[];
   teamLoading: boolean;
   teamSubscription: RealtimeChannel | null;
+  messagesSubscription: RealtimeChannel | null;
   initializeAuth: () => () => void;
   updateProfile: (profileData: EditableProfile) => Promise<void>;
   setActiveTeam: (team: Team) => void;
-  clearTeamSubscription: () => void;
+  clearSubscriptions: () => void;
   
   // Navigation
   currentPage: Page;
@@ -156,20 +158,24 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   allTeamMembers: [],
   teamLoading: true,
   teamSubscription: null,
+  messagesSubscription: null,
   
-  clearTeamSubscription: () => {
-    const { teamSubscription } = get();
+  clearSubscriptions: () => {
+    const { teamSubscription, messagesSubscription } = get();
     if (teamSubscription) {
         supabase.removeChannel(teamSubscription);
-        set({ teamSubscription: null });
     }
+    if (messagesSubscription) {
+        supabase.removeChannel(messagesSubscription);
+    }
+    set({ teamSubscription: null, messagesSubscription: null });
   },
 
   initializeAuth: () => {
     if (get().isInitialized) return () => {};
 
     const handleSession = async (session: Session | null) => {
-      get().clearTeamSubscription();
+      get().clearSubscriptions();
       const user = session?.user ?? null;
       set({ session, user, profile: null, activeTeam: null, userTeams: [], allTeamMembers: [] });
 
@@ -258,7 +264,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ isInitialized: true });
     return () => {
         subscription.unsubscribe();
-        get().clearTeamSubscription();
+        get().clearSubscriptions();
     };
   },
 
@@ -280,6 +286,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   dataLoadedForTeam: null,
   fetchInitialData: async (teamId: string) => {
       if (!get().user || !teamId) return;
+
+      const { messagesSubscription } = get();
+      if (messagesSubscription) {
+          supabase.removeChannel(messagesSubscription);
+      }
+
       set({ loading: true, dataLoadedForTeam: null });
       try {
           const data = await fetchAllInitialData(teamId);
@@ -294,6 +306,44 @@ export const useAuthStore = create<AuthState>((set, get) => ({
               }
               return { loading: false };
           });
+          
+          const newMessagesSubscription = supabase.channel(`team-messages-${teamId}`)
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `team_id=eq.${teamId}` },
+            (payload) => {
+                const newMessage = inboxService.mapPayloadToUnifiedMessage(payload.new as Message);
+                const { activeContactId, conversations, contacts } = get();
+
+                if (newMessage.contact_id === activeContactId) {
+                    set(state => ({ messages: [...state.messages, newMessage] }));
+                }
+
+                const convoIndex = conversations.findIndex(c => c.contact.id === newMessage.contact_id);
+                if (convoIndex > -1) {
+                    const updatedConvo = {
+                        ...conversations[convoIndex],
+                        last_message: newMessage,
+                        unread_count: (newMessage.contact_id !== activeContactId && newMessage.type === 'inbound') 
+                            ? (conversations[convoIndex].unread_count || 0) + 1 
+                            : conversations[convoIndex].unread_count,
+                    };
+                    const newConversations = [
+                        updatedConvo,
+                        ...conversations.slice(0, convoIndex),
+                        ...conversations.slice(convoIndex + 1)
+                    ];
+                    set({ conversations: newConversations });
+                } else {
+                    get().fetchConversations();
+                }
+
+                if (newMessage.type === 'inbound' && newMessage.contact_id !== activeContactId) {
+                    const contact = contacts.find(c => c.id === newMessage.contact_id);
+                    useUiStore.getState().addToast(`Nova mensagem de ${contact?.name || 'desconhecido'}.`, 'info');
+                }
+            })
+            .subscribe();
+          set({ messagesSubscription: newMessagesSubscription });
+          
           get().fetchConversations();
           get().fetchTodaysTasks();
       } catch (err) {
@@ -301,20 +351,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           set({ loading: false });
       }
   },
-  clearAllData: () => set({
-      templates: [],
-      contacts: [],
-      campaigns: [],
-      automations: [],
-      pipelines: [],
-      stages: [],
-      deals: [],
-      definitions: [],
-      responses: [],
-      messages: [],
-      activePipelineId: null,
-      dataLoadedForTeam: null
-  }),
+  clearAllData: () => {
+    const { messagesSubscription } = get();
+    if (messagesSubscription) {
+        supabase.removeChannel(messagesSubscription);
+    }
+    set({
+      templates: [], contacts: [], campaigns: [], automations: [], pipelines: [], stages: [], deals: [],
+      definitions: [], responses: [], messages: [], activePipelineId: null, dataLoadedForTeam: null,
+      messagesSubscription: null
+    });
+  },
 
   // Templates
   templates: [],
@@ -587,9 +634,34 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isSending: false,
   setMessages: (messages) => set({ messages: typeof messages === 'function' ? messages(get().messages) : messages }),
   setActiveContactId: (contactId) => {
-    set({ activeContactId: contactId });
+    if (get().activeContactId === contactId) return;
+
+    set({ activeContactId: contactId, messages: [], inboxLoading: !!contactId });
+
     if (contactId) {
-        set(state => ({ conversations: state.conversations.map(c => c.contact.id === contactId ? { ...c, unread_count: 0 } : c) }));
+        set(state => ({ 
+            conversations: state.conversations.map(c => 
+                c.contact.id === contactId ? { ...c, unread_count: 0 } : c
+            ) 
+        }));
+        
+        const { activeTeam } = get();
+        if (activeTeam) {
+            inboxService.fetchMessagesFromDb(activeTeam.id, contactId)
+                .then(fetchedMessages => {
+                    if (get().activeContactId === contactId) {
+                        set({ messages: fetchedMessages });
+                    }
+                })
+                .catch(error => console.error("Failed to fetch messages for contact:", error))
+                .finally(() => {
+                    if (get().activeContactId === contactId) {
+                        set({ inboxLoading: false });
+                    }
+                });
+        } else {
+            set({ inboxLoading: false });
+        }
     }
   },
   fetchConversations: async () => {
