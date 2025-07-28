@@ -9,29 +9,31 @@ export const fetchActivitiesForContact = async (teamId: string, contactId: strin
         .eq('contact_id', contactId)
         .order('created_at', { ascending: false });
     if (error) throw error;
-    return data as unknown as ContactActivity[] || [];
+    return (data as ContactActivity[]) || [];
 };
 
 export const addActivity = async (activityData: ContactActivityInsert): Promise<ContactActivity> => {
     const { data, error } = await supabase
         .from('contact_activities')
-        .insert(activityData as any)
+        .insert(activityData)
         .select()
         .single();
     if (error) throw error;
-    return data as unknown as ContactActivity;
+    if (!data) throw new Error("Failed to create activity or retrieve the created record.");
+    return data as ContactActivity;
 };
 
 export const updateActivity = async (activityId: string, teamId: string, updates: ContactActivityUpdate): Promise<ContactActivity> => {
     const { data, error } = await supabase
         .from('contact_activities')
-        .update(updates as any)
+        .update(updates)
         .eq('id', activityId)
         .eq('team_id', teamId)
         .select()
         .single();
     if (error) throw error;
-    return data as unknown as ContactActivity;
+    if (!data) throw new Error("Activity not found or update failed to return a record.");
+    return data as ContactActivity;
 };
 
 export const deleteActivity = async (activityId: string, teamId: string): Promise<void> => {
@@ -61,5 +63,5 @@ export const fetchTodaysTasks = async (teamId: string): Promise<TaskWithContact[
         throw error;
     }
     
-    return data as unknown as TaskWithContact[] || [];
+    return (data as TaskWithContact[]) || [];
 };

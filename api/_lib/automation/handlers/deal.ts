@@ -35,13 +35,12 @@ export const createDeal: ActionHandler = async ({ profile, contact, node, trigge
     }
     
     // Dispara o evento de "deal_created" para que outros gatilhos possam reagir
-    // Removido 'await' para permitir que a automação atual continue e registre o log sem esperar por automações encadeadas.
-    publishEvent('deal_created', profile.id, { contact, deal: newDeal });
+    await publishEvent('deal_created', profile.id, { contact, deal: newDeal });
 
     return { details: `Negócio "${dealName}" criado com sucesso.` };
 };
 
-export const updateDealStage: ActionHandler = async ({ profile, contact, node }) => {
+export const updateDealStage: ActionHandler = async ({ profile, contact, node, teamId }) => {
     if (!contact) {
         throw new Error('Ação "Atualizar Etapa do Negócio" requer um contato.');
     }
@@ -91,8 +90,7 @@ export const updateDealStage: ActionHandler = async ({ profile, contact, node })
     }
 
     // Dispara o evento de "deal_stage_changed"
-    // Removido 'await' para permitir que a automação atual continue e registre o log sem esperar por automações encadeadas.
-    publishEvent('deal_stage_changed', profile.id, { contact, deal: updatedDeal, new_stage_id: config.stage_id });
+    await publishEvent('deal_stage_changed', profile.id, { contact, deal: updatedDeal, new_stage_id: config.stage_id });
 
     return { details: `Negócio "${latestDeal.name}" movido para a nova etapa.` };
 };
