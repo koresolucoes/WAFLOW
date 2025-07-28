@@ -1,6 +1,7 @@
 import React, { Suspense, lazy, useEffect } from 'react';
 import { useAuthStore } from './stores/authStore';
 import MainLayout from './components/layout/MainLayout';
+import { ToastContainer } from './components/common/Toast';
 
 const Auth = lazy(() => import('./pages/Auth/Auth'));
 const Dashboard = lazy(() => import('./pages/Dashboard/Dashboard'));
@@ -98,20 +99,21 @@ const App: React.FC = () => {
       )
   }
 
-  if (!session) {
-    return (
-      <Suspense fallback={<FullPageSuspenseFallback />}>
-        <Auth />
-      </Suspense>
-    );
-  }
-
   return (
-    <MainLayout>
-      <Suspense fallback={<PageSuspenseFallback />}>
-        {renderPage()}
-      </Suspense>
-    </MainLayout>
+    <>
+      {!session ? (
+        <Suspense fallback={<FullPageSuspenseFallback />}>
+          <Auth />
+        </Suspense>
+      ) : (
+        <MainLayout>
+          <Suspense fallback={<PageSuspenseFallback />}>
+            {renderPage()}
+          </Suspense>
+        </MainLayout>
+      )}
+      <ToastContainer />
+    </>
   );
 };
 

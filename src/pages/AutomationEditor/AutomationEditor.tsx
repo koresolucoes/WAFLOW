@@ -11,6 +11,7 @@ import { nodeIcons } from '../../lib/automation/nodeIcons';
 import Switch from '../../components/common/Switch';
 import { ALERT_TRIANGLE_ICON, ARROW_LEFT_ICON, TRASH_ICON } from '../../components/icons';
 import { useAuthStore } from '../../stores/authStore';
+import { useUiStore } from '../../stores/uiStore';
 
 const initialNodes: AutomationNode[] = [];
 const initialEdges: Edge[] = [];
@@ -248,6 +249,7 @@ const AutomationEditor: FC = () => {
         pageParams, 
         setCurrentPage 
     } = useAuthStore();
+    const addToast = useUiStore(state => state.addToast);
 
     const reactFlowWrapper = useRef<HTMLDivElement>(null);
     const { screenToFlowPosition } = useReactFlow();
@@ -280,12 +282,13 @@ const AutomationEditor: FC = () => {
         };
         try {
             await updateAutomation(automationToSave);
+            addToast('Automação salva com sucesso!', 'success');
         } catch (error: any) {
-            alert(`Falha ao salvar: ${error.message}`);
+            addToast(`Falha ao salvar: ${error.message}`, 'error');
         } finally {
             setIsSaving(false);
         }
-    }, [automation, nodes, edges, updateAutomation]);
+    }, [automation, nodes, edges, updateAutomation, addToast]);
     
     const onConnect = useCallback((params: Connection) => setEdges((eds) => addEdge({ ...params, type: 'deletable', markerEnd: { type: MarkerType.ArrowClosed } }, eds)), [setEdges]);
 

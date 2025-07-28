@@ -4,9 +4,11 @@ import Button from '../../components/common/Button';
 import { PLUS_ICON, AUTOMATION_ICON, SEARCH_ICON } from '../../components/icons';
 import AutomationCard from './AutomationCard';
 import { useAuthStore } from '../../stores/authStore';
+import { useUiStore } from '../../stores/uiStore';
 
 const Automations: React.FC = () => {
     const { automations, createAndNavigateToAutomation } = useAuthStore();
+    const addToast = useUiStore(state => state.addToast);
     const [isCreating, setIsCreating] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
 
@@ -24,7 +26,7 @@ const Automations: React.FC = () => {
             await createAndNavigateToAutomation();
         } catch (error: any) {
             console.error("Falha ao criar automação:", error);
-            alert(`Não foi possível criar a automação: ${error.message}`);
+            addToast(`Não foi possível criar a automação: ${error.message}`, 'error');
         } finally {
             setIsCreating(false);
         }

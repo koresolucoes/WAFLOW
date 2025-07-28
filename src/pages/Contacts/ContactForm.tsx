@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { EditableContact } from '../../types';
 import Button from '../../components/common/Button';
+import { useUiStore } from '../../stores/uiStore';
 
 interface ContactFormProps {
   contact?: EditableContact;
@@ -20,11 +21,12 @@ const ContactForm: React.FC<ContactFormProps> = ({ contact, onSave, onCancel, is
     sentiment: null,
   });
   const [tagInput, setTagInput] = useState('');
+  const addToast = useUiStore(state => state.addToast);
 
   useEffect(() => {
     if (contact) {
       setFormData({
-        ...contact,
+        ...(contact as any),
         tags: contact.tags || [],
         email: contact.email || '',
         company: contact.company || ''
@@ -61,7 +63,7 @@ const ContactForm: React.FC<ContactFormProps> = ({ contact, onSave, onCancel, is
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name || !formData.phone) {
-      alert("Nome e telefone são obrigatórios.");
+      addToast("Nome e telefone são obrigatórios.", 'warning');
       return;
     }
     onSave(formData);

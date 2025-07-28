@@ -4,6 +4,7 @@ import Button from '../../components/common/Button';
 import { TEMPLATE_ICON, SEND_ICON, MAIL_CHECK_ICON, MAIL_OPEN_ICON, TRASH_ICON, SEARCH_ICON } from '../../components/icons';
 import { CampaignWithMetrics } from '../../types';
 import { useAuthStore } from '../../stores/authStore';
+import { useUiStore } from '../../stores/uiStore';
 
 const CampaignCard: React.FC<{ campaign: CampaignWithMetrics; onViewDetails: () => void; onDelete: () => void; }> = ({ campaign, onViewDetails, onDelete }) => {
     const readRate = campaign.metrics.sent > 0 ? ((campaign.metrics.read / campaign.metrics.sent) * 100).toFixed(1) + '%' : '0.0%';
@@ -79,6 +80,7 @@ const CampaignCard: React.FC<{ campaign: CampaignWithMetrics; onViewDetails: () 
 
 const Campaigns: React.FC = () => {
     const { campaigns, deleteCampaign, setCurrentPage } = useAuthStore();
+    const addToast = useUiStore(state => state.addToast);
     const [searchTerm, setSearchTerm] = useState('');
 
     const filteredCampaigns = useMemo(() => {
@@ -93,8 +95,9 @@ const Campaigns: React.FC = () => {
         if (window.confirm(`Tem certeza de que deseja excluir a campanha "${campaignName}"? Esta ação não pode ser desfeita e excluirá todos os seus dados.`)) {
             try {
                 await deleteCampaign(campaignId);
+                addToast(`Campanha "${campaignName}" excluída.`, 'success');
             } catch (err: any) {
-                alert(`Erro ao excluir campanha: ${err.message}`);
+                addToast(`Erro ao excluir campanha: ${err.message}`, 'error');
             }
         }
     };

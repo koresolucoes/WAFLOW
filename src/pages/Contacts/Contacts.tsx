@@ -4,8 +4,9 @@ import Button from '../../components/common/Button';
 import Modal from '../../components/common/Modal';
 import ContactForm from './ContactForm';
 import { Contact, EditableContact } from '../../types';
-import { PLUS_ICON, TRASH_ICON, CONTACTS_ICON, UPLOAD_ICON, FILE_TEXT_ICON, SEND_ICON, SEARCH_ICON } from '../../components/icons';
+import { PLUS_ICON, TRASH_ICON, CONTACTS_ICON, UPLOAD_ICON, SEND_ICON, SEARCH_ICON } from '../../components/icons';
 import { useAuthStore } from '../../stores/authStore';
+import { useUiStore } from '../../stores/uiStore';
 import DirectMessageModal from './DirectMessageModal';
 
 const Tag: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -37,251 +38,217 @@ const ContactRow: React.FC<{ contact: Contact; onViewDetails: () => void; onDele
 
 
 const Contacts: React.FC = () => {
-    const { contacts, addContact, deleteContact, importContacts, sendDirectMessages, setCurrentPage } = useAuthStore();
+    const { contacts, addContact, updateContact, deleteContact, importContacts, sendDirectMessages, setCurrentPage } = useAuthStore();
+    const addToast = useUiStore(state => state.addToast);
     const [isFormModalOpen, setIsFormModalOpen] = useState(false);
-    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [isDirectMessageModalOpen, setIsDirectMessageModalOpen] = useState(false);
-    const [isLoading, setIsLoading] = useState(false);
-    const [searchTerm, setSearchTerm] = useState('');
+    const [editingContact, setEditingContact] = useState<Contact | undefined>(undefined);
+    const [isSaving, setIsSaving] = useState(false);
+    const [isImporting, setIsImporting] = useState(false);
+    const [isSendingDM, setIsSendingDM] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [searchTerm, setSearchTerm] = useState('');
 
     const filteredContacts = useMemo(() => {
         if (!searchTerm) return contacts;
         const lowercasedTerm = searchTerm.toLowerCase();
         return contacts.filter(contact =>
             contact.name.toLowerCase().includes(lowercasedTerm) ||
-            contact.phone.includes(lowercasedTerm) ||
-            (contact.email && contact.email.toLowerCase().includes(lowercasedTerm)) ||
-            (contact.company && contact.company.toLowerCase().includes(lowercasedTerm)) ||
-            (contact.tags && contact.tags.some(tag => tag.toLowerCase().includes(lowercasedTerm)))
+            contact.phone.toLowerCase().includes(lowercasedTerm) ||
+            contact.tags?.some(tag => tag.toLowerCase().includes(lowercasedTerm))
         );
     }, [contacts, searchTerm]);
 
-    const handleOpenFormModal = () => {
+    const handleOpenForm = (contact?: Contact) => {
+        setEditingContact(contact);
         setIsFormModalOpen(true);
     };
 
-    const handleCloseFormModal = () => {
+    const handleCloseForm = () => {
         setIsFormModalOpen(false);
+        setEditingContact(undefined);
     };
 
     const handleSaveContact = async (contact: EditableContact) => {
-        setIsLoading(true);
+        setIsSaving(true);
         try {
-            // A edição agora é feita na página de detalhes
-            await addContact(contact);
-            handleCloseFormModal();
-        } catch(err: any) {
-            alert(`Erro ao salvar contato: ${err.message}`);
+            if (editingContact?.id) {
+                await updateContact({ ...(contact as Contact), id: editingContact.id });
+                addToast('Contato atualizado com sucesso!', 'success');
+            } else {
+                await addContact(contact);
+                addToast('Contato criado com sucesso!', 'success');
+            }
+            handleCloseForm();
+        } catch (err: any) {
+            addToast(`Erro ao salvar contato: ${err.message}`, 'error');
         } finally {
-            setIsLoading(false);
+            setIsSaving(false);
         }
     };
-    
-    const handleDeleteContact = async (contactId: string) => {
-        if (window.confirm("Tem certeza de que deseja excluir este contato? Esta ação não pode ser desfeita.")) {
+
+    const handleDeleteContact = async (contact: Contact) => {
+        if (window.confirm(`Tem certeza de que deseja excluir o contato "${contact.name}"?`)) {
             try {
-                await deleteContact(contactId);
+                await deleteContact(contact.id);
+                addToast('Contato excluído.', 'success');
             } catch (err: any) {
-                alert(`Erro ao deletar contato: ${err.message}`);
+                addToast(`Erro ao excluir contato: ${err.message}`, 'error');
             }
         }
     };
 
-    const handleTriggerImport = () => {
-        setIsImportModalOpen(false);
+    const handleImportClick = () => {
         fileInputRef.current?.click();
     };
 
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (!file) return;
-        setIsLoading(true);
 
+        setIsImporting(true);
         const reader = new FileReader();
         reader.onload = async (e) => {
-            const text = e.target?.result as string;
-            const lines = text.split('\n').filter(line => line.trim() !== '');
-            const newContacts: EditableContact[] = [];
-            
-            const startIndex = lines[0].toLowerCase().includes('nome') ? 1 : 0;
-            
-            for (let i = startIndex; i < lines.length; i++) {
-                const [name, phone, email, company, tagsStr] = lines[i].split(',');
-                if (name && phone) {
-                    const tags = tagsStr ? tagsStr.trim().split(';').map(t => t.trim()).filter(Boolean) : [];
-                    newContacts.push({ name: name.trim(), phone: phone.trim(), email: email?.trim() || '', company: company?.trim() || '', tags, custom_fields: null, sentiment: null });
+            try {
+                const text = e.target?.result as string;
+                const lines = text.split('\n').filter(line => line.trim() !== '');
+                const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/"/g, ''));
+                
+                const requiredHeaders = ['name', 'phone'];
+                if (!requiredHeaders.every(h => headers.includes(h))) {
+                    throw new Error("O arquivo CSV precisa conter as colunas 'name' e 'phone'.");
                 }
-            }
 
-            if (newContacts.length > 0) {
-                try {
-                    const { importedCount, skippedCount } = await importContacts(newContacts);
-                    alert(`${importedCount} contatos importados com sucesso. ${skippedCount} contatos ignorados por serem duplicados.`);
-                } catch(err: any) {
-                    alert(`Erro ao importar contatos: ${err.message}`)
-                }
-            } else {
-                alert("Nenhum contato válido encontrado no arquivo. Verifique se o formato é 'nome,telefone,email,empresa,tags'.");
+                const newContacts: EditableContact[] = lines.slice(1).map(line => {
+                    const values = line.split(',').map(v => v.trim().replace(/"/g, ''));
+                    const contactData = headers.reduce((obj, header, index) => {
+                        obj[header] = values[index] || '';
+                        return obj;
+                    }, {} as any);
+                    return {
+                        name: contactData.name,
+                        phone: contactData.phone,
+                        email: contactData.email || null,
+                        company: contactData.company || null,
+                        tags: contactData.tags ? contactData.tags.split(';').map((t:string) => t.trim()).filter(Boolean) : [],
+                        custom_fields: null,
+                        sentiment: null
+                    };
+                });
+                
+                const { importedCount, skippedCount } = await importContacts(newContacts);
+                addToast(`${importedCount} contatos importados com sucesso. ${skippedCount} duplicados foram ignorados.`, 'success');
+
+            } catch (err: any) {
+                addToast(`Erro na importação: ${err.message}`, 'error');
+            } finally {
+                setIsImporting(false);
+                if (fileInputRef.current) fileInputRef.current.value = '';
             }
-            
-            if(event.target) event.target.value = '';
-            setIsLoading(false);
         };
         reader.readAsText(file);
     };
-
-    const handleSendDirect = async (message: string, recipients: Contact[]) => {
-        setIsLoading(true);
+    
+    const handleSendDirectMessages = async (message: string, recipients: Contact[]) => {
+        setIsSendingDM(true);
         try {
             await sendDirectMessages(message, recipients);
-            alert(`Mensagem enviada para ${recipients.length} contatos. Verifique a Caixa de Entrada para o status de envio.`);
+            addToast(`Mensagens enviadas para ${recipients.length} contatos.`, 'success');
             setIsDirectMessageModalOpen(false);
         } catch (err: any) {
-            alert(`Erro ao enviar mensagens: ${err.message}`);
+             addToast(`Erro ao enviar mensagens: ${err.message}`, 'error');
         } finally {
-            setIsLoading(false);
+            setIsSendingDM(false);
         }
     };
 
     return (
-        <div className="space-y-8">
-            <div className="flex justify-between items-center flex-wrap gap-4">
-                <h1 className="text-3xl font-bold text-white">Contatos</h1>
-                <div className="flex items-center gap-4">
-                     <div className="relative">
-                        <SEARCH_ICON className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
-                        <input
-                            type="text"
-                            placeholder="Buscar por nome, fone, tag..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="bg-slate-800 border border-slate-700 rounded-lg py-2 pl-10 pr-4 text-white placeholder-slate-400 focus:ring-2 focus:ring-sky-500 focus:outline-none"
-                        />
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <input
-                            type="file"
-                            ref={fileInputRef}
-                            onChange={handleFileChange}
-                            accept=".csv"
-                            className="hidden"
-                        />
-                         <Button variant="secondary" onClick={() => setIsImportModalOpen(true)} isLoading={isLoading}>
-                            <UPLOAD_ICON className="w-5 h-5 mr-2" />
-                            Importar
+        <>
+            <div className="space-y-8">
+                 <div className="flex justify-between items-center flex-wrap gap-4">
+                    <h1 className="text-3xl font-bold text-white">Contatos</h1>
+                    <div className="flex items-center gap-4">
+                        <div className="relative">
+                            <SEARCH_ICON className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+                            <input
+                                type="text"
+                                placeholder="Buscar contatos..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="bg-slate-800 border border-slate-700 rounded-lg py-2 pl-10 pr-4 text-white placeholder-slate-400 focus:ring-2 focus:ring-sky-500 focus:outline-none"
+                            />
+                        </div>
+                        <Button variant="secondary" onClick={() => setIsDirectMessageModalOpen(true)}>
+                            <SEND_ICON className="w-4 h-4 mr-2" />
+                            Mensagem Direta
                         </Button>
-                         <Button variant="secondary" onClick={() => setIsDirectMessageModalOpen(true)}>
-                            <SEND_ICON className="w-5 h-5 mr-2" />
-                            Mensagem
+                         <Button variant="secondary" onClick={handleImportClick} isLoading={isImporting}>
+                            <UPLOAD_ICON className="w-4 h-4 mr-2" />
+                            Importar CSV
                         </Button>
-                        <Button variant="primary" onClick={handleOpenFormModal}>
+                        <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".csv" className="hidden" />
+                        <Button variant="primary" onClick={() => handleOpenForm()}>
                             <PLUS_ICON className="w-5 h-5 mr-2" />
-                            Adicionar
+                            Adicionar Contato
                         </Button>
                     </div>
                 </div>
-            </div>
-      
-            <Card className="overflow-x-auto">
-                {filteredContacts.length > 0 ? (
-                    <table className="w-full text-left">
-                        <thead>
-                            <tr className="border-b border-slate-600">
-                                <th className="p-4 text-sm font-semibold text-slate-400">Nome</th>
-                                <th className="p-4 text-sm font-semibold text-slate-400">Telefone</th>
-                                <th className="p-4 text-sm font-semibold text-slate-400">Email</th>
-                                <th className="p-4 text-sm font-semibold text-slate-400">Empresa</th>
-                                <th className="p-4 text-sm font-semibold text-slate-400">Tags</th>
-                                <th className="p-4"></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {filteredContacts.map(contact => (
-                                <ContactRow
-                                    key={contact.id}
-                                    contact={contact}
-                                    onViewDetails={() => setCurrentPage('contact-details', { contactId: contact.id })}
-                                    onDelete={() => handleDeleteContact(contact.id)}
-                                />
-                            ))}
-                        </tbody>
-                    </table>
-                ) : (
-                    <div className="text-center py-12">
-                        <CONTACTS_ICON className="w-12 h-12 mx-auto text-slate-500" />
-                        <h2 className="text-xl font-semibold text-white mt-4">{searchTerm ? 'Nenhum contato encontrado.' : 'Nenhum contato adicionado.'}</h2>
-                        <p className="text-slate-400 mt-2 mb-6">{searchTerm ? `Sua busca por "${searchTerm}" não retornou resultados.` : 'Comece adicionando seu primeiro contato ou importe uma lista de um arquivo CSV.'}</p>
-                        <Button variant="primary" onClick={handleOpenFormModal}>
-                            Adicionar Primeiro Contato
-                        </Button>
-                    </div>
-                )}
-            </Card>
 
+                <Card className="overflow-x-auto">
+                    {filteredContacts.length > 0 ? (
+                        <table className="w-full text-left">
+                            <thead>
+                                <tr className="border-b border-slate-600">
+                                    <th className="p-4 text-sm font-semibold text-slate-400">Nome</th>
+                                    <th className="p-4 text-sm font-semibold text-slate-400">Telefone</th>
+                                    <th className="p-4 text-sm font-semibold text-slate-400">Email</th>
+                                    <th className="p-4 text-sm font-semibold text-slate-400">Empresa</th>
+                                    <th className="p-4 text-sm font-semibold text-slate-400">Tags</th>
+                                    <th className="p-4"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {filteredContacts.map(contact => (
+                                    <ContactRow
+                                        key={contact.id}
+                                        contact={contact}
+                                        onViewDetails={() => setCurrentPage('contact-details', { contactId: contact.id })}
+                                        onDelete={() => handleDeleteContact(contact)}
+                                    />
+                                ))}
+                            </tbody>
+                        </table>
+                    ) : (
+                         <div className="text-center py-12">
+                            <CONTACTS_ICON className="w-12 h-12 mx-auto text-slate-500" />
+                            <h2 className="text-xl font-semibold text-white mt-4">{searchTerm ? 'Nenhum contato encontrado.' : 'Nenhum contato cadastrado.'}</h2>
+                            <p className="text-slate-400 mt-2">{searchTerm ? `Sua busca por "${searchTerm}" não retornou resultados.` : 'Adicione seu primeiro contato para começar.'}</p>
+                        </div>
+                    )}
+                </Card>
+            </div>
+            
             <Modal
                 isOpen={isFormModalOpen}
-                onClose={handleCloseFormModal}
-                title="Adicionar Novo Contato"
+                onClose={handleCloseForm}
+                title={editingContact ? 'Editar Contato' : 'Novo Contato'}
             >
                 <ContactForm
+                    contact={editingContact}
                     onSave={handleSaveContact}
-                    onCancel={handleCloseFormModal}
-                    isLoading={isLoading}
+                    onCancel={handleCloseForm}
+                    isLoading={isSaving}
                 />
             </Modal>
 
-            <Modal
-                isOpen={isImportModalOpen}
-                onClose={() => setIsImportModalOpen(false)}
-                title="Como Importar Contatos via CSV"
-            >
-                <div className="space-y-4 text-slate-300">
-                    <p>Para importar seus contatos, prepare um arquivo <code>.csv</code> com as seguintes colunas, nesta ordem:</p>
-                    <ol className="list-decimal list-inside space-y-2 pl-2">
-                        <li><strong>nome:</strong> O nome completo do contato.</li>
-                        <li><strong>telefone:</strong> O número do WhatsApp no formato internacional (ex: <code>5511999998888</code>).</li>
-                        <li><strong>email:</strong> (Opcional) O email do contato.</li>
-                        <li><strong>empresa:</strong> (Opcional) O nome da empresa do contato.</li>
-                        <li><strong>tags:</strong> (Opcional) Uma ou mais tags para segmentação, separadas por ponto e vírgula (<code>;</code>).</li>
-                    </ol>
-
-                    <div className="p-4 bg-slate-900/50 rounded-lg">
-                        <div className='flex items-center gap-2 mb-2'>
-                          <FILE_TEXT_ICON className="w-5 h-5 text-sky-400"/>
-                          <p className="font-semibold">Exemplo: <code>meus_contatos.csv</code></p>
-                        </div>
-                        <pre className="text-xs font-mono whitespace-pre-wrap text-slate-400">
-                            <code>
-                                nome,telefone,email,empresa,tags<br/>
-                                Ana Silva,5511987654321,ana.silva@email.com,Empresa X,vip;cliente-antigo<br/>
-                                Bruno Costa,5521912345678,bruno@email.com,Empresa Y,novo-cliente<br/>
-                                Carla Dias,5531955554444,,,
-                            </code>
-                        </pre>
-                    </div>
-
-                    <p className="text-sm text-slate-400">
-                        <strong>Atenção:</strong> A primeira linha (cabeçalho) é opcional e será ignorada. Contatos com números de telefone que já existem na sua lista não serão importados para evitar duplicatas.
-                    </p>
-                </div>
-                <div className="mt-6 flex justify-end">
-                    <Button variant="primary" onClick={handleTriggerImport}>
-                        <UPLOAD_ICON className="w-5 h-5 mr-2" />
-                        Selecionar Arquivo CSV
-                    </Button>
-                </div>
-            </Modal>
-            
-            <DirectMessageModal
+            <DirectMessageModal 
                 isOpen={isDirectMessageModalOpen}
                 onClose={() => setIsDirectMessageModalOpen(false)}
-                onSend={handleSendDirect}
+                onSend={handleSendDirectMessages}
                 contacts={contacts}
-                isSending={isLoading}
+                isSending={isSendingDM}
             />
-
-        </div>
+        </>
     );
 };
 
