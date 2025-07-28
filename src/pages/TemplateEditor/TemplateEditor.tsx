@@ -236,7 +236,7 @@ const TemplateEditor: React.FC = () => {
                         </select>
                          {template.category === 'AUTHENTICATION' && (
                             <InfoCard variant="warning" className="mt-3">
-                                <p className="text-sm">Modelos de autenticação têm regras rígidas. O corpo DEVE conter um placeholder para o código (ex: '{{1}}'). Botões de 'Copiar Código' (OTP) não são suportados aqui e devem ser criados no Gerenciador da Meta.</p>
+                                <p className="text-sm">{`Modelos de autenticação têm regras rígidas. O corpo DEVE conter um placeholder para o código (ex: '{{1}}'). Botões de 'Copiar Código' (OTP) não são suportados aqui e devem ser criados no Gerenciador da Meta.`}</p>
                             </InfoCard>
                         )}
                     </div>
