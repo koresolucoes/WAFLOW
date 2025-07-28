@@ -17,20 +17,51 @@ export const mapPayloadToUnifiedMessage = (payload: Message): UnifiedMessage => 
 };
 
 export const fetchConversationsFromDb = async (teamId: string): Promise<Conversation[]> => {
-    const { data, error } = await supabase.rpc('get_conversations_with_contacts', { p_team_id: teamId } as any);
-    if (error) {
-        console.error("Error fetching conversations:", error);
-        throw error;
+    // Step 1: Call the existing RPC to get the main conversation structure (last message, contact details, etc.)
+    const { data: rpcData, error: rpcError } = await supabase.rpc('get_conversations_with_contacts', { p_team_id: teamId } as any);
+
+    if (rpcError) {
+        console.error("Error fetching conversations via RPC:", rpcError);
+        throw rpcError;
     }
-    if (data && Array.isArray(data)) {
-        return (data as any[]).map(item => ({
-            contact: item.contact_details as Contact,
-            last_message: item.last_message as UnifiedMessage,
-            unread_count: item.unread_count,
-            assignee_id: item.assignee_id,
-            assignee_email: item.assignee_email as string | null,
-        }));
+
+    // Step 2: Fetch the latest assignment data directly from the `conversations` table.
+    // This acts as a patch to ensure assignment data is always fresh, even if the RPC is stale.
+    const { data: assignmentData, error: assignmentError } = await supabase
+        .from('conversations')
+        .select('contact_id, assignee_id')
+        .eq('team_id', teamId);
+
+    if (assignmentError) {
+        console.error("Error fetching conversation assignments, assignee data might be stale:", assignmentError);
+        // We can continue with just the RPC data if this fails, so we don't throw an error.
     }
+
+    // Create a map for quick lookups of the fresh assignment data.
+    const assignmentMap = new Map<string, string | null>();
+    if (assignmentData) {
+        for (const assignment of (assignmentData as any[])) {
+            assignmentMap.set(assignment.contact_id, assignment.assignee_id);
+        }
+    }
+    
+    if (rpcData && Array.isArray(rpcData)) {
+        return (rpcData as any[]).map(item => {
+            const contactId = item.contact_details?.id;
+            const freshAssigneeId = contactId !== undefined ? (assignmentMap.get(contactId) ?? null) : null;
+
+            return {
+                contact: item.contact_details as Contact,
+                last_message: item.last_message as UnifiedMessage,
+                unread_count: item.unread_count,
+                // Use the fresh assignee_id from our direct query. Fallback to RPC data if not found.
+                assignee_id: freshAssigneeId,
+                // The email will be correctly mapped in the authStore using the fresh assignee_id.
+                assignee_email: item.assignee_email as string | null, 
+            };
+        });
+    }
+    
     return [];
 };
 
