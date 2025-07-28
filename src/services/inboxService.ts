@@ -28,7 +28,7 @@ export const fetchConversationsFromDb = async (teamId: string): Promise<Conversa
             last_message: item.last_message as UnifiedMessage,
             unread_count: item.unread_count,
             assignee_id: item.assignee_id,
-            assignee_email: item.assignee_email,
+            assignee_email: item.assignee_email as string | null,
         }));
     }
     return [];
