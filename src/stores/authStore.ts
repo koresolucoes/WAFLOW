@@ -126,7 +126,6 @@ interface AuthState {
   conversations: Conversation[];
   messages: UnifiedMessage[];
   activeContactId: string | null;
-  teamMembers: TeamMemberWithEmail[];
   setActiveContactId: (contactId: string | null) => void;
   sendMessage: (contactId: string, text: string) => Promise<void>;
   assignConversation: (contactId: string, assigneeId: string | null) => Promise<void>;
@@ -630,7 +629,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   conversations: [],
   messages: [],
   activeContactId: null,
-  teamMembers: [],
   inboxLoading: false,
   isSending: false,
   setMessages: (messages) => set({ messages: typeof messages === 'function' ? messages(get().messages) : messages }),

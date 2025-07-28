@@ -40,7 +40,7 @@ const ContactPanel: React.FC<{ contactId: string }> = ({ contactId }) => {
         user,
         activeTeam,
         conversations,
-        teamMembers,
+        allTeamMembers,
         assignConversation
     } = useAuthStore();
 
@@ -151,7 +151,7 @@ const ContactPanel: React.FC<{ contactId: string }> = ({ contactId }) => {
                             className="w-full bg-slate-700 p-2 rounded-md text-sm"
                         >
                             <option value="null">Ninguém</option>
-                            {teamMembers.map(member => (
+                            {allTeamMembers.map(member => (
                                 <option key={member.user_id} value={member.user_id}>{member.email}</option>
                             ))}
                         </select>
