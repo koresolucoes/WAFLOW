@@ -23,7 +23,8 @@
     "@dnd-kit/sortable": "7.0.2",
     "@dnd-kit/utilities": "3.2.2",
     "@supabase/realtime-js": "^2.12.2",
-    "@supabase/auth-js": "^2.71.1"
+    "@supabase/auth-js": "^2.71.1",
+    "@upstash/redis": "^1.33.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

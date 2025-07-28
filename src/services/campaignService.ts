@@ -27,7 +27,7 @@ export const fetchCampaignDetailsFromDb = async (teamId: string, campaignId: str
     const typedMessagesData = (messagesData as unknown as MessageWithContact[]) || [];
     
     const metrics = {
-        sent: typedMessagesData.filter(d => d.status !== 'failed').length,
+        sent: typedMessagesData.filter(d => d.status !== 'failed' && d.status !== 'pending').length,
         delivered: typedMessagesData.filter(d => d.status === 'delivered' || d.status === 'read').length,
         read: typedMessagesData.filter(d => d.status === 'read').length,
         failed: typedMessagesData.filter(d => d.status === 'failed').length
@@ -52,36 +52,30 @@ export const fetchCampaignDetailsFromDb = async (teamId: string, campaignId: str
 
 export const addCampaignToDb = async (
     teamId: string, 
-    campaign: Omit<Campaign, 'id' | 'team_id' | 'sent_at' | 'created_at' | 'recipient_count' | 'status'> & { status: CampaignStatus }, 
-    messages: Omit<MessageInsert, 'campaign_id' | 'team_id'>[]
+    campaignData: Omit<TablesInsert<'campaigns'>, 'id' | 'team_id' | 'created_at' | 'recipient_count'>,
+    recipientCount: number
 ): Promise<Campaign> => {
-     const now = new Date().toISOString();
     const campaignPayload: TablesInsert<'campaigns'> = {
-        ...campaign,
+        ...campaignData,
         team_id: teamId,
-        created_at: now,
-        sent_at: campaign.status === 'Sent' ? now : undefined,
-        recipient_count: messages.length,
-        status: campaign.status
+        recipient_count: recipientCount,
     };
-    const { data: newCampaignData, error: campaignError } = await supabase.from('campaigns').insert(campaignPayload as any).select('id, created_at, name, recipient_count, sent_at, status, template_id, team_id').single();
 
-    if (campaignError) throw campaignError;
-    const newCampaign = newCampaignData as any;
-    if (!newCampaign) throw new Error("Failed to create campaign.");
+    const { data: newCampaignData, error: campaignError } = await supabase
+        .from('campaigns')
+        .insert(campaignPayload as any)
+        .select('*')
+        .single();
 
-    if (messages.length > 0) {
-        const messagesToInsert = messages.map(msg => ({ ...msg, campaign_id: newCampaign.id, team_id: teamId }));
-        const { error: messagesError } = await supabase.from('messages').insert(messagesToInsert as any);
-
-        if (messagesError) {
-            // Rollback campaign creation if messages fail
-            await supabase.from('campaigns').delete().eq('id', newCampaign.id);
-            throw messagesError;
-        }
+    if (campaignError) {
+        console.error("Error creating campaign in DB:", campaignError);
+        throw campaignError;
+    }
+    if (!newCampaignData) {
+        throw new Error("Failed to create campaign record in database.");
     }
 
-    return newCampaign as Campaign;
+    return newCampaignData as unknown as Campaign;
 };
 
 

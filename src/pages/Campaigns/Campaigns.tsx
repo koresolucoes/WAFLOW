@@ -13,10 +13,18 @@ const CampaignCard: React.FC<{ campaign: CampaignWithMetrics; onViewDetails: () 
         Sent: "bg-green-500/20 text-green-400",
         Draft: "bg-yellow-500/20 text-yellow-400",
         Failed: "bg-red-500/20 text-red-400",
-        Scheduled: "bg-sky-500/20 text-sky-400"
+        Scheduled: "bg-sky-500/20 text-sky-400",
+        Sending: "bg-blue-500/20 text-blue-400 animate-pulse"
     };
     
-    const sentDate = campaign.sent_at ? new Date(campaign.sent_at).toLocaleDateString('pt-BR', { year: 'numeric', month: 'long', day: 'numeric' }) : 'Não enviado';
+    const displayDate = campaign.status === 'Sending'
+        ? 'Enviando agora...'
+        : campaign.sent_at 
+            ? campaign.status === 'Scheduled'
+                ? `Agendada para ${new Date(campaign.sent_at).toLocaleString('pt-BR', { day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit' })}`
+                : `Enviada em ${new Date(campaign.sent_at).toLocaleDateString('pt-BR', { year: 'numeric', month: 'long', day: 'numeric' })}`
+            : 'Não enviada';
+
 
     return (
         <Card className="flex flex-col justify-between hover:border-sky-500 border border-transparent transition-colors duration-200 group relative">
@@ -36,7 +44,7 @@ const CampaignCard: React.FC<{ campaign: CampaignWithMetrics; onViewDetails: () 
                         {campaign.status}
                     </span>
                 </div>
-                <p className="text-sm text-slate-400 mt-1">Enviada em {sentDate}</p>
+                <p className="text-sm text-slate-400 mt-1">{displayDate}</p>
 
                 <div className="mt-4 grid grid-cols-2 gap-4 text-sm">
                     <div className="flex items-center gap-2">

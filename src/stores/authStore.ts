@@ -21,7 +21,7 @@ import * as cannedResponseService from '../services/cannedResponseService';
 import * as inboxService from '../services/inboxService';
 import * as activityService from '../services/activityService';
 import { fetchAllInitialData } from '../services/dataService';
-import { TablesUpdate } from '../types/database.types';
+import { TablesUpdate, TablesInsert } from '../types/database.types';
 import { useUiStore } from './uiStore';
 
 interface AuthState {
@@ -75,8 +75,12 @@ interface AuthState {
   campaignDetails: CampaignWithDetails | null;
   setCampaigns: React.Dispatch<React.SetStateAction<CampaignWithMetrics[]>>;
   setCampaignDetails: React.Dispatch<React.SetStateAction<CampaignWithDetails | null>>;
-  addCampaign: (campaign: Omit<Campaign, 'id' | 'team_id' | 'sent_at' | 'created_at' | 'recipient_count' | 'status'> & { status: CampaignStatus }, messages: Omit<MessageInsert, 'campaign_id' | 'team_id'>[]) => Promise<void>;
-  fetchCampaignDetails: (campaignId: string) => Promise<void>;
+  addCampaign: (
+    campaignData: Omit<TablesInsert<'campaigns'>, 'id' | 'team_id' | 'created_at' | 'recipient_count'>, 
+    recipientIds: string[], 
+    templateVariables: Record<string, string>
+  ) => Promise<void>;
+  fetchCampaignDetails: (campaignId: string) => Promise<CampaignWithDetails | undefined>;
   deleteCampaign: (campaignId: string) => Promise<void>;
 
   // Automations
@@ -308,37 +312,54 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           });
           
           const newMessagesSubscription = supabase.channel(`team-messages-${teamId}`)
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `team_id=eq.${teamId}` },
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `team_id=eq.${teamId}` },
             (payload) => {
-                const newMessage = inboxService.mapPayloadToUnifiedMessage(payload.new as Message);
-                const { activeContactId, conversations, contacts } = get();
+                const changedMessage = inboxService.mapPayloadToUnifiedMessage(payload.new as Message);
+                const { activeContactId, conversations, contacts, campaigns, fetchCampaignDetails } = get();
 
-                if (newMessage.contact_id === activeContactId) {
-                    set(state => ({ messages: [...state.messages, newMessage] }));
+                if (changedMessage.contact_id === activeContactId) {
+                    set(state => ({ messages: [...state.messages.filter(m => m.id !== changedMessage.id), changedMessage].sort((a,b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) }));
                 }
 
-                const convoIndex = conversations.findIndex(c => c.contact.id === newMessage.contact_id);
-                if (convoIndex > -1) {
-                    const updatedConvo = {
-                        ...conversations[convoIndex],
-                        last_message: newMessage,
-                        unread_count: (newMessage.contact_id !== activeContactId && newMessage.type === 'inbound') 
-                            ? (conversations[convoIndex].unread_count || 0) + 1 
-                            : conversations[convoIndex].unread_count,
-                    };
-                    const newConversations = [
-                        updatedConvo,
-                        ...conversations.slice(0, convoIndex),
-                        ...conversations.slice(convoIndex + 1)
-                    ];
-                    set({ conversations: newConversations });
-                } else {
-                    get().fetchConversations();
+                if(payload.eventType === 'INSERT') {
+                    const convoIndex = conversations.findIndex(c => c.contact.id === changedMessage.contact_id);
+                    if (convoIndex > -1) {
+                        const updatedConvo = {
+                            ...conversations[convoIndex],
+                            last_message: changedMessage,
+                            unread_count: (changedMessage.contact_id !== activeContactId && changedMessage.type === 'inbound') 
+                                ? (conversations[convoIndex].unread_count || 0) + 1 
+                                : conversations[convoIndex].unread_count,
+                        };
+                        const newConversations = [
+                            updatedConvo,
+                            ...conversations.slice(0, convoIndex),
+                            ...conversations.slice(convoIndex + 1)
+                        ];
+                        set({ conversations: newConversations });
+                    } else {
+                        get().fetchConversations();
+                    }
+
+                    if (changedMessage.type === 'inbound' && changedMessage.contact_id !== activeContactId) {
+                        const contact = contacts.find(c => c.id === changedMessage.contact_id);
+                        useUiStore.getState().addToast(`Nova mensagem de ${contact?.name || 'desconhecido'}.`, 'info');
+                    }
                 }
 
-                if (newMessage.type === 'inbound' && newMessage.contact_id !== activeContactId) {
-                    const contact = contacts.find(c => c.id === newMessage.contact_id);
-                    useUiStore.getState().addToast(`Nova mensagem de ${contact?.name || 'desconhecido'}.`, 'info');
+                 if (changedMessage.source === 'campaign' && changedMessage.campaign_id) {
+                    const campaignIndex = campaigns.findIndex(c => c.id === changedMessage.campaign_id);
+                    if (campaignIndex > -1) {
+                        fetchCampaignDetails(changedMessage.campaign_id).then(details => {
+                            if (details) {
+                                const updatedCampaign: CampaignWithMetrics = {
+                                    ...campaigns[campaignIndex],
+                                    ...details
+                                };
+                                set(state => ({ campaigns: state.campaigns.map(c => c.id === changedMessage.campaign_id ? updatedCampaign : c) }));
+                            }
+                        });
+                    }
                 }
             })
             .subscribe();
@@ -460,14 +481,43 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   campaignDetails: null,
   setCampaigns: (campaigns) => set({ campaigns: typeof campaigns === 'function' ? campaigns(get().campaigns) : campaigns }),
   setCampaignDetails: (details) => set({ campaignDetails: typeof details === 'function' ? details(get().campaignDetails) : details }),
-  addCampaign: async (campaign, messages) => {
-    const { user, activeTeam } = get();
-    if (!user || !activeTeam) throw new Error("User or active team not available.");
-    const newCampaign = await addCampaignToDb(activeTeam.id, campaign, messages);
-    const sentCount = messages.filter(m => m.status !== 'failed').length;
+  addCampaign: async (campaignData, recipientIds, templateVariables) => {
+    const { user, activeTeam, session } = get();
+    if (!user || !activeTeam || !session) throw new Error("User, active team, or session not available.");
+    
+    // Step 1: Create the campaign entry in the database.
+    const newCampaign = await addCampaignToDb(activeTeam.id, campaignData, recipientIds.length);
+    
+    // Step 2: Call the API to enqueue the jobs in Redis.
+    const response = await fetch('/api/enqueue-campaign', {
+        method: 'POST',
+        headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}` 
+        },
+        body: JSON.stringify({
+            campaignId: newCampaign.id,
+            teamId: activeTeam.id,
+            recipientIds,
+            templateVariables
+        }),
+    });
+
+    if (!response.ok) {
+        // If enqueuing fails, we should try to roll back the campaign creation.
+        const errorData = await response.json().catch(() => ({error: 'Falha ao enfileirar a campanha.'}));
+        try {
+            await deleteCampaignFromDb(activeTeam.id, newCampaign.id); 
+        } catch (rollbackError) {
+            console.error("CRITICAL: Failed to rollback campaign creation after enqueue failure.", rollbackError);
+        }
+        throw new Error(errorData.error || 'Failed to enqueue campaign jobs.');
+    }
+    
+    // Step 3: Optimistically update the local state.
     const newCampaignWithMetrics: CampaignWithMetrics = {
         ...(newCampaign as Campaign),
-        metrics: { sent: sentCount, delivered: 0, read: 0, failed: messages.length - sentCount }
+        metrics: { sent: 0, delivered: 0, read: 0, failed: 0 } // Metrics start at 0
     };
     set(state => ({ campaigns: [newCampaignWithMetrics, ...state.campaigns] }));
   },
@@ -476,6 +526,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (!user || !activeTeam) return;
     const details = await fetchCampaignDetailsFromDb(activeTeam.id, campaignId);
     set({ campaignDetails: details });
+    return details;
   },
   deleteCampaign: async (campaignId) => {
     const { user, activeTeam } = get();
@@ -699,6 +750,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         type: 'outbound',
         status: 'pending',
         source: 'direct',
+        campaign_id: null,
         message_template_id: null,
         replied_to_message_id: null,
     };

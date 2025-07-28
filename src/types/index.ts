@@ -102,6 +102,7 @@ export interface UnifiedMessage {
     source: MessageSource;
     template?: MessageTemplate | null;
     message_template_id: string | null;
+    campaign_id: string | null;
     replied_to_message_id: string | null;
     replied_to_message_content?: string | null;
 }
