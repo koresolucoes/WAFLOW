@@ -97,8 +97,8 @@ export const fetchAllInitialData = async (teamId: string) => {
         pipelines: (pipelinesRes.data as unknown as Pipeline[]) || [],
         stages: (stagesRes.data as unknown as PipelineStage[]) || [],
         deals: (dealsRes.data as unknown as DealWithContact[]) || [],
-        customFieldDefinitions: (customFieldsRes.data as unknown as CustomFieldDefinition[]) || [],
-        cannedResponses: (cannedResponsesRes.data as unknown as CannedResponse[]) || [],
+        definitions: (customFieldsRes.data as unknown as CustomFieldDefinition[]) || [],
+        responses: (cannedResponsesRes.data as unknown as CannedResponse[]) || [],
     };
 };
 
