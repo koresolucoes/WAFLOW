@@ -33,7 +33,7 @@ const ActivityModal: React.FC<ActivityModalProps> = ({ isOpen, onClose, type, co
             contact_id: contactId,
             type,
             content: content.trim(),
-            due_date: type === 'TAREFA' ? new Date(dueDate).toISOString() : null,
+            due_date: type === 'TAREFA' ? dueDate : null,
             is_completed: false
         };
 

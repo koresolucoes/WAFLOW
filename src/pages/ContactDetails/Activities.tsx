@@ -59,7 +59,7 @@ const Activities: React.FC<ActivitiesProps> = ({ contactId, onDataChange }) => {
             contact_id: contactId,
             type: 'TAREFA',
             content: taskContent.trim(),
-            due_date: new Date(taskDueDate).toISOString(),
+            due_date: taskDueDate,
             is_completed: false,
         };
         await addActivity(payload);
