@@ -130,6 +130,7 @@ interface AuthState {
   setActiveContactId: (contactId: string | null) => void;
   sendMessage: (contactId: string, text: string) => Promise<void>;
   assignConversation: (contactId: string, assigneeId: string | null) => Promise<void>;
+  deleteConversation: (contactId: string) => Promise<void>;
   inboxLoading: boolean;
   isSending: boolean;
   fetchConversations: () => Promise<void>;
@@ -731,12 +732,35 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }));
 
     try {
-        await inboxService.assignConversation(activeTeam.id, contactId, assigneeId);
+        await inboxService.assignConversation(contactId, assigneeId);
     } catch (error) {
         console.error("Failed to assign conversation, reverting via refetch.", error);
         fetchConversations();
         throw error;
     }
+  },
+  deleteConversation: async (contactId) => {
+    const { user, activeTeam } = get();
+    if (!user || !activeTeam) throw new Error("User or active team not available.");
+    
+    await inboxService.deleteConversation(contactId);
+    
+    set(state => {
+        const newConversations = state.conversations.filter(c => c.contact.id !== contactId);
+        let newActiveContactId = state.activeContactId;
+        let newMessages = state.messages;
+
+        if (state.activeContactId === contactId) {
+            newActiveContactId = null;
+            newMessages = [];
+        }
+
+        return {
+            conversations: newConversations,
+            activeContactId: newActiveContactId,
+            messages: newMessages,
+        };
+    });
   },
 
   // Activities

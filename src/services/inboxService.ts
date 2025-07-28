@@ -81,52 +81,40 @@ export const sendMessageToApi = async (teamId: string, contact: Contact, text: s
     return data as unknown as Message;
 };
 
-export const assignConversation = async (teamId: string, contactId: string, assigneeId: string | null): Promise<void> => {
-    // A chamada upsert estava a falhar devido à falta de uma restrição única na tabela.
-    // Substituído por um padrão manual de seleção-inserção/atualização.
+export const assignConversation = async (contactId: string, assigneeId: string | null): Promise<void> => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error("Not authenticated");
 
-    // 1. Verificar se existe um registo de conversação para este contacto e equipa.
-    const { data: existingConversation, error: selectError } = await supabase
-        .from('conversations')
-        .select('id')
-        .eq('team_id', teamId)
-        .eq('contact_id', contactId)
-        .maybeSingle();
+    const response = await fetch('/api/assign-conversation', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ contactId, assigneeId }),
+    });
 
-    if (selectError) {
-        console.error("Erro ao encontrar a conversação existente:", selectError);
-        throw selectError;
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to assign conversation');
     }
+};
 
-    if (existingConversation) {
-        // 2a. Se existir uma conversação, atualizar o seu responsável.
-        const { error: updateError } = await supabase
-            .from('conversations')
-            .update({ 
-                assignee_id: assigneeId, 
-                updated_at: new Date().toISOString() 
-            } as any)
-            .eq('id', existingConversation.id);
+export const deleteConversation = async (contactId: string): Promise<void> => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error("Not authenticated");
 
-        if (updateError) {
-            console.error("Erro ao atualizar o responsável pela conversação:", updateError);
-            throw updateError;
-        }
-    } else {
-        // 2b. Se não existir nenhuma conversação, criar uma nova.
-        const { error: insertError } = await supabase
-            .from('conversations')
-            .insert({
-                team_id: teamId,
-                contact_id: contactId,
-                assignee_id: assigneeId,
-                status: 'open', // Definir um estado padrão para novas conversações
-                updated_at: new Date().toISOString()
-            } as any);
+    const response = await fetch('/api/delete-conversation', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ contactId }),
+    });
 
-        if (insertError) {
-            console.error("Erro ao inserir nova conversação:", insertError);
-            throw insertError;
-        }
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete conversation');
     }
 };

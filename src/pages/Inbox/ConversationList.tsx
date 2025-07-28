@@ -1,8 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import { useAuthStore } from '../../stores/authStore';
 import { Conversation } from '../../types';
+import { useUiStore } from '../../stores/uiStore';
+import { TRASH_ICON } from '../../components/icons';
+import Button from '../../components/common/Button';
 
-const ConversationListItem: React.FC<{ conversation: Conversation; isActive: boolean; onClick: () => void; }> = ({ conversation, isActive, onClick }) => {
+const ConversationListItem: React.FC<{ conversation: Conversation; isActive: boolean; onClick: () => void; onDelete: () => void; }> = ({ conversation, isActive, onClick, onDelete }) => {
     
     const truncate = (text: string | null | undefined, length: number) => {
         if (!text) return '';
@@ -29,7 +32,7 @@ const ConversationListItem: React.FC<{ conversation: Conversation; isActive: boo
     return (
         <li
             onClick={onClick}
-            className={`flex items-center p-3 cursor-pointer transition-colors duration-150 rounded-lg ${isActive ? 'bg-slate-700/80' : 'hover:bg-slate-800/50'}`}
+            className={`group flex items-center p-3 cursor-pointer transition-colors duration-150 rounded-lg ${isActive ? 'bg-slate-700/80' : 'hover:bg-slate-800/50'}`}
         >
             <div className="relative flex-shrink-0">
                 <img
@@ -70,6 +73,15 @@ const ConversationListItem: React.FC<{ conversation: Conversation; isActive: boo
                     )}
                 </div>
             </div>
+             <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => { e.stopPropagation(); onDelete(); }}
+                className="ml-2 flex-shrink-0 text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                title="Excluir conversa"
+            >
+                <TRASH_ICON className="w-4 h-4" />
+            </Button>
         </li>
     );
 };
@@ -84,7 +96,8 @@ const FilterButton: React.FC<{ label: string; isActive: boolean; onClick: () => 
 );
 
 const ConversationList: React.FC = () => {
-    const { conversations, activeContactId, setActiveContactId, inboxLoading, user } = useAuthStore();
+    const { conversations, activeContactId, setActiveContactId, inboxLoading, user, deleteConversation } = useAuthStore();
+    const { showConfirmation, addToast } = useUiStore();
     const [searchTerm, setSearchTerm] = useState('');
     const [filter, setFilter] = useState<'all' | 'mine' | 'unassigned'>('all');
 
@@ -101,6 +114,21 @@ const ConversationList: React.FC = () => {
             });
     }, [conversations, searchTerm, filter, user]);
     
+    const handleDeleteConversation = (conv: Conversation) => {
+        showConfirmation(
+            'Excluir Conversa',
+            `Tem certeza de que deseja excluir a conversa com "${conv.contact.name}"? Todas as mensagens serão perdidas permanentemente.`,
+            async () => {
+                try {
+                    await deleteConversation(conv.contact.id);
+                    addToast('Conversa excluída com sucesso.', 'success');
+                } catch (err: any) {
+                    addToast(`Erro ao excluir conversa: ${err.message}`, 'error');
+                }
+            }
+        );
+    };
+
     return (
         <aside className="w-96 flex-shrink-0 bg-slate-800/10 border-r border-slate-700/50 flex flex-col">
             <div className="p-4 space-y-3">
@@ -129,6 +157,7 @@ const ConversationList: React.FC = () => {
                             conversation={conv}
                             isActive={activeContactId === conv.contact.id}
                             onClick={() => setActiveContactId(conv.contact.id)}
+                            onDelete={() => handleDeleteConversation(conv)}
                         />
                     ))
                 )}
