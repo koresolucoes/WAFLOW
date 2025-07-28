@@ -47,14 +47,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             ${campaignGoal}
 
             **Instruções para Geração:**
-            1.  **Estrutura JSON:** Gere uma estrutura de componentes JSON completa.
-            2.  **Componentes:** O componente 'BODY' é obrigatório. Inclua opcionalmente 'HEADER', 'FOOTER' e 'BUTTONS' se forem relevantes para o objetivo.
-                *   **HEADER**: Um título curto e chamativo para a mensagem. Use o formato 'TEXT'.
-                *   **BODY**: O texto principal, conciso e em português do Brasil. Use placeholders como '{{1}}' para o nome do cliente.
-                *   **FOOTER**: Uma linha de texto curta no final, como um slogan ou um aviso.
-                *   **BUTTONS**: Se a campanha tiver uma chamada para ação clara, adicione até 3 botões. Tipos de botão podem ser 'URL' (para um link), 'PHONE_NUMBER' (para ligar), ou 'QUICK_REPLY' (para uma resposta rápida).
-            3.  **Nome do Template:** O nome do template ('template_name') deve ser em 'snake_case', com letras minúsculas, números e underscores.
-            4.  **Categoria:** A categoria ('category') deve ser uma das seguintes: 'MARKETING', 'UTILITY', 'AUTHENTICATION'. Escolha a mais apropriada.
+            1.  **Nome do Template:** Gere um 'template_name' em 'snake_case' (letras minúsculas, números, underscores) com no máximo 512 caracteres.
+            2.  **Categoria:** A 'category' deve ser 'MARKETING', 'UTILITY', ou 'AUTHENTICATION'. Escolha a mais apropriada.
+            3.  **Estrutura JSON:** Gere a estrutura de componentes JSON completa. O componente 'BODY' é obrigatório.
+            4.  **Texto do Botão:** O texto de qualquer botão ('text') deve ter no máximo 20 caracteres.
+            
+            **Regras por Categoria:**
+            - **Se a categoria for MARKETING ou UTILITY:**
+                *   Inclua opcionalmente 'HEADER', 'FOOTER' e 'BUTTONS' se forem relevantes.
+                *   HEADER: Título curto e chamativo (formato 'TEXT').
+                *   BODY: Texto principal, conciso, em português do Brasil. Use placeholders como '{{1}}' para personalização (ex: nome do cliente).
+                *   FOOTER: Linha de texto curta (slogan, aviso).
+                *   BUTTONS: Se houver uma chamada para ação clara, adicione até 3 botões ('URL', 'PHONE_NUMBER', ou 'QUICK_REPLY').
+            - **Se a categoria for AUTHENTICATION:**
+                *   O 'BODY' DEVE conter um placeholder para o código, como '{{1}}'. (Ex: "Seu código de acesso é {{1}}.").
+                *   NÃO inclua um componente 'BUTTONS'.
+                *   Você PODE incluir um 'HEADER' com o nome do app/empresa.
+                *   Você PODE incluir um 'FOOTER' com um aviso de segurança (Ex: "Não compartilhe este código.").
         `;
 
         const schema = {
@@ -62,7 +71,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             properties: {
                 template_name: {
                     type: Type.STRING,
-                    description: "Um nome curto e descritivo para o template em snake_case (ex: 'promocao_verao'). Deve conter apenas letras minúsculas, números e underscores."
+                    description: "Um nome curto e descritivo para o template em snake_case (ex: 'promocao_verao'). Deve conter apenas letras minúsculas, números e underscores, com no máximo 512 caracteres."
                 },
                 category: {
                     type: Type.STRING,

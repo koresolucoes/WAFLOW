@@ -380,10 +380,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   allTags: [],
   contactDetails: null,
   setContacts: (contacts) => {
-      const newContacts = typeof contacts === 'function' ? contacts(get().contacts) : contacts;
-      const tagsSet = new Set<string>();
-      newContacts.forEach(c => c.tags?.forEach(t => tagsSet.add(t.trim())));
-      set({ contacts: newContacts, allTags: Array.from(tagsSet).sort() });
+    const newContacts: Contact[] = typeof contacts === 'function' ? contacts(get().contacts) : contacts;
+    const tagsSet = new Set<string>();
+    newContacts.forEach(c => c.tags?.forEach(t => tagsSet.add(t.trim())));
+    set({ contacts: newContacts, allTags: Array.from(tagsSet).sort() });
   },
   setContactDetails: (contactDetails) => set({ contactDetails: typeof contactDetails === 'function' ? contactDetails(get().contactDetails) : contactDetails }),
   addContact: async (contact) => {
@@ -426,7 +426,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   importContacts: async (newContacts) => {
       const { user, activeTeam, contacts } = get();
       if (!user || !activeTeam) throw new Error("User or active team not available.");
-      const existingPhones = new Set(contacts.map(c => contactService.normalizePhoneNumber(c.phone)));
+      const existingPhones = new Set<string>(contacts.map(c => contactService.normalizePhoneNumber(c.phone)));
       const { imported, skippedCount } = await contactService.importContactsToDb(activeTeam.id, newContacts, existingPhones);
       if (imported.length > 0) {
           get().setContacts(prev => [...imported, ...prev].sort((a,b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()));
@@ -722,7 +722,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const { activeTeam, allTeamMembers, fetchConversations } = get();
     if (!activeTeam) throw new Error("No active team selected.");
 
-    const assigneeEmail = allTeamMembers.find(m => m.user_id === assigneeId)?.email || null;
+    const assigneeEmail = allTeamMembers.find(m => m.user_id === assigneeId)?.email ?? null;
     set(state => ({
         conversations: state.conversations.map(c =>
             c.contact.id === contactId ? { ...c, assignee_id: assigneeId, assignee_email: assigneeEmail } : c

@@ -59,7 +59,13 @@ export const createMetaTemplate = async (
         if ((newComponent.type === 'HEADER' || newComponent.type === 'BODY') && newComponent.text) {
             const placeholders = newComponent.text.match(/\{\{\d+\}\}/g);
             if (placeholders && placeholders.length > 0) {
-                const exampleValues = placeholders.map(p => `[Exemplo ${p.replace(/\{|\}/g, '')}]`);
+                const exampleValues = placeholders.map(p => {
+                    // Se o template for de autenticação, o exemplo do código deve ser numérico.
+                    if (template.category === 'AUTHENTICATION') {
+                        return "123456";
+                    }
+                    return `[Exemplo ${p.replace(/\{|\}/g, '')}]`;
+                });
                 if (newComponent.type === 'BODY') {
                     // O formato { body_text: [exampleValues] } cria corretamente a estrutura string[][]
                     newComponent.example = { body_text: [exampleValues] };

@@ -81,23 +81,69 @@ const Templates: React.FC = () => {
     setError(null);
     setSyncMessage(null);
     try {
+        // 1. Obter templates da Meta
         const metaTemplates = await getMetaTemplates(metaConfig);
 
-        const templatesToUpsert: any[] = metaTemplates.map(mt => ({
-            meta_id: mt.id,
-            team_id: activeTeam.id,
-            template_name: mt.name,
-            status: mt.status as TemplateStatus,
-            category: mt.category as TemplateCategory,
-            components: mt.components as unknown as Json,
-        }));
+        // 2. Obter templates existentes do nosso BD
+        const { data: dbTemplatesData, error: dbError } = await supabase
+            .from('message_templates')
+            .select('id, meta_id, template_name, status, category, components')
+            .eq('team_id', activeTeam.id);
         
-        if (templatesToUpsert.length > 0) {
-            const { error: upsertError } = await supabase.from('message_templates').upsert(templatesToUpsert, { onConflict: 'meta_id, team_id' });
-            if (upsertError) throw upsertError;
+        if (dbError) throw dbError;
+
+        const dbTemplatesMap = new Map((dbTemplatesData as any[]).map(t => [t.meta_id, t]));
+
+        const templatesToInsert: TablesInsert<'message_templates'>[] = [];
+        const updatePromises: Promise<any>[] = [];
+
+        // 3. Comparar e preparar inserções/atualizações
+        for (const metaTemplate of metaTemplates) {
+            const existingTemplate = dbTemplatesMap.get(metaTemplate.id);
+            const templatePayload = {
+                meta_id: metaTemplate.id,
+                team_id: activeTeam.id,
+                template_name: metaTemplate.name,
+                status: metaTemplate.status as TemplateStatus,
+                category: metaTemplate.category as TemplateCategory,
+                components: metaTemplate.components as unknown as Json,
+            };
+
+            if (existingTemplate) {
+                // É uma atualização. Verificar se algo realmente mudou.
+                if (
+                    existingTemplate.template_name !== templatePayload.template_name ||
+                    existingTemplate.status !== templatePayload.status ||
+                    existingTemplate.category !== templatePayload.category ||
+                    JSON.stringify(existingTemplate.components) !== JSON.stringify(templatePayload.components)
+                ) {
+                    const { team_id, ...updatePayload } = templatePayload;
+                    const promise = supabase
+                        .from('message_templates')
+                        .update(updatePayload)
+                        .eq('id', existingTemplate.id);
+                    updatePromises.push(promise);
+                }
+            } else {
+                // É uma inserção
+                templatesToInsert.push(templatePayload);
+            }
+        }
+        
+        // 4. Executar operações no BD
+        if (templatesToInsert.length > 0) {
+            const { error: insertError } = await supabase.from('message_templates').insert(templatesToInsert as any);
+            if (insertError) throw insertError;
         }
 
-        const { data: dbTemplates, error: refetchError } = await supabase
+        if (updatePromises.length > 0) {
+            const results = await Promise.all(updatePromises);
+            const firstError = results.find(res => res.error);
+            if (firstError) throw firstError.error;
+        }
+
+        // 5. Rebuscar todos os templates para atualizar o estado da UI
+        const { data: finalDbTemplates, error: refetchError } = await supabase
             .from('message_templates')
             .select('id, meta_id, team_id, template_name, status, category, components, created_at')
             .eq('team_id', activeTeam.id)
@@ -105,7 +151,7 @@ const Templates: React.FC = () => {
 
         if (refetchError) throw refetchError;
         
-        const typedTemplates = ((dbTemplates as any[]) || []).map(t => ({
+        const typedTemplates = ((finalDbTemplates as any[]) || []).map(t => ({
             ...t,
             category: t.category as TemplateCategory,
             status: t.status as TemplateStatus,

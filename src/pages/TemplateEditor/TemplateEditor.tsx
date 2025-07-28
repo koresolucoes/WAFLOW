@@ -7,6 +7,7 @@ import { MessageTemplate, MessageTemplateInsert } from '../../types';
 import { MetaTemplateComponent, MetaButton } from '../../services/meta/types';
 import TemplatePreview from '../../components/common/TemplatePreview';
 import { useAuthStore, useMetaConfig } from '../../stores/authStore';
+import InfoCard from '../../components/common/InfoCard';
 
 type EditableTemplate = Omit<MessageTemplateInsert, 'id' | 'team_id' | 'created_at' | 'status' | 'meta_id'>;
 
@@ -23,12 +24,36 @@ const TemplateEditor: React.FC = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const header = useMemo(() => template.components.find(c => c.type === 'HEADER'), [template.components]);
   const body = useMemo(() => template.components.find(c => c.type === 'BODY'), [template.components]);
   const footer = useMemo(() => template.components.find(c => c.type === 'FOOTER'), [template.components]);
   const buttonsComponent = useMemo(() => template.components.find(c => c.type === 'BUTTONS'), [template.components]);
+
+  const validateTemplate = () => {
+    const newErrors: Record<string, string> = {};
+    if (!/^[a-z0-9_]{1,512}$/.test(template.template_name)) {
+        newErrors.template_name = "O nome deve ter no máximo 512 caracteres, usando apenas letras minúsculas, números e underscores (_).";
+    }
+    if (!body || !body.text?.trim()) {
+        newErrors.body = "O corpo da mensagem é obrigatório.";
+    }
+    if (buttonsComponent && buttonsComponent.buttons) {
+        buttonsComponent.buttons.forEach((btn, index) => {
+            if (btn.text.length > 20) {
+                newErrors[`button_${index}`] = `O texto do botão ${index + 1} não pode exceder 20 caracteres.`;
+            }
+             if (!btn.text.trim()) {
+                newErrors[`button_${index}`] = `O texto do botão ${index + 1} é obrigatório.`;
+            }
+        });
+    }
+
+    setValidationErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handleGenerate = async () => {
     if (!campaignGoal || !profile) {
@@ -54,6 +79,7 @@ const TemplateEditor: React.FC = () => {
           category: category.toUpperCase() as MessageTemplate['category'],
           components,
       });
+      setValidationErrors({});
     } catch (err: any) {
       setError(err.message || 'Ocorreu um erro inesperado ao gerar com IA.');
     } finally {
@@ -62,8 +88,8 @@ const TemplateEditor: React.FC = () => {
   };
 
   const handleSave = async () => {
-    if (!template.template_name || !body?.text) {
-        setError("O nome do template e o corpo da mensagem são obrigatórios.");
+    setError(null);
+    if (!validateTemplate()) {
         return;
     }
      if (!metaConfig.wabaId || !metaConfig.accessToken) {
@@ -72,7 +98,6 @@ const TemplateEditor: React.FC = () => {
     }
 
     setIsSaving(true);
-    setError(null);
     setSuccessMessage(null);
     try {
         await createTemplate(template);
@@ -200,6 +225,7 @@ const TemplateEditor: React.FC = () => {
                     <div>
                         <label htmlFor="template_name" className="block text-sm font-medium text-slate-300 mb-1">Nome do Template (snake_case)</label>
                         <input type="text" name="template_name" id="template_name" value={template.template_name} onChange={handleMainInputChange} placeholder="ex: promocao_verao_20" className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white" />
+                        {validationErrors.template_name && <p className="text-red-400 text-xs mt-1">{validationErrors.template_name}</p>}
                     </div>
                     <div>
                         <label htmlFor="category" className="block text-sm font-medium text-slate-300 mb-1">Categoria</label>
@@ -208,6 +234,11 @@ const TemplateEditor: React.FC = () => {
                             <option value="UTILITY">UTILITY</option>
                             <option value="AUTHENTICATION">AUTHENTICATION</option>
                         </select>
+                         {template.category === 'AUTHENTICATION' && (
+                            <InfoCard variant="warning" className="mt-3">
+                                <p className="text-sm">Modelos de autenticação têm regras rígidas. O corpo DEVE conter um placeholder para o código (ex: '{{1}}'). Botões de 'Copiar Código' (OTP) não são suportados aqui e devem ser criados no Gerenciador da Meta.</p>
+                            </InfoCard>
+                        )}
                     </div>
 
                     <div className="border-t border-slate-700 pt-4 space-y-2">
@@ -229,6 +260,7 @@ const TemplateEditor: React.FC = () => {
                     <div>
                         <label htmlFor="body" className="block text-sm font-medium text-slate-300 mb-1">Corpo da Mensagem (Obrigatório)</label>
                         <textarea name="body" id="body" value={body?.text || ''} onChange={(e) => updateComponent('BODY', e.target.value)} rows={8} placeholder="O conteúdo da sua mensagem. Use {{1}} para o nome do cliente." className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white font-mono text-sm"></textarea>
+                        {validationErrors.body && <p className="text-red-400 text-xs mt-1">{validationErrors.body}</p>}
                     </div>
 
                     {footer && (
@@ -248,6 +280,7 @@ const TemplateEditor: React.FC = () => {
                                    <div>
                                        <label className="text-xs text-slate-400">Texto do Botão</label>
                                        <input type="text" value={btn.text} onChange={(e) => handleButtonChange(index, 'text', e.target.value)} className="w-full mt-1 bg-slate-800 border border-slate-600 rounded-md p-1.5 text-white text-sm" />
+                                       {validationErrors[`button_${index}`] && <p className="text-red-400 text-xs mt-1">{validationErrors[`button_${index}`]}</p>}
                                    </div>
                                    {btn.type === 'URL' && (
                                        <div>
@@ -281,7 +314,7 @@ const TemplateEditor: React.FC = () => {
             <h2 className="text-xl font-semibold text-white mb-4">3. Pré-visualização</h2>
             <TemplatePreview components={template.components} recipientName="Ana Silva" />
              <div className="mt-6">
-                <Button onClick={handleSave} variant="primary" size="lg" className="w-full" isLoading={isSaving} disabled={isSaving || !!successMessage || !template.template_name || !body?.text}>
+                <Button onClick={handleSave} variant="primary" size="lg" className="w-full" isLoading={isSaving} disabled={isSaving || !!successMessage}>
                     Salvar e Enviar para Aprovação
                 </Button>
             </div>
