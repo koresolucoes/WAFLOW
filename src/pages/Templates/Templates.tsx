@@ -1,14 +1,12 @@
-import React, { useContext, useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { MessageTemplate, TemplateCategory, TemplateStatus } from '../../types';
 import type { TablesInsert } from '../../types/database.types';
 import { getMetaTemplates } from '../../services/meta/templates';
 import { supabase } from '../../lib/supabaseClient';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
-import { SPARKLES_ICON } from '../../components/icons';
+import { SPARKLES_ICON, SEARCH_ICON } from '../../components/icons';
 import { Json } from '../../types/database.types';
-import { TemplatesContext } from '../../contexts/providers/TemplatesContext';
-import { NavigationContext } from '../../contexts/providers/NavigationContext';
 import { useAuthStore, useMetaConfig } from '../../stores/authStore';
 import { MetaTemplateComponent } from '../../services/meta/types';
 
@@ -55,13 +53,20 @@ const TemplateCard: React.FC<{ template: MessageTemplate; onUse: () => void }> =
 }
 
 const Templates: React.FC = () => {
-  const { templates, setTemplates } = useContext(TemplatesContext);
-  const { setCurrentPage } = useContext(NavigationContext);
-  const { user, activeTeam } = useAuthStore();
+  const { templates, setTemplates, setCurrentPage, user, activeTeam } = useAuthStore();
   const metaConfig = useMetaConfig();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const filteredTemplates = useMemo(() => {
+    if (!searchTerm) return templates;
+    const lowercasedTerm = searchTerm.toLowerCase();
+    return templates.filter(template =>
+        template.template_name.toLowerCase().includes(lowercasedTerm)
+    );
+  }, [templates, searchTerm]);
   
   const handleUseTemplate = (templateId: string) => {
     setCurrentPage('new-campaign', { templateId });
@@ -78,7 +83,7 @@ const Templates: React.FC = () => {
     try {
         const metaTemplates = await getMetaTemplates(metaConfig);
 
-        const templatesToUpsert: TablesInsert<'message_templates'>[] = metaTemplates.map(mt => ({
+        const templatesToUpsert: any[] = metaTemplates.map(mt => ({
             meta_id: mt.id,
             team_id: activeTeam.id,
             template_name: mt.name,
@@ -88,7 +93,7 @@ const Templates: React.FC = () => {
         }));
         
         if (templatesToUpsert.length > 0) {
-            const { error: upsertError } = await supabase.from('message_templates').upsert(templatesToUpsert as any, { onConflict: 'meta_id, team_id' });
+            const { error: upsertError } = await supabase.from('message_templates').upsert(templatesToUpsert, { onConflict: 'meta_id, team_id' });
             if (upsertError) throw upsertError;
         }
 
@@ -122,26 +127,38 @@ const Templates: React.FC = () => {
     <div className="space-y-8">
       <div className="flex justify-between items-center flex-wrap gap-4">
         <h1 className="text-3xl font-bold text-white">Templates de Mensagem</h1>
-        <div className="flex gap-2">
-            <Button variant="secondary" onClick={handleSync} isLoading={isLoading}>Sincronizar com Meta</Button>
-            <Button variant="primary" onClick={() => setCurrentPage('template-editor')}>
-                <SPARKLES_ICON className="w-5 h-5 mr-2" />
-                Criar com IA
-            </Button>
+        <div className="flex items-center gap-4">
+             <div className="relative">
+                <SEARCH_ICON className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+                <input
+                    type="text"
+                    placeholder="Buscar templates..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="bg-slate-800 border border-slate-700 rounded-lg py-2 pl-10 pr-4 text-white placeholder-slate-400 focus:ring-2 focus:ring-sky-500 focus:outline-none"
+                />
+            </div>
+            <div className="flex gap-2">
+                <Button variant="secondary" onClick={handleSync} isLoading={isLoading}>Sincronizar com Meta</Button>
+                <Button variant="primary" onClick={() => setCurrentPage('template-editor')}>
+                    <SPARKLES_ICON className="w-5 h-5 mr-2" />
+                    Criar com IA
+                </Button>
+            </div>
         </div>
       </div>
 
       {error && <Card className="border-l-4 border-red-500"><p className="text-red-400">{error}</p></Card>}
       {syncMessage && <Card className="border-l-4 border-green-500"><p className="text-green-400">{syncMessage}</p></Card>}
       
-      {templates.length === 0 ? (
+      {filteredTemplates.length === 0 ? (
         <Card className="text-center py-12">
-            <h2 className="text-xl font-semibold text-white">Nenhum template encontrado.</h2>
-            <p className="text-slate-400 mt-2 mb-6">Sincronize com sua conta da Meta para ver seus templates ou crie um novo com IA.</p>
+            <h2 className="text-xl font-semibold text-white">{searchTerm ? 'Nenhum template encontrado.' : 'Nenhum template encontrado.'}</h2>
+            <p className="text-slate-400 mt-2 mb-6">{searchTerm ? `Sua busca por "${searchTerm}" não retornou resultados.` : 'Sincronize com sua conta da Meta para ver seus templates ou crie um novo com IA.'}</p>
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {templates.map((template) => (
+            {filteredTemplates.map((template) => (
                 <TemplateCard key={template.id} template={template} onUse={() => handleUseTemplate(template.id)} />
             ))}
         </div>

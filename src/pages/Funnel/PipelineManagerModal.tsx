@@ -1,12 +1,12 @@
-import React, { useContext, useState } from 'react';
+import React, { useState } from 'react';
 import Modal from '../../components/common/Modal';
 import Button from '../../components/common/Button';
 import { TRASH_ICON, PLUS_ICON } from '../../components/icons';
 import { Pipeline, PipelineStage, StageType } from '../../types';
-import { FunnelContext } from '../../contexts/providers/FunnelContext';
+import { useAuthStore } from '../../stores/authStore';
 
 const StageRow: React.FC<{ stage: PipelineStage }> = ({ stage }) => {
-    const { updateStage, deleteStage } = useContext(FunnelContext);
+    const { updateStage, deleteStage } = useAuthStore();
     const [name, setName] = useState(stage.name);
 
     const handleNameBlur = () => {
@@ -55,7 +55,7 @@ const StageRow: React.FC<{ stage: PipelineStage }> = ({ stage }) => {
 
 
 const PipelineManagerModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ isOpen, onClose }) => {
-    const { pipelines, stages, addPipeline, updatePipeline, deletePipeline, addStage } = useContext(FunnelContext);
+    const { pipelines, stages, addPipeline, updatePipeline, deletePipeline, addStage } = useAuthStore();
     const [newPipelineName, setNewPipelineName] = useState('');
     const [editingPipelineId, setEditingPipelineId] = useState<string | null>(null);
     const [editingName, setEditingName] = useState('');

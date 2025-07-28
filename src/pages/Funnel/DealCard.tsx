@@ -1,6 +1,6 @@
-import React, { useContext, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { DealWithContact } from '../../types';
-import { NavigationContext } from '../../contexts/providers/NavigationContext';
+import { useAuthStore } from '../../stores/authStore';
 
 interface DealCardProps {
     deal: DealWithContact;
@@ -9,7 +9,7 @@ interface DealCardProps {
 }
 
 const DealCard: React.FC<DealCardProps> = ({ deal, onDragStart, isGhost }) => {
-    const { setCurrentPage } = useContext(NavigationContext);
+    const { setCurrentPage } = useAuthStore();
 
     const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
         onDragStart(deal.id);

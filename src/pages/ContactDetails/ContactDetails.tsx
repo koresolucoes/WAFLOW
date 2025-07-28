@@ -1,24 +1,29 @@
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Contact, DealInsert, Json, TimelineEvent } from '../../types';
 import Button from '../../components/common/Button';
 import Card from '../../components/common/Card';
 import { ARROW_LEFT_ICON, PLUS_ICON } from '../../components/icons';
 import AddCustomFieldModal from '../../components/common/AddCustomFieldModal';
 import Activities from './Activities';
-import { ContactsContext } from '../../contexts/providers/ContactsContext';
-import { NavigationContext } from '../../contexts/providers/NavigationContext';
-import { CustomFieldsContext } from '../../contexts/providers/CustomFieldsContext';
-import { FunnelContext } from '../../contexts/providers/FunnelContext';
 import { useAuthStore } from '../../stores/authStore';
 import { fetchContactTimeline } from '../../services/contactService';
 import DealFormModal from '../../components/common/DealFormModal';
 
 const ContactDetails: React.FC = () => {
-    const { pageParams, setCurrentPage } = useContext(NavigationContext);
-    const { contactDetails, fetchContactDetails, updateContact } = useContext(ContactsContext);
-    const { definitions } = useContext(CustomFieldsContext);
-    const { deals, addDeal, pipelines, stages } = useContext(FunnelContext);
-    const { user, activeTeam } = useAuthStore();
+    const { 
+        pageParams, 
+        setCurrentPage,
+        contactDetails, 
+        fetchContactDetails, 
+        updateContact,
+        definitions,
+        deals, 
+        addDeal, 
+        pipelines, 
+        stages,
+        user,
+        activeTeam
+    } = useAuthStore();
 
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);

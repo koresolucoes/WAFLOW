@@ -1,9 +1,8 @@
-import React, { useState, useContext, useEffect } from 'react';
-import { ActivityContext } from '../../contexts/providers/ActivityContext';
+import React, { useState, useEffect } from 'react';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import ActivityItem from './ActivityItem';
-import { ContactActivity, ContactActivityInsert } from '../../types';
+import { ContactActivityInsert } from '../../types';
 import { useAuthStore } from '../../stores/authStore';
 
 const TabButton: React.FC<{ label: string; active: boolean; onClick: () => void }> = ({ label, active, onClick }) => (
@@ -23,8 +22,7 @@ interface ActivitiesProps {
 }
 
 const Activities: React.FC<ActivitiesProps> = ({ contactId, onDataChange }) => {
-    const { activitiesForContact, fetchActivitiesForContact, addActivity, isLoading } = useContext(ActivityContext);
-    const user = useAuthStore(state => state.user);
+    const { activitiesForContact, fetchActivitiesForContact, addActivity, activityLoading, user } = useAuthStore();
     const [activeTab, setActiveTab] = useState<'list' | 'note' | 'task'>('list');
     
     const [noteContent, setNoteContent] = useState('');
@@ -86,7 +84,7 @@ const Activities: React.FC<ActivitiesProps> = ({ contactId, onDataChange }) => {
             <div>
                 {activeTab === 'list' && (
                     <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
-                        {isLoading ? (
+                        {activityLoading ? (
                             <p className="text-center text-slate-400 py-4">Carregando...</p>
                         ) : activitiesForContact.length === 0 ? (
                             <p className="text-center text-slate-400 py-4">Nenhuma nota ou tarefa registrada.</p>

@@ -42,24 +42,27 @@ export const createDefaultLoggingHooks = (automationId: string, contactId: strin
 
     hooks.addHandler('nodeExecuteAfter', async (node, status, details) => {
         if (!runId) return;
-
-        // Log the node execution result
-        const logPayload: TablesInsert<'automation_node_logs'> = {
+        const logEntry: TablesInsert<'automation_node_logs'> = {
             run_id: runId,
             node_id: node.id,
             team_id: teamId,
             status,
             details,
         };
-        await supabaseAdmin.from('automation_node_logs').insert(logPayload as any);
-        
-        // Increment the success/error counter for the node
-        await supabaseAdmin.rpc('increment_node_stat', {
+        const { error: logError } = await supabaseAdmin.from('automation_node_logs').insert(logEntry as any);
+        if (logError) {
+            console.error(`[Execution Logging] Failed to create node log for node ${node.id} in run ${runId}`, logError);
+        }
+
+        const { error: rpcError } = await supabaseAdmin.rpc('increment_automation_node_stats', {
             p_automation_id: automationId,
             p_node_id: node.id,
-            p_status: status,
-            p_team_id: teamId
+            p_team_id: teamId,
+            p_is_success: status === 'success',
         });
+        if (rpcError) {
+            console.error(`[Execution Logging] Failed to update node stats for node ${node.id} in run ${runId}`, rpcError);
+        }
     });
 
     return hooks;
@@ -67,107 +70,72 @@ export const createDefaultLoggingHooks = (automationId: string, contactId: strin
 
 /**
  * The core engine for executing an automation workflow.
- * This function is designed to be non-blocking (fire and forget).
- *
- * @param automation The automation object to execute.
- * @param contact The contact associated with this execution run.
- * @param startNodeId The ID of the node that triggered the execution.
- * @param triggerPayload The data payload from the trigger.
- * @param profile The user's profile, containing API keys and other settings.
  */
 export const executeAutomation = async (
     automation: Automation,
     contact: Contact | null,
     startNodeId: string,
-    triggerPayload: Json | null,
+    trigger: Json | null,
     profile: Profile
 ): Promise<void> => {
     
-    const hooks = createDefaultLoggingHooks(automation.id, contact ? contact.id : null, automation.team_id);
-    await hooks.runHook('workflowExecuteBefore');
-
-    const teamId = automation.team_id;
-
-    const nodesMap = new Map(automation.nodes.map(n => [n.id, n]));
-    const edgesMap = new Map();
-    automation.edges.forEach(edge => {
-        if (!edgesMap.has(edge.source)) {
-            edgesMap.set(edge.source, []);
-        }
-        edgesMap.get(edge.source).push(edge);
-    });
-    
-    const executionQueue: { node: AutomationNode; contextContact: Contact | null }[] = [];
-    let currentContactState = contact;
-
-    // Start the execution with the trigger node itself.
-    const startNode = nodesMap.get(startNodeId);
-    if (startNode) {
-        executionQueue.push({ node: startNode, contextContact: currentContactState });
-    } else {
-        const error = new Error(`Start node with ID ${startNodeId} not found in automation ${automation.id}.`);
-        console.error(error.message);
-        await hooks.runHook('workflowExecuteAfter', 'failed', error.message);
-        return;
-    }
-    
+    let currentContact = contact;
+    const { id: automationId, team_id: teamId, nodes, edges } = automation;
+    const hooks = createDefaultLoggingHooks(automationId, currentContact?.id || null, teamId);
 
     try {
-        while (executionQueue.length > 0) {
-            const { node, contextContact } = executionQueue.shift()!;
-            await hooks.runHook('nodeExecuteBefore', node);
-
-            const handler = actionHandlers[node.data.type];
-            if (!handler) {
-                throw new Error(`No action handler found for node type: ${node.data.type}`);
-            }
-
+        await hooks.runHook('workflowExecuteBefore');
+        
+        const nodesMap = new Map(nodes.map(node => [node.id, node]));
+        const edgesMap = new Map();
+        edges.forEach(edge => {
+            const key = edge.sourceHandle ? `${edge.source}-${edge.sourceHandle}` : edge.source;
+            edgesMap.set(key, edge.target);
+        });
+        
+        let currentNode = nodesMap.get(startNodeId);
+        
+        while (currentNode) {
+            let nextNodeId: string | undefined;
             let result: ActionResult = {};
-            let details = `Executing node '${node.data.label}'.`;
-            let status: 'success' | 'failed' = 'success';
 
             try {
-                result = await handler({ profile, contact: contextContact, trigger: triggerPayload, node, automationId: automation.id, teamId });
-                details = result.details || `Node '${node.data.label}' executed successfully.`;
+                await hooks.runHook('nodeExecuteBefore', currentNode);
+                const handler = actionHandlers[currentNode.data.type];
+                if (!handler) {
+                    throw new Error(`No handler found for node type: ${currentNode.data.type}`);
+                }
                 
-                // Update contact state for the rest of the execution flow
+                result = await handler({
+                    profile,
+                    contact: currentContact,
+                    trigger,
+                    node: currentNode,
+                    automationId,
+                    teamId,
+                });
+
+                await hooks.runHook('nodeExecuteAfter', currentNode, 'success', result.details || 'Executed successfully.');
+                
                 if (result.updatedContact) {
-                    currentContactState = result.updatedContact;
+                    currentContact = result.updatedContact;
                 }
-                
-                const nextEdges = edgesMap.get(node.id) || [];
-                
-                if (result.nextNodeHandle) { // For logic nodes (condition, split)
-                    const chosenEdge = nextEdges.find((e: any) => e.sourceHandle === result.nextNodeHandle);
-                    if (chosenEdge) {
-                        const nextNode = nodesMap.get(chosenEdge.target);
-                        if (nextNode) {
-                            executionQueue.push({ node: nextNode, contextContact: currentContactState });
-                        }
-                    }
-                } else { // For action/trigger nodes
-                    nextEdges.forEach((edge: any) => {
-                        const nextNode = nodesMap.get(edge.target);
-                        if (nextNode) {
-                            executionQueue.push({ node: nextNode, contextContact: currentContactState });
-                        }
-                    });
-                }
-            } catch (e: any) {
-                status = 'failed';
-                details = e.message;
-                console.error(`[Execution Engine] Error executing node ${node.id} (${node.data.label}):`, e);
-                // Stop the execution path on failure
-                await hooks.runHook('nodeExecuteAfter', node, status, details);
-                throw e; // Propagate to the main catch block to fail the entire run
+
+                const edgeMapKey = result.nextNodeHandle ? `${currentNode.id}-${result.nextNodeHandle}` : currentNode.id;
+                nextNodeId = edgesMap.get(edgeMapKey);
+
+            } catch (nodeError: any) {
+                await hooks.runHook('nodeExecuteAfter', currentNode, 'failed', nodeError.message);
+                throw nodeError; // Stop the whole workflow on node error
             }
-            await hooks.runHook('nodeExecuteAfter', node, status, details);
+
+            currentNode = nextNodeId ? nodesMap.get(nextNodeId) : undefined;
         }
 
-        await hooks.runHook('workflowExecuteAfter', 'success', 'Workflow completed successfully.');
+        await hooks.runHook('workflowExecuteAfter', 'success', 'Workflow completed.');
 
-    } catch (error: any) {
-        console.error(`[Execution Engine] Workflow ${automation.id} failed.`, error);
-        await hooks.runHook('workflowExecuteAfter', 'failed', error.message);
+    } catch (workflowError: any) {
+        console.error(`[Execution Engine] Workflow failed for automation ${automationId}:`, workflowError.message);
+        await hooks.runHook('workflowExecuteAfter', 'failed', workflowError.message);
     }
 };

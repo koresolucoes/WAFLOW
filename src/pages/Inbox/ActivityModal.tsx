@@ -1,5 +1,4 @@
-import React, { useState, useContext, useEffect } from 'react';
-import { ActivityContext } from '../../contexts/providers/ActivityContext';
+import React, { useState, useEffect } from 'react';
 import Modal from '../../components/common/Modal';
 import Button from '../../components/common/Button';
 import { ContactActivityInsert } from '../../types';
@@ -13,8 +12,7 @@ interface ActivityModalProps {
 }
 
 const ActivityModal: React.FC<ActivityModalProps> = ({ isOpen, onClose, type, contactId }) => {
-    const { addActivity } = useContext(ActivityContext);
-    const user = useAuthStore(state => state.user);
+    const { addActivity, user } = useAuthStore();
     const [content, setContent] = useState('');
     const [dueDate, setDueDate] = useState('');
     const [isSaving, setIsSaving] = useState(false);

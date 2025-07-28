@@ -1,4 +1,4 @@
-import React, { useState, useContext, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { generateTemplateWithAI } from '../../services/geminiService';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
@@ -6,16 +6,12 @@ import { SPARKLES_ICON, PLUS_ICON, TRASH_ICON } from '../../components/icons';
 import { MessageTemplate, MessageTemplateInsert } from '../../types';
 import { MetaTemplateComponent, MetaButton } from '../../services/meta/types';
 import TemplatePreview from '../../components/common/TemplatePreview';
-import { TemplatesContext } from '../../contexts/providers/TemplatesContext';
-import { NavigationContext } from '../../contexts/providers/NavigationContext';
 import { useAuthStore, useMetaConfig } from '../../stores/authStore';
 
 type EditableTemplate = Omit<MessageTemplateInsert, 'id' | 'team_id' | 'created_at' | 'status' | 'meta_id'>;
 
 const TemplateEditor: React.FC = () => {
-  const { createTemplate } = useContext(TemplatesContext);
-  const { setCurrentPage } = useContext(NavigationContext);
-  const profile = useAuthStore(state => state.profile);
+  const { createTemplate, setCurrentPage, profile } = useAuthStore();
   const metaConfig = useMetaConfig();
 
   const [campaignGoal, setCampaignGoal] = useState('');

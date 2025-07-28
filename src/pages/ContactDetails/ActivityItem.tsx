@@ -1,6 +1,6 @@
-import React, { useContext } from 'react';
+import React from 'react';
 import { ContactActivity } from '../../types';
-import { ActivityContext } from '../../contexts/providers/ActivityContext';
+import { useAuthStore } from '../../stores/authStore';
 import { NOTE_ICON, CALENDAR_ICON, TRASH_ICON, CHECK_SQUARE_ICON } from '../../components/icons';
 import Button from '../../components/common/Button';
 
@@ -10,7 +10,7 @@ interface ActivityItemProps {
 }
 
 const ActivityItem: React.FC<ActivityItemProps> = ({ activity, onDataChange }) => {
-    const { updateActivity, deleteActivity } = useContext(ActivityContext);
+    const { updateActivity, deleteActivity } = useAuthStore();
     const isTask = activity.type === 'TAREFA';
 
     const handleToggleComplete = async () => {

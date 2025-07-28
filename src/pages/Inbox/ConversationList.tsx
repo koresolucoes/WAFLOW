@@ -1,5 +1,4 @@
-import React, { useContext, useState, useMemo } from 'react';
-import { InboxContext } from '../../contexts/providers/InboxContext';
+import React, { useState, useMemo } from 'react';
 import { useAuthStore } from '../../stores/authStore';
 import { Conversation } from '../../types';
 
@@ -85,8 +84,7 @@ const FilterButton: React.FC<{ label: string; isActive: boolean; onClick: () => 
 );
 
 const ConversationList: React.FC = () => {
-    const { conversations, activeContactId, setActiveContactId, isLoading } = useContext(InboxContext);
-    const { user } = useAuthStore();
+    const { conversations, activeContactId, setActiveContactId, inboxLoading, user } = useAuthStore();
     const [searchTerm, setSearchTerm] = useState('');
     const [filter, setFilter] = useState<'all' | 'mine' | 'unassigned'>('all');
 
@@ -120,7 +118,7 @@ const ConversationList: React.FC = () => {
                 </div>
             </div>
             <ul className="flex-grow overflow-y-auto px-2">
-                 {isLoading && conversations.length === 0 ? (
+                 {inboxLoading && conversations.length === 0 ? (
                     <div className="p-4 text-center text-slate-400">Carregando conversas...</div>
                 ) : filteredConversations.length === 0 ? (
                     <div className="p-4 text-center text-slate-400">Nenhuma conversa encontrada.</div>

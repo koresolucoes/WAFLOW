@@ -1,6 +1,5 @@
-import React, { useContext, Suspense, lazy } from 'react';
+import React, { Suspense, lazy, useEffect } from 'react';
 import { useAuthStore } from './stores/authStore';
-import { NavigationContext } from './contexts/providers/NavigationContext';
 import MainLayout from './components/layout/MainLayout';
 
 const Auth = lazy(() => import('./pages/Auth/Auth'));
@@ -36,9 +35,23 @@ const FullPageSuspenseFallback = () => (
 );
 
 const App: React.FC = () => {
-  const session = useAuthStore(state => state.session);
-  const loading = useAuthStore(state => state.loading);
-  const { currentPage } = useContext(NavigationContext);
+  const { 
+    session, 
+    loading, 
+    currentPage, 
+    activeTeam, 
+    fetchInitialData, 
+    dataLoadedForTeam, 
+    clearAllData 
+  } = useAuthStore();
+
+  useEffect(() => {
+    if (activeTeam && activeTeam.id !== dataLoadedForTeam) {
+        console.log(`Team changed to ${activeTeam.name}. Fetching new data.`);
+        clearAllData();
+        fetchInitialData(activeTeam.id);
+    }
+  }, [activeTeam, dataLoadedForTeam, fetchInitialData, clearAllData]);
 
   const renderPage = () => {
     switch (currentPage) {

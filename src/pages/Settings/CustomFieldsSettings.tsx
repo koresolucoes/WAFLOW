@@ -1,12 +1,12 @@
-import React, { useState, useContext } from 'react';
-import { CustomFieldsContext } from '../../contexts/providers/CustomFieldsContext';
+import React, { useState } from 'react';
+import { useAuthStore } from '../../stores/authStore';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import AddCustomFieldModal from '../../components/common/AddCustomFieldModal';
 import { PLUS_ICON, TRASH_ICON } from '../../components/icons';
 
 const CustomFieldsSettings: React.FC = () => {
-    const { definitions, deleteDefinition } = useContext(CustomFieldsContext);
+    const { definitions, deleteDefinition } = useAuthStore();
     const [isModalOpen, setIsModalOpen] = useState(false);
     
     const handleDelete = async (id: string) => {

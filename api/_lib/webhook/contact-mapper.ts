@@ -109,7 +109,7 @@ export const processWebhookPayloadForContact = async (
         const newCustomFields: { [key: string]: any } = { ...(contact.custom_fields as object || {}) };
         let needsUpdate = false;
 
-        const updatePayload: TablesUpdate<'contacts'> = {};
+        const updatePayload: any = {};
 
         mappingRules.forEach((rule: any) => {
             if (!rule.source || rule.destination === 'phone') return;
@@ -150,7 +150,7 @@ export const processWebhookPayloadForContact = async (
         if (needsUpdate) {
             const { data: updatedContact, error: updateContactError } = await supabaseAdmin
                 .from('contacts')
-                .update(updatePayload as any)
+                .update(updatePayload)
                 .eq('id', contact.id)
                 .select('company, created_at, custom_fields, email, id, name, phone, sentiment, tags, team_id')
                 .single();

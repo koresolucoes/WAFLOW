@@ -1,12 +1,10 @@
-import React, { useContext, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import Card from '../../components/common/Card';
-import { CampaignsContext } from '../../contexts/providers/CampaignsContext';
-import { NavigationContext } from '../../contexts/providers/NavigationContext';
+import { useAuthStore } from '../../stores/authStore';
 import { CAMPAIGN_ICON } from '../../components/icons';
 
 const CampaignAnalytics: React.FC = () => {
-    const { campaigns } = useContext(CampaignsContext);
-    const { setCurrentPage } = useContext(NavigationContext);
+    const { campaigns, setCurrentPage } = useAuthStore();
 
     const stats = useMemo(() => {
         if (campaigns.length === 0) {

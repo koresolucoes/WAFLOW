@@ -10,11 +10,7 @@ import NodeLogsModal from './NodeLogsModal';
 import { nodeIcons } from '../../lib/automation/nodeIcons';
 import Switch from '../../components/common/Switch';
 import { ALERT_TRIANGLE_ICON, ARROW_LEFT_ICON, TRASH_ICON } from '../../components/icons';
-import { AutomationsContext } from '../../contexts/providers/AutomationsContext';
-import { TemplatesContext } from '../../contexts/providers/TemplatesContext';
-import { ContactsContext } from '../../contexts/providers/ContactsContext';
 import { useAuthStore } from '../../stores/authStore';
-import { NavigationContext } from '../../contexts/providers/NavigationContext';
 
 const initialNodes: AutomationNode[] = [];
 const initialEdges: Edge[] = [];
@@ -105,7 +101,7 @@ const nodeStyles = {
 
 const CustomNode: FC<NodeProps<AutomationNode>> = memo(({ data, id, isConnectable }) => {
     const { onNodeLogsClick } = useContext(EditorContext)!;
-    const { automationStats } = useContext(AutomationsContext);
+    const { automationStats } = useAuthStore();
     const { setNodes } = useReactFlow();
     const { nodeType, type, label } = data;
     const Icon = nodeIcons[type] || nodeIcons.default;
@@ -241,11 +237,17 @@ const IconForType: FC<{ type: string, nodeType: string}> = ({ type, nodeType }) 
 // Main Component
 const AutomationEditor: FC = () => {
     // --- Hooks ---
-    const { automations, updateAutomation, fetchAutomationStats, fetchNodeLogs } = useContext(AutomationsContext);
-    const { templates } = useContext(TemplatesContext);
-    const { allTags } = useContext(ContactsContext);
-    const profile = useAuthStore(state => state.profile);
-    const { pageParams, setCurrentPage } = useContext(NavigationContext);
+    const { 
+        automations, 
+        updateAutomation, 
+        fetchAutomationStats, 
+        fetchNodeLogs, 
+        templates, 
+        allTags, 
+        profile, 
+        pageParams, 
+        setCurrentPage 
+    } = useAuthStore();
 
     const reactFlowWrapper = useRef<HTMLDivElement>(null);
     const { screenToFlowPosition } = useReactFlow();

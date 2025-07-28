@@ -1,17 +1,11 @@
-import React, { useContext, useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Contact, DealInsert } from '../../types';
-import { ContactsContext } from '../../contexts/providers/ContactsContext';
-import { FunnelContext } from '../../contexts/providers/FunnelContext';
-import { CustomFieldsContext } from '../../contexts/providers/CustomFieldsContext';
-import { NavigationContext } from '../../contexts/providers/NavigationContext';
-import { InboxContext } from '../../contexts/providers/InboxContext';
 import { useAuthStore } from '../../stores/authStore';
 import Button from '../../components/common/Button';
 import Card from '../../components/common/Card';
 import DealFormModal from '../../components/common/DealFormModal';
 import AddCustomFieldModal from '../../components/common/AddCustomFieldModal';
 import { PLUS_ICON, X_ICON } from '../../components/icons';
-import { ActivityContext } from '../../contexts/providers/ActivityContext';
 import ActivityItem from '../ContactDetails/ActivityItem';
 
 const InfoRow: React.FC<{ label: string, value: string | null | undefined }> = ({ label, value }) => (
@@ -31,13 +25,24 @@ const Tag: React.FC<{ children: React.ReactNode, onRemove: () => void }> = ({ ch
 );
 
 const ContactPanel: React.FC<{ contactId: string }> = ({ contactId }) => {
-    const { contacts, updateContact } = useContext(ContactsContext);
-    const { deals, addDeal, pipelines, stages } = useContext(FunnelContext);
-    const { definitions } = useContext(CustomFieldsContext);
-    const { setCurrentPage } = useContext(NavigationContext);
-    const { activitiesForContact, fetchActivitiesForContact, isLoading: isActivitiesLoading } = useContext(ActivityContext);
-    const { user, activeTeam } = useAuthStore();
-    const { conversations, teamMembers, assignConversation } = useContext(InboxContext);
+    const { 
+        contacts, 
+        updateContact,
+        deals, 
+        addDeal, 
+        pipelines, 
+        stages,
+        definitions,
+        setCurrentPage,
+        activitiesForContact, 
+        fetchActivitiesForContact, 
+        activityLoading,
+        user,
+        activeTeam,
+        conversations,
+        teamMembers,
+        assignConversation
+    } = useAuthStore();
 
     const [localContact, setLocalContact] = useState<Contact | null>(null);
     const [tagInput, setTagInput] = useState('');
@@ -129,126 +134,105 @@ const ContactPanel: React.FC<{ contactId: string }> = ({ contactId }) => {
                         src={`https://api.dicebear.com/8.x/initials/svg?seed=${contact.name}`}
                         alt="Avatar"
                     />
-                    <h2 className="text-xl font-bold text-white mt-3">{contact.name}</h2>
-                    <Button variant="ghost" size="sm" className="mt-2 text-sky-400" onClick={() => setCurrentPage('contact-details', { contactId })}>
-                        Ver Detalhes Completos
+                    <h3 className="text-xl font-bold text-white mt-2">{contact.name}</h3>
+                    <Button variant="ghost" size="sm" className="mt-1" onClick={() => setCurrentPage('contact-details', { contactId })}>
+                        Ver Perfil Completo
                     </Button>
                 </div>
-                
+
                 <div className="space-y-4">
-                    <Card className="bg-slate-900/50">
-                        <h3 className="text-base font-semibold text-white mb-3">Atribuição</h3>
-                        <div>
-                            <label htmlFor="assignee" className="block text-xs text-slate-400 font-semibold uppercase tracking-wider mb-1">Atribuir a</label>
-                            <select
-                                id="assignee"
-                                value={conversation?.assignee_id || 'null'}
-                                onChange={handleAssigneeChange}
-                                className="w-full bg-slate-700 p-2 rounded-md text-white text-sm"
-                            >
-                                <option value="null">Não atribuído</option>
-                                {teamMembers.map(member => (
-                                    <option key={member.user_id} value={member.user_id}>
-                                        {member.email} {member.user_id === user?.id ? '(Você)' : ''}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                    </Card>
-
-                    <Card className="bg-slate-900/50">
-                        <h3 className="text-base font-semibold text-white mb-3">Informações</h3>
-                        <div className="space-y-3">
-                            <InfoRow label="Telefone" value={contact.phone} />
-                            <InfoRow label="Email" value={contact.email} />
-                            <InfoRow label="Empresa" value={contact.company} />
-                        </div>
-                    </Card>
-
-                    <Card className="bg-slate-900/50">
-                        <div className="flex justify-between items-center mb-3">
-                            <h3 className="text-base font-semibold text-white">Informações Adicionais</h3>
-                            <Button variant="ghost" size="sm" onClick={() => setIsCustomFieldModalOpen(true)}>
-                                <PLUS_ICON className="w-4 h-4 mr-1"/> Novo Campo
-                            </Button>
-                        </div>
-                        <div className="space-y-3">
-                            {definitions.length > 0 ? definitions.map(def => {
-                                const value = (contact.custom_fields as any)?.[def.key];
-                                return <InfoRow key={def.id} label={def.name} value={value} />;
-                            }) : <p className="text-xs text-center text-slate-500 py-2">Nenhum campo adicional.</p>}
-                        </div>
-                    </Card>
-
-                    <Card className="bg-slate-900/50">
-                        <h3 className="text-base font-semibold text-white mb-3">Tags</h3>
-                        <div className="flex flex-wrap items-center">
-                            {localContact.tags?.map(tag => (
-                                <Tag key={tag} onRemove={() => removeTag(tag)}>{tag}</Tag>
+                    <InfoRow label="Telefone" value={contact.phone} />
+                    <InfoRow label="Email" value={contact.email} />
+                    <div>
+                        <h4 className="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-2">Atribuído a</h4>
+                        <select
+                            value={conversation?.assignee_id || 'null'}
+                            onChange={handleAssigneeChange}
+                            className="w-full bg-slate-700 p-2 rounded-md text-sm"
+                        >
+                            <option value="null">Ninguém</option>
+                            {teamMembers.map(member => (
+                                <option key={member.user_id} value={member.user_id}>{member.email}</option>
                             ))}
-                        </div>
-                        <input
-                            type="text"
-                            value={tagInput}
-                            onChange={e => setTagInput(e.target.value)}
-                            onKeyDown={handleTagInputKeyDown}
-                            placeholder="Adicionar tag..."
-                            className="w-full mt-2 bg-slate-700 border border-slate-600 rounded-lg p-1.5 text-sm text-white"
-                        />
-                    </Card>
-                    
-                    <Card className="bg-slate-900/50">
-                        <h3 className="text-base font-semibold text-white mb-3">Atividades</h3>
-                        <div className="space-y-2 max-h-48 overflow-y-auto">
-                           {isActivitiesLoading ? (
-                                <p className="text-xs text-center text-slate-500 py-2">Carregando...</p>
-                           ) : activitiesForContact.length > 0 ? (
-                                activitiesForContact.map(activity => (
-                                    <ActivityItem key={activity.id} activity={activity} onDataChange={handleActivityDataChange} />
-                                ))
-                           ) : (
-                                <p className="text-sm text-slate-400 text-center py-2">Nenhuma atividade.</p>
-                           )}
-                        </div>
-                    </Card>
-
-                    <Card className="bg-slate-900/50">
-                        <div className="flex justify-between items-center mb-3">
-                            <h3 className="text-base font-semibold text-white">Negócios</h3>
-                            <Button variant="secondary" size="sm" onClick={() => setIsDealModalOpen(true)} disabled={!defaultPipeline} title={!defaultPipeline ? "Crie um funil de vendas na página 'Funil' para poder adicionar negócios." : "Adicionar Novo Negócio"}>
-                                <PLUS_ICON className="w-4 h-4 mr-1" /> Novo
-                            </Button>
-                        </div>
-                        {contactDeals.length > 0 ? (
-                            <ul className="space-y-2">
-                            {contactDeals.map(deal => {
-                                    const stage = stages.find(s => s.id === deal.stage_id);
-                                    return (
-                                        <li key={deal.id} className="p-2 bg-slate-800 rounded-lg">
-                                            <p className="font-semibold text-white text-sm truncate">{deal.name}</p>
-                                            <div className="flex justify-between items-center text-xs mt-1">
-                                                <span className="font-mono text-green-400">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(deal.value || 0)}</span>
-                                                <span className="px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300">{stage?.name || '-'}</span>
-                                            </div>
-                                        </li>
-                                    )
-                                })}
-                            </ul>
-                        ) : (
-                            <p className="text-sm text-slate-400 text-center py-2">Nenhum negócio.</p>
-                        )}
-                    </Card>
+                        </select>
+                    </div>
                 </div>
-                
+
+                <div className="mt-4 pt-4 border-t border-slate-700/50">
+                     <h3 className="text-md font-semibold text-white mb-2">Tags</h3>
+                     <div className="flex flex-wrap items-center">
+                        {localContact.tags?.map(tag => (
+                            <Tag key={tag} onRemove={() => removeTag(tag)}>{tag}</Tag>
+                        ))}
+                     </div>
+                     <input
+                        type="text"
+                        value={tagInput}
+                        onChange={e => setTagInput(e.target.value)}
+                        onKeyDown={handleTagInputKeyDown}
+                        placeholder="Adicionar tag..."
+                        className="w-full bg-slate-700 p-2 mt-2 rounded-md text-sm"
+                    />
+                </div>
+
                 {hasChanges && (
-                    <div className="mt-auto pt-4 sticky bottom-0 bg-slate-800">
+                    <div className="mt-auto pt-4">
                         <Button variant="primary" className="w-full" onClick={handleSaveChanges} isLoading={isSaving}>
                             Salvar Alterações
                         </Button>
                     </div>
                 )}
-            </aside>
+                 
+                 {/* Deals section in Panel */}
+                <div className="mt-4 pt-4 border-t border-slate-700/50">
+                    <div className="flex justify-between items-center mb-2">
+                        <h3 className="text-md font-semibold text-white">Negócios</h3>
+                        <Button
+                            variant="ghost" size="sm"
+                            onClick={() => setIsDealModalOpen(true)}
+                            disabled={!defaultPipeline}
+                            title={!defaultPipeline ? "Crie um funil de vendas para adicionar negócios." : "Novo Negócio"}
+                        >
+                            <PLUS_ICON className="w-4 h-4" />
+                        </Button>
+                    </div>
+                     <div className="space-y-2">
+                        {contactDeals.length > 0 ? (
+                            contactDeals.map(deal => {
+                                const stage = stages.find(s => s.id === deal.stage_id);
+                                return (
+                                    <div key={deal.id} className="p-2 bg-slate-700/50 rounded-md text-sm">
+                                        <p className="font-semibold text-white truncate">{deal.name}</p>
+                                        <div className="flex justify-between items-center text-xs mt-1">
+                                            <span className="font-mono text-green-400">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(deal.value || 0)}</span>
+                                            <span className="px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300">{stage?.name || '-'}</span>
+                                        </div>
+                                    </div>
+                                );
+                            })
+                        ) : (
+                            <p className="text-center text-xs text-slate-500 py-2">Nenhum negócio.</p>
+                        )}
+                    </div>
+                </div>
 
+                {/* Activities in Panel */}
+                <div className="mt-4 pt-4 border-t border-slate-700/50">
+                    <h3 className="text-md font-semibold text-white mb-2">Atividades Recentes</h3>
+                     <div className="space-y-3 max-h-60 overflow-y-auto">
+                        {activityLoading ? <p className="text-xs text-slate-400">Carregando...</p> : 
+                            activitiesForContact.length > 0 ? (
+                                activitiesForContact.slice(0, 5).map(activity => (
+                                    <ActivityItem key={activity.id} activity={activity} onDataChange={handleActivityDataChange} />
+                                ))
+                            ) : (
+                                <p className="text-center text-xs text-slate-500 py-2">Nenhuma atividade.</p>
+                            )
+                        }
+                     </div>
+                </div>
+                
+            </aside>
             {defaultPipeline && (
                 <DealFormModal
                     isOpen={isDealModalOpen}

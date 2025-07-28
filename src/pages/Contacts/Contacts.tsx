@@ -1,12 +1,11 @@
-import React, { useContext, useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import Modal from '../../components/common/Modal';
 import ContactForm from './ContactForm';
 import { Contact, EditableContact } from '../../types';
-import { PLUS_ICON, TRASH_ICON, CONTACTS_ICON, UPLOAD_ICON, FILE_TEXT_ICON, SEND_ICON } from '../../components/icons';
-import { ContactsContext } from '../../contexts/providers/ContactsContext';
-import { NavigationContext } from '../../contexts/providers/NavigationContext';
+import { PLUS_ICON, TRASH_ICON, CONTACTS_ICON, UPLOAD_ICON, FILE_TEXT_ICON, SEND_ICON, SEARCH_ICON } from '../../components/icons';
+import { useAuthStore } from '../../stores/authStore';
 import DirectMessageModal from './DirectMessageModal';
 
 const Tag: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -38,13 +37,25 @@ const ContactRow: React.FC<{ contact: Contact; onViewDetails: () => void; onDele
 
 
 const Contacts: React.FC = () => {
-    const { contacts, addContact, deleteContact, importContacts, sendDirectMessages } = useContext(ContactsContext);
-    const { setCurrentPage } = useContext(NavigationContext);
+    const { contacts, addContact, deleteContact, importContacts, sendDirectMessages, setCurrentPage } = useAuthStore();
     const [isFormModalOpen, setIsFormModalOpen] = useState(false);
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [isDirectMessageModalOpen, setIsDirectMessageModalOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const filteredContacts = useMemo(() => {
+        if (!searchTerm) return contacts;
+        const lowercasedTerm = searchTerm.toLowerCase();
+        return contacts.filter(contact =>
+            contact.name.toLowerCase().includes(lowercasedTerm) ||
+            contact.phone.includes(lowercasedTerm) ||
+            (contact.email && contact.email.toLowerCase().includes(lowercasedTerm)) ||
+            (contact.company && contact.company.toLowerCase().includes(lowercasedTerm)) ||
+            (contact.tags && contact.tags.some(tag => tag.toLowerCase().includes(lowercasedTerm)))
+        );
+    }, [contacts, searchTerm]);
 
     const handleOpenFormModal = () => {
         setIsFormModalOpen(true);
@@ -135,33 +146,45 @@ const Contacts: React.FC = () => {
 
     return (
         <div className="space-y-8">
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center flex-wrap gap-4">
                 <h1 className="text-3xl font-bold text-white">Contatos</h1>
-                <div className="space-x-2">
-                    <input
-                        type="file"
-                        ref={fileInputRef}
-                        onChange={handleFileChange}
-                        accept=".csv"
-                        className="hidden"
-                    />
-                     <Button variant="secondary" onClick={() => setIsImportModalOpen(true)} isLoading={isLoading}>
-                        <UPLOAD_ICON className="w-5 h-5 mr-2" />
-                        Importar CSV
-                    </Button>
-                     <Button variant="secondary" onClick={() => setIsDirectMessageModalOpen(true)}>
-                        <SEND_ICON className="w-5 h-5 mr-2" />
-                        Enviar Mensagem
-                    </Button>
-                    <Button variant="primary" onClick={handleOpenFormModal}>
-                        <PLUS_ICON className="w-5 h-5 mr-2" />
-                        Adicionar Contato
-                    </Button>
+                <div className="flex items-center gap-4">
+                     <div className="relative">
+                        <SEARCH_ICON className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+                        <input
+                            type="text"
+                            placeholder="Buscar por nome, fone, tag..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="bg-slate-800 border border-slate-700 rounded-lg py-2 pl-10 pr-4 text-white placeholder-slate-400 focus:ring-2 focus:ring-sky-500 focus:outline-none"
+                        />
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <input
+                            type="file"
+                            ref={fileInputRef}
+                            onChange={handleFileChange}
+                            accept=".csv"
+                            className="hidden"
+                        />
+                         <Button variant="secondary" onClick={() => setIsImportModalOpen(true)} isLoading={isLoading}>
+                            <UPLOAD_ICON className="w-5 h-5 mr-2" />
+                            Importar
+                        </Button>
+                         <Button variant="secondary" onClick={() => setIsDirectMessageModalOpen(true)}>
+                            <SEND_ICON className="w-5 h-5 mr-2" />
+                            Mensagem
+                        </Button>
+                        <Button variant="primary" onClick={handleOpenFormModal}>
+                            <PLUS_ICON className="w-5 h-5 mr-2" />
+                            Adicionar
+                        </Button>
+                    </div>
                 </div>
             </div>
       
             <Card className="overflow-x-auto">
-                {contacts.length > 0 ? (
+                {filteredContacts.length > 0 ? (
                     <table className="w-full text-left">
                         <thead>
                             <tr className="border-b border-slate-600">
@@ -174,7 +197,7 @@ const Contacts: React.FC = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            {contacts.map(contact => (
+                            {filteredContacts.map(contact => (
                                 <ContactRow
                                     key={contact.id}
                                     contact={contact}
@@ -187,8 +210,8 @@ const Contacts: React.FC = () => {
                 ) : (
                     <div className="text-center py-12">
                         <CONTACTS_ICON className="w-12 h-12 mx-auto text-slate-500" />
-                        <h2 className="text-xl font-semibold text-white mt-4">Nenhum contato adicionado.</h2>
-                        <p className="text-slate-400 mt-2 mb-6">Comece adicionando seu primeiro contato ou importe uma lista de um arquivo CSV.</p>
+                        <h2 className="text-xl font-semibold text-white mt-4">{searchTerm ? 'Nenhum contato encontrado.' : 'Nenhum contato adicionado.'}</h2>
+                        <p className="text-slate-400 mt-2 mb-6">{searchTerm ? `Sua busca por "${searchTerm}" não retornou resultados.` : 'Comece adicionando seu primeiro contato ou importe uma lista de um arquivo CSV.'}</p>
                         <Button variant="primary" onClick={handleOpenFormModal}>
                             Adicionar Primeiro Contato
                         </Button>

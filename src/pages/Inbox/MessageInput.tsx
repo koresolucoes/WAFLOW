@@ -1,6 +1,4 @@
-import React, { useState, useContext, useMemo, useEffect, useRef } from 'react';
-import { InboxContext } from '../../contexts/providers/InboxContext';
-import { CannedResponsesContext } from '../../contexts/providers/CannedResponsesContext';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { SEND_ICON, SPARKLES_ICON } from '../../components/icons';
 import Button from '../../components/common/Button';
 import { CannedResponse } from '../../types';
@@ -13,9 +11,7 @@ interface MessageInputProps {
 
 const MessageInput: React.FC<MessageInputProps> = ({ contactId }) => {
     const [text, setText] = useState('');
-    const { sendMessage, isSending, messages } = useContext(InboxContext);
-    const { responses } = useContext(CannedResponsesContext);
-    const profile = useAuthStore(state => state.profile);
+    const { sendMessage, isSending, messages, responses, profile } = useAuthStore();
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
     const [showPicker, setShowPicker] = useState(false);

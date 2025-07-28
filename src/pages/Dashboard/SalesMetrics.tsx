@@ -1,13 +1,12 @@
-
-import React, { useContext, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import Card from '../../components/common/Card';
-import { FunnelContext } from '../../contexts/providers/FunnelContext';
+import { useAuthStore } from '../../stores/authStore';
 import { CustomTooltip } from './Dashboard';
 import { FUNNEL_ICON } from '../../components/icons';
 
 const SalesMetrics: React.FC = () => {
-    const { deals, stages, activePipelineId } = useContext(FunnelContext);
+    const { deals, stages, activePipelineId } = useAuthStore();
 
     const salesKPIs = useMemo(() => {
         const relevantDeals = deals.filter(d => d.pipeline_id === activePipelineId);

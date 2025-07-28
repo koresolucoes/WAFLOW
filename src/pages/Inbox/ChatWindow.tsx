@@ -1,6 +1,5 @@
-import React, { useContext, useRef, useEffect, useState } from 'react';
-import { InboxContext } from '../../contexts/providers/InboxContext';
-import { ContactsContext } from '../../contexts/providers/ContactsContext';
+import React, { useRef, useEffect, useState } from 'react';
+import { useAuthStore } from '../../stores/authStore';
 import MessageBubble from './MessageBubble';
 import MessageInput from './MessageInput';
 import Button from '../../components/common/Button';
@@ -14,8 +13,7 @@ interface ChatWindowProps {
 }
 
 const ChatWindow: React.FC<ChatWindowProps> = ({ isPanelOpen, setIsPanelOpen }) => {
-    const { messages, activeContactId, isLoading } = useContext(InboxContext);
-    const { contacts } = useContext(ContactsContext);
+    const { messages, activeContactId, inboxLoading, contacts } = useAuthStore();
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const [activityModal, setActivityModal] = useState<{isOpen: boolean; type: 'NOTA' | 'TAREFA' | null}>({isOpen: false, type: null});
 
@@ -72,7 +70,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ isPanelOpen, setIsPanelOpen }) 
 
                 <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-[#0a1014] bg-[url('https://www.heroscreen.cc/static/media/whats-app-dark-bg.a5027f2f.png')] bg-cover">
                     <div className="space-y-4">
-                        {isLoading ? (
+                        {inboxLoading ? (
                             <div className="text-center text-slate-400">Carregando mensagens...</div>
                         ) : (
                             messages.map((msg: UnifiedMessage) => (

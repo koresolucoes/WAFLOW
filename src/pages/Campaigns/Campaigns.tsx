@@ -1,10 +1,9 @@
-import React, { useContext } from 'react';
+import React, { useState, useMemo } from 'react';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
-import { TEMPLATE_ICON, SEND_ICON, MAIL_CHECK_ICON, MAIL_OPEN_ICON, TRASH_ICON } from '../../components/icons';
+import { TEMPLATE_ICON, SEND_ICON, MAIL_CHECK_ICON, MAIL_OPEN_ICON, TRASH_ICON, SEARCH_ICON } from '../../components/icons';
 import { CampaignWithMetrics } from '../../types';
-import { CampaignsContext } from '../../contexts/providers/CampaignsContext';
-import { NavigationContext } from '../../contexts/providers/NavigationContext';
+import { useAuthStore } from '../../stores/authStore';
 
 const CampaignCard: React.FC<{ campaign: CampaignWithMetrics; onViewDetails: () => void; onDelete: () => void; }> = ({ campaign, onViewDetails, onDelete }) => {
     const readRate = campaign.metrics.sent > 0 ? ((campaign.metrics.read / campaign.metrics.sent) * 100).toFixed(1) + '%' : '0.0%';
@@ -79,8 +78,16 @@ const CampaignCard: React.FC<{ campaign: CampaignWithMetrics; onViewDetails: () 
 };
 
 const Campaigns: React.FC = () => {
-    const { campaigns, deleteCampaign } = useContext(CampaignsContext);
-    const { setCurrentPage } = useContext(NavigationContext);
+    const { campaigns, deleteCampaign, setCurrentPage } = useAuthStore();
+    const [searchTerm, setSearchTerm] = useState('');
+
+    const filteredCampaigns = useMemo(() => {
+        if (!searchTerm) return campaigns;
+        const lowercasedTerm = searchTerm.toLowerCase();
+        return campaigns.filter(campaign =>
+            campaign.name.toLowerCase().includes(lowercasedTerm)
+        );
+    }, [campaigns, searchTerm]);
 
     const handleDeleteCampaign = async (campaignId: string, campaignName: string) => {
         if (window.confirm(`Tem certeza de que deseja excluir a campanha "${campaignName}"? Esta ação não pode ser desfeita e excluirá todos os seus dados.`)) {
@@ -95,15 +102,32 @@ const Campaigns: React.FC = () => {
 
     return (
         <div className="space-y-8">
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center flex-wrap gap-4">
                 <h1 className="text-3xl font-bold text-white">Histórico de Campanhas</h1>
-                <Button variant="primary" onClick={() => setCurrentPage('templates')}>
-                    <TEMPLATE_ICON className="w-5 h-5 mr-2" />
-                    Criar Nova Campanha
-                </Button>
+                <div className="flex items-center gap-4">
+                    <div className="relative">
+                        <SEARCH_ICON className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+                        <input
+                            type="text"
+                            placeholder="Buscar campanhas..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="bg-slate-800 border border-slate-700 rounded-lg py-2 pl-10 pr-4 text-white placeholder-slate-400 focus:ring-2 focus:ring-sky-500 focus:outline-none"
+                        />
+                    </div>
+                    <Button variant="primary" onClick={() => setCurrentPage('templates')}>
+                        <TEMPLATE_ICON className="w-5 h-5 mr-2" />
+                        Criar Nova Campanha
+                    </Button>
+                </div>
             </div>
       
-            {campaigns.length === 0 ? (
+            {filteredCampaigns.length === 0 && campaigns.length > 0 ? (
+                 <Card className="text-center py-12">
+                    <h2 className="text-xl font-semibold text-white">Nenhuma campanha encontrada.</h2>
+                    <p className="text-slate-400 mt-2">{`Sua busca por "${searchTerm}" não retornou resultados.`}</p>
+                </Card>
+            ) : campaigns.length === 0 ? (
                 <Card className="text-center py-12">
                     <h2 className="text-xl font-semibold text-white">Nenhuma campanha enviada.</h2>
                     <p className="text-slate-400 mt-2 mb-6">Crie uma campanha a partir de um template para começar.</p>
@@ -113,7 +137,7 @@ const Campaigns: React.FC = () => {
                 </Card>
             ) : (
                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {campaigns.map(campaign => (
+                    {filteredCampaigns.map(campaign => (
                         <CampaignCard
                             key={campaign.id}
                             campaign={campaign}

@@ -1,12 +1,12 @@
-import React, { useContext, useState } from 'react';
+import React, { useState } from 'react';
 import ConversationList from './ConversationList';
 import ChatWindow from './ChatWindow';
 import ContactPanel from './ContactPanel';
-import { InboxContext } from '../../contexts/providers/InboxContext';
+import { useAuthStore } from '../../stores/authStore';
 import { INBOX_ICON } from '../../components/icons';
 
 const Inbox: React.FC = () => {
-    const { activeContactId } = useContext(InboxContext);
+    const { activeContactId } = useAuthStore();
     const [isPanelOpen, setIsPanelOpen] = useState(true);
 
     return (

@@ -1,9 +1,5 @@
-
-import React, { useContext, useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import Card from '../../components/common/Card';
-import { ContactsContext } from '../../contexts/providers/ContactsContext';
-import { FunnelContext } from '../../contexts/providers/FunnelContext';
-import { AutomationsContext } from '../../contexts/providers/AutomationsContext';
 import { useAuthStore } from '../../stores/authStore';
 import { fetchDashboardData, DashboardData } from '../../services/dataService';
 
@@ -70,10 +66,7 @@ const SortableCardWrapper: React.FC<{ id: string; children: React.ReactNode; cla
 };
 
 const Dashboard: React.FC = () => {
-  const { user, profile, updateProfile, activeTeam } = useAuthStore();
-  const { contacts } = useContext(ContactsContext);
-  const { deals, activePipelineId } = useContext(FunnelContext);
-  const { automations } = useContext(AutomationsContext);
+  const { user, profile, updateProfile, activeTeam, contacts, deals, activePipelineId, automations } = useAuthStore();
 
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);

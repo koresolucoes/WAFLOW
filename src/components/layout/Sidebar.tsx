@@ -1,9 +1,7 @@
-
-
-import React, { useContext } from 'react';
+import React from 'react';
 import { Page } from '../../types';
 import { ZAPFLOW_AI_LOGO, DASHBOARD_ICON, CAMPAIGN_ICON, TEMPLATE_ICON, CONTACTS_ICON, PROFILE_ICON, SETTINGS_ICON, AUTOMATION_ICON, FUNNEL_ICON, INBOX_ICON, WEBHOOK_INSPECTOR_ICON } from '../icons';
-import { NavigationContext } from '../../contexts/providers/NavigationContext';
+import { useAuthStore } from '../../stores/authStore';
 
 interface NavItemProps {
   icon: React.ReactNode;
@@ -32,7 +30,7 @@ const NavItem: React.FC<NavItemProps> = ({ icon, label, isActive, onClick }) => 
 );
 
 const Sidebar: React.FC = () => {
-  const { currentPage, setCurrentPage } = useContext(NavigationContext);
+  const { currentPage, setCurrentPage } = useAuthStore();
 
   const navItems = [
     { icon: <DASHBOARD_ICON className="w-5 h-5" />, label: 'Painel', page: 'dashboard' as Page },

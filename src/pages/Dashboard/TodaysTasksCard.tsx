@@ -1,14 +1,11 @@
-
-import React, { useContext } from 'react';
+import React from 'react';
 import Card from '../../components/common/Card';
-import { ActivityContext } from '../../contexts/providers/ActivityContext';
-import { NavigationContext } from '../../contexts/providers/NavigationContext';
+import { useAuthStore } from '../../stores/authStore';
 import { CALENDAR_ICON } from '../../components/icons';
 import Button from '../../components/common/Button';
 
 const TodaysTasksCard: React.FC = () => {
-    const { todaysTasks } = useContext(ActivityContext);
-    const { setCurrentPage } = useContext(NavigationContext);
+    const { todaysTasks, setCurrentPage } = useAuthStore();
 
     const formatDate = (dateString: string) => {
         const date = new Date(dateString);

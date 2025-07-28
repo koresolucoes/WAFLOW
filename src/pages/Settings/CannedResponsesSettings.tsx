@@ -1,6 +1,5 @@
-
-import React, { useState, useContext } from 'react';
-import { CannedResponsesContext } from '../../contexts/providers/CannedResponsesContext';
+import React, { useState } from 'react';
+import { useAuthStore } from '../../stores/authStore';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import Modal from '../../components/common/Modal';
@@ -63,7 +62,7 @@ const CannedResponseForm: React.FC<{
 };
 
 const CannedResponsesSettings: React.FC = () => {
-    const { responses, addResponse, updateResponse, deleteResponse } = useContext(CannedResponsesContext);
+    const { responses, addResponse, updateResponse, deleteResponse } = useAuthStore();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingResponse, setEditingResponse] = useState<CannedResponse | null>(null);
 

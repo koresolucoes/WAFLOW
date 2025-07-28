@@ -1,5 +1,5 @@
-import React, { useState, useContext } from 'react';
-import { CustomFieldsContext } from '../../contexts/providers/CustomFieldsContext';
+import React, { useState } from 'react';
+import { useAuthStore } from '../../stores/authStore';
 import { CustomFieldDefinitionInsert } from '../../types';
 import Modal from './Modal';
 import Button from './Button';
@@ -12,7 +12,7 @@ interface AddCustomFieldModalProps {
 type EditableDefinition = Omit<CustomFieldDefinitionInsert, 'id' | 'team_id' | 'created_at'>;
 
 const AddCustomFieldModal: React.FC<AddCustomFieldModalProps> = ({ isOpen, onClose }) => {
-    const { addDefinition } = useContext(CustomFieldsContext);
+    const { addDefinition } = useAuthStore();
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [formData, setFormData] = useState<EditableDefinition>({

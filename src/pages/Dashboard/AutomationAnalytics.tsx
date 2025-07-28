@@ -1,8 +1,6 @@
-
-import React, { useContext, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import Card from '../../components/common/Card';
-import { AutomationsContext } from '../../contexts/providers/AutomationsContext';
-import { NavigationContext } from '../../contexts/providers/NavigationContext';
+import { useAuthStore } from '../../stores/authStore';
 import { DashboardData } from '../../services/dataService';
 import { AUTOMATION_ICON } from '../../components/icons';
 
@@ -12,8 +10,7 @@ interface AutomationAnalyticsProps {
 }
 
 const AutomationAnalytics: React.FC<AutomationAnalyticsProps> = ({ data, isLoading }) => {
-    const { automations } = useContext(AutomationsContext);
-    const { setCurrentPage } = useContext(NavigationContext);
+    const { automations, setCurrentPage } = useAuthStore();
 
     const stats = useMemo(() => {
         if (!data) return { successRate: '0.0%', totalRuns: 0, mostActive: [] };

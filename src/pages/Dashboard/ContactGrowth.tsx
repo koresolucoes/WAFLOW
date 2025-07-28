@@ -1,13 +1,12 @@
-
-import React, { useContext, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import Card from '../../components/common/Card';
-import { ContactsContext } from '../../contexts/providers/ContactsContext';
+import { useAuthStore } from '../../stores/authStore';
 import { CustomTooltip } from './Dashboard';
 import { CONTACTS_ICON } from '../../components/icons';
 
 const ContactGrowth: React.FC = () => {
-    const { contacts, allTags } = useContext(ContactsContext);
+    const { contacts, allTags } = useAuthStore();
 
     const growthData = useMemo(() => {
         const countsByDay: { [key: string]: number } = {};

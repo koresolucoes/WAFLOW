@@ -1,9 +1,9 @@
-import React, { useState, useMemo, useContext } from 'react';
+import React, { useState, useMemo } from 'react';
 import Modal from '../../components/common/Modal';
 import Button from '../../components/common/Button';
 import InfoCard from '../../components/common/InfoCard';
 import { Contact } from '../../types';
-import { ContactsContext } from '../../contexts/providers/ContactsContext';
+import { useAuthStore } from '../../stores/authStore';
 
 interface DirectMessageModalProps {
     isOpen: boolean;
@@ -14,7 +14,7 @@ interface DirectMessageModalProps {
 }
 
 const DirectMessageModal: React.FC<DirectMessageModalProps> = ({ isOpen, onClose, onSend, contacts, isSending }) => {
-    const { allTags } = useContext(ContactsContext);
+    const { allTags } = useAuthStore();
     const [message, setMessage] = useState('');
     const [sendToAll, setSendToAll] = useState(true);
     const [selectedTags, setSelectedTags] = useState<string[]>([]);

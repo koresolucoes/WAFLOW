@@ -1,10 +1,10 @@
-import React, { useContext, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import StageColumn from './StageColumn';
 import { FUNNEL_ICON, PLUS_ICON } from '../../components/icons';
 import Button from '../../components/common/Button';
 import PipelineManagerModal from './PipelineManagerModal';
 import DealClosingModal from './DealClosingModal';
-import { FunnelContext } from '../../contexts/providers/FunnelContext';
+import { useAuthStore } from '../../stores/authStore';
 
 const FunnelMetric: React.FC<{ label: string, value: string | number }> = ({ label, value }) => (
     <div className="text-center px-4">
@@ -17,7 +17,7 @@ const Funnel: React.FC = () => {
     const { 
         pipelines, stages, deals, updateDeal, createDefaultPipeline, 
         activePipelineId, setActivePipelineId, addStage,
-    } = useContext(FunnelContext);
+    } = useAuthStore();
 
     const [draggedDealId, setDraggedDealId] = useState<string | null>(null);
     const [isCreating, setIsCreating] = useState(false);
