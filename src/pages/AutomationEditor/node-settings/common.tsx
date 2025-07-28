@@ -1,5 +1,5 @@
 import React, { useState, useRef, memo } from 'react';
-import { AutomationNode, MessageTemplate, Profile, AutomationNodeData } from '../../../types';
+import { AutomationNode, MessageTemplate, Profile, AutomationNodeData, Pipeline, PipelineStage } from '../../../types';
 
 
 // ====================================================================================
@@ -13,6 +13,8 @@ export interface NodeSettingsProps {
     allTags: string[];
     profile: Profile | null; // For TriggerSettings
     automationId?: string;
+    pipelines: Pipeline[]; // For Deal settings
+    stages: PipelineStage[]; // For Deal settings
 }
 
 

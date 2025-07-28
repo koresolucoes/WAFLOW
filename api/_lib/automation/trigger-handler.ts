@@ -1,6 +1,6 @@
 import { supabaseAdmin } from '../supabaseAdmin.js';
 import { executeAutomation } from './engine.js';
-import { Automation, Contact, Json, Profile } from '../types.js';
+import { Automation, Contact, Json, Profile, Deal } from '../types.js';
 import { sanitizeAutomation } from './utils.js';
 
 type TriggerInfo = {
@@ -187,6 +187,30 @@ export const handleTagAddedEvent = async (userId: string, contact: Contact, adde
     }
 };
 
+const handleDealCreatedEvent = async (userId: string, contact: Contact, deal: Deal) => {
+    console.log(`[HANDLER] Processing deal_created event for deal ${deal.id}`);
+    const { data: teamData, error: teamError } = await supabaseAdmin.from('teams').select('id').eq('owner_id', userId).single();
+    if (teamError || !teamData) return;
+    const { data: triggers, error } = await supabaseAdmin.from('automation_triggers').select('automation_id, node_id').eq('team_id', teamData.id).eq('trigger_type', 'deal_created');
+    if (error) { console.error(`[HANDLER] Error in DealCreatedEvent:`, error); return; }
+    if (triggers && triggers.length > 0) {
+        const triggerData = { type: 'deal_created', payload: { deal } };
+        await dispatchAutomations(userId, triggers as unknown as TriggerInfo[], contact, triggerData);
+    }
+};
+
+const handleDealStageChangedEvent = async (userId: string, contact: Contact, deal: Deal, new_stage_id: string) => {
+    console.log(`[HANDLER] Processing deal_stage_changed event for deal ${deal.id} to stage ${new_stage_id}`);
+    const { data: teamData, error: teamError } = await supabaseAdmin.from('teams').select('id').eq('owner_id', userId).single();
+    if (teamError || !teamData) return;
+    const { data: triggers, error } = await supabaseAdmin.from('automation_triggers').select('automation_id, node_id').eq('team_id', teamData.id).eq('trigger_type', 'deal_stage_changed').eq('trigger_key', new_stage_id);
+    if (error) { console.error(`[HANDLER] Error in DealStageChangedEvent:`, error); return; }
+    if (triggers && triggers.length > 0) {
+        const triggerData = { type: 'deal_stage_changed', payload: { deal, new_stage_id } };
+        await dispatchAutomations(userId, triggers as unknown as TriggerInfo[], contact, triggerData);
+    }
+};
+
 export const publishEvent = async (eventType: string, userId: string, data: any) => {
     console.log(`[EVENT BUS] Publicando evento: ${eventType} para o usuário ${userId}`);
     try {
@@ -199,6 +223,12 @@ export const publishEvent = async (eventType: string, userId: string, data: any)
                 break;
             case 'tag_added':
                 await handleTagAddedEvent(userId, data.contact, data.tag);
+                break;
+            case 'deal_created':
+                await handleDealCreatedEvent(userId, data.contact, data.deal);
+                break;
+            case 'deal_stage_changed':
+                await handleDealStageChangedEvent(userId, data.contact, data.deal, data.new_stage_id);
                 break;
             default:
                 console.warn(`[EVENT BUS] Tipo de evento desconhecido: ${eventType}`);

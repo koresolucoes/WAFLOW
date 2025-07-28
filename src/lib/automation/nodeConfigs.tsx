@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import { AutomationNodeData } from '../../types';
 import MetaTriggerSettings from '../../pages/AutomationEditor/node-settings/MetaTriggerSettings';
@@ -86,6 +87,22 @@ export const nodeConfigs: Record<string, NodeConfig> = {
         SettingsComponent: TriggerSettings,
         description: () => 'Quando dados são recebidos na URL de gatilho.',
         isConfigured: () => true,
+    },
+    'deal_created': {
+        label: 'Novo Negócio Criado',
+        nodeType: 'trigger',
+        data: { nodeType: 'trigger', type: 'deal_created', label: 'Novo Negócio Criado', config: {} },
+        SettingsComponent: MetaTriggerSettings,
+        description: () => 'Inicia quando um novo negócio é criado no funil.',
+        isConfigured: () => true,
+    },
+    'deal_stage_changed': {
+        label: 'Etapa do Negócio Alterada',
+        nodeType: 'trigger',
+        data: { nodeType: 'trigger', type: 'deal_stage_changed', label: 'Etapa do Negócio Alterada', config: { pipeline_id: '', stage_id: '' } },
+        SettingsComponent: MetaTriggerSettings,
+        description: data => (data.config as any)?.stage_id ? 'Quando um negócio entra em uma etapa específica.' : 'Configurar etapa do funil.',
+        isConfigured: data => !!(data.config as any)?.stage_id,
     },
     // Actions
     'send_template': {
@@ -206,6 +223,22 @@ export const nodeConfigs: Record<string, NodeConfig> = {
         SettingsComponent: SendWebhookSettings,
         description: data => (data.config as any)?.url ? `${(data.config as any).method} para ${truncate((data.config as any).url, 30)}` : 'Configurar URL do webhook.',
         isConfigured: data => !!(data.config as any)?.url,
+    },
+    'create_deal': {
+        label: 'Criar Negócio',
+        nodeType: 'action',
+        data: { nodeType: 'action', type: 'create_deal', label: 'Criar Negócio', config: { deal_name: '', deal_value: '', pipeline_id: '', stage_id: '' } },
+        SettingsComponent: ActionSettings,
+        description: data => (data.config as any)?.deal_name ? `Cria o negócio: "${truncate((data.config as any).deal_name, 25)}"` : 'Configurar detalhes do negócio.',
+        isConfigured: data => !!((data.config as any)?.deal_name && (data.config as any)?.pipeline_id && (data.config as any)?.stage_id),
+    },
+    'update_deal_stage': {
+        label: 'Atualizar Etapa do Negócio',
+        nodeType: 'action',
+        data: { nodeType: 'action', type: 'update_deal_stage', label: 'Atualizar Etapa do Negócio', config: { pipeline_id: '', stage_id: '' } },
+        SettingsComponent: ActionSettings,
+        description: data => (data.config as any)?.stage_id ? 'Move o negócio para uma nova etapa.' : 'Configurar etapa de destino.',
+        isConfigured: data => !!((data.config as any)?.pipeline_id && (data.config as any)?.stage_id),
     },
     // Logic
     'condition': {

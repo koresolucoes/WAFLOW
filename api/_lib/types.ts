@@ -34,8 +34,8 @@ export type AutomationStatus = Enums<'automation_status'>;
 export type AutomationRunStatus = 'running' | 'success' | 'failed';
 export type NodeType = 'trigger' | 'action' | 'logic';
 
-export type TriggerType = 'new_contact_with_tag' | 'message_received_with_keyword' | 'button_clicked' | 'new_contact' | 'webhook_received';
-export type ActionType = 'send_template' | 'add_tag' | 'remove_tag' | 'send_text_message' | 'send_media' | 'send_interactive_message' | 'set_custom_field' | 'send_webhook';
+export type TriggerType = 'new_contact_with_tag' | 'message_received_with_keyword' | 'button_clicked' | 'new_contact' | 'webhook_received' | 'deal_created' | 'deal_stage_changed';
+export type ActionType = 'send_template' | 'add_tag' | 'remove_tag' | 'send_text_message' | 'send_media' | 'send_interactive_message' | 'set_custom_field' | 'send_webhook' | 'create_deal' | 'update_deal_stage';
 export type LogicType = 'condition' | 'split_path';
 
 // --- Data Structures ---
@@ -51,6 +51,7 @@ export type Profile = Database['public']['Tables']['profiles']['Row'];
 export type Contact = Database['public']['Tables']['contacts']['Row'];
 export type Message = Database['public']['Tables']['messages']['Row'];
 export type MessageInsert = Database['public']['Tables']['messages']['Insert'];
+export type Deal = Database['public']['Tables']['deals']['Row'];
 
 export type MessageTemplate = Omit<Database['public']['Tables']['message_templates']['Row'], 'category' | 'status' | 'components'> & {
     category: TemplateCategory;

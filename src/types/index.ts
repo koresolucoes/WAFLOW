@@ -28,8 +28,8 @@ export type StageType = Enums<'stage_type'>;
 export type NodeType = 'trigger' | 'action' | 'logic';
 
 // Tipos expandidos para corresponderem ao backend
-export type TriggerType = 'new_contact_with_tag' | 'message_received_with_keyword' | 'button_clicked' | 'new_contact' | 'webhook_received';
-export type ActionType = 'send_template' | 'add_tag' | 'remove_tag' | 'send_text_message' | 'send_media' | 'send_interactive_message' | 'set_custom_field' | 'send_webhook';
+export type TriggerType = 'new_contact_with_tag' | 'message_received_with_keyword' | 'button_clicked' | 'new_contact' | 'webhook_received' | 'deal_created' | 'deal_stage_changed';
+export type ActionType = 'send_template' | 'add_tag' | 'remove_tag' | 'send_text_message' | 'send_media' | 'send_interactive_message' | 'set_custom_field' | 'send_webhook' | 'create_deal' | 'update_deal_stage';
 export type LogicType = 'condition' | 'split_path';
 
 

@@ -535,12 +535,33 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (!user || !activeTeam) throw new Error("User or active team not available.");
     const newDeal = await funnelService.addDealToDb({ ...dealData, team_id: activeTeam.id });
     set(state => ({ deals: [newDeal, ...state.deals] }));
+    fetch('/api/run-trigger', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eventType: 'deal_created', userId: user.id, contactId: newDeal.contact_id, data: { deal: newDeal } })
+    }).catch(err => console.error("Failed to call deal_created trigger API", err));
   },
   updateDeal: async (dealId, updates) => {
-    const { user, activeTeam } = get();
+    const { user, activeTeam, deals } = get();
     if (!user || !activeTeam) throw new Error("User not authenticated.");
+    
+    const oldDeal = deals.find(d => d.id === dealId);
+    
     const updatedDeal = await funnelService.updateDealInDb(dealId, activeTeam.id, updates);
     set(state => ({ deals: state.deals.map(d => d.id === dealId ? { ...d, ...updatedDeal } : d) }));
+
+    if (updates.stage_id && oldDeal && oldDeal.stage_id !== updates.stage_id) {
+        fetch('/api/run-trigger', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                eventType: 'deal_stage_changed', 
+                userId: user.id, 
+                contactId: updatedDeal.contact_id, 
+                data: { deal: updatedDeal, new_stage_id: updates.stage_id }
+            })
+        }).catch(err => console.error("Failed to call deal_stage_changed trigger API", err));
+    }
   },
   createDefaultPipeline: async () => {
     const { user, activeTeam } = get();

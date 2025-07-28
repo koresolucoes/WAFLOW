@@ -6,7 +6,7 @@ import Button from '../../../components/common/Button';
 
 const baseInputClass = "w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white placeholder-slate-400 focus:ring-2 focus:ring-sky-500 focus:border-sky-500";
 
-const ActionSettings: React.FC<NodeSettingsProps> = ({ node, onConfigChange, availableVariables }) => {
+const ActionSettings: React.FC<NodeSettingsProps> = ({ node, onConfigChange, availableVariables, pipelines, stages }) => {
     const { data } = node;
     const config = (data.config as any) || {};
 
@@ -112,6 +112,61 @@ const ActionSettings: React.FC<NodeSettingsProps> = ({ node, onConfigChange, ava
                         </div>
                     </div>
                 );
+        case 'create_deal': {
+            const stagesForPipeline = stages.filter(s => s.pipeline_id === config.pipeline_id);
+            return (
+                <div className="space-y-3">
+                    <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-1">Nome do Negócio</label>
+                        <InputWithVariables onValueChange={val => handleConfigChange('deal_name', val)} value={config.deal_name || ''} type="text" placeholder="Negócio para {{contact.name}}" className={baseInputClass} variables={availableVariables} />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-1">Valor do Negócio (R$)</label>
+                        <InputWithVariables onValueChange={val => handleConfigChange('deal_value', val)} value={config.deal_value || ''} type="number" placeholder="1500.00" className={baseInputClass} variables={availableVariables} />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-1">Funil</label>
+                        <select value={config.pipeline_id || ''} onChange={(e) => onConfigChange({ ...config, pipeline_id: e.target.value, stage_id: '' })} className={baseInputClass}>
+                            <option value="">Selecione um funil</option>
+                            {pipelines.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                        </select>
+                    </div>
+                    {config.pipeline_id && (
+                        <div>
+                            <label className="block text-sm font-medium text-slate-300 mb-1">Etapa Inicial</label>
+                            <select value={config.stage_id || ''} onChange={(e) => handleConfigChange('stage_id', e.target.value)} className={baseInputClass}>
+                                <option value="">Selecione uma etapa</option>
+                                {stagesForPipeline.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                            </select>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+        case 'update_deal_stage': {
+            const stagesForPipeline = stages.filter(s => s.pipeline_id === config.pipeline_id);
+            return (
+                <div className="space-y-3">
+                     <p className="text-xs text-slate-400">Esta ação irá atualizar o negócio mais recente associado ao contato.</p>
+                     <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-1">Funil de Destino</label>
+                        <select value={config.pipeline_id || ''} onChange={(e) => onConfigChange({ ...config, pipeline_id: e.target.value, stage_id: '' })} className={baseInputClass}>
+                            <option value="">Selecione um funil</option>
+                            {pipelines.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                        </select>
+                    </div>
+                    {config.pipeline_id && (
+                        <div>
+                            <label className="block text-sm font-medium text-slate-300 mb-1">Nova Etapa</label>
+                            <select value={config.stage_id || ''} onChange={(e) => handleConfigChange('stage_id', e.target.value)} className={baseInputClass}>
+                                <option value="">Selecione a nova etapa</option>
+                                {stagesForPipeline.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                            </select>
+                        </div>
+                    )}
+                </div>
+            );
+        }
         default:
              return <p className="text-slate-400">Nenhuma configuração necessária para este nó de ação.</p>;
     }

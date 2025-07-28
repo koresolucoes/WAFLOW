@@ -1,10 +1,12 @@
 
+
 import { ActionHandler } from '../types.js';
 import { addTag, removeTag, setCustomField } from './contact.js';
 import { sendWebhook } from './integrations.js';
 import { condition, splitPath } from './logic.js';
 import { sendTemplate, sendTextMessageAction, sendMediaAction, sendInteractiveMessageAction } from './messaging.js';
 import { triggerHandler } from './trigger.js';
+import { createDeal, updateDealStage } from './deal.js';
 
 export const actionHandlers: Record<string, ActionHandler> = {
     // Triggers
@@ -13,6 +15,8 @@ export const actionHandlers: Record<string, ActionHandler> = {
     'new_contact': triggerHandler,
     'new_contact_with_tag': triggerHandler,
     'webhook_received': triggerHandler,
+    'deal_created': triggerHandler,
+    'deal_stage_changed': triggerHandler,
 
     // Actions - Contact
     'add_tag': addTag,
@@ -27,6 +31,10 @@ export const actionHandlers: Record<string, ActionHandler> = {
 
     // Actions - Integrations
     'send_webhook': sendWebhook,
+
+    // Actions - Deals
+    'create_deal': createDeal,
+    'update_deal_stage': updateDealStage,
 
     // Logic
     'condition': condition,

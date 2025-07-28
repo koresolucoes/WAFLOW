@@ -5,7 +5,8 @@ import {
     PLUS_ICON,
     TRASH_ICON,
     FILE_TEXT_ICON,
-    WEBHOOK_ICON
+    WEBHOOK_ICON,
+    FUNNEL_ICON
 } from '../../components/icons';
 
 const TagIcon = ({className}: {className?: string}) => <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z"/><path d="M7 7h.01"/></svg>;
@@ -25,6 +26,8 @@ export const nodeIcons: Record<string, React.FC<{ className?: string }>> = {
     'new_contact': UserPlusIcon,
     'new_contact_with_tag': TagIcon,
     'webhook_received': WEBHOOK_ICON,
+    'deal_created': FUNNEL_ICON,
+    'deal_stage_changed': FUNNEL_ICON,
     // Actions
     'send_template': FILE_TEXT_ICON,
     'send_text_message': MessageIcon,
@@ -34,6 +37,8 @@ export const nodeIcons: Record<string, React.FC<{ className?: string }>> = {
     'send_media': MediaIcon,
     'send_interactive_message': InteractiveIcon,
     'send_webhook': SEND_ICON,
+    'create_deal': FUNNEL_ICON,
+    'update_deal_stage': FUNNEL_ICON,
     // Logic
     'condition': ConditionIcon,
     'split_path': SplitIcon,

@@ -247,7 +247,9 @@ const AutomationEditor: FC = () => {
         allTags, 
         profile, 
         pageParams, 
-        setCurrentPage 
+        setCurrentPage,
+        pipelines,
+        stages
     } = useAuthStore();
     const addToast = useUiStore(state => state.addToast);
 
@@ -456,6 +458,8 @@ const AutomationEditor: FC = () => {
                     templates={templates}
                     allTags={allTags}
                     profile={profile}
+                    pipelines={pipelines}
+                    stages={stages}
                 />
                 <NodeLogsModal
                     isOpen={isLogsModalOpen}

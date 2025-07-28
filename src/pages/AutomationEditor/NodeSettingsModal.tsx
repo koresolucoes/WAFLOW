@@ -1,6 +1,6 @@
 import React, { useMemo, useContext } from 'react';
 import { Node } from '@xyflow/react';
-import { AutomationNode, MessageTemplate, Profile, AutomationNodeData } from '../../types';
+import { AutomationNode, MessageTemplate, Profile, AutomationNodeData, Pipeline, PipelineStage } from '../../types';
 import Button from '../../components/common/Button';
 import { getContextVariables } from './node-settings/common';
 import { nodeConfigs } from '../../lib/automation/nodeConfigs';
@@ -16,6 +16,8 @@ interface NodeSettingsModalProps {
     templates: MessageTemplate[];
     allTags: string[];
     profile: Profile | null;
+    pipelines: Pipeline[];
+    stages: PipelineStage[];
 }
 
 const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({ 
@@ -27,7 +29,9 @@ const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
     automationId,
     templates,
     allTags,
-    profile
+    profile,
+    pipelines,
+    stages
 }) => {
     
     const availableVariables = useMemo(() => getContextVariables(nodes), [nodes]);
@@ -82,6 +86,8 @@ const NodeSettingsModal: React.FC<NodeSettingsModalProps> = ({
                        allTags={allTags}
                        profile={profile}
                        automationId={automationId}
+                       pipelines={pipelines}
+                       stages={stages}
                     />
                 </main>
 

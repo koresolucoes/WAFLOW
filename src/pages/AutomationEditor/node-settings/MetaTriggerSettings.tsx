@@ -1,12 +1,12 @@
 
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { NodeSettingsProps } from './common';
 import { InputWithVariables } from './common';
 
 const baseInputClass = "w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white placeholder-slate-400 focus:ring-2 focus:ring-sky-500 focus:border-sky-500";
 
-const MetaTriggerSettings: React.FC<NodeSettingsProps> = ({ node, onConfigChange, availableVariables, allTags }) => {
+const MetaTriggerSettings: React.FC<NodeSettingsProps> = ({ node, onConfigChange, availableVariables, allTags, pipelines, stages }) => {
     const { data } = node;
     const config = (data.config as any) || {};
 
@@ -102,6 +102,34 @@ const MetaTriggerSettings: React.FC<NodeSettingsProps> = ({ node, onConfigChange
 
         case 'new_contact':
              return <p className="text-slate-400">Este gatilho é acionado sempre que um novo contato é criado no sistema (seja via webhook ou importação, quando aplicável).</p>;
+        
+        case 'deal_created':
+             return <p className="text-slate-400">Este gatilho é acionado sempre que um novo negócio é criado para qualquer contato.</p>;
+
+        case 'deal_stage_changed': {
+            const stagesForPipeline = stages.filter(s => s.pipeline_id === config.pipeline_id);
+            return (
+                <div className="space-y-3">
+                    <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-1">Funil</label>
+                        <select value={config.pipeline_id || ''} onChange={(e) => onConfigChange({ ...config, pipeline_id: e.target.value, stage_id: '' })} className={baseInputClass}>
+                            <option value="">Qualquer Funil</option>
+                            {pipelines.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                        </select>
+                    </div>
+                    {config.pipeline_id && (
+                        <div>
+                            <label className="block text-sm font-medium text-slate-300 mb-1">Quando o negócio entrar na etapa</label>
+                            <select value={config.stage_id || ''} onChange={(e) => handleConfigChange('stage_id', e.target.value)} className={baseInputClass}>
+                                <option value="">Qualquer Etapa</option>
+                                {stagesForPipeline.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                            </select>
+                        </div>
+                    )}
+                    <p className="text-xs text-slate-400 mt-1">A automação iniciará quando um negócio for movido para a etapa especificada.</p>
+                </div>
+            )
+        }
 
         default:
              return <p className="text-slate-400">Nenhuma configuração necessária para este gatilho.</p>;
