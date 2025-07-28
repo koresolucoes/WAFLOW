@@ -4,9 +4,11 @@ import Button from '../../components/common/Button';
 import { TRASH_ICON, PLUS_ICON } from '../../components/icons';
 import { Pipeline, PipelineStage, StageType } from '../../types';
 import { useAuthStore } from '../../stores/authStore';
+import { useUiStore } from '../../stores/uiStore';
 
 const StageRow: React.FC<{ stage: PipelineStage }> = ({ stage }) => {
     const { updateStage, deleteStage } = useAuthStore();
+    const { showConfirmation, addToast } = useUiStore();
     const [name, setName] = useState(stage.name);
 
     const handleNameBlur = () => {
@@ -22,9 +24,18 @@ const StageRow: React.FC<{ stage: PipelineStage }> = ({ stage }) => {
     };
 
     const handleDelete = () => {
-        if (window.confirm("A exclusão de uma etapa é permanente. Todos os negócios nesta etapa precisarão ser movidos. Deseja continuar?")) {
-            deleteStage(stage.id);
-        }
+        showConfirmation(
+            'Excluir Etapa',
+            "A exclusão de uma etapa é permanente. Todos os negócios nesta etapa precisarão ser movidos. Deseja continuar?",
+            async () => {
+                try {
+                    await deleteStage(stage.id);
+                    addToast('Etapa excluída.', 'success');
+                } catch(err: any) {
+                    addToast(`Erro ao excluir: ${err.message}`, 'error');
+                }
+            }
+        );
     };
 
     return (
@@ -56,6 +67,7 @@ const StageRow: React.FC<{ stage: PipelineStage }> = ({ stage }) => {
 
 const PipelineManagerModal: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ isOpen, onClose }) => {
     const { pipelines, stages, addPipeline, updatePipeline, deletePipeline, addStage } = useAuthStore();
+    const { showConfirmation, addToast } = useUiStore();
     const [newPipelineName, setNewPipelineName] = useState('');
     const [editingPipelineId, setEditingPipelineId] = useState<string | null>(null);
     const [editingName, setEditingName] = useState('');
@@ -77,9 +89,18 @@ const PipelineManagerModal: React.FC<{ isOpen: boolean; onClose: () => void; }> 
     };
 
     const handleDelete = (pipelineId: string) => {
-        if (window.confirm("Tem certeza que deseja excluir este funil? Todos os negócios e etapas associados serão perdidos permanentemente.")) {
-            deletePipeline(pipelineId);
-        }
+        showConfirmation(
+            'Excluir Funil',
+            "Tem certeza que deseja excluir este funil? Todos os negócios e etapas associados serão perdidos permanentemente.",
+            async () => {
+                try {
+                    await deletePipeline(pipelineId);
+                    addToast('Funil excluído.', 'success');
+                } catch (err: any) {
+                    addToast(`Erro ao excluir funil: ${err.message}`, 'error');
+                }
+            }
+        );
     };
 
     return (

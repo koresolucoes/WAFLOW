@@ -4,6 +4,7 @@ import DealCard from './DealCard';
 import { useAuthStore } from '../../stores/authStore';
 import { TRASH_ICON } from '../../components/icons';
 import Button from '../../components/common/Button';
+import { useUiStore } from '../../stores/uiStore';
 
 interface StageColumnProps {
     stage: PipelineStage;
@@ -15,6 +16,7 @@ interface StageColumnProps {
 
 const StageColumn: React.FC<StageColumnProps> = ({ stage, deals, onDragStart, onDrop, draggedDealId }) => {
     const { updateStage, deleteStage } = useAuthStore();
+    const { showConfirmation, addToast } = useUiStore();
     const [isEditing, setIsEditing] = useState(false);
     const [name, setName] = useState(stage.name);
     const [isDragOver, setIsDragOver] = useState(false);
@@ -30,12 +32,21 @@ const StageColumn: React.FC<StageColumnProps> = ({ stage, deals, onDragStart, on
     
     const handleDelete = () => {
         if (deals.length > 0) {
-            alert(`Não é possível excluir a etapa "${stage.name}" porque ela contém ${deals.length} negócio(s). Por favor, mova os negócios para outra etapa antes de excluir.`);
+            addToast(`Não é possível excluir a etapa "${stage.name}" porque ela contém ${deals.length} negócio(s). Mova-os primeiro.`, 'warning');
             return;
         }
-        if (window.confirm(`Tem certeza de que deseja excluir a etapa "${stage.name}"?`)) {
-            deleteStage(stage.id);
-        }
+        showConfirmation(
+            'Excluir Etapa',
+            `Tem certeza de que deseja excluir a etapa "${stage.name}"?`,
+            async () => {
+                try {
+                    await deleteStage(stage.id);
+                    addToast('Etapa excluída com sucesso.', 'success');
+                } catch (err: any) {
+                    addToast(`Erro ao excluir etapa: ${err.message}`, 'error');
+                }
+            }
+        );
     };
 
     const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {

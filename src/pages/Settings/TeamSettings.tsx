@@ -4,9 +4,11 @@ import * as teamService from '../../services/teamService';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import { USER_PLUS_ICON, TRASH_ICON } from '../../components/icons';
+import { useUiStore } from '../../stores/uiStore';
 
 const TeamSettings: React.FC = () => {
     const { activeTeam, user, allTeamMembers, teamLoading } = useAuthStore();
+    const { showConfirmation, addToast } = useUiStore();
     const [error, setError] = useState<string | null>(null);
     const [inviteEmail, setInviteEmail] = useState('');
     const [isInviting, setIsInviting] = useState(false);
@@ -42,22 +44,26 @@ const TeamSettings: React.FC = () => {
             await teamService.updateTeamMemberRole(activeTeam.id, userId, newRole);
             // The authStore listener should ideally handle this update via realtime
             // For now, an optimistic update would be too complex, let's rely on a page refresh or realtime.
-            alert("Função atualizada. A alteração pode levar alguns instantes para ser refletida.");
+            addToast("Função atualizada. A alteração pode levar alguns instantes para ser refletida.", 'info');
         } catch (err: any) {
-            alert(`Erro ao atualizar função: ${err.message}`);
+            addToast(`Erro ao atualizar função: ${err.message}`, 'error');
         }
     };
     
     const handleRemoveMember = async (userId: string) => {
         if (!activeTeam) return;
-        if (window.confirm("Tem certeza de que deseja remover este membro da equipe?")) {
-            try {
-                await teamService.removeTeamMember(activeTeam.id, userId);
-                 // The authStore listener should ideally handle this update via realtime
-            } catch (err: any) {
-                alert(`Erro ao remover membro: ${err.message}`);
+        showConfirmation(
+            'Remover Membro',
+            "Tem certeza de que deseja remover este membro da equipe?",
+            async () => {
+                try {
+                    await teamService.removeTeamMember(activeTeam.id, userId);
+                    addToast('Membro removido com sucesso.', 'success');
+                } catch (err: any) {
+                    addToast(`Erro ao remover membro: ${err.message}`, 'error');
+                }
             }
-        }
+        );
     };
 
     if (!activeTeam) {

@@ -5,6 +5,7 @@ import Switch from '../../components/common/Switch';
 import Button from '../../components/common/Button';
 import { TRASH_ICON } from '../../components/icons';
 import { useAuthStore } from '../../stores/authStore';
+import { useUiStore } from '../../stores/uiStore';
 
 interface AutomationCardProps {
     automation: Automation;
@@ -12,15 +13,25 @@ interface AutomationCardProps {
 
 const AutomationCard: React.FC<AutomationCardProps> = ({ automation }) => {
     const { updateAutomation, deleteAutomation, setCurrentPage } = useAuthStore();
+    const { showConfirmation, addToast } = useUiStore();
 
     const handleStatusChange = async (checked: boolean) => {
         await updateAutomation({ ...automation, status: checked ? 'active' : 'paused' });
     };
 
     const handleDelete = async () => {
-        if (window.confirm(`Tem certeza que deseja excluir a automação "${automation.name}"?`)) {
-            await deleteAutomation(automation.id);
-        }
+        showConfirmation(
+            'Excluir Automação',
+            `Tem certeza que deseja excluir a automação "${automation.name}"?`,
+            async () => {
+                try {
+                    await deleteAutomation(automation.id);
+                    addToast('Automação excluída com sucesso.', 'success');
+                } catch (err: any) {
+                    addToast(`Erro ao excluir automação: ${err.message}`, 'error');
+                }
+            }
+        );
     };
     
     const handleEdit = () => {

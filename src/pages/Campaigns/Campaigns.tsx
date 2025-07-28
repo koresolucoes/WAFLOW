@@ -80,7 +80,7 @@ const CampaignCard: React.FC<{ campaign: CampaignWithMetrics; onViewDetails: () 
 
 const Campaigns: React.FC = () => {
     const { campaigns, deleteCampaign, setCurrentPage } = useAuthStore();
-    const addToast = useUiStore(state => state.addToast);
+    const { addToast, showConfirmation } = useUiStore();
     const [searchTerm, setSearchTerm] = useState('');
 
     const filteredCampaigns = useMemo(() => {
@@ -92,14 +92,18 @@ const Campaigns: React.FC = () => {
     }, [campaigns, searchTerm]);
 
     const handleDeleteCampaign = async (campaignId: string, campaignName: string) => {
-        if (window.confirm(`Tem certeza de que deseja excluir a campanha "${campaignName}"? Esta ação não pode ser desfeita e excluirá todos os seus dados.`)) {
-            try {
-                await deleteCampaign(campaignId);
-                addToast(`Campanha "${campaignName}" excluída.`, 'success');
-            } catch (err: any) {
-                addToast(`Erro ao excluir campanha: ${err.message}`, 'error');
+        showConfirmation(
+            'Excluir Campanha',
+            `Tem certeza de que deseja excluir a campanha "${campaignName}"? Esta ação não pode ser desfeita e excluirá todos os seus dados.`,
+            async () => {
+                try {
+                    await deleteCampaign(campaignId);
+                    addToast(`Campanha "${campaignName}" excluída.`, 'success');
+                } catch (err: any) {
+                    addToast(`Erro ao excluir campanha: ${err.message}`, 'error');
+                }
             }
-        }
+        );
     };
 
 

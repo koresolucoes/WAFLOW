@@ -2,6 +2,7 @@ import React, { Suspense, lazy, useEffect } from 'react';
 import { useAuthStore } from './stores/authStore';
 import MainLayout from './components/layout/MainLayout';
 import { ToastContainer } from './components/common/Toast';
+import ConfirmationModal from './components/common/ConfirmationModal';
 
 const Auth = lazy(() => import('./pages/Auth/Auth'));
 const Dashboard = lazy(() => import('./pages/Dashboard/Dashboard'));
@@ -113,6 +114,7 @@ const App: React.FC = () => {
         </MainLayout>
       )}
       <ToastContainer />
+      <ConfirmationModal />
     </>
   );
 };

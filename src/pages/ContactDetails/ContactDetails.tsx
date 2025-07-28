@@ -8,6 +8,7 @@ import Activities from './Activities';
 import { useAuthStore } from '../../stores/authStore';
 import { fetchContactTimeline } from '../../services/contactService';
 import DealFormModal from '../../components/common/DealFormModal';
+import { useUiStore } from '../../stores/uiStore';
 
 const ContactDetails: React.FC = () => {
     const { 
@@ -24,6 +25,7 @@ const ContactDetails: React.FC = () => {
         user,
         activeTeam
     } = useAuthStore();
+    const addToast = useUiStore(state => state.addToast);
 
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
@@ -109,8 +111,9 @@ const ContactDetails: React.FC = () => {
         setIsSaving(true);
         try {
             await updateContact(localContact);
+            addToast('Contato salvo com sucesso!', 'success');
         } catch (err: any) {
-            alert(`Erro ao salvar: ${err.message}`);
+            addToast(`Erro ao salvar: ${err.message}`, 'error');
         } finally {
             setIsSaving(false);
         }
@@ -121,8 +124,9 @@ const ContactDetails: React.FC = () => {
         try {
             await addDeal({ ...dealData, contact_id: pageParams.contactId });
             setIsDealModalOpen(false);
+            addToast('Negócio criado com sucesso!', 'success');
         } catch (err: any) {
-            alert(`Erro ao criar negócio: ${err.message}`);
+            addToast(`Erro ao criar negócio: ${err.message}`, 'error');
         }
     };
 

@@ -39,7 +39,7 @@ const ContactRow: React.FC<{ contact: Contact; onViewDetails: () => void; onDele
 
 const Contacts: React.FC = () => {
     const { contacts, addContact, updateContact, deleteContact, importContacts, sendDirectMessages, setCurrentPage } = useAuthStore();
-    const addToast = useUiStore(state => state.addToast);
+    const { addToast, showConfirmation } = useUiStore();
     const [isFormModalOpen, setIsFormModalOpen] = useState(false);
     const [isDirectMessageModalOpen, setIsDirectMessageModalOpen] = useState(false);
     const [editingContact, setEditingContact] = useState<Contact | undefined>(undefined);
@@ -88,14 +88,18 @@ const Contacts: React.FC = () => {
     };
 
     const handleDeleteContact = async (contact: Contact) => {
-        if (window.confirm(`Tem certeza de que deseja excluir o contato "${contact.name}"?`)) {
-            try {
-                await deleteContact(contact.id);
-                addToast('Contato excluído.', 'success');
-            } catch (err: any) {
-                addToast(`Erro ao excluir contato: ${err.message}`, 'error');
+        showConfirmation(
+            'Excluir Contato',
+            `Tem certeza de que deseja excluir o contato "${contact.name}"?`,
+            async () => {
+                try {
+                    await deleteContact(contact.id);
+                    addToast('Contato excluído.', 'success');
+                } catch (err: any) {
+                    addToast(`Erro ao excluir contato: ${err.message}`, 'error');
+                }
             }
-        }
+        );
     };
 
     const handleImportClick = () => {

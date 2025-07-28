@@ -4,19 +4,26 @@ import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import AddCustomFieldModal from '../../components/common/AddCustomFieldModal';
 import { PLUS_ICON, TRASH_ICON } from '../../components/icons';
+import { useUiStore } from '../../stores/uiStore';
 
 const CustomFieldsSettings: React.FC = () => {
     const { definitions, deleteDefinition } = useAuthStore();
+    const { showConfirmation, addToast } = useUiStore();
     const [isModalOpen, setIsModalOpen] = useState(false);
     
     const handleDelete = async (id: string) => {
-        if (window.confirm("Tem certeza que deseja excluir este campo? Esta ação não pode ser desfeita.")) {
-            try {
-                await deleteDefinition(id);
-            } catch (err: any) {
-                alert(`Erro ao excluir: ${err.message}`);
+        showConfirmation(
+            'Excluir Campo',
+            "Tem certeza que deseja excluir este campo? Esta ação não pode ser desfeita.",
+            async () => {
+                try {
+                    await deleteDefinition(id);
+                    addToast('Campo excluído com sucesso.', 'success');
+                } catch (err: any) {
+                    addToast(`Erro ao excluir: ${err.message}`, 'error');
+                }
             }
-        }
+        );
     };
 
     return (

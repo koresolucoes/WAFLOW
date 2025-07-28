@@ -6,6 +6,7 @@ import Modal from '../../components/common/Modal';
 import { CannedResponse, CannedResponseInsert } from '../../types';
 import { PLUS_ICON, TRASH_ICON, BOLT_ICON } from '../../components/icons';
 import { TablesUpdate } from '../../types/database.types';
+import { useUiStore } from '../../stores/uiStore';
 
 const CannedResponseForm: React.FC<{
     response?: CannedResponse;
@@ -63,6 +64,7 @@ const CannedResponseForm: React.FC<{
 
 const CannedResponsesSettings: React.FC = () => {
     const { responses, addResponse, updateResponse, deleteResponse } = useAuthStore();
+    const { showConfirmation, addToast } = useUiStore();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingResponse, setEditingResponse] = useState<CannedResponse | null>(null);
 
@@ -85,9 +87,18 @@ const CannedResponsesSettings: React.FC = () => {
     };
 
     const handleDelete = async (id: string) => {
-        if (window.confirm("Tem certeza que deseja excluir esta resposta?")) {
-            await deleteResponse(id);
-        }
+        showConfirmation(
+            'Excluir Resposta Rápida',
+            "Tem certeza que deseja excluir esta resposta?",
+            async () => {
+                try {
+                    await deleteResponse(id);
+                    addToast('Resposta excluída.', 'success');
+                } catch(err: any) {
+                    addToast(`Erro ao excluir: ${err.message}`, 'error');
+                }
+            }
+        );
     };
 
     return (
