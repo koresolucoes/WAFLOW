@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import Card from '../../components/common/Card';
 import { useAuthStore } from '../../stores/authStore';
 import { CustomTooltip } from './Dashboard';
@@ -33,12 +33,13 @@ const SalesMetrics: React.FC = () => {
 
     const funnelChartData = useMemo(() => {
         const activeStages = stages
-            .filter(s => s.pipeline_id === activePipelineId && s.type === 'Intermediária')
+            .filter(s => s.pipeline_id === activePipelineId)
             .sort((a, b) => a.sort_order - b.sort_order);
             
         return activeStages.map(stage => ({
             name: stage.name,
             Negócios: deals.filter(d => d.stage_id === stage.id).length,
+            fill: stage.type === 'Ganho' ? '#22c55e' : stage.type === 'Perdido' ? '#ef4444' : '#0ea5e9',
         }));
     }, [stages, deals, activePipelineId]);
 
@@ -64,10 +65,14 @@ const SalesMetrics: React.FC = () => {
                 <ResponsiveContainer width="100%" height={250}>
                     <BarChart data={funnelChartData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                        <XAxis dataKey="name" tick={{ fill: '#94a3b8' }} fontSize={12} />
+                        <XAxis dataKey="name" tick={{ fill: '#94a3b8' }} fontSize={12} interval={0} angle={-15} textAnchor="end" height={50} />
                         <YAxis tick={{ fill: '#94a3b8' }} allowDecimals={false} />
                         <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(14, 165, 233, 0.1)' }} />
-                        <Bar dataKey="Negócios" fill="#0ea5e9" name="Negócios" barSize={40} />
+                        <Bar dataKey="Negócios" name="Negócios" barSize={40}>
+                            {funnelChartData.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={entry.fill} />
+                            ))}
+                        </Bar>
                     </BarChart>
                 </ResponsiveContainer>
             ) : (

@@ -33,12 +33,18 @@ const TodaysTasksCard: React.FC = () => {
                     {todaysTasks.map(task => (
                         <li 
                             key={task.id} 
-                            className="p-3 bg-slate-900/50 rounded-lg cursor-pointer hover:bg-slate-700/50"
-                            onClick={() => task.contacts?.id && setCurrentPage('contact-details', { contactId: task.contacts.id })}
+                            className="p-3 bg-slate-900/50 rounded-lg"
                         >
                             <p className="text-sm text-slate-200">{task.content}</p>
                             <div className="flex justify-between items-center mt-2 text-xs">
-                                <span className="font-semibold text-sky-400 truncate pr-2">{task.contacts?.name}</span>
+                                <button
+                                    onClick={() => task.contacts?.id && setCurrentPage('contact-details', { contactId: task.contacts.id })}
+                                    className="font-semibold text-sky-400 truncate pr-2 hover:underline disabled:no-underline disabled:text-slate-400 disabled:cursor-default text-left"
+                                    disabled={!task.contacts?.id}
+                                    title={task.contacts?.id ? `Ver detalhes de ${task.contacts.name}` : 'Nenhum contato associado'}
+                                >
+                                    {task.contacts?.name || 'Contato não associado'}
+                                </button>
                                 {task.due_date && (
                                     <span className={`flex items-center gap-1 font-mono ${isOverdue(task.due_date) ? 'text-red-400' : 'text-slate-400'}`}>
                                         <CALENDAR_ICON className="w-3 h-3" />
