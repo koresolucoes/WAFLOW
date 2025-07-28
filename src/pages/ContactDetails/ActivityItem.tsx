@@ -1,6 +1,7 @@
 import React from 'react';
 import { ContactActivity } from '../../types';
 import { useAuthStore } from '../../stores/authStore';
+import { useUiStore } from '../../stores/uiStore';
 import { NOTE_ICON, CALENDAR_ICON, TRASH_ICON, CHECK_SQUARE_ICON } from '../../components/icons';
 import Button from '../../components/common/Button';
 
@@ -11,6 +12,7 @@ interface ActivityItemProps {
 
 const ActivityItem: React.FC<ActivityItemProps> = ({ activity, onDataChange }) => {
     const { updateActivity, deleteActivity } = useAuthStore();
+    const { showConfirmation, addToast } = useUiStore();
     const isTask = activity.type === 'TAREFA';
 
     const handleToggleComplete = async () => {
@@ -20,10 +22,19 @@ const ActivityItem: React.FC<ActivityItemProps> = ({ activity, onDataChange }) =
     };
 
     const handleDelete = async () => {
-        if (window.confirm("Tem certeza que deseja excluir esta atividade?")) {
-            await deleteActivity(activity.id);
-            onDataChange();
-        }
+        showConfirmation(
+            'Excluir Atividade',
+            "Tem certeza que deseja excluir esta atividade?",
+            async () => {
+                try {
+                    await deleteActivity(activity.id);
+                    onDataChange();
+                    addToast('Atividade excluída.', 'success');
+                } catch (err: any) {
+                    addToast(`Erro ao excluir atividade: ${err.message}`, 'error');
+                }
+            }
+        );
     };
     
     const formatDate = (dateString: string | null) => {
