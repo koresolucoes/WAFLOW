@@ -1,11 +1,18 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { sendTemplatedMessage } from '../../services/meta/messages';
+import { getMetaTemplateById } from '../../services/meta/templates';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import Modal from '../../components/common/Modal';
-import InfoCard from '../../components/common/InfoCard';
-import { Contact, CampaignStatus } from '../../types';
+import { MessageInsert, Contact, MessageTemplate } from '../../types';
 import TemplatePreview from '../../components/common/TemplatePreview';
-import { useAuthStore } from '../../stores/authStore';
+import { useAuthStore, useMetaConfig } from '../../stores/authStore';
+
+interface SendResult {
+    success: boolean;
+    contact: Contact;
+    error?: string;
+}
 
 // Helper functions for variable substitution
 const getValueFromPath = (obj: any, path: string): any => {
@@ -30,6 +37,7 @@ const resolveVariables = (text: string, context: { contact: Contact | null }): s
 
 const NewCampaign: React.FC = () => {
   const { templates, contacts, addCampaign, pageParams, setCurrentPage } = useAuthStore();
+  const metaConfig = useMetaConfig();
   
   const [campaignName, setCampaignName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -41,10 +49,10 @@ const NewCampaign: React.FC = () => {
   
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [isResultsModalOpen, setIsResultsModalOpen] = useState(false);
+  const [sendResults, setSendResults] = useState<SendResult[]>([]);
 
   const [isScheduled, setIsScheduled] = useState(false);
   const [scheduleDate, setScheduleDate] = useState('');
-  const [throttleRate, setThrottleRate] = useState(60);
 
 
   const template = useMemo(() => {
@@ -146,30 +154,196 @@ const NewCampaign: React.FC = () => {
   }
 
   const handleLaunch = async () => {
-    if (!template) return;
     setIsConfirmModalOpen(false);
     setIsLoading(true);
     setError(null);
+    
+    if (isScheduled) {
+        await handleScheduleCampaign();
+    } else {
+        await handleSendCampaignNow();
+    }
 
+    setIsLoading(false);
+  };
+
+  const handleScheduleCampaign = async () => {
+    if (!template) return;
     try {
-        const campaignData = {
-            name: campaignName,
-            template_id: template.id,
-            status: (isScheduled ? 'Scheduled' : 'Sending') as CampaignStatus,
-            sent_at: isScheduled ? new Date(scheduleDate).toISOString() : new Date().toISOString(),
-            throttle_rate: throttleRate,
-            throttle_unit: 'minute' as 'minute' | 'hour',
-        };
+        const messagesToInsert: Omit<MessageInsert, 'campaign_id' | 'team_id'>[] = recipients.map(contact => {
+             const bodyComponentText = template.components.find(c => c.type === 'BODY')?.text || '';
+             let resolvedContent = bodyComponentText;
+             const placeholdersInBody = bodyComponentText.match(/\{\{\d+\}\}/g) || [];
+             for (const placeholder of placeholdersInBody) {
+                  let resolvedValue = '';
+                  if(placeholder === '{{1}}') {
+                      resolvedValue = contact.name;
+                  } else {
+                      resolvedValue = resolveVariables(templateVariables[placeholder] || '', { contact });
+                  }
+                  resolvedContent = resolvedContent.replace(placeholder, resolvedValue);
+             }
+             return {
+                contact_id: contact.id,
+                status: 'pending',
+                type: 'outbound',
+                source: 'campaign',
+                content: resolvedContent,
+             };
+        });
 
-        await addCampaign(campaignData, recipients.map(r => r.id), templateVariables);
+        await addCampaign(
+            {
+              name: campaignName,
+              template_id: template.id,
+              status: 'Scheduled',
+              sent_at: new Date(scheduleDate).toISOString(),
+            },
+            messagesToInsert
+        );
+        
+        setSendResults([]);
         setIsResultsModalOpen(true);
 
-    } catch (err: any) {
+    } catch(err: any) {
         setError(err.message);
-    } finally {
-        setIsLoading(false);
     }
-};
+  };
+
+  const handleSendCampaignNow = async () => {
+    if (!template || !metaConfig.phoneNumberId || !metaConfig.accessToken) {
+      setError("Configuração ou template inválido. Tente novamente.");
+      return;
+    }
+    
+    const results: SendResult[] = [];
+    try {
+      if (!template.meta_id) {
+        throw new Error(`Este template não está sincronizado com a Meta. Por favor, sincronize seus templates e tente novamente.`);
+      }
+
+      let metaTemplateDetails: { name: string; language: string; };
+      try {
+          metaTemplateDetails = await getMetaTemplateById(metaConfig, template.meta_id);
+      } catch (err: any) {
+          throw new Error(`Falha ao verificar o template na Meta: ${err.message}. Certifique-se de que o template existe e está aprovado.`);
+      }
+        
+      const messagesToInsert: Omit<MessageInsert, 'campaign_id' | 'team_id'>[] = [];
+      
+      const promises = recipients.map(contact => (async () => {
+        try {
+            const context = { contact };
+            const resolvePlaceholder = (placeholder: string) => {
+                const rawValue = placeholder === '{{1}}' ? '{{contact.name}}' : (templateVariables[placeholder] || '');
+                return resolveVariables(rawValue, context);
+            };
+
+            const finalComponents: any[] = [];
+            const templateComponents = template.components || [];
+
+            // Process HEADER
+            const headerComponent = templateComponents.find(c => c.type === 'HEADER');
+            if (headerComponent?.text) {
+                const headerPlaceholders = headerComponent.text.match(/\{\{\d+\}\}/g) || [];
+                if (headerPlaceholders.length > 0) {
+                    const parameters = headerPlaceholders.map(p => ({ type: 'text', text: resolvePlaceholder(p) }));
+                    finalComponents.push({ type: 'header', parameters });
+                }
+            }
+
+            // Process BODY
+            const bodyComponent = templateComponents.find(c => c.type === 'BODY');
+            if (bodyComponent?.text) {
+                const bodyPlaceholders = bodyComponent.text.match(/\{\{\d+\}\}/g) || [];
+                if (bodyPlaceholders.length > 0) {
+                    const parameters = bodyPlaceholders.map(p => ({ type: 'text', text: resolvePlaceholder(p) }));
+                    finalComponents.push({ type: 'body', parameters });
+                }
+            }
+
+            // Process BUTTONS
+            const buttonsComponent = templateComponents.find(c => c.type === 'BUTTONS');
+            if (buttonsComponent?.buttons) {
+                buttonsComponent.buttons.forEach((button, index) => {
+                    if (button.type === 'URL' && button.url) {
+                        const buttonPlaceholders = button.url.match(/\{\{\d+\}\}/g) || [];
+                        if (buttonPlaceholders.length > 0) {
+                            const parameters = buttonPlaceholders.map(p => ({ type: 'text', text: resolvePlaceholder(p) }));
+                            finalComponents.push({
+                                type: 'button',
+                                sub_type: 'url',
+                                index: String(index),
+                                parameters: parameters,
+                            });
+                        }
+                    }
+                });
+            }
+            
+            const response = await sendTemplatedMessage(
+                metaConfig,
+                contact.phone,
+                metaTemplateDetails.name,
+                metaTemplateDetails.language,
+                finalComponents.length > 0 ? finalComponents : undefined
+            );
+
+            let resolvedContent = bodyComponent?.text || '';
+            const placeholdersInBody = resolvedContent.match(/\{\{\d+\}\}/g) || [];
+            for (const placeholder of placeholdersInBody) {
+                resolvedContent = resolvedContent.replace(placeholder, resolvePlaceholder(placeholder));
+            }
+          
+            messagesToInsert.push({
+                contact_id: contact.id,
+                meta_message_id: response.messages[0].id,
+                status: 'sent',
+                type: 'outbound',
+                source: 'campaign',
+                content: resolvedContent,
+                sent_at: new Date().toISOString()
+            });
+            results.push({ success: true, contact });
+
+        } catch (err: any) {
+            console.error(`Falha ao enviar para ${contact.name} (${contact.phone}): ${err.message}`);
+            messagesToInsert.push({
+                contact_id: contact.id,
+                status: 'failed',
+                error_message: err.message,
+                type: 'outbound',
+                source: 'campaign',
+                content: template.components.find(c => c.type === 'BODY')?.text || ''
+            });
+            results.push({ success: false, contact, error: err.message });
+        }
+      })());
+
+      await Promise.all(promises);
+
+      const successCount = results.filter(r => r.success).length;
+      if (successCount > 0 || messagesToInsert.length > 0) {
+          await addCampaign(
+            {
+              name: campaignName,
+              template_id: template.id,
+              status: 'Sent',
+              sent_at: new Date().toISOString(),
+            },
+            messagesToInsert
+          );
+      } else {
+        throw new Error("Falha total no envio. Nenhuma mensagem pôde ser processada. Verifique os erros e a configuração da Meta.");
+      }
+      
+      setSendResults(results);
+      setIsResultsModalOpen(true);
+
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
   
   const previewName = useMemo(() => {
      return recipients[0]?.name || contacts[0]?.name || 'Cliente';
@@ -188,6 +362,8 @@ const NewCampaign: React.FC = () => {
 
   const variablePlaceholders = placeholders.filter(p => p !== '{{1}}');
   
+  const successfulSends = sendResults.filter(r => r.success).length;
+  const failedSends = sendResults.filter(r => !r.success);
 
   return (
     <>
@@ -211,25 +387,7 @@ const NewCampaign: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">2. Controle de Velocidade</label>
-               <div className="p-4 bg-slate-700/50 rounded-md space-y-2">
-                    <label htmlFor="throttleRate" className="block text-xs font-medium text-slate-400">Mensagens por Minuto</label>
-                    <input
-                        type="number"
-                        id="throttleRate"
-                        value={throttleRate}
-                        onChange={(e) => setThrottleRate(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                        min="1"
-                        className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white"
-                    />
-                    <InfoCard>
-                        Controle a velocidade de envio para evitar bloqueios e gerenciar o fluxo de respostas. Recomendamos iniciar com no máximo 60 mensagens/minuto.
-                    </InfoCard>
-                </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">3. Agendamento (Opcional)</label>
+              <label className="block text-sm font-medium text-slate-300 mb-2">2. Agendamento (Opcional)</label>
               <div className="p-4 bg-slate-700/50 rounded-md">
                 <label htmlFor="isScheduled" className="flex items-center cursor-pointer">
                   <input type="checkbox" id="isScheduled" checked={isScheduled} onChange={(e) => setIsScheduled(e.target.checked)} className="h-4 w-4 rounded bg-slate-800 border-slate-600 text-sky-600 focus:ring-sky-500"/>
@@ -253,7 +411,7 @@ const NewCampaign: React.FC = () => {
             
             {variablePlaceholders.length > 0 && (
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">4. Preencher Variáveis</label>
+                <label className="block text-sm font-medium text-slate-300 mb-2">3. Preencher Variáveis</label>
                  <p className="text-xs text-slate-400 mb-2">
                     Você pode usar variáveis como {"{{contact.name}}"}, {"{{contact.email}}"}, ou {"{{contact.custom_fields.sua_chave}}"} nos campos.
                 </p>
@@ -279,7 +437,7 @@ const NewCampaign: React.FC = () => {
 
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">
-                {variablePlaceholders.length > 0 ? '5.' : '4.'} Selecionar Destinatários
+                {variablePlaceholders.length > 0 ? '4.' : '3.'} Selecionar Destinatários
               </label>
               <div className="space-y-3 p-4 bg-slate-700/50 rounded-md">
                   <div className="flex items-center">
@@ -344,11 +502,10 @@ const NewCampaign: React.FC = () => {
           title="Confirmar Campanha"
         >
             <div className="text-slate-300 space-y-4">
-                <p>Você está prestes a {isScheduled ? 'agendar' : 'enfileirar para envio'} a campanha <strong className="text-white">{campaignName}</strong>.</p>
+                <p>Você está prestes a {isScheduled ? 'agendar' : 'enviar'} a campanha <strong className="text-white">{campaignName}</strong>.</p>
                 <div className="p-4 bg-slate-700/50 rounded-lg space-y-2">
                      <p><strong>Template:</strong> <span className="font-mono text-sky-300">{template?.template_name}</span></p>
                      <p><strong>Total de destinatários:</strong> <span className="font-bold text-white">{recipients.length.toLocaleString('pt-BR')}</span></p>
-                     <p><strong>Velocidade:</strong> <span className="font-bold text-white">{throttleRate} mensagens/minuto</span></p>
                      {isScheduled && <p><strong>Agendada para:</strong> <span className="font-bold text-white">{new Date(scheduleDate).toLocaleString('pt-BR')}</span></p>}
                 </div>
                 <p className="text-amber-400 text-sm">Esta ação não pode ser desfeita. Tem certeza de que deseja continuar?</p>
@@ -356,7 +513,7 @@ const NewCampaign: React.FC = () => {
             <div className="mt-6 flex justify-end gap-3">
                 <Button variant="secondary" onClick={() => setIsConfirmModalOpen(false)}>Cancelar</Button>
                 <Button variant="primary" onClick={handleLaunch} isLoading={isLoading}>
-                    Sim, {isScheduled ? 'Agendar Agora' : 'Enfileirar Agora'}
+                    Sim, {isScheduled ? 'Agendar Agora' : 'Enviar Agora'}
                 </Button>
             </div>
         </Modal>
@@ -364,11 +521,29 @@ const NewCampaign: React.FC = () => {
         <Modal
             isOpen={isResultsModalOpen}
             onClose={() => setCurrentPage('campaigns')}
-            title={isScheduled ? "Campanha Agendada!" : "Campanha na Fila de Envio!"}
+            title={isScheduled ? "Campanha Agendada!" : "Resultados do Envio da Campanha"}
         >
             <div className="text-slate-300 space-y-4">
-                <p>A campanha <strong className="text-white">{campaignName}</strong> foi {isScheduled ? 'agendada com sucesso' : 'enfileirada para envio'}.</p>
-                 <p>Você pode acompanhar o progresso na página de Campanhas.</p>
+                <p>A campanha <strong className="text-white">{campaignName}</strong> foi {isScheduled ? 'agendada com sucesso' : 'processada'}.</p>
+                {!isScheduled && (
+                  <div className="p-4 bg-slate-700/50 rounded-lg space-y-2 text-center">
+                    <p className="text-green-400"><strong className="text-2xl">{successfulSends}</strong> envios bem-sucedidos.</p>
+                    <p className="text-red-400"><strong className="text-2xl">{failedSends.length}</strong> envios falharam.</p>
+                  </div>
+                )}
+                {failedSends.length > 0 && (
+                    <div>
+                        <h4 className="font-semibold text-white mb-2">Detalhes das Falhas:</h4>
+                        <div className="max-h-60 overflow-y-auto p-3 bg-slate-900/50 rounded-lg space-y-3">
+                            {failedSends.map((result, index) => (
+                                <div key={index} className="text-sm border-b border-slate-700 pb-2">
+                                    <p className="font-bold text-slate-200">{result.contact.name} ({result.contact.phone})</p>
+                                    <p className="text-red-400 font-mono text-xs mt-1">{result.error}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </div>
             <div className="mt-6 flex justify-end">
                 <Button variant="primary" onClick={() => setCurrentPage('campaigns')}>

@@ -8,7 +8,7 @@ export type Json =
 
 export type PublicEnums = {
   automation_status: "active" | "paused"
-  campaign_status: "Sent" | "Draft" | "Failed" | "Scheduled" | "Sending"
+  campaign_status: "Sent" | "Draft" | "Failed" | "Scheduled"
   custom_field_type: "TEXTO" | "NUMERO" | "DATA" | "LISTA"
   deal_status: "Aberto" | "Ganho" | "Perdido"
   message_source:
@@ -168,40 +168,34 @@ export type PublicTables = {
   }
   campaigns: {
     Row: {
-      created_at: string
       id: string
+      created_at: string
       name: string
       recipient_count: number
       sent_at: string | null
       status: PublicEnums["campaign_status"]
-      team_id: string
       template_id: string | null
-      throttle_rate: number | null
-      throttle_unit: "minute" | "hour" | null
+      team_id: string
     }
     Insert: {
-      created_at?: string
       id?: string
+      created_at?: string
       name: string
       recipient_count?: number
       sent_at?: string | null
       status: PublicEnums["campaign_status"]
-      team_id: string
       template_id?: string | null
-      throttle_rate?: number | null
-      throttle_unit?: "minute" | "hour" | null
+      team_id: string
     }
     Update: {
-      created_at?: string
       id?: string
+      created_at?: string
       name?: string
       recipient_count?: number
       sent_at?: string | null
       status?: PublicEnums["campaign_status"]
-      team_id?: string
       template_id?: string | null
-      throttle_rate?: number | null
-      throttle_unit?: "minute" | "hour" | null
+      team_id?: string
     }
   }
   canned_responses: {

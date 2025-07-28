@@ -12,7 +12,6 @@ export const mapPayloadToUnifiedMessage = (payload: Message): UnifiedMessage => 
         status: payload.status,
         source: payload.source,
         message_template_id: payload.message_template_id,
-        campaign_id: payload.campaign_id,
         replied_to_message_id: payload.replied_to_message_id,
     };
 };

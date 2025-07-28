@@ -52,30 +52,35 @@ export const fetchCampaignDetailsFromDb = async (teamId: string, campaignId: str
 
 export const addCampaignToDb = async (
     teamId: string, 
-    campaignData: Omit<TablesInsert<'campaigns'>, 'id' | 'team_id' | 'created_at' | 'recipient_count'>,
-    recipientCount: number
+    campaign: Omit<Campaign, 'id' | 'team_id' | 'created_at' | 'recipient_count'>, 
+    messages: Omit<MessageInsert, 'campaign_id' | 'team_id'>[]
 ): Promise<Campaign> => {
+     const now = new Date().toISOString();
     const campaignPayload: TablesInsert<'campaigns'> = {
-        ...campaignData,
+        ...campaign,
         team_id: teamId,
-        recipient_count: recipientCount,
+        created_at: now,
+        sent_at: campaign.sent_at || (campaign.status === 'Sent' ? now : null),
+        recipient_count: messages.length,
     };
+    const { data: newCampaignData, error: campaignError } = await supabase.from('campaigns').insert(campaignPayload as any).select('id, created_at, name, recipient_count, sent_at, status, template_id, team_id').single();
 
-    const { data: newCampaignData, error: campaignError } = await supabase
-        .from('campaigns')
-        .insert(campaignPayload as any)
-        .select('*')
-        .single();
+    if (campaignError) throw campaignError;
+    const newCampaign = newCampaignData as any;
+    if (!newCampaign) throw new Error("Failed to create campaign.");
 
-    if (campaignError) {
-        console.error("Error creating campaign in DB:", campaignError);
-        throw campaignError;
+    if (messages.length > 0) {
+        const messagesToInsert = messages.map(msg => ({ ...msg, campaign_id: newCampaign.id, team_id: teamId }));
+        const { error: messagesError } = await supabase.from('messages').insert(messagesToInsert as any);
+
+        if (messagesError) {
+            // Rollback campaign creation if messages fail
+            await supabase.from('campaigns').delete().eq('id', newCampaign.id);
+            throw messagesError;
+        }
     }
-    if (!newCampaignData) {
-        throw new Error("Failed to create campaign record in database.");
-    }
 
-    return newCampaignData as unknown as Campaign;
+    return newCampaign as Campaign;
 };
 
 

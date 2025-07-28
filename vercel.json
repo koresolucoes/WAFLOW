@@ -1,10 +1,4 @@
 {
-  "crons": [
-    {
-      "path": "/api/process-campaign-queue",
-      "schedule": "* * * * *"
-    }
-  ],
   "rewrites": [
     {
       "source": "/((?!api/).*)",
