@@ -37,14 +37,24 @@ const TodaysTasksCard: React.FC = () => {
                         >
                             <p className="text-sm text-slate-200">{task.content}</p>
                             <div className="flex justify-between items-center mt-2 text-xs">
-                                <button
-                                    onClick={() => task.contacts?.id && setCurrentPage('contact-details', { contactId: task.contacts.id })}
-                                    className="font-semibold text-sky-400 truncate pr-2 hover:underline disabled:no-underline disabled:text-slate-400 disabled:cursor-default text-left"
-                                    disabled={!task.contacts?.id}
+                                <a
+                                    href="#"
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        if (task.contacts?.id) {
+                                            setCurrentPage('contact-details', { contactId: task.contacts.id });
+                                        }
+                                    }}
+                                    className={`font-semibold truncate pr-2 text-left ${
+                                        task.contacts?.id
+                                            ? 'text-sky-400 hover:underline cursor-pointer'
+                                            : 'text-slate-400 cursor-default'
+                                    }`}
+                                    aria-disabled={!task.contacts?.id}
                                     title={task.contacts?.id ? `Ver detalhes de ${task.contacts.name}` : 'Nenhum contato associado'}
                                 >
                                     {task.contacts?.name || 'Contato não associado'}
-                                </button>
+                                </a>
                                 {task.due_date && (
                                     <span className={`flex items-center gap-1 font-mono ${isOverdue(task.due_date) ? 'text-red-400' : 'text-slate-400'}`}>
                                         <CALENDAR_ICON className="w-3 h-3" />
