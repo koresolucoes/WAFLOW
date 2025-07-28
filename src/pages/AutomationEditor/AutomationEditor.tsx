@@ -359,8 +359,9 @@ const AutomationEditor: FC = () => {
     useEffect(() => {
         if (!automation) return;
 
-        const channel = supabase.channel(`automation-editor-${automation.id}`);
-        channel.on('broadcast', { event: 'webhook_captured' }, ({ payload }) => {
+        // Channel for webhook data capture
+        const webhookChannel = supabase.channel(`automation-editor-${automation.id}`);
+        webhookChannel.on('broadcast', { event: 'webhook_captured' }, ({ payload }) => {
             if (payload.nodeId) {
                 setNodes(nds => nds.map(n => {
                     if (n.id === payload.nodeId) {
@@ -371,8 +372,28 @@ const AutomationEditor: FC = () => {
                 }));
             }
         }).subscribe();
-        return () => { supabase.removeChannel(channel); };
-    }, [automation, setNodes]);
+
+        // Channel for real-time stat updates
+        const statsChannel = supabase.channel(`automation-stats-${automation.id}`);
+        statsChannel.on(
+            'postgres_changes',
+            {
+                event: '*',
+                schema: 'public',
+                table: 'automation_node_stats',
+                filter: `automation_id=eq.${automation.id}`,
+            },
+            () => {
+                // Refetch all stats for this automation to update the UI
+                fetchAutomationStats(automation.id);
+            }
+        ).subscribe();
+
+        return () => {
+            supabase.removeChannel(webhookChannel);
+            supabase.removeChannel(statsChannel);
+        };
+    }, [automation, setNodes, fetchAutomationStats]);
     
     const selectedNode = useMemo(() => {
         if (!selectedNodeId) return null;
