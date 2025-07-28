@@ -61,9 +61,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const usersById = new Map(relevantUsers.map((u: User) => [u.id, u]));
         
         const result = members.map(member => ({
-            team_id: member.team_id,
-            user_id: member.user_id,
-            role: member.role,
+            team_id: member.team_id as string,
+            user_id: member.user_id as string,
+            role: member.role as 'admin' | 'agent',
             email: (usersById.get(member.user_id) as User | undefined)?.email || 'Email não encontrado'
         }));
         
