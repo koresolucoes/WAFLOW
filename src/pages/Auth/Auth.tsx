@@ -1,12 +1,14 @@
 import React, { useState, useRef } from 'react';
 import { supabase } from '../../lib/supabaseClient';
-import { ZAPFLOW_AI_LOGO } from '../../components/icons';
+import { ZAPFLOW_AI_LOGO, GOOGLE_ICON } from '../../components/icons';
 import Button from '../../components/common/Button';
 import Card from '../../components/common/Card';
 import HCaptcha from '@hcaptcha/react-hcaptcha';
 
+type AuthView = 'login' | 'signup' | 'reset_password';
+
 const Auth: React.FC = () => {
-  const [isLoginView, setIsLoginView] = useState(true);
+  const [view, setView] = useState<AuthView>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -17,49 +19,36 @@ const Auth: React.FC = () => {
   
   const sitekey = (import.meta as any).env.VITE_HCAPTCHA_SITEKEY;
 
-  const handleAuth = async (e: React.FormEvent) => {
+  const handlePasswordAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
     setMessage(null);
 
-    if (!sitekey) {
+    if (view !== 'reset_password' && !sitekey) {
         setError("A chave do site hCaptcha não está configurada. A autenticação está desativada.");
         setLoading(false);
         return;
     }
 
-    if (!captchaToken) {
+    if (view !== 'reset_password' && !captchaToken) {
         setError("Por favor, complete o CAPTCHA para continuar.");
         setLoading(false);
         return;
     }
 
     try {
-      if (isLoginView) {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-          options: {
-            captchaToken,
-          }
-        });
+      if (view === 'login') {
+        const { error } = await supabase.auth.signInWithPassword({ email, password, options: { captchaToken } });
         if (error) throw error;
-      } else {
-        const { data, error } = await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-                captchaToken,
-                data: {
-                    company_name: 'Minha Empresa', // Default values
-                }
-            }
-        });
+      } else if (view === 'signup') {
+        const { data, error } = await supabase.auth.signUp({ email, password, options: { captchaToken, data: { company_name: 'Minha Empresa' } } });
         if (error) throw error;
-        // The database trigger 'handle_new_user' will automatically create the profile,
-        // team, and team membership. No API call is needed from the client.
         setMessage("Cadastro realizado! Verifique seu e-mail para confirmar a conta.");
+      } else if (view === 'reset_password') {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin });
+        if (error) throw error;
+        setMessage("Instruções para redefinição de senha enviadas para o seu e-mail.");
       }
     } catch (err: any) {
       setError(err.message || 'Ocorreu um erro.');
@@ -68,6 +57,37 @@ const Auth: React.FC = () => {
       captcha.current?.resetCaptcha();
       setCaptchaToken(null);
     }
+  };
+  
+  const handleOAuthLogin = async (provider: 'google') => {
+      setLoading(true);
+      setError(null);
+      const { error } = await supabase.auth.signInWithOAuth({ provider });
+      if (error) {
+          setError(error.message);
+          setLoading(false);
+      }
+  };
+
+  const switchView = (newView: AuthView) => {
+      setEmail('');
+      setPassword('');
+      setError(null);
+      setMessage(null);
+      captcha.current?.resetCaptcha();
+      setCaptchaToken(null);
+      setView(newView);
+  };
+
+  const titles = {
+      login: 'Bem-vindo de volta!',
+      signup: 'Crie sua conta',
+      reset_password: 'Redefinir Senha'
+  };
+  const descriptions = {
+      login: 'Faça login para continuar.',
+      signup: 'Comece a otimizar suas campanhas.',
+      reset_password: 'Digite seu e-mail para receber as instruções.'
   };
 
   return (
@@ -79,81 +99,70 @@ const Auth: React.FC = () => {
       
       <Card className="w-full max-w-sm">
         <h2 className="text-2xl font-bold text-center text-white mb-2">
-          {isLoginView ? 'Bem-vindo de volta!' : 'Crie sua conta'}
+          {titles[view]}
         </h2>
         <p className="text-center text-slate-400 mb-6">
-            {isLoginView ? 'Faça login para continuar.' : 'Comece a otimizar suas campanhas.'}
+            {descriptions[view]}
         </p>
 
-        <form onSubmit={handleAuth} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1" htmlFor="email">
-              E-mail
-            </label>
-            <input
-              id="email"
-              className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1" htmlFor="password">
-              Senha
-            </label>
-            <input
-              id="password"
-              className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          </div>
+        {view !== 'reset_password' && (
+             <>
+                <Button variant="secondary" className="w-full mb-4 border border-slate-600 hover:bg-slate-700" onClick={() => handleOAuthLogin('google')} disabled={loading}>
+                    <GOOGLE_ICON className="w-5 h-5 mr-3"/>
+                    Continuar com Google
+                </Button>
+                <div className="relative my-4">
+                    <div className="absolute inset-0 flex items-center">
+                        <span className="w-full border-t border-slate-600" />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                        <span className="bg-slate-800 px-2 text-slate-400">Ou continue com</span>
+                    </div>
+                </div>
+             </>
+        )}
+       
 
-          <div className="my-2 flex justify-center">
-             {sitekey ? (
-                  <HCaptcha
-                      ref={captcha}
-                      sitekey={sitekey}
-                      theme="dark"
-                      onVerify={(token) => {
-                          setCaptchaToken(token);
-                          setError(null);
-                      }}
-                      onExpire={() => {
-                          setCaptchaToken(null);
-                      }}
-                      onError={(err) => setError(`Erro no CAPTCHA: ${err}`)}
-                  />
-            ) : (
-              <div className="text-center text-red-400 text-sm p-3 bg-red-500/10 rounded-md border border-red-500/30">
-                O CAPTCHA não pôde ser carregado. A autenticação está desativada.
-              </div>
-            )}
+        <form onSubmit={handlePasswordAuth} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-1" htmlFor="email">E-mail</label>
+            <input id="email" className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
           </div>
+          {view !== 'reset_password' && (
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1" htmlFor="password">Senha</label>
+                <input id="password" className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+              </div>
+          )}
+          
+          {view === 'login' && (
+            <div className="text-right">
+                <button type="button" onClick={() => switchView('reset_password')} className="text-xs text-sky-400 hover:underline">Esqueceu a senha?</button>
+            </div>
+          )}
+
+          {view !== 'reset_password' && (
+              <div className="my-2 flex justify-center">
+                 {sitekey ? (
+                      <HCaptcha ref={captcha} sitekey={sitekey} theme="dark" onVerify={(token) => { setCaptchaToken(token); setError(null); }} onExpire={() => setCaptchaToken(null)} onError={(err) => setError(`Erro no CAPTCHA: ${err}`)} />
+                ) : (
+                  <div className="text-center text-red-400 text-sm p-3 bg-red-500/10 rounded-md border border-red-500/30">
+                    O CAPTCHA não pôde ser carregado. A autenticação está desativada.
+                  </div>
+                )}
+              </div>
+          )}
 
           {error && <p className="text-red-400 text-sm text-center">{error}</p>}
           {message && <p className="text-green-400 text-sm text-center">{message}</p>}
-          <Button type="submit" className="w-full" isLoading={loading} size="lg" disabled={loading || !sitekey}>
-            {isLoginView ? 'Entrar' : 'Cadastrar'}
+          <Button type="submit" className="w-full" isLoading={loading} size="lg" disabled={loading || (view !== 'reset_password' && !sitekey)}>
+            {view === 'login' ? 'Entrar' : view === 'signup' ? 'Cadastrar' : 'Enviar Instruções'}
           </Button>
         </form>
 
         <div className="mt-6 text-center">
-          <button
-            onClick={() => {
-                setIsLoginView(!isLoginView)
-                setError(null)
-                setMessage(null)
-                captcha.current?.resetCaptcha();
-                setCaptchaToken(null);
-            }}
-            className="text-sm text-sky-400 hover:underline"
-          >
-            {isLoginView ? 'Não tem uma conta? Cadastre-se' : 'Já tem uma conta? Faça login'}
+          <button onClick={() => switchView(view === 'login' ? 'signup' : 'login')} className="text-sm text-sky-400 hover:underline">
+            {view === 'login' ? 'Não tem uma conta? Cadastre-se' : view === 'signup' ? 'Já tem uma conta? Faça login' : 'Lembrou a senha? Voltar para o Login'}
           </button>
         </div>
       </Card>
