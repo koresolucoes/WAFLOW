@@ -58,7 +58,7 @@ export const createDefaultLoggingHooks = (automationId: string, contactId: strin
             p_automation_id: automationId,
             p_node_id: node.id,
             p_team_id: teamId,
-            p_is_success: status === 'success',
+            p_status: status,
         });
         if (rpcError) {
             console.error(`[Execution Logging] Failed to update node stats for node ${node.id} in run ${runId}`, rpcError);
