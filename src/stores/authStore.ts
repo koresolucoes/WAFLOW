@@ -756,14 +756,24 @@ export const useMetaConfig = create<MetaConfig>(() => ({
 
 // Sincroniza as credenciais da Meta do perfil principal para o store dedicado
 useAuthStore.subscribe(
-  (state) => state.profile,
-  (profile, _previousProfile) => {
-    if (profile) {
-      useMetaConfig.setState({
-        accessToken: profile.meta_access_token || '',
-        wabaId: profile.meta_waba_id || '',
-        phoneNumberId: profile.meta_phone_number_id || '',
-      });
+  (state, previousState) => {
+    // Only run if the profile object itself has changed instance
+    if (state.profile !== previousState.profile) {
+      const profile = state.profile;
+      if (profile) {
+        useMetaConfig.setState({
+          accessToken: profile.meta_access_token || '',
+          wabaId: profile.meta_waba_id || '',
+          phoneNumberId: profile.meta_phone_number_id || '',
+        });
+      } else {
+        // Clear meta config if profile is null (e.g., on logout)
+        useMetaConfig.setState({
+          accessToken: '',
+          wabaId: '',
+          phoneNumberId: '',
+        });
+      }
     }
   }
 );

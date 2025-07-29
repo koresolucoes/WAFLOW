@@ -45,9 +45,17 @@ const App: React.FC = () => {
     activeTeam, 
     fetchInitialData, 
     dataLoadedForTeam, 
-    clearAllData 
+    clearAllData,
+    initializeAuth,
   } = useAuthStore();
   const { setTheme } = useUiStore();
+
+  useEffect(() => {
+    const unsubscribe = initializeAuth();
+    return () => {
+      unsubscribe();
+    };
+  }, [initializeAuth]);
 
   useEffect(() => {
     const storedTheme = localStorage.getItem('theme');
