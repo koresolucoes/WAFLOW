@@ -3,7 +3,7 @@ import { Client } from '@upstash/qstash';
 import { supabaseAdmin } from './_lib/supabaseAdmin.js';
 import { TablesInsert } from './_lib/database.types.js';
 
-// Verifique se as variáveis de ambiente do QStash e da App URL estão definidas.
+// Verifique se as variáveis de ambiente estão definidas.
 if (!process.env.QSTASH_TOKEN) {
     throw new Error("A variável de ambiente QSTASH_TOKEN é obrigatória.");
 }
@@ -22,7 +22,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     try {
-        // 1. Autenticar o usuário a partir do token de acesso
+        // 1. Autenticar o usuário
         const authHeader = req.headers.authorization;
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
             return res.status(401).json({ error: 'O cabeçalho de autorização está ausente ou malformado.' });
@@ -33,9 +33,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(401).json({ error: 'Não autorizado' });
         }
 
-        // 2. Obter e validar o corpo da requisição
+        // 2. Validar o corpo da requisição
         const { teamId, templateId, variables, recipients, speed, campaignName, scheduleDate } = req.body;
-        if (!teamId || !templateId || !recipients || !speed || !campaignName) {
+        if (!teamId || !templateId || !recipients || !Array.isArray(recipients) || !speed || !campaignName) {
             return res.status(400).json({ error: 'Faltando campos obrigatórios no corpo da requisição.' });
         }
 
@@ -48,8 +48,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (memberError || count === 0) {
             return res.status(403).json({ error: 'Acesso negado a esta equipe.' });
         }
-        
-        // 4. Salvar o registro da campanha e das mensagens pendentes no DB
+
+        // 4. Salvar campanha e mensagens no DB
         const campaignPayload: TablesInsert<'campaigns'> = {
             name: campaignName,
             team_id: teamId,
@@ -58,7 +58,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             sent_at: scheduleDate ? new Date(scheduleDate).toISOString() : new Date().toISOString(),
             recipient_count: recipients.length,
         };
-        
+
         const { data: newCampaignData, error: campaignError } = await supabaseAdmin.from('campaigns').insert(campaignPayload as any).select('id').single();
         if (campaignError) throw campaignError;
         const campaignId = (newCampaignData as any).id;
@@ -75,54 +75,45 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const { error: messagesError } = await supabaseAdmin.from('messages').insert(messagesToInsert as any);
         if (messagesError) {
-            // Reverte a criação da campanha se a inserção das mensagens falhar
             await supabaseAdmin.from('campaigns').delete().eq('id', campaignId);
             throw messagesError;
         }
-        
-        // 5. Determinar o atraso e construir as mensagens para o QStash
+
+        // 5. Construir as mensagens para o QStash
         const delayMap = { instant: 0, slow: 60, 'very_slow': 300 };
         const staggerDelay = delayMap[speed as keyof typeof delayMap] || 0;
-        
         const appUrl = process.env.APP_URL;
         const scheduleTimestamp = scheduleDate ? Math.floor(new Date(scheduleDate).getTime() / 1000) : undefined;
 
         const qstashMessages = recipients.map((recipient: any, index: number) => {
             const messagePayload: any = {
-                destination: `${appUrl}/api/send-single-message`,
-                // Corpo é explicitamente stringified e o Content-Type é definido
-                // para garantir que o worker de destino o analise corretamente.
-                body: JSON.stringify({
+                // ✅ **CORREÇÃO**: Usar 'url' para métodos de batch
+                url: `${appUrl}/api/send-single-message`,
+                // ✅ **CORREÇÃO**: 'body' como objeto, 'batchJSON' fará a conversão
+                body: {
                     teamId,
                     campaignId,
                     templateId,
                     variables,
                     recipient,
                     userId: user.id
-                }),
-                headers: {
-                    'Content-Type': 'application/json',
                 },
             };
-            
+
             if (scheduleTimestamp) {
-                // Se agendado, usa notBefore para cada mensagem, com o atraso de escalonamento
                 messagePayload.notBefore = scheduleTimestamp + (index * staggerDelay);
             } else if (staggerDelay > 0) {
-                // Se não agendado mas escalonado, usa delay
                 messagePayload.delay = index * staggerDelay;
             }
 
             return messagePayload;
         });
 
-        // 6. Publicar as mensagens em lote para o QStash usando `publish`
+        // 6. ✅ **CORREÇÃO**: Publicar as mensagens usando qstashClient.batchJSON
         if (qstashMessages.length > 0) {
-            // Usando .publish() em vez de .publishJSON() para contornar um possível
-            // problema de detecção de array no SDK no ambiente serverless.
-            await qstashClient.publish(qstashMessages);
+            await qstashClient.batchJSON(qstashMessages);
         }
-        
+
         return res.status(202).json({ message: 'Campanha aceita e enfileirada para envio.' });
 
     } catch (error: any) {
