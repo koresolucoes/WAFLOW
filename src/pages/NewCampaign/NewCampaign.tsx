@@ -53,6 +53,7 @@ const NewCampaign: React.FC = () => {
 
   const [isScheduled, setIsScheduled] = useState(false);
   const [scheduleDate, setScheduleDate] = useState('');
+  const [sendingSpeed, setSendingSpeed] = useState<'instant' | 'slow' | 'very_slow'>('instant');
 
 
   const template = useMemo(() => {
@@ -152,13 +153,46 @@ const NewCampaign: React.FC = () => {
     }
     setIsConfirmModalOpen(true);
   }
+  
+  const handleQueueCampaign = async () => {
+    if (!template) return;
+    try {
+        const response = await fetch('/api/enqueue-campaign-send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                campaignName,
+                templateId: template.id,
+                variables: templateVariables,
+                recipients,
+                speed: sendingSpeed,
+            }),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Falha ao enfileirar a campanha.');
+        }
+        
+        // Em uma implementação real, o backend salvaria a campanha como "Enfileirada".
+        // Aqui, apenas mostramos uma confirmação ao usuário.
+        setSendResults([]);
+        setIsResultsModalOpen(true);
+
+    } catch(err: any) {
+        setError(err.message);
+    }
+  };
+
 
   const handleLaunch = async () => {
     setIsConfirmModalOpen(false);
     setIsLoading(true);
     setError(null);
     
-    if (isScheduled) {
+    if (sendingSpeed !== 'instant') {
+        await handleQueueCampaign();
+    } else if (isScheduled) {
         await handleScheduleCampaign();
     } else {
         await handleSendCampaignNow();
@@ -387,11 +421,27 @@ const NewCampaign: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">2. Agendamento (Opcional)</label>
+              <label className="block text-sm font-medium text-slate-300 mb-2">2. Velocidade de Envio</label>
+                <div className="p-4 bg-slate-700/50 rounded-md">
+                    <select
+                        value={sendingSpeed}
+                        onChange={(e) => setSendingSpeed(e.target.value as any)}
+                        className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white"
+                    >
+                        <option value="instant">Imediato (Máxima velocidade)</option>
+                        <option value="slow">Lento (aprox. 1 por minuto)</option>
+                        <option value="very_slow">Muito Lento (aprox. 1 por 5 minutos)</option>
+                    </select>
+                    <p className="text-xs text-slate-400 mt-2">Escolher uma velocidade mais lenta pode ajudar a evitar bloqueios do WhatsApp em grandes campanhas. Requer um serviço de fila configurado no backend.</p>
+                </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-2">3. Agendamento (Opcional)</label>
               <div className="p-4 bg-slate-700/50 rounded-md">
                 <label htmlFor="isScheduled" className="flex items-center cursor-pointer">
                   <input type="checkbox" id="isScheduled" checked={isScheduled} onChange={(e) => setIsScheduled(e.target.checked)} className="h-4 w-4 rounded bg-slate-800 border-slate-600 text-sky-600 focus:ring-sky-500"/>
-                  <span className="ml-3 text-sm font-medium text-white">Agendar envio</span>
+                  <span className="ml-3 text-sm font-medium text-white">Agendar envio para uma data específica</span>
                 </label>
                 {isScheduled && (
                   <div className="mt-3">
@@ -411,7 +461,7 @@ const NewCampaign: React.FC = () => {
             
             {variablePlaceholders.length > 0 && (
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">3. Preencher Variáveis</label>
+                <label className="block text-sm font-medium text-slate-300 mb-2">4. Preencher Variáveis</label>
                  <p className="text-xs text-slate-400 mb-2">
                     Você pode usar variáveis como {"{{contact.name}}"}, {"{{contact.email}}"}, ou {"{{contact.custom_fields.sua_chave}}"} nos campos.
                 </p>
@@ -437,7 +487,7 @@ const NewCampaign: React.FC = () => {
 
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">
-                {variablePlaceholders.length > 0 ? '4.' : '3.'} Selecionar Destinatários
+                5. Selecionar Destinatários
               </label>
               <div className="space-y-3 p-4 bg-slate-700/50 rounded-md">
                   <div className="flex items-center">
@@ -502,18 +552,19 @@ const NewCampaign: React.FC = () => {
           title="Confirmar Campanha"
         >
             <div className="text-slate-300 space-y-4">
-                <p>Você está prestes a {isScheduled ? 'agendar' : 'enviar'} a campanha <strong className="text-white">{campaignName}</strong>.</p>
+                <p>Você está prestes a {sendingSpeed !== 'instant' ? 'enfileirar' : isScheduled ? 'agendar' : 'enviar'} a campanha <strong className="text-white">{campaignName}</strong>.</p>
                 <div className="p-4 bg-slate-700/50 rounded-lg space-y-2">
                      <p><strong>Template:</strong> <span className="font-mono text-sky-300">{template?.template_name}</span></p>
                      <p><strong>Total de destinatários:</strong> <span className="font-bold text-white">{recipients.length.toLocaleString('pt-BR')}</span></p>
                      {isScheduled && <p><strong>Agendada para:</strong> <span className="font-bold text-white">{new Date(scheduleDate).toLocaleString('pt-BR')}</span></p>}
+                     {sendingSpeed !== 'instant' && <p><strong>Velocidade:</strong> <span className="font-bold text-white">{sendingSpeed === 'slow' ? 'Lenta' : 'Muito Lenta'}</span></p>}
                 </div>
                 <p className="text-amber-400 text-sm">Esta ação não pode ser desfeita. Tem certeza de que deseja continuar?</p>
             </div>
             <div className="mt-6 flex justify-end gap-3">
                 <Button variant="secondary" onClick={() => setIsConfirmModalOpen(false)}>Cancelar</Button>
                 <Button variant="primary" onClick={handleLaunch} isLoading={isLoading}>
-                    Sim, {isScheduled ? 'Agendar Agora' : 'Enviar Agora'}
+                    Sim, {sendingSpeed !== 'instant' ? 'Enfileirar Agora' : isScheduled ? 'Agendar Agora' : 'Enviar Agora'}
                 </Button>
             </div>
         </Modal>
@@ -521,11 +572,11 @@ const NewCampaign: React.FC = () => {
         <Modal
             isOpen={isResultsModalOpen}
             onClose={() => setCurrentPage('campaigns')}
-            title={isScheduled ? "Campanha Agendada!" : "Resultados do Envio da Campanha"}
+            title={sendingSpeed !== 'instant' ? "Campanha Enfileirada!" : isScheduled ? "Campanha Agendada!" : "Resultados do Envio da Campanha"}
         >
             <div className="text-slate-300 space-y-4">
-                <p>A campanha <strong className="text-white">{campaignName}</strong> foi {isScheduled ? 'agendada com sucesso' : 'processada'}.</p>
-                {!isScheduled && (
+                <p>A campanha <strong className="text-white">{campaignName}</strong> foi {sendingSpeed !== 'instant' ? 'enfileirada com sucesso para envio gradual' : isScheduled ? 'agendada com sucesso' : 'processada'}.</p>
+                {sendingSpeed === 'instant' && !isScheduled && (
                   <div className="p-4 bg-slate-700/50 rounded-lg space-y-2 text-center">
                     <p className="text-green-400"><strong className="text-2xl">{successfulSends}</strong> envios bem-sucedidos.</p>
                     <p className="text-red-400"><strong className="text-2xl">{failedSends.length}</strong> envios falharam.</p>

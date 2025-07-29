@@ -11,13 +11,12 @@ export const getTeamMembersForTeams = async (teamIds: string[]): Promise<TeamMem
         throw new Error("Not authenticated");
     }
 
-    const response = await fetch('/api/get-team-members', {
-        method: 'POST',
+    const response = await fetch(`/api/members?team_ids=${teamIds.join(',')}`, {
+        method: 'GET',
         headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ team_ids: teamIds }),
     });
 
     if (!response.ok) {
@@ -36,7 +35,7 @@ export const inviteUserToTeam = async (teamId: string, email: string, role: 'adm
         throw new Error("Não autenticado. Por favor, faça login novamente.");
     }
 
-    const response = await fetch('/api/invite-member', {
+    const response = await fetch('/api/members', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',

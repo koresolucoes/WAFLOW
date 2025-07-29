@@ -116,7 +116,7 @@ export const assignConversation = async (contactId: string, assigneeId: string |
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error("Not authenticated");
 
-    const response = await fetch('/api/assign-conversation', {
+    const response = await fetch('/api/conversation', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -135,13 +135,11 @@ export const deleteConversation = async (contactId: string): Promise<void> => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error("Not authenticated");
 
-    const response = await fetch('/api/delete-conversation', {
-        method: 'POST',
+    const response = await fetch(`/api/conversation?contactId=${contactId}`, {
+        method: 'DELETE',
         headers: {
-            'Content-Type': 'application/json',
             'Authorization': `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ contactId }),
     });
 
     if (!response.ok) {
