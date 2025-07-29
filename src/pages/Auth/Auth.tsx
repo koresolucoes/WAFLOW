@@ -25,13 +25,13 @@ const Auth: React.FC = () => {
     setError(null);
     setMessage(null);
 
-    if (view !== 'reset_password' && !sitekey) {
+    if (!sitekey) {
         setError("A chave do site hCaptcha não está configurada. A autenticação está desativada.");
         setLoading(false);
         return;
     }
 
-    if (view !== 'reset_password' && !captchaToken) {
+    if (!captchaToken) {
         setError("Por favor, complete o CAPTCHA para continuar.");
         setLoading(false);
         return;
@@ -46,7 +46,7 @@ const Auth: React.FC = () => {
         if (error) throw error;
         setMessage("Cadastro realizado! Verifique seu e-mail para confirmar a conta.");
       } else if (view === 'reset_password') {
-        const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin });
+        const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin, captchaToken });
         if (error) throw error;
         setMessage("Instruções para redefinição de senha enviadas para o seu e-mail.");
       }
@@ -141,21 +141,19 @@ const Auth: React.FC = () => {
             </div>
           )}
 
-          {view !== 'reset_password' && (
-              <div className="my-2 flex justify-center">
-                 {sitekey ? (
-                      <HCaptcha ref={captcha} sitekey={sitekey} theme="dark" onVerify={(token) => { setCaptchaToken(token); setError(null); }} onExpire={() => setCaptchaToken(null)} onError={(err) => setError(`Erro no CAPTCHA: ${err}`)} />
-                ) : (
-                  <div className="text-center text-red-400 text-sm p-3 bg-red-500/10 rounded-md border border-red-500/30">
-                    O CAPTCHA não pôde ser carregado. A autenticação está desativada.
-                  </div>
-                )}
+          <div className="my-2 flex justify-center">
+             {sitekey ? (
+                  <HCaptcha ref={captcha} sitekey={sitekey} theme="dark" onVerify={(token) => { setCaptchaToken(token); setError(null); }} onExpire={() => setCaptchaToken(null)} onError={(err) => setError(`Erro no CAPTCHA: ${err}`)} />
+            ) : (
+              <div className="text-center text-red-400 text-sm p-3 bg-red-500/10 rounded-md border border-red-500/30">
+                O CAPTCHA não pôde ser carregado. A autenticação está desativada.
               </div>
-          )}
+            )}
+          </div>
 
           {error && <p className="text-red-400 text-sm text-center">{error}</p>}
           {message && <p className="text-green-400 text-sm text-center">{message}</p>}
-          <Button type="submit" className="w-full" isLoading={loading} size="lg" disabled={loading || (view !== 'reset_password' && !sitekey)}>
+          <Button type="submit" className="w-full" isLoading={loading} size="lg" disabled={loading || !sitekey}>
             {view === 'login' ? 'Entrar' : view === 'signup' ? 'Cadastrar' : 'Enviar Instruções'}
           </Button>
         </form>

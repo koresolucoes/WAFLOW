@@ -8,6 +8,7 @@ import { PLUS_ICON, TRASH_ICON, CONTACTS_ICON, UPLOAD_ICON, SEND_ICON, SEARCH_IC
 import { useAuthStore } from '../../stores/authStore';
 import { useUiStore } from '../../stores/uiStore';
 import DirectMessageModal from './DirectMessageModal';
+import InfoCard from '../../components/common/InfoCard';
 
 const Tag: React.FC<{ children: React.ReactNode }> = ({ children }) => (
     <span className="mr-2 mb-2 inline-block px-2 py-1 text-xs font-semibold rounded-full bg-sky-500/20 text-sky-400">
@@ -197,6 +198,13 @@ const Contacts: React.FC = () => {
                         </Button>
                     </div>
                 </div>
+
+                <InfoCard>
+                    <p className="text-sm">
+                        Para importar, use um arquivo CSV com as colunas <strong>name</strong> e <strong>phone</strong> (obrigatórias).
+                        Você também pode incluir as colunas opcionais: <strong>email</strong>, <strong>company</strong>, e <strong>tags</strong> (separadas por ponto e vírgula, ex: "vip;cliente novo").
+                    </p>
+                </InfoCard>
 
                 <Card className="overflow-x-auto">
                     {filteredContacts.length > 0 ? (
