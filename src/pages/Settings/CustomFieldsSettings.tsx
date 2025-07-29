@@ -31,8 +31,8 @@ const CustomFieldsSettings: React.FC = () => {
             <Card>
                 <div className="flex justify-between items-center mb-4">
                     <div>
-                        <h2 className="text-lg font-semibold text-white">Gerenciar Campos Personalizados</h2>
-                        <p className="text-sm text-slate-400">Crie e gerencie campos de dados para seus contatos.</p>
+                        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Gerenciar Campos Personalizados</h2>
+                        <p className="text-sm text-gray-500 dark:text-slate-400">Crie e gerencie campos de dados para seus contatos.</p>
                     </div>
                     <Button variant="primary" onClick={() => setIsModalOpen(true)}>
                         <PLUS_ICON className="w-5 h-5 mr-2" />
@@ -40,23 +40,23 @@ const CustomFieldsSettings: React.FC = () => {
                     </Button>
                 </div>
                 
-                <div className="bg-slate-900/50 rounded-lg">
+                <div className="bg-gray-50 dark:bg-slate-900/50 rounded-lg">
                     {definitions.length > 0 ? (
-                        <ul className="divide-y divide-slate-700/50">
+                        <ul className="divide-y divide-gray-200 dark:divide-slate-700/50">
                             {definitions.map(def => (
                                 <li key={def.id} className="p-3 flex justify-between items-center">
                                     <div>
-                                        <p className="font-semibold text-white">{def.name}</p>
-                                        <p className="text-xs text-slate-400 font-mono">{def.key} - <span className="uppercase">{def.type}</span></p>
+                                        <p className="font-semibold text-gray-900 dark:text-white">{def.name}</p>
+                                        <p className="text-xs text-gray-500 dark:text-slate-400 font-mono">{def.key} - <span className="uppercase">{def.type}</span></p>
                                     </div>
-                                    <Button variant="ghost" size="sm" onClick={() => handleDelete(def.id)} className="text-red-400 hover:bg-red-500/10">
+                                    <Button variant="ghost" size="sm" onClick={() => handleDelete(def.id)} className="text-red-500 hover:bg-red-100/50 dark:text-red-400 dark:hover:bg-red-500/10">
                                         <TRASH_ICON className="w-4 h-4" />
                                     </Button>
                                 </li>
                             ))}
                         </ul>
                     ) : (
-                        <p className="text-center text-slate-400 p-6">Nenhum campo personalizado foi criado ainda.</p>
+                        <p className="text-center text-gray-500 dark:text-slate-400 p-6">Nenhum campo personalizado foi criado ainda.</p>
                     )}
                 </div>
             </Card>

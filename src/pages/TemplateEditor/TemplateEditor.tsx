@@ -193,23 +193,23 @@ const TemplateEditor: React.FC = () => {
 
   return (
     <div className="space-y-8 max-w-4xl mx-auto">
-      <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Editor de Templates</h1>
+      <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Editor de Templates</h1>
 
-      {error && <Card className="border-l-4 border-red-500"><p className="text-red-400">{error}</p></Card>}
-      {successMessage && <Card className="border-l-4 border-green-500"><p className="text-green-400">{successMessage}</p></Card>}
+      {error && <Card className="border-l-4 border-red-500"><p className="text-red-500 dark:text-red-400">{error}</p></Card>}
+      {successMessage && <Card className="border-l-4 border-green-500"><p className="text-green-500 dark:text-green-400">{successMessage}</p></Card>}
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
         {/* Coluna de Edição */}
         <div className="space-y-6">
             <Card>
-                <h2 className="text-xl font-semibold text-slate-900 dark:text-white mb-4">1. Gerar com IA (Opcional)</h2>
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">1. Gerar com IA (Opcional)</h2>
                 <div className="space-y-4">
-                    <label htmlFor="campaignGoal" className="block text-sm font-medium text-slate-500 dark:text-slate-300">
+                    <label htmlFor="campaignGoal" className="block text-sm font-medium text-gray-500 dark:text-slate-300">
                         Descreva o objetivo da sua campanha
                     </label>
                     <textarea id="campaignGoal" value={campaignGoal} onChange={(e) => { setCampaignGoal(e.target.value); setError(null); setSuccessMessage(null); }}
                         placeholder="Ex: Anunciar um desconto de 20% em novos produtos para a temporada de verão e levar o cliente para o site."
-                        className="w-full bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md p-3 text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-slate-500 dark:focus:ring-sky-500 focus:border-sky-500"
+                        className="w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-md p-3 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 dark:focus:ring-sky-500 focus:border-blue-500 dark:focus:border-sky-500"
                         rows={3}
                     />
                     <Button onClick={handleGenerate} isLoading={isGenerating} disabled={!campaignGoal}>
@@ -220,16 +220,16 @@ const TemplateEditor: React.FC = () => {
             </Card>
 
             <Card>
-                <h2 className="text-xl font-semibold text-slate-900 dark:text-white mb-4">2. Configurar e Editar Template</h2>
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">2. Configurar e Editar Template</h2>
                 <div className="space-y-4">
                     <div>
-                        <label htmlFor="template_name" className="block text-sm font-medium text-slate-500 dark:text-slate-300 mb-1">Nome do Template (snake_case)</label>
-                        <input type="text" name="template_name" id="template_name" value={template.template_name} onChange={handleMainInputChange} placeholder="ex: promocao_verao_20" className="w-full bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md p-2 text-slate-900 dark:text-white" />
-                        {validationErrors.template_name && <p className="text-red-400 text-xs mt-1">{validationErrors.template_name}</p>}
+                        <label htmlFor="template_name" className="block text-sm font-medium text-gray-500 dark:text-slate-300 mb-1">Nome do Template (snake_case)</label>
+                        <input type="text" name="template_name" id="template_name" value={template.template_name} onChange={handleMainInputChange} placeholder="ex: promocao_verao_20" className="w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-md p-2 text-gray-900 dark:text-white" />
+                        {validationErrors.template_name && <p className="text-red-500 dark:text-red-400 text-xs mt-1">{validationErrors.template_name}</p>}
                     </div>
                     <div>
-                        <label htmlFor="category" className="block text-sm font-medium text-slate-500 dark:text-slate-300 mb-1">Categoria</label>
-                        <select name="category" id="category" value={template.category} onChange={handleMainInputChange} className="w-full bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md p-2 text-slate-900 dark:text-white">
+                        <label htmlFor="category" className="block text-sm font-medium text-gray-500 dark:text-slate-300 mb-1">Categoria</label>
+                        <select name="category" id="category" value={template.category} onChange={handleMainInputChange} className="w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-md p-2 text-gray-900 dark:text-white">
                             <option value="MARKETING">MARKETING</option>
                             <option value="UTILITY">UTILITY</option>
                             <option value="AUTHENTICATION">AUTHENTICATION</option>
@@ -241,8 +241,8 @@ const TemplateEditor: React.FC = () => {
                         )}
                     </div>
 
-                    <div className="border-t border-slate-200 dark:border-slate-700 pt-4 space-y-2">
-                        <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Componentes</h3>
+                    <div className="border-t border-gray-200 dark:border-slate-700 pt-4 space-y-2">
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Componentes</h3>
                         <div className="flex gap-2 flex-wrap">
                             {addComponentButton('HEADER', 'Cabeçalho')}
                             {addComponentButton('FOOTER', 'Rodapé')}
@@ -252,46 +252,46 @@ const TemplateEditor: React.FC = () => {
 
                     {header && (
                         <div>
-                            <label htmlFor="header" className="block text-sm font-medium text-slate-500 dark:text-slate-300 mb-1">Cabeçalho (Header)</label>
-                            <input type="text" name="header" id="header" value={header.text || ''} onChange={(e) => updateComponent('HEADER', e.target.value)} placeholder="Título da mensagem..." className="w-full bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md p-2 text-slate-900 dark:text-white" />
+                            <label htmlFor="header" className="block text-sm font-medium text-gray-500 dark:text-slate-300 mb-1">Cabeçalho (Header)</label>
+                            <input type="text" name="header" id="header" value={header.text || ''} onChange={(e) => updateComponent('HEADER', e.target.value)} placeholder="Título da mensagem..." className="w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-md p-2 text-gray-900 dark:text-white" />
                         </div>
                     )}
                     
                     <div>
-                        <label htmlFor="body" className="block text-sm font-medium text-slate-500 dark:text-slate-300 mb-1">Corpo da Mensagem (Obrigatório)</label>
-                        <textarea name="body" id="body" value={body?.text || ''} onChange={(e) => updateComponent('BODY', e.target.value)} rows={8} placeholder="O conteúdo da sua mensagem. Use {{1}} para o nome do cliente." className="w-full bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md p-2 text-slate-900 dark:text-white font-mono text-sm"></textarea>
-                        {validationErrors.body && <p className="text-red-400 text-xs mt-1">{validationErrors.body}</p>}
+                        <label htmlFor="body" className="block text-sm font-medium text-gray-500 dark:text-slate-300 mb-1">Corpo da Mensagem (Obrigatório)</label>
+                        <textarea name="body" id="body" value={body?.text || ''} onChange={(e) => updateComponent('BODY', e.target.value)} rows={8} placeholder="O conteúdo da sua mensagem. Use {{1}} para o nome do cliente." className="w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-md p-2 text-gray-900 dark:text-white font-mono text-sm"></textarea>
+                        {validationErrors.body && <p className="text-red-500 dark:text-red-400 text-xs mt-1">{validationErrors.body}</p>}
                     </div>
 
                     {footer && (
                          <div>
-                            <label htmlFor="footer" className="block text-sm font-medium text-slate-500 dark:text-slate-300 mb-1">Rodapé (Footer)</label>
-                            <input type="text" name="footer" id="footer" value={footer.text || ''} onChange={(e) => updateComponent('FOOTER', e.target.value)} placeholder="Texto de rodapé..." className="w-full bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md p-2 text-slate-900 dark:text-white" />
+                            <label htmlFor="footer" className="block text-sm font-medium text-gray-500 dark:text-slate-300 mb-1">Rodapé (Footer)</label>
+                            <input type="text" name="footer" id="footer" value={footer.text || ''} onChange={(e) => updateComponent('FOOTER', e.target.value)} placeholder="Texto de rodapé..." className="w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-md p-2 text-gray-900 dark:text-white" />
                         </div>
                     )}
 
                     {buttonsComponent && (
-                        <div className="border-t border-slate-200 dark:border-slate-700 pt-4 space-y-3">
-                           <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Botões Interativos</h3>
+                        <div className="border-t border-gray-200 dark:border-slate-700 pt-4 space-y-3">
+                           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Botões Interativos</h3>
                            {buttonsComponent.buttons?.map((btn, index) => (
-                               <div key={index} className="p-3 bg-slate-100 dark:bg-slate-700/50 rounded-lg space-y-2 relative">
-                                   <button onClick={() => removeInteractiveButton(index)} className="absolute top-2 right-2 p-1 text-slate-400 hover:text-red-400"><TRASH_ICON className="w-4 h-4" /></button>
-                                   <p className="text-sm font-semibold text-slate-700 dark:text-sky-300">{btn.type}</p>
+                               <div key={index} className="p-3 bg-gray-100 dark:bg-slate-700/50 rounded-lg space-y-2 relative">
+                                   <button onClick={() => removeInteractiveButton(index)} className="absolute top-2 right-2 p-1 text-gray-400 hover:text-red-500 dark:text-slate-400 dark:hover:text-red-400"><TRASH_ICON className="w-4 h-4" /></button>
+                                   <p className="text-sm font-semibold text-gray-700 dark:text-sky-300">{btn.type}</p>
                                    <div>
-                                       <label className="text-xs text-slate-500 dark:text-slate-400">Texto do Botão</label>
-                                       <input type="text" value={btn.text} onChange={(e) => handleButtonChange(index, 'text', e.target.value)} className="w-full mt-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md p-1.5 text-slate-900 dark:text-white text-sm" />
-                                       {validationErrors[`button_${index}`] && <p className="text-red-400 text-xs mt-1">{validationErrors[`button_${index}`]}</p>}
+                                       <label className="text-xs text-gray-500 dark:text-slate-400">Texto do Botão</label>
+                                       <input type="text" value={btn.text} onChange={(e) => handleButtonChange(index, 'text', e.target.value)} className="w-full mt-1 bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-600 rounded-md p-1.5 text-gray-900 dark:text-white text-sm" />
+                                       {validationErrors[`button_${index}`] && <p className="text-red-500 dark:text-red-400 text-xs mt-1">{validationErrors[`button_${index}`]}</p>}
                                    </div>
                                    {btn.type === 'URL' && (
                                        <div>
-                                           <label className="text-xs text-slate-500 dark:text-slate-400">URL</label>
-                                           <input type="text" value={btn.url || ''} onChange={(e) => handleButtonChange(index, 'url', e.target.value)} className="w-full mt-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md p-1.5 text-slate-900 dark:text-white text-sm" />
+                                           <label className="text-xs text-gray-500 dark:text-slate-400">URL</label>
+                                           <input type="text" value={btn.url || ''} onChange={(e) => handleButtonChange(index, 'url', e.target.value)} className="w-full mt-1 bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-600 rounded-md p-1.5 text-gray-900 dark:text-white text-sm" />
                                        </div>
                                    )}
                                    {btn.type === 'PHONE_NUMBER' && (
                                         <div>
-                                           <label className="text-xs text-slate-500 dark:text-slate-400">Número de Telefone</label>
-                                           <input type="text" value={btn.phone_number || ''} onChange={(e) => handleButtonChange(index, 'phone_number', e.target.value)} className="w-full mt-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md p-1.5 text-slate-900 dark:text-white text-sm" />
+                                           <label className="text-xs text-gray-500 dark:text-slate-400">Número de Telefone</label>
+                                           <input type="text" value={btn.phone_number || ''} onChange={(e) => handleButtonChange(index, 'phone_number', e.target.value)} className="w-full mt-1 bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-600 rounded-md p-1.5 text-gray-900 dark:text-white text-sm" />
                                        </div>
                                    )}
                                </div>
@@ -311,7 +311,7 @@ const TemplateEditor: React.FC = () => {
         
         {/* Coluna de Preview */}
         <div className="sticky top-8">
-            <h2 className="text-xl font-semibold text-slate-900 dark:text-white mb-4">3. Pré-visualização</h2>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">3. Pré-visualização</h2>
             <TemplatePreview components={template.components} recipientName="Ana Silva" />
              <div className="mt-6">
                 <Button onClick={handleSave} variant="primary" size="lg" className="w-full" isLoading={isSaving} disabled={isSaving || !!successMessage}>

@@ -11,24 +11,24 @@ import DirectMessageModal from './DirectMessageModal';
 import InfoCard from '../../components/common/InfoCard';
 
 const Tag: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-    <span className="mr-2 mb-2 inline-block px-2 py-1 text-xs font-semibold rounded-full bg-slate-200 text-slate-700 dark:bg-sky-500/20 dark:text-sky-400">
+    <span className="mr-2 mb-2 inline-block px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 dark:bg-sky-500/20 dark:text-sky-400">
         {children}
     </span>
 );
 
 const ContactRow: React.FC<{ contact: Contact; onViewDetails: () => void; onDelete: () => void; }> = ({ contact, onViewDetails, onDelete }) => {
     return (
-        <tr className="border-b border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800/50 cursor-pointer" onClick={onViewDetails}>
-            <td className="p-4 font-medium text-slate-900 dark:text-white">{contact.name}</td>
-            <td className="p-4 text-slate-600 dark:text-slate-300 font-mono">{contact.phone}</td>
-            <td className="p-4 text-slate-600 dark:text-slate-300">{contact.email || '-'}</td>
-            <td className="p-4 text-slate-600 dark:text-slate-300">{contact.company || '-'}</td>
-            <td className="p-4 text-slate-600 dark:text-slate-300">
+        <tr className="border-b border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-800/50 cursor-pointer" onClick={onViewDetails}>
+            <td className="p-4 font-medium text-gray-900 dark:text-white">{contact.name}</td>
+            <td className="p-4 text-gray-600 dark:text-slate-300 font-mono">{contact.phone}</td>
+            <td className="p-4 text-gray-600 dark:text-slate-300">{contact.email || '-'}</td>
+            <td className="p-4 text-gray-600 dark:text-slate-300">{contact.company || '-'}</td>
+            <td className="p-4 text-gray-600 dark:text-slate-300">
                 {contact.tags?.map(tag => <Tag key={tag}>{tag}</Tag>)}
             </td>
             <td className="p-4 text-right">
                 <div className="flex justify-end gap-2" onClick={e => e.stopPropagation()}>
-                    <Button variant="ghost" size="sm" onClick={onDelete} className="text-red-400 hover:bg-red-500/10 hover:text-red-300">
+                    <Button variant="ghost" size="sm" onClick={onDelete} className="text-red-500 hover:bg-red-100/50 hover:text-red-600 dark:text-red-400 dark:hover:bg-red-500/10 dark:hover:text-red-300">
                         <TRASH_ICON className="w-4 h-4" />
                     </Button>
                 </div>
@@ -171,16 +171,16 @@ const Contacts: React.FC = () => {
         <>
             <div className="space-y-8">
                  <div className="flex justify-between items-center flex-wrap gap-4">
-                    <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Contatos</h1>
+                    <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Contatos</h1>
                     <div className="flex items-center gap-4">
                         <div className="relative">
-                            <SEARCH_ICON className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+                            <SEARCH_ICON className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
                             <input
                                 type="text"
                                 placeholder="Buscar contatos..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg py-2 pl-10 pr-4 text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-slate-400 dark:focus:ring-sky-500 focus:outline-none"
+                                className="bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg py-2 pl-10 pr-4 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 dark:focus:ring-sky-500 focus:outline-none"
                             />
                         </div>
                         <Button variant="secondary" onClick={() => setIsDirectMessageModalOpen(true)}>
@@ -210,12 +210,12 @@ const Contacts: React.FC = () => {
                     {filteredContacts.length > 0 ? (
                         <table className="w-full text-left">
                             <thead>
-                                <tr className="border-b border-slate-200 dark:border-slate-600">
-                                    <th className="p-4 text-sm font-semibold text-slate-500 dark:text-slate-400">Nome</th>
-                                    <th className="p-4 text-sm font-semibold text-slate-500 dark:text-slate-400">Telefone</th>
-                                    <th className="p-4 text-sm font-semibold text-slate-500 dark:text-slate-400">Email</th>
-                                    <th className="p-4 text-sm font-semibold text-slate-500 dark:text-slate-400">Empresa</th>
-                                    <th className="p-4 text-sm font-semibold text-slate-500 dark:text-slate-400">Tags</th>
+                                <tr className="border-b border-gray-200 dark:border-slate-600">
+                                    <th className="p-4 text-sm font-semibold text-gray-500 dark:text-slate-400">Nome</th>
+                                    <th className="p-4 text-sm font-semibold text-gray-500 dark:text-slate-400">Telefone</th>
+                                    <th className="p-4 text-sm font-semibold text-gray-500 dark:text-slate-400">Email</th>
+                                    <th className="p-4 text-sm font-semibold text-gray-500 dark:text-slate-400">Empresa</th>
+                                    <th className="p-4 text-sm font-semibold text-gray-500 dark:text-slate-400">Tags</th>
                                     <th className="p-4"></th>
                                 </tr>
                             </thead>
@@ -232,9 +232,9 @@ const Contacts: React.FC = () => {
                         </table>
                     ) : (
                          <div className="text-center py-12">
-                            <CONTACTS_ICON className="w-12 h-12 mx-auto text-slate-400 dark:text-slate-500" />
-                            <h2 className="text-xl font-semibold text-slate-900 dark:text-white mt-4">{searchTerm ? 'Nenhum contato encontrado.' : 'Nenhum contato cadastrado.'}</h2>
-                            <p className="text-slate-500 dark:text-slate-400 mt-2">{searchTerm ? `Sua busca por "${searchTerm}" não retornou resultados.` : 'Adicione seu primeiro contato para começar.'}</p>
+                            <CONTACTS_ICON className="w-12 h-12 mx-auto text-gray-400 dark:text-slate-500" />
+                            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mt-4">{searchTerm ? 'Nenhum contato encontrado.' : 'Nenhum contato cadastrado.'}</h2>
+                            <p className="text-gray-500 dark:text-slate-400 mt-2">{searchTerm ? `Sua busca por "${searchTerm}" não retornou resultados.` : 'Adicione seu primeiro contato para começar.'}</p>
                         </div>
                     )}
                 </Card>

@@ -11,9 +11,9 @@ const Button: React.FC<ButtonProps> = ({ children, className = '', variant = 'pr
   const baseClasses = 'inline-flex items-center justify-center rounded-md font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none';
 
   const variantClasses = {
-    primary: 'bg-slate-900 text-white hover:bg-slate-700 dark:bg-sky-500 dark:hover:bg-sky-600 focus-visible:ring-slate-900 dark:focus-visible:ring-sky-500 dark:focus-visible:ring-offset-slate-900',
-    secondary: 'bg-slate-200 text-slate-800 hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-100 dark:hover:bg-slate-600 focus-visible:ring-slate-400 dark:focus-visible:ring-slate-500 dark:focus-visible:ring-offset-slate-900',
-    ghost: 'hover:bg-slate-200 hover:text-slate-900 dark:hover:bg-slate-700 dark:hover:text-slate-100 focus-visible:ring-slate-400 dark:focus-visible:ring-slate-600',
+    primary: 'bg-blue-600 text-white hover:bg-blue-700 dark:bg-sky-500 dark:hover:bg-sky-600 focus-visible:ring-blue-500 dark:focus-visible:ring-sky-500 dark:focus-visible:ring-offset-gray-50 dark:dark:focus-visible:ring-offset-slate-900',
+    secondary: 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-slate-700 dark:text-slate-100 dark:hover:bg-slate-600 focus-visible:ring-gray-400 dark:focus-visible:ring-slate-500 dark:focus-visible:ring-offset-gray-50 dark:dark:focus-visible:ring-offset-slate-900',
+    ghost: 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-slate-100 focus-visible:ring-gray-400 dark:focus-visible:ring-slate-600',
   };
 
   const sizeClasses = {
@@ -22,7 +22,7 @@ const Button: React.FC<ButtonProps> = ({ children, className = '', variant = 'pr
     lg: 'px-6 py-3 text-base',
   };
   
-  const spinnerColorClass = variant === 'primary' ? 'text-white' : 'text-slate-800 dark:text-white';
+  const spinnerColorClass = variant === 'primary' ? 'text-white' : 'text-gray-900 dark:text-white';
 
   return (
     <button

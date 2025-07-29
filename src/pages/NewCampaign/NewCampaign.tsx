@@ -387,8 +387,8 @@ const NewCampaign: React.FC = () => {
   if (!template) {
     return (
       <div className="text-center">
-        <h2 className="text-xl font-semibold text-white">Template não encontrado.</h2>
-        <p className="text-slate-400 mt-2">Por favor, volte e selecione um template para começar.</p>
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Template não encontrado.</h2>
+        <p className="text-gray-500 dark:text-slate-400 mt-2">Por favor, volte e selecione um template para começar.</p>
         <Button className="mt-4" onClick={() => setCurrentPage('templates')}>Voltar para Templates</Button>
       </div>
     );
@@ -402,57 +402,57 @@ const NewCampaign: React.FC = () => {
   return (
     <>
       <div className="space-y-8 max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Lançar Nova Campanha</h1>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Lançar Nova Campanha</h1>
         
-        {error && <Card className="border-l-4 border-red-500"><p className="text-red-400">{error}</p></Card>}
+        {error && <Card className="border-l-4 border-red-500"><p className="text-red-500 dark:text-red-400">{error}</p></Card>}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
           <Card className="space-y-6">
             <div>
-              <label htmlFor="campaignName" className="block text-sm font-medium text-slate-500 dark:text-slate-300 mb-1">1. Nome da Campanha</label>
+              <label htmlFor="campaignName" className="block text-sm font-medium text-gray-500 dark:text-slate-300 mb-1">1. Nome da Campanha</label>
               <input
                 type="text"
                 id="campaignName"
                 value={campaignName}
                 onChange={(e) => setCampaignName(e.target.value)}
                 placeholder="Ex: Promoção de Verão - VIPs"
-                className="w-full bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md p-2 text-slate-900 dark:text-white"
+                className="w-full bg-gray-100 dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-md p-2 text-gray-900 dark:text-white"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-500 dark:text-slate-300 mb-2">2. Velocidade de Envio</label>
-                <div className="p-4 bg-slate-100 dark:bg-slate-700/50 rounded-md">
+              <label className="block text-sm font-medium text-gray-500 dark:text-slate-300 mb-2">2. Velocidade de Envio</label>
+                <div className="p-4 bg-gray-100 dark:bg-slate-700/50 rounded-md">
                     <select
                         value={sendingSpeed}
                         onChange={(e) => setSendingSpeed(e.target.value as any)}
-                        className="w-full bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md p-2 text-slate-900 dark:text-white"
+                        className="w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-md p-2 text-gray-900 dark:text-white"
                     >
                         <option value="instant">Imediato (Máxima velocidade)</option>
                         <option value="slow">Lento (aprox. 1 por minuto)</option>
                         <option value="very_slow">Muito Lento (aprox. 1 por 5 minutos)</option>
                     </select>
-                    <p className="text-xs text-slate-400 dark:text-slate-400 mt-2">Escolher uma velocidade mais lenta pode ajudar a evitar bloqueios do WhatsApp em grandes campanhas. Requer um serviço de fila configurado no backend.</p>
+                    <p className="text-xs text-gray-500 dark:text-slate-400 mt-2">Escolher uma velocidade mais lenta pode ajudar a evitar bloqueios do WhatsApp em grandes campanhas. Requer um serviço de fila configurado no backend.</p>
                 </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-500 dark:text-slate-300 mb-2">3. Agendamento (Opcional)</label>
-              <div className="p-4 bg-slate-100 dark:bg-slate-700/50 rounded-md">
+              <label className="block text-sm font-medium text-gray-500 dark:text-slate-300 mb-2">3. Agendamento (Opcional)</label>
+              <div className="p-4 bg-gray-100 dark:bg-slate-700/50 rounded-md">
                 <label htmlFor="isScheduled" className="flex items-center cursor-pointer">
-                  <input type="checkbox" id="isScheduled" checked={isScheduled} onChange={(e) => setIsScheduled(e.target.checked)} className="h-4 w-4 rounded bg-slate-300 dark:bg-slate-800 border-slate-400 dark:border-slate-600 text-slate-900 dark:text-sky-600 focus:ring-slate-500 dark:focus:ring-sky-500"/>
-                  <span className="ml-3 text-sm font-medium text-slate-800 dark:text-white">Agendar envio para uma data específica</span>
+                  <input type="checkbox" id="isScheduled" checked={isScheduled} onChange={(e) => setIsScheduled(e.target.checked)} className="h-4 w-4 rounded bg-gray-200 dark:bg-slate-800 border-gray-300 dark:border-slate-600 text-blue-600 dark:text-sky-600 focus:ring-blue-500 dark:focus:ring-sky-500"/>
+                  <span className="ml-3 text-sm font-medium text-gray-800 dark:text-white">Agendar envio para uma data específica</span>
                 </label>
                 {isScheduled && (
                   <div className="mt-3">
-                    <label htmlFor="scheduleDate" className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Data e Hora do Envio</label>
+                    <label htmlFor="scheduleDate" className="block text-xs font-medium text-gray-500 dark:text-slate-400 mb-1">Data e Hora do Envio</label>
                     <input
                       type="datetime-local"
                       id="scheduleDate"
                       value={scheduleDate}
                       onChange={(e) => setScheduleDate(e.target.value)}
                       min={new Date().toISOString().slice(0, 16)}
-                      className="w-full bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md p-2 text-slate-900 dark:text-white"
+                      className="w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-md p-2 text-gray-900 dark:text-white"
                     />
                   </div>
                 )}
@@ -461,14 +461,14 @@ const NewCampaign: React.FC = () => {
             
             {variablePlaceholders.length > 0 && (
               <div>
-                <label className="block text-sm font-medium text-slate-500 dark:text-slate-300 mb-2">4. Preencher Variáveis</label>
-                 <p className="text-xs text-slate-400 dark:text-slate-400 mb-2">
+                <label className="block text-sm font-medium text-gray-500 dark:text-slate-300 mb-2">4. Preencher Variáveis</label>
+                 <p className="text-xs text-gray-500 dark:text-slate-400 mb-2">
                     Você pode usar variáveis como {"{{contact.name}}"}, {"{{contact.email}}"}, ou {"{{contact.custom_fields.sua_chave}}"} nos campos.
                 </p>
-                <div className="space-y-3 p-4 bg-slate-100 dark:bg-slate-700/50 rounded-md">
+                <div className="space-y-3 p-4 bg-gray-100 dark:bg-slate-700/50 rounded-md">
                   {variablePlaceholders.map(p => (
                     <div key={p}>
-                      <label htmlFor={`var-${p}`} className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">
+                      <label htmlFor={`var-${p}`} className="block text-xs font-medium text-gray-500 dark:text-slate-400 mb-1">
                         Variável {p}
                       </label>
                       <input
@@ -476,7 +476,7 @@ const NewCampaign: React.FC = () => {
                         id={`var-${p}`}
                         value={templateVariables[p] || ''}
                         onChange={(e) => handleVariableChange(p, e.target.value)}
-                        className="w-full bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md p-2 text-slate-900 dark:text-white"
+                        className="w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-md p-2 text-gray-900 dark:text-white"
                         placeholder={`Valor para ${p}`}
                       />
                     </div>
@@ -486,19 +486,19 @@ const NewCampaign: React.FC = () => {
             )}
 
             <div>
-              <label className="block text-sm font-medium text-slate-500 dark:text-slate-300 mb-2">
+              <label className="block text-sm font-medium text-gray-500 dark:text-slate-300 mb-2">
                 5. Selecionar Destinatários
               </label>
-              <div className="space-y-3 p-4 bg-slate-100 dark:bg-slate-700/50 rounded-md">
+              <div className="space-y-3 p-4 bg-gray-100 dark:bg-slate-700/50 rounded-md">
                   <div className="flex items-center">
-                      <input type="radio" id="sendToAll" name="recipientType" checked={sendToAll} onChange={() => setSendToAll(true)} className="h-4 w-4 text-slate-900 dark:text-sky-600 bg-slate-300 dark:bg-slate-800 border-slate-400 dark:border-slate-600 focus:ring-slate-500 dark:focus:ring-sky-500"/>
-                      <label htmlFor="sendToAll" className="ml-3 block text-sm font-medium text-slate-800 dark:text-white">
+                      <input type="radio" id="sendToAll" name="recipientType" checked={sendToAll} onChange={() => setSendToAll(true)} className="h-4 w-4 text-blue-600 dark:text-sky-600 bg-gray-200 dark:bg-slate-800 border-gray-300 dark:border-slate-600 focus:ring-blue-500 dark:focus:ring-sky-500"/>
+                      <label htmlFor="sendToAll" className="ml-3 block text-sm font-medium text-gray-800 dark:text-white">
                           Todos os Contatos ({contacts.length})
                       </label>
                   </div>
                   <div className="flex items-center">
-                      <input type="radio" id="sendToSegment" name="recipientType" checked={!sendToAll} onChange={() => setSendToAll(false)} className="h-4 w-4 text-slate-900 dark:text-sky-600 bg-slate-300 dark:bg-slate-800 border-slate-400 dark:border-slate-600 focus:ring-slate-500 dark:focus:ring-sky-500"/>
-                      <label htmlFor="sendToSegment" className="ml-3 block text-sm font-medium text-slate-800 dark:text-white">
+                      <input type="radio" id="sendToSegment" name="recipientType" checked={!sendToAll} onChange={() => setSendToAll(false)} className="h-4 w-4 text-blue-600 dark:text-sky-600 bg-gray-200 dark:bg-slate-800 border-gray-300 dark:border-slate-600 focus:ring-blue-500 dark:focus:ring-sky-500"/>
+                      <label htmlFor="sendToSegment" className="ml-3 block text-sm font-medium text-gray-800 dark:text-white">
                           Segmentar por Tags
                       </label>
                   </div>
@@ -512,19 +512,19 @@ const NewCampaign: React.FC = () => {
                                           type="checkbox"
                                           checked={selectedTags.includes(tag)}
                                           onChange={() => handleTagToggle(tag)}
-                                          className="h-4 w-4 rounded bg-slate-300 dark:bg-slate-800 border-slate-400 dark:border-slate-600 text-slate-900 dark:text-sky-600 focus:ring-slate-500 dark:focus:ring-sky-500"
+                                          className="h-4 w-4 rounded bg-gray-200 dark:bg-slate-800 border-gray-300 dark:border-slate-600 text-blue-600 dark:text-sky-600 focus:ring-blue-500 dark:focus:ring-sky-500"
                                       />
-                                      <label htmlFor={`tag-${tag}`} className="ml-3 text-sm text-slate-700 dark:text-slate-300">
+                                      <label htmlFor={`tag-${tag}`} className="ml-3 text-sm text-gray-700 dark:text-slate-300">
                                           {tag}
                                       </label>
                                   </div>
                               ))
                           ) : (
-                              <p className="text-sm text-slate-500 dark:text-slate-400">Nenhuma tag encontrada nos seus contatos.</p>
+                              <p className="text-sm text-gray-500 dark:text-slate-400">Nenhuma tag encontrada nos seus contatos.</p>
                           )}
                       </div>
                   )}
-                  <div className="pt-2 text-center text-sm font-semibold text-slate-800 dark:text-sky-300">
+                  <div className="pt-2 text-center text-sm font-semibold text-gray-800 dark:text-sky-300">
                       <p>Total de destinatários selecionados: {recipients.length}</p>
                   </div>
               </div>
@@ -536,7 +536,7 @@ const NewCampaign: React.FC = () => {
           </Card>
 
           <div>
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">Prévia da Mensagem</h2>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Prévia da Mensagem</h2>
             <TemplatePreview 
                 components={template.components}
                 recipientName={previewName}
@@ -551,15 +551,15 @@ const NewCampaign: React.FC = () => {
           onClose={() => setIsConfirmModalOpen(false)}
           title="Confirmar Campanha"
         >
-            <div className="text-slate-300 space-y-4">
-                <p>Você está prestes a {sendingSpeed !== 'instant' ? 'enfileirar' : isScheduled ? 'agendar' : 'enviar'} a campanha <strong className="text-white">{campaignName}</strong>.</p>
-                <div className="p-4 bg-slate-700/50 rounded-lg space-y-2">
-                     <p><strong>Template:</strong> <span className="font-mono text-sky-300">{template?.template_name}</span></p>
-                     <p><strong>Total de destinatários:</strong> <span className="font-bold text-white">{recipients.length.toLocaleString('pt-BR')}</span></p>
-                     {isScheduled && <p><strong>Agendada para:</strong> <span className="font-bold text-white">{new Date(scheduleDate).toLocaleString('pt-BR')}</span></p>}
-                     {sendingSpeed !== 'instant' && <p><strong>Velocidade:</strong> <span className="font-bold text-white">{sendingSpeed === 'slow' ? 'Lenta' : 'Muito Lenta'}</span></p>}
+            <div className="text-gray-600 dark:text-slate-300 space-y-4">
+                <p>Você está prestes a {sendingSpeed !== 'instant' ? 'enfileirar' : isScheduled ? 'agendar' : 'enviar'} a campanha <strong className="text-gray-900 dark:text-white">{campaignName}</strong>.</p>
+                <div className="p-4 bg-gray-100 dark:bg-slate-700/50 rounded-lg space-y-2">
+                     <p><strong>Template:</strong> <span className="font-mono text-blue-600 dark:text-sky-300">{template?.template_name}</span></p>
+                     <p><strong>Total de destinatários:</strong> <span className="font-bold text-gray-900 dark:text-white">{recipients.length.toLocaleString('pt-BR')}</span></p>
+                     {isScheduled && <p><strong>Agendada para:</strong> <span className="font-bold text-gray-900 dark:text-white">{new Date(scheduleDate).toLocaleString('pt-BR')}</span></p>}
+                     {sendingSpeed !== 'instant' && <p><strong>Velocidade:</strong> <span className="font-bold text-gray-900 dark:text-white">{sendingSpeed === 'slow' ? 'Lenta' : 'Muito Lenta'}</span></p>}
                 </div>
-                <p className="text-amber-400 text-sm">Esta ação não pode ser desfeita. Tem certeza de que deseja continuar?</p>
+                <p className="text-amber-600 dark:text-amber-400 text-sm">Esta ação não pode ser desfeita. Tem certeza de que deseja continuar?</p>
             </div>
             <div className="mt-6 flex justify-end gap-3">
                 <Button variant="secondary" onClick={() => setIsConfirmModalOpen(false)}>Cancelar</Button>
@@ -574,22 +574,22 @@ const NewCampaign: React.FC = () => {
             onClose={() => setCurrentPage('campaigns')}
             title={sendingSpeed !== 'instant' ? "Campanha Enfileirada!" : isScheduled ? "Campanha Agendada!" : "Resultados do Envio da Campanha"}
         >
-            <div className="text-slate-300 space-y-4">
-                <p>A campanha <strong className="text-white">{campaignName}</strong> foi {sendingSpeed !== 'instant' ? 'enfileirada com sucesso para envio gradual' : isScheduled ? 'agendada com sucesso' : 'processada'}.</p>
+            <div className="text-gray-600 dark:text-slate-300 space-y-4">
+                <p>A campanha <strong className="text-gray-900 dark:text-white">{campaignName}</strong> foi {sendingSpeed !== 'instant' ? 'enfileirada com sucesso para envio gradual' : isScheduled ? 'agendada com sucesso' : 'processada'}.</p>
                 {sendingSpeed === 'instant' && !isScheduled && (
-                  <div className="p-4 bg-slate-700/50 rounded-lg space-y-2 text-center">
-                    <p className="text-green-400"><strong className="text-2xl">{successfulSends}</strong> envios bem-sucedidos.</p>
-                    <p className="text-red-400"><strong className="text-2xl">{failedSends.length}</strong> envios falharam.</p>
+                  <div className="p-4 bg-gray-100 dark:bg-slate-700/50 rounded-lg space-y-2 text-center">
+                    <p className="text-green-600 dark:text-green-400"><strong className="text-2xl">{successfulSends}</strong> envios bem-sucedidos.</p>
+                    <p className="text-red-600 dark:text-red-400"><strong className="text-2xl">{failedSends.length}</strong> envios falharam.</p>
                   </div>
                 )}
                 {failedSends.length > 0 && (
                     <div>
-                        <h4 className="font-semibold text-white mb-2">Detalhes das Falhas:</h4>
-                        <div className="max-h-60 overflow-y-auto p-3 bg-slate-900/50 rounded-lg space-y-3">
+                        <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Detalhes das Falhas:</h4>
+                        <div className="max-h-60 overflow-y-auto p-3 bg-gray-50 dark:bg-slate-900/50 rounded-lg space-y-3">
                             {failedSends.map((result, index) => (
-                                <div key={index} className="text-sm border-b border-slate-700 pb-2">
-                                    <p className="font-bold text-slate-200">{result.contact.name} ({result.contact.phone})</p>
-                                    <p className="text-red-400 font-mono text-xs mt-1">{result.error}</p>
+                                <div key={index} className="text-sm border-b border-gray-200 dark:border-slate-700 pb-2">
+                                    <p className="font-bold text-gray-800 dark:text-slate-200">{result.contact.name} ({result.contact.phone})</p>
+                                    <p className="text-red-500 dark:text-red-400 font-mono text-xs mt-1">{result.error}</p>
                                 </div>
                             ))}
                         </div>

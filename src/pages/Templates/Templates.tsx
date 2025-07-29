@@ -12,11 +12,11 @@ import { MetaTemplateComponent } from '../../services/meta/types';
 
 const StatusBadge: React.FC<{ status: MessageTemplate['status'] }> = ({ status }) => {
     const statusStyles: Record<TemplateStatus, string> = {
-        APPROVED: 'bg-green-500/20 text-green-400 border-green-500/30',
-        PENDING: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-        REJECTED: 'bg-red-500/20 text-red-400 border-red-500/30',
-        PAUSED: 'bg-slate-500/20 text-slate-400 border-slate-500/30',
-        LOCAL: 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30',
+        APPROVED: 'bg-green-100 text-green-800 border-green-200 dark:bg-green-500/20 dark:text-green-400 dark:border-green-500/30',
+        PENDING: 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-500/20 dark:text-yellow-400 dark:border-yellow-500/30',
+        REJECTED: 'bg-red-100 text-red-800 border-red-200 dark:bg-red-500/20 dark:text-red-400 dark:border-red-500/30',
+        PAUSED: 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-slate-500/20 dark:text-slate-400 dark:border-slate-500/30',
+        LOCAL: 'bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-500/20 dark:text-indigo-400 dark:border-indigo-500/30',
     };
     const style = status ? statusStyles[status] : statusStyles.LOCAL;
     const text = status ? status.charAt(0).toUpperCase() + status.slice(1).toLowerCase() : 'Local';
@@ -30,16 +30,16 @@ const TemplateCard: React.FC<{ template: MessageTemplate; onUse: () => void }> =
     const body = useMemo(() => template.components.find(c => c.type === 'BODY'), [template.components]);
 
     return (
-        <Card className="flex flex-col justify-between hover:border-slate-300 dark:hover:border-sky-500 border border-transparent transition-colors duration-200">
+        <Card className="flex flex-col justify-between hover:border-gray-300 dark:hover:border-sky-500 border border-transparent transition-colors duration-200">
             <div>
                 <div className="flex justify-between items-start gap-2">
-                    <h3 className="font-mono text-lg text-slate-900 dark:text-white break-all">{template.template_name}</h3>
+                    <h3 className="font-mono text-lg text-gray-900 dark:text-white break-all">{template.template_name}</h3>
                     <div className="flex-shrink-0">
                          <StatusBadge status={template.status} />
                     </div>
                 </div>
-                 <div className="mt-4 text-sm text-slate-600 dark:text-slate-400 font-mono bg-slate-100 dark:bg-slate-900/50 p-3 rounded-md whitespace-pre-wrap space-y-2">
-                    {header?.text && <p className="font-bold text-slate-800 dark:text-slate-200">{header.text}</p>}
+                 <div className="mt-4 text-sm text-gray-600 dark:text-slate-400 font-mono bg-gray-100 dark:bg-slate-900/50 p-3 rounded-md whitespace-pre-wrap space-y-2">
+                    {header?.text && <p className="font-bold text-gray-800 dark:text-slate-200">{header.text}</p>}
                     {body?.text && <p>{body.text}</p>}
                 </div>
             </div>
@@ -172,16 +172,16 @@ const Templates: React.FC = () => {
   return (
     <div className="space-y-8">
       <div className="flex justify-between items-center flex-wrap gap-4">
-        <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Templates de Mensagem</h1>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Templates de Mensagem</h1>
         <div className="flex items-center gap-4">
              <div className="relative">
-                <SEARCH_ICON className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+                <SEARCH_ICON className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
                 <input
                     type="text"
                     placeholder="Buscar templates..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg py-2 pl-10 pr-4 text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-slate-400 dark:focus:ring-sky-500 focus:outline-none"
+                    className="bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg py-2 pl-10 pr-4 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 dark:focus:ring-sky-500 focus:outline-none"
                 />
             </div>
             <div className="flex gap-2">
@@ -194,13 +194,13 @@ const Templates: React.FC = () => {
         </div>
       </div>
 
-      {error && <Card className="border-l-4 border-red-500"><p className="text-red-400">{error}</p></Card>}
-      {syncMessage && <Card className="border-l-4 border-green-500"><p className="text-green-400">{syncMessage}</p></Card>}
+      {error && <Card className="border-l-4 border-red-500"><p className="text-red-500 dark:text-red-400">{error}</p></Card>}
+      {syncMessage && <Card className="border-l-4 border-green-500"><p className="text-green-500 dark:text-green-400">{syncMessage}</p></Card>}
       
       {filteredTemplates.length === 0 ? (
         <Card className="text-center py-12">
-            <h2 className="text-xl font-semibold text-slate-900 dark:text-white">{searchTerm ? 'Nenhum template encontrado.' : 'Nenhum template encontrado.'}</h2>
-            <p className="text-slate-500 dark:text-slate-400 mt-2 mb-6">{searchTerm ? `Sua busca por "${searchTerm}" não retornou resultados.` : 'Sincronize com sua conta da Meta para ver seus templates ou crie um novo com IA.'}</p>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{searchTerm ? 'Nenhum template encontrado.' : 'Nenhum template encontrado.'}</h2>
+            <p className="text-gray-500 dark:text-slate-400 mt-2 mb-6">{searchTerm ? `Sua busca por "${searchTerm}" não retornou resultados.` : 'Sincronize com sua conta da Meta para ver seus templates ou crie um novo com IA.'}</p>
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

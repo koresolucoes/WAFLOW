@@ -55,30 +55,32 @@ const AccountSettings: React.FC = () => {
         }
         setIsUpdatingPassword(false);
     };
+    
+    const baseInputClass = "w-full bg-gray-50 dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-md p-2 text-gray-900 dark:text-white";
 
     return (
         <div className="space-y-6">
             <Card>
-                <h2 className="text-lg font-semibold text-white">Alterar E-mail</h2>
-                <p className="text-sm text-slate-400 mt-1 mb-4">
-                    Seu e-mail de login atual é: <span className="font-semibold text-white">{user?.email}</span>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Alterar E-mail</h2>
+                <p className="text-sm text-gray-500 dark:text-slate-400 mt-1 mb-4">
+                    Seu e-mail de login atual é: <span className="font-semibold text-gray-800 dark:text-white">{user?.email}</span>
                 </p>
                 <InfoCard variant="info" className="mb-4">
                     Para alterar seu e-mail, você precisará confirmar a alteração em ambos os endereços, o antigo e o novo.
                 </InfoCard>
                 <form onSubmit={handleUpdateEmail} className="space-y-3">
                     <div>
-                        <label htmlFor="newEmail" className="block text-sm font-medium text-slate-300 mb-1">Novo E-mail</label>
+                        <label htmlFor="newEmail" className="block text-sm font-medium text-gray-600 dark:text-slate-300 mb-1">Novo E-mail</label>
                         <input
                             type="email"
                             id="newEmail"
                             value={newEmail}
                             onChange={(e) => setNewEmail(e.target.value)}
                             required
-                            className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white"
+                            className={baseInputClass}
                         />
                     </div>
-                     {emailError && <p className="text-red-400 text-sm">{emailError}</p>}
+                     {emailError && <p className="text-red-500 dark:text-red-400 text-sm">{emailError}</p>}
                     <div className="flex justify-end">
                         <Button type="submit" variant="primary" isLoading={isUpdatingEmail}>Atualizar E-mail</Button>
                     </div>
@@ -86,13 +88,13 @@ const AccountSettings: React.FC = () => {
             </Card>
 
             <Card>
-                <h2 className="text-lg font-semibold text-white">Alterar Senha</h2>
-                <p className="text-sm text-slate-400 mt-1 mb-4">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Alterar Senha</h2>
+                <p className="text-sm text-gray-500 dark:text-slate-400 mt-1 mb-4">
                     Para sua segurança, recomendamos o uso de uma senha forte e única.
                 </p>
                 <form onSubmit={handleUpdatePassword} className="space-y-3">
                      <div>
-                        <label htmlFor="newPassword" className="block text-sm font-medium text-slate-300 mb-1">Nova Senha</label>
+                        <label htmlFor="newPassword" className="block text-sm font-medium text-gray-600 dark:text-slate-300 mb-1">Nova Senha</label>
                         <input
                             type="password"
                             id="newPassword"
@@ -100,11 +102,11 @@ const AccountSettings: React.FC = () => {
                             onChange={(e) => setNewPassword(e.target.value)}
                             required
                             minLength={6}
-                            className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white"
+                            className={baseInputClass}
                         />
                     </div>
                     <div>
-                        <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-300 mb-1">Confirmar Nova Senha</label>
+                        <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-600 dark:text-slate-300 mb-1">Confirmar Nova Senha</label>
                         <input
                             type="password"
                             id="confirmPassword"
@@ -112,10 +114,10 @@ const AccountSettings: React.FC = () => {
                             onChange={(e) => setConfirmPassword(e.target.value)}
                             required
                             minLength={6}
-                            className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white"
+                            className={baseInputClass}
                         />
                     </div>
-                    {passwordError && <p className="text-red-400 text-sm">{passwordError}</p>}
+                    {passwordError && <p className="text-red-500 dark:text-red-400 text-sm">{passwordError}</p>}
                     <div className="flex justify-end">
                         <Button type="submit" variant="primary" isLoading={isUpdatingPassword}>Atualizar Senha</Button>
                     </div>

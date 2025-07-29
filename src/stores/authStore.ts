@@ -754,7 +754,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const assigneeEmail = allTeamMembers.find(m => m.user_id === assigneeId)?.email ?? null;
     set(state => ({
         conversations: state.conversations.map(c =>
-            c.contact.id === contactId ? { ...c, assignee_id: assigneeId, assignee_email: assigneeEmail as string | null } : c
+            c.contact.id === contactId ? { ...c, assignee_id: assigneeId, assignee_email: assigneeEmail } : c
         )
     }));
 

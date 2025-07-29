@@ -11,8 +11,8 @@ import DealFormModal from '../../components/common/DealFormModal';
 
 const FunnelMetric: React.FC<{ label: string, value: string | number }> = ({ label, value }) => (
     <div className="text-center px-4">
-        <p className="text-xs text-slate-400 uppercase tracking-wider">{label}</p>
-        <p className="text-xl font-bold text-white">{value}</p>
+        <p className="text-xs text-gray-400 dark:text-slate-400 uppercase tracking-wider">{label}</p>
+        <p className="text-xl font-bold text-gray-900 dark:text-white">{value}</p>
     </div>
 );
 
@@ -152,9 +152,9 @@ const Funnel: React.FC = () => {
 
     if (pipelines.length === 0 && !isCreating) {
         return (
-             <div className="flex flex-col items-center justify-center h-full text-center text-slate-400">
-                <FUNNEL_ICON className="w-16 h-16 mb-4 text-slate-500" />
-                <h2 className="text-2xl text-white font-bold">Nenhum funil de vendas encontrado.</h2>
+             <div className="flex flex-col items-center justify-center h-full text-center text-gray-500 dark:text-slate-400">
+                <FUNNEL_ICON className="w-16 h-16 mb-4 text-gray-400 dark:text-slate-500" />
+                <h2 className="text-2xl text-gray-900 dark:text-white font-bold">Nenhum funil de vendas encontrado.</h2>
                 <p className="mt-2 mb-6">Crie seu primeiro funil para começar a organizar seus negócios.</p>
                 <Button onClick={handleCreatePipeline} isLoading={isCreating}>
                     Criar Funil Padrão
@@ -166,14 +166,14 @@ const Funnel: React.FC = () => {
     return (
         <>
             <div className="h-full flex flex-col">
-                <header className="flex-shrink-0 p-4 border-b border-slate-700/50 flex flex-col gap-4">
+                <header className="flex-shrink-0 p-4 border-b border-gray-200 dark:border-slate-700/50 flex flex-col gap-4">
                     <div className="flex justify-between items-center gap-4 w-full flex-wrap">
                         <div className="flex items-center gap-4">
-                            <h1 className="text-2xl font-bold text-white">Funil</h1>
+                            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Funil</h1>
                             <select
                                 value={activePipelineId || ''}
                                 onChange={(e) => setActivePipelineId(e.target.value)}
-                                className="bg-slate-700 border border-slate-600 rounded-md p-2 text-white text-sm"
+                                className="bg-gray-100 dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-md p-2 text-gray-900 dark:text-white text-sm"
                             >
                                 {pipelines.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                             </select>
@@ -181,7 +181,7 @@ const Funnel: React.FC = () => {
                         <Button variant="secondary" onClick={() => setIsManagerOpen(true)}>Gerenciar Funis</Button>
                     </div>
                     {activePipeline && (
-                        <div className="w-full bg-slate-800/50 p-3 rounded-lg flex items-center justify-around flex-wrap gap-4">
+                        <div className="w-full bg-white dark:bg-slate-800/50 p-3 rounded-lg flex items-center justify-around flex-wrap gap-4">
                             <FunnelMetric label="Valor em Aberto" value={pipelineMetrics.openValue} />
                             <FunnelMetric label="Negócios Abertos" value={pipelineMetrics.openDealsCount} />
                             <FunnelMetric label="Taxa de Conversão" value={pipelineMetrics.conversionRate} />
@@ -204,7 +204,7 @@ const Funnel: React.FC = () => {
                             />
                         ))}
                         <div className="w-80 flex-shrink-0 h-full flex items-center justify-center">
-                            <Button variant="ghost" className="w-full h-full border-2 border-dashed border-slate-700 hover:bg-slate-800 hover:border-sky-500" onClick={handleAddStage}>
+                            <Button variant="ghost" className="w-full h-full border-2 border-dashed border-gray-300 dark:border-slate-700 hover:bg-gray-100 dark:hover:bg-slate-800 hover:border-blue-500 dark:hover:border-sky-500" onClick={handleAddStage}>
                                 <PLUS_ICON className="w-5 h-5 mr-2" />
                                 Adicionar Etapa
                             </Button>

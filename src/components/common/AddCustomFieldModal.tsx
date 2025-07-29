@@ -78,23 +78,26 @@ const AddCustomFieldModal: React.FC<AddCustomFieldModalProps> = ({ isOpen, onClo
             setIsLoading(false);
         }
     };
+    
+    const baseInputClass = "w-full bg-gray-50 dark:bg-slate-700 p-2 rounded-md text-gray-900 dark:text-white border border-gray-300 dark:border-slate-600";
+    const baseLabelClass = "block text-sm font-medium text-gray-600 dark:text-slate-300 mb-1";
 
     return (
         <Modal isOpen={isOpen} onClose={onClose} title="Adicionar Campo Personalizado">
             <form onSubmit={handleSave} className="space-y-4">
-                {error && <p className="text-red-400 text-sm p-2 bg-red-500/10 rounded-md">{error}</p>}
+                {error && <p className="text-red-500 dark:text-red-400 text-sm p-2 bg-red-100/50 dark:bg-red-500/10 rounded-md">{error}</p>}
                 <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-1">Nome do Campo</label>
-                    <input name="name" value={formData.name} onChange={handleFormChange} placeholder="Ex: Data de Nascimento" className="w-full bg-slate-700 p-2 rounded-md" required />
+                    <label className={baseLabelClass}>Nome do Campo</label>
+                    <input name="name" value={formData.name} onChange={handleFormChange} placeholder="Ex: Data de Nascimento" className={baseInputClass} required />
                 </div>
                 <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-1">Chave do Campo</label>
-                    <input name="key" value={formData.key} onChange={handleFormChange} placeholder="Ex: data_nascimento" className="w-full bg-slate-700 p-2 rounded-md font-mono" required />
-                        <p className="text-xs text-slate-400 mt-1">Identificador único para o campo (sem espaços ou caracteres especiais).</p>
+                    <label className={baseLabelClass}>Chave do Campo</label>
+                    <input name="key" value={formData.key} onChange={handleFormChange} placeholder="Ex: data_nascimento" className={`${baseInputClass} font-mono`} required />
+                        <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">Identificador único para o campo (sem espaços ou caracteres especiais).</p>
                 </div>
                     <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-1">Tipo de Campo</label>
-                    <select name="type" value={formData.type} onChange={handleFormChange} className="w-full bg-slate-700 p-2 rounded-md">
+                    <label className={baseLabelClass}>Tipo de Campo</label>
+                    <select name="type" value={formData.type} onChange={handleFormChange} className={baseInputClass}>
                         <option value="TEXTO">Texto</option>
                         <option value="NUMERO">Número</option>
                         <option value="DATA">Data</option>
@@ -103,9 +106,9 @@ const AddCustomFieldModal: React.FC<AddCustomFieldModalProps> = ({ isOpen, onClo
                 </div>
                 {formData.type === 'LISTA' && (
                         <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-1">Opções da Lista</label>
-                        <textarea name="options" value={Array.isArray(formData.options) ? formData.options.join(', ') : formData.options || ''} onChange={handleFormChange} rows={3} placeholder="Opção 1, Opção 2, Opção 3" className="w-full bg-slate-700 p-2 rounded-md" />
-                        <p className="text-xs text-slate-400 mt-1">Separe as opções por vírgula.</p>
+                        <label className={baseLabelClass}>Opções da Lista</label>
+                        <textarea name="options" value={Array.isArray(formData.options) ? formData.options.join(', ') : formData.options || ''} onChange={handleFormChange} rows={3} placeholder="Opção 1, Opção 2, Opção 3" className={baseInputClass} />
+                        <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">Separe as opções por vírgula.</p>
                     </div>
                 )}
                 <div className="flex justify-end gap-2 pt-4">

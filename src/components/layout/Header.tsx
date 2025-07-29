@@ -21,7 +21,7 @@ const ThemeToggle: React.FC = () => {
             {theme === 'dark' ? (
                 <SUN_ICON className="w-5 h-5 text-slate-400 hover:text-amber-400" />
             ) : (
-                <MOON_ICON className="w-5 h-5 text-slate-500 hover:text-slate-900" />
+                <MOON_ICON className="w-5 h-5 text-gray-500 hover:text-gray-900" />
             )}
         </Button>
     );
@@ -43,11 +43,11 @@ const TeamSwitcher: React.FC = () => {
     }, []);
 
     if (teamLoading) {
-        return <div className="text-sm text-slate-500 dark:text-slate-400">Carregando equipes...</div>;
+        return <div className="text-sm text-gray-500 dark:text-slate-400">Carregando equipes...</div>;
     }
     
     if (!activeTeam) {
-        return <div className="text-sm text-slate-500 dark:text-slate-400">Nenhuma equipe encontrada.</div>;
+        return <div className="text-sm text-gray-500 dark:text-slate-400">Nenhuma equipe encontrada.</div>;
     }
 
     const switchTeam = (team: Team) => {
@@ -59,11 +59,11 @@ const TeamSwitcher: React.FC = () => {
         <div className="relative" ref={dropdownRef}>
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="flex items-center gap-2 p-2 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
+                className="flex items-center gap-2 p-2 rounded-lg bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors"
             >
-                <USERS_ICON className="w-5 h-5 text-slate-600 dark:text-sky-400" />
-                <span className="font-semibold text-slate-800 dark:text-white text-sm">{activeTeam.name}</span>
-                 <svg className={`w-4 h-4 text-slate-500 dark:text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <USERS_ICON className="w-5 h-5 text-gray-600 dark:text-sky-400" />
+                <span className="font-semibold text-gray-800 dark:text-white text-sm">{activeTeam.name}</span>
+                 <svg className={`w-4 h-4 text-gray-500 dark:text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
                 </svg>
             </button>
@@ -75,7 +75,7 @@ const TeamSwitcher: React.FC = () => {
                                 key={team.id}
                                 href="#"
                                 onClick={(e) => { e.preventDefault(); switchTeam(team); }}
-                                className={`block px-4 py-2 text-sm ${activeTeam.id === team.id ? 'bg-slate-100 text-slate-900 font-semibold dark:bg-sky-500/20 dark:text-sky-300' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
+                                className={`block px-4 py-2 text-sm ${activeTeam.id === team.id ? 'bg-blue-50 text-blue-700 font-semibold dark:bg-sky-500/20 dark:text-sky-300' : 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700'}`}
                             >
                                 {team.name}
                             </a>
@@ -95,11 +95,11 @@ const Header: React.FC = () => {
   };
 
   return (
-    <header className="flex-shrink-0 bg-white/80 dark:bg-slate-900/70 backdrop-blur-sm flex items-center justify-end p-4 border-b border-slate-200 dark:border-slate-700/50">
+    <header className="flex-shrink-0 bg-white/80 dark:bg-slate-900/70 backdrop-blur-sm flex items-center justify-end p-4 border-b border-gray-200 dark:border-slate-700/50">
       <div className="flex items-center space-x-4">
         <ThemeToggle />
         <TeamSwitcher />
-        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{user?.email}</span>
+        <span className="text-sm font-medium text-gray-700 dark:text-slate-300">{user?.email}</span>
         <img
           className="h-9 w-9 rounded-full object-cover"
           src={`https://api.dicebear.com/8.x/initials/svg?seed=${user?.email}`}

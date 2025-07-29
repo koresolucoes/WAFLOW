@@ -69,8 +69,8 @@ const ContactForm: React.FC<ContactFormProps> = ({ contact, onSave, onCancel, is
     onSave(formData);
   };
 
-  const inputClasses = "w-full bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md p-2 text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-slate-400 dark:focus:ring-sky-500";
-  const labelClasses = "block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1";
+  const inputClasses = "w-full bg-gray-50 dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-md p-2 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-400 focus:ring-2 focus:ring-blue-500 dark:focus:ring-sky-500";
+  const labelClasses = "block text-sm font-medium text-gray-600 dark:text-slate-300 mb-1";
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -127,11 +127,11 @@ const ContactForm: React.FC<ContactFormProps> = ({ contact, onSave, onCancel, is
       </div>
       <div>
           <label htmlFor="tags" className={labelClasses}>Tags (pressione Enter para adicionar)</label>
-          <div className="flex flex-wrap items-center w-full bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md p-2">
+          <div className="flex flex-wrap items-center w-full bg-gray-50 dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-md p-2">
               {formData.tags.map(tag => (
-                  <span key={tag} className="flex items-center mr-2 mb-1 px-2 py-1 text-xs font-semibold rounded-full bg-slate-200 text-slate-700 dark:bg-sky-500/20 dark:text-sky-300">
+                  <span key={tag} className="flex items-center mr-2 mb-1 px-2 py-1 text-xs font-semibold rounded-full bg-gray-200 text-gray-700 dark:bg-sky-500/20 dark:text-sky-300">
                       {tag}
-                      <button type="button" onClick={() => removeTag(tag)} className="ml-1.5 text-slate-600 dark:text-sky-200 hover:text-black dark:hover:text-white">
+                      <button type="button" onClick={() => removeTag(tag)} className="ml-1.5 text-gray-600 dark:text-sky-200 hover:text-black dark:hover:text-white">
                           &times;
                       </button>
                   </span>
@@ -143,7 +143,7 @@ const ContactForm: React.FC<ContactFormProps> = ({ contact, onSave, onCancel, is
                 onChange={handleTagInputChange}
                 onKeyDown={handleTagInputKeyDown}
                 placeholder="vip, novo-cliente..."
-                className="bg-transparent flex-1 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none min-w-[100px]"
+                className="bg-transparent flex-1 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none min-w-[100px]"
             />
           </div>
       </div>

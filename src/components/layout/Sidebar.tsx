@@ -21,8 +21,8 @@ const NavItem: React.FC<NavItemProps> = ({ icon, label, isActive, onClick }) => 
       }}
       className={`flex items-center p-3 my-1 rounded-lg transition-colors duration-200 ${
         isActive 
-          ? 'bg-slate-200 text-slate-900 font-bold dark:bg-slate-700/50 dark:text-sky-400' 
-          : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200/70 dark:hover:bg-slate-700'
+          ? 'bg-blue-50 text-blue-600 font-bold dark:bg-slate-700/50 dark:text-sky-400' 
+          : 'text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700'
       }`}
     >
       {icon}
@@ -51,11 +51,11 @@ const Sidebar: React.FC = () => {
   ];
 
   return (
-    <aside className="w-64 flex-shrink-0 bg-white dark:bg-slate-800/50 p-4 flex flex-col justify-between border-r border-slate-200 dark:border-slate-700/50">
+    <aside className="w-64 flex-shrink-0 bg-white dark:bg-slate-800/50 p-4 flex flex-col justify-between border-r border-gray-200 dark:border-slate-700/50">
       <div>
         <div className="flex items-center space-x-3 p-3 mb-6">
           {ZAPFLOW_AI_LOGO}
-          <span className="text-xl font-bold text-slate-900 dark:text-white">ZapFlow AI</span>
+          <span className="text-xl font-bold text-gray-900 dark:text-white">ZapFlow AI</span>
         </div>
         <nav>
           <ul>
@@ -87,8 +87,8 @@ const Sidebar: React.FC = () => {
                 ))}
             </ul>
          </nav>
-        <div className="p-4 mt-4 bg-slate-100 dark:bg-slate-800 rounded-lg text-center">
-            <p className="text-xs text-slate-500 dark:text-slate-400">© 2024 ZapFlow AI. Todos os direitos reservados.</p>
+        <div className="p-4 mt-4 bg-gray-50 dark:bg-slate-800 rounded-lg text-center">
+            <p className="text-xs text-gray-500 dark:text-slate-400">© 2024 ZapFlow AI. Todos os direitos reservados.</p>
         </div>
       </div>
     </aside>

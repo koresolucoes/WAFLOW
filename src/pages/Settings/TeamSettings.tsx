@@ -67,7 +67,7 @@ const TeamSettings: React.FC = () => {
     };
 
     if (!activeTeam) {
-        return <Card><p className="text-center text-slate-400">Nenhuma equipe ativa selecionada.</p></Card>;
+        return <Card><p className="text-center text-gray-500 dark:text-slate-400">Nenhuma equipe ativa selecionada.</p></Card>;
     }
     
     const isOwner = (memberUserId: string) => activeTeam.owner_id === memberUserId;
@@ -85,17 +85,17 @@ const TeamSettings: React.FC = () => {
     return (
         <div className="space-y-6">
             <Card>
-                <h2 className="text-lg font-semibold text-white">Convidar Novo Membro</h2>
-                <p className="text-sm text-slate-400 mb-4">Os usuários convidados receberão um e-mail para se juntarem à sua equipe.</p>
-                {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
-                {inviteMessage && <p className="text-green-400 text-sm mb-4">{inviteMessage}</p>}
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Convidar Novo Membro</h2>
+                <p className="text-sm text-gray-500 dark:text-slate-400 mb-4">Os usuários convidados receberão um e-mail para se juntarem à sua equipe.</p>
+                {error && <p className="text-red-500 dark:text-red-400 text-sm mb-4">{error}</p>}
+                {inviteMessage && <p className="text-green-500 dark:text-green-400 text-sm mb-4">{inviteMessage}</p>}
                 <form onSubmit={handleInvite} className="flex gap-2">
                     <input
                         type="email"
                         value={inviteEmail}
                         onChange={(e) => setInviteEmail(e.target.value)}
                         placeholder="email@exemplo.com"
-                        className="w-full bg-slate-700 p-2 rounded-md text-white"
+                        className="w-full bg-gray-50 dark:bg-slate-700 p-2 rounded-md text-gray-900 dark:text-white border border-gray-300 dark:border-slate-600"
                         required
                         disabled={!canManageTeam}
                     />
@@ -104,26 +104,26 @@ const TeamSettings: React.FC = () => {
                         Convidar
                     </Button>
                 </form>
-                {!canManageTeam && <p className="text-xs text-amber-400 mt-2">Apenas proprietários ou administradores podem convidar novos membros.</p>}
+                {!canManageTeam && <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">Apenas proprietários ou administradores podem convidar novos membros.</p>}
             </Card>
 
             <Card>
-                <h2 className="text-lg font-semibold text-white mb-4">Membros da Equipe ({members.length})</h2>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Membros da Equipe ({members.length})</h2>
                 {teamLoading ? <p>Carregando membros...</p> : (
-                    <div className="bg-slate-900/50 rounded-lg">
-                         <ul className="divide-y divide-slate-700/50">
+                    <div className="bg-gray-50 dark:bg-slate-900/50 rounded-lg">
+                         <ul className="divide-y divide-gray-200 dark:divide-slate-700/50">
                             {members.map(member => (
                                 <li key={member.user_id} className="p-3 flex justify-between items-center">
                                     <div>
-                                        <p className="font-semibold text-white">{member.email}</p>
-                                        <p className="text-xs text-slate-400">{isOwner(member.user_id) ? 'Proprietário' : member.role === 'admin' ? 'Admin' : 'Agente'}</p>
+                                        <p className="font-semibold text-gray-900 dark:text-white">{member.email}</p>
+                                        <p className="text-xs text-gray-500 dark:text-slate-400">{isOwner(member.user_id) ? 'Proprietário' : member.role === 'admin' ? 'Admin' : 'Agente'}</p>
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <select
                                             value={member.role}
                                             onChange={(e) => handleRoleChange(member.user_id, e.target.value as 'admin' | 'agent')}
                                             disabled={isOwner(member.user_id) || !canManageTeam}
-                                            className="bg-slate-700 text-white text-xs p-1 rounded-md disabled:opacity-50"
+                                            className="bg-gray-100 dark:bg-slate-700 text-gray-900 dark:text-white text-xs p-1 rounded-md disabled:opacity-50 border border-gray-300 dark:border-slate-600"
                                         >
                                             <option value="admin">Admin</option>
                                             <option value="agent">Agente</option>
@@ -132,7 +132,7 @@ const TeamSettings: React.FC = () => {
                                             variant="ghost" size="sm"
                                             onClick={() => handleRemoveMember(member.user_id)}
                                             disabled={isOwner(member.user_id) || !canManageTeam}
-                                            className="text-red-400 hover:bg-red-500/10"
+                                            className="text-red-500 hover:bg-red-100/50 dark:text-red-400 dark:hover:bg-red-500/10"
                                             title={isOwner(member.user_id) ? "O proprietário não pode ser removido." : "Remover membro"}
                                         >
                                             <TRASH_ICON className="w-4 h-4" />

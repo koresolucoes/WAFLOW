@@ -16,6 +16,9 @@ const CannedResponseForm: React.FC<{
     const [shortcut, setShortcut] = useState(response?.shortcut || '');
     const [content, setContent] = useState(response?.content || '');
     const [isLoading, setIsLoading] = useState(false);
+    
+    const baseInputClass = "w-full bg-gray-50 dark:bg-slate-700 p-2 rounded-md text-gray-900 dark:text-white border border-gray-300 dark:border-slate-600";
+    const baseLabelClass = "block text-sm font-medium text-gray-600 dark:text-slate-300 mb-1";
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -34,23 +37,23 @@ const CannedResponseForm: React.FC<{
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1">Atalho</label>
+                <label className={baseLabelClass}>Atalho</label>
                 <input
                     value={shortcut}
                     onChange={(e) => setShortcut(e.target.value)}
                     placeholder="/agradecimento"
-                    className="w-full bg-slate-700 p-2 rounded-md"
+                    className={baseInputClass}
                     required
                 />
             </div>
             <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1">Conteúdo da Mensagem</label>
+                <label className={baseLabelClass}>Conteúdo da Mensagem</label>
                 <textarea
                     value={content}
                     onChange={(e) => setContent(e.target.value)}
                     rows={4}
                     placeholder="Obrigado pelo seu contato!"
-                    className="w-full bg-slate-700 p-2 rounded-md"
+                    className={baseInputClass}
                     required
                 />
             </div>
@@ -106,8 +109,8 @@ const CannedResponsesSettings: React.FC = () => {
             <Card>
                 <div className="flex justify-between items-center mb-4">
                     <div>
-                        <h2 className="text-lg font-semibold text-white">Gerenciar Respostas Rápidas</h2>
-                        <p className="text-sm text-slate-400">Crie atalhos para mensagens usadas com frequência na Caixa de Entrada.</p>
+                        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Gerenciar Respostas Rápidas</h2>
+                        <p className="text-sm text-gray-500 dark:text-slate-400">Crie atalhos para mensagens usadas com frequência na Caixa de Entrada.</p>
                     </div>
                     <Button variant="primary" onClick={() => handleOpenModal()}>
                         <PLUS_ICON className="w-5 h-5 mr-2" />
@@ -115,17 +118,17 @@ const CannedResponsesSettings: React.FC = () => {
                     </Button>
                 </div>
 
-                <div className="bg-slate-900/50 rounded-lg">
+                <div className="bg-gray-50 dark:bg-slate-900/50 rounded-lg">
                     {responses.length > 0 ? (
-                        <ul className="divide-y divide-slate-700/50">
+                        <ul className="divide-y divide-gray-200 dark:divide-slate-700/50">
                             {responses.map(res => (
                                 <li key={res.id} className="p-3 flex justify-between items-start group">
                                     <div className="flex-grow cursor-pointer" onClick={() => handleOpenModal(res)}>
-                                        <p className="font-semibold text-sky-400 font-mono">{res.shortcut}</p>
-                                        <p className="text-sm text-slate-300 mt-1 whitespace-pre-wrap">{res.content}</p>
+                                        <p className="font-semibold text-blue-600 dark:text-sky-400 font-mono">{res.shortcut}</p>
+                                        <p className="text-sm text-gray-700 dark:text-slate-300 mt-1 whitespace-pre-wrap">{res.content}</p>
                                     </div>
                                     <div className="flex-shrink-0 ml-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); handleDelete(res.id); }} className="text-red-400 hover:bg-red-500/10">
+                                        <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); handleDelete(res.id); }} className="text-red-500 hover:bg-red-100/50 dark:text-red-400 dark:hover:bg-red-500/10">
                                             <TRASH_ICON className="w-4 h-4" />
                                         </Button>
                                     </div>
@@ -133,8 +136,8 @@ const CannedResponsesSettings: React.FC = () => {
                             ))}
                         </ul>
                     ) : (
-                        <div className="text-center text-slate-400 p-6 flex flex-col items-center">
-                            <BOLT_ICON className="w-10 h-10 text-slate-500 mb-2"/>
+                        <div className="text-center text-gray-500 dark:text-slate-400 p-6 flex flex-col items-center">
+                            <BOLT_ICON className="w-10 h-10 text-gray-400 dark:text-slate-500 mb-2"/>
                             <span>Nenhuma resposta rápida criada ainda.</span>
                         </div>
                     )}
