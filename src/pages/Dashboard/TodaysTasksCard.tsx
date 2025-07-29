@@ -37,25 +37,16 @@ const TodaysTasksCard: React.FC = () => {
                         >
                             <p className="text-sm text-slate-200">{task.content}</p>
                             <div className="flex justify-between items-center mt-2 text-xs">
-                                <a
-                                    href="#"
-                                    onMouseDown={(e) => e.stopPropagation()}
-                                    onClick={(e) => {
-                                        e.preventDefault();
-                                        if (task.contacts?.id) {
-                                            setCurrentPage('contact-details', { contactId: task.contacts.id });
-                                        }
-                                    }}
+                                <span
                                     className={`font-semibold truncate pr-2 text-left ${
                                         task.contacts?.id
-                                            ? 'text-sky-400 hover:underline cursor-pointer'
-                                            : 'text-slate-400 cursor-default'
+                                            ? 'text-sky-400'
+                                            : 'text-slate-400'
                                     }`}
-                                    aria-disabled={!task.contacts?.id}
-                                    title={task.contacts?.id ? `Ver detalhes de ${task.contacts.name}` : 'Nenhum contato associado'}
+                                    title={task.contacts?.id ? task.contacts.name : 'Nenhum contato associado'}
                                 >
                                     {task.contacts?.name || 'Contato não associado'}
-                                </a>
+                                </span>
                                 {task.due_date && (
                                     <span className={`flex items-center gap-1 font-mono ${isOverdue(task.due_date) ? 'text-red-400' : 'text-slate-400'}`}>
                                         <CALENDAR_ICON className="w-3 h-3" />
@@ -72,7 +63,7 @@ const TodaysTasksCard: React.FC = () => {
                     <p>Nenhuma tarefa pendente para hoje.</p>
                 </div>
             )}
-            <Button variant="secondary" size="sm" className="mt-4 w-full flex-shrink-0" onClick={() => setCurrentPage('contacts')} onMouseDown={(e) => e.stopPropagation()}>
+            <Button variant="secondary" size="sm" className="mt-4 w-full flex-shrink-0" disabled title="Navegação desativada temporariamente">
                 Ver todos os contatos
             </Button>
         </Card>

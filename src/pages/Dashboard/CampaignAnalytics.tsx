@@ -64,9 +64,8 @@ const CampaignAnalytics: React.FC = () => {
                             return (
                                 <li
                                     key={campaign.id}
-                                    className="flex justify-between items-center p-2 bg-slate-800 rounded-md text-sm cursor-pointer hover:bg-slate-700/50"
-                                    onMouseDown={(e) => e.stopPropagation()}
-                                    onClick={() => setCurrentPage('campaign-details', { campaignId: campaign.id })}
+                                    className="flex justify-between items-center p-2 bg-slate-800 rounded-md text-sm"
+                                    title={campaign.name}
                                 >
                                     <span className="font-medium text-slate-200 truncate pr-2">{campaign.name}</span>
                                     <span className="font-mono font-semibold text-pink-400 bg-pink-500/10 px-2 py-0.5 rounded">{readRate}</span>

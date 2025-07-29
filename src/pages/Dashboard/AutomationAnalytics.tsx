@@ -57,9 +57,8 @@ const AutomationAnalytics: React.FC<AutomationAnalyticsProps> = ({ data, isLoadi
                         {stats.mostActive.map(item => (
                             <li
                                 key={item.automation_id}
-                                className="flex justify-between items-center p-2 bg-slate-800 rounded-md text-sm cursor-pointer hover:bg-slate-700/50"
-                                onMouseDown={(e) => e.stopPropagation()}
-                                onClick={() => setCurrentPage('automation-editor', { automationId: item.automation_id })}
+                                className="flex justify-between items-center p-2 bg-slate-800 rounded-md text-sm"
+                                title={item.automations?.name}
                             >
                                 <span className="font-medium text-slate-200 truncate pr-2">{item.automations?.name}</span>
                                 <span className="font-mono font-semibold text-sky-400 bg-sky-500/10 px-2 py-0.5 rounded">{item.count}</span>
