@@ -19,8 +19,10 @@ const NavItem: React.FC<NavItemProps> = ({ icon, label, isActive, onClick }) => 
         e.preventDefault();
         onClick();
       }}
-      className={`flex items-center p-3 my-1 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-300/70 dark:hover:bg-slate-700 transition-colors duration-200 ${
-        isActive ? 'bg-slate-300 dark:bg-slate-700/50 text-sky-600 dark:text-sky-400' : ''
+      className={`flex items-center p-3 my-1 rounded-lg transition-colors duration-200 ${
+        isActive 
+          ? 'bg-slate-200 text-slate-900 font-bold dark:bg-slate-700/50 dark:text-sky-400' 
+          : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200/70 dark:hover:bg-slate-700'
       }`}
     >
       {icon}
@@ -49,7 +51,7 @@ const Sidebar: React.FC = () => {
   ];
 
   return (
-    <aside className="w-64 flex-shrink-0 bg-slate-200/50 dark:bg-slate-800/50 p-4 flex flex-col justify-between border-r border-slate-300 dark:border-slate-700/50">
+    <aside className="w-64 flex-shrink-0 bg-white dark:bg-slate-800/50 p-4 flex flex-col justify-between border-r border-slate-200 dark:border-slate-700/50">
       <div>
         <div className="flex items-center space-x-3 p-3 mb-6">
           {ZAPFLOW_AI_LOGO}

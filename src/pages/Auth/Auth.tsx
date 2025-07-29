@@ -93,7 +93,7 @@ const Auth: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 dark:bg-slate-900 flex flex-col items-center justify-center p-4">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col items-center justify-center p-4">
       <div className="flex items-center space-x-3 mb-8">
         {ZAPFLOW_AI_LOGO}
         <span className="text-3xl font-bold text-slate-900 dark:text-white">ZapFlow AI</span>
@@ -139,7 +139,7 @@ const Auth: React.FC = () => {
           
           {view === 'login' && (
             <div className="text-right">
-                <button type="button" onClick={() => switchView('reset_password')} className="text-xs text-sky-500 dark:text-sky-400 hover:underline">Esqueceu a senha?</button>
+                <button type="button" onClick={() => switchView('reset_password')} className="text-xs text-slate-600 hover:text-slate-900 dark:text-sky-400 dark:hover:underline">Esqueceu a senha?</button>
             </div>
           )}
 
@@ -161,7 +161,7 @@ const Auth: React.FC = () => {
         </form>
 
         <div className="mt-6 text-center">
-          <button onClick={() => switchView(view === 'login' ? 'signup' : 'login')} className="text-sm text-sky-500 dark:text-sky-400 hover:underline">
+          <button onClick={() => switchView(view === 'login' ? 'signup' : 'login')} className="text-sm text-slate-600 hover:text-slate-900 dark:text-sky-400 dark:hover:underline">
             {view === 'login' ? 'Não tem uma conta? Cadastre-se' : view === 'signup' ? 'Já tem uma conta? Faça login' : 'Lembrou a senha? Voltar para o Login'}
           </button>
         </div>

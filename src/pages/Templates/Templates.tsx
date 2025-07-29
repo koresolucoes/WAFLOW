@@ -30,16 +30,16 @@ const TemplateCard: React.FC<{ template: MessageTemplate; onUse: () => void }> =
     const body = useMemo(() => template.components.find(c => c.type === 'BODY'), [template.components]);
 
     return (
-        <Card className="flex flex-col justify-between hover:border-sky-500 border border-transparent transition-colors duration-200">
+        <Card className="flex flex-col justify-between hover:border-slate-300 dark:hover:border-sky-500 border border-transparent transition-colors duration-200">
             <div>
                 <div className="flex justify-between items-start gap-2">
-                    <h3 className="font-mono text-lg text-white break-all">{template.template_name}</h3>
+                    <h3 className="font-mono text-lg text-slate-900 dark:text-white break-all">{template.template_name}</h3>
                     <div className="flex-shrink-0">
                          <StatusBadge status={template.status} />
                     </div>
                 </div>
-                 <div className="mt-4 text-sm text-slate-400 font-mono bg-slate-900/50 p-3 rounded-md whitespace-pre-wrap space-y-2">
-                    {header?.text && <p className="font-bold text-slate-200">{header.text}</p>}
+                 <div className="mt-4 text-sm text-slate-600 dark:text-slate-400 font-mono bg-slate-100 dark:bg-slate-900/50 p-3 rounded-md whitespace-pre-wrap space-y-2">
+                    {header?.text && <p className="font-bold text-slate-800 dark:text-slate-200">{header.text}</p>}
                     {body?.text && <p>{body.text}</p>}
                 </div>
             </div>
@@ -172,7 +172,7 @@ const Templates: React.FC = () => {
   return (
     <div className="space-y-8">
       <div className="flex justify-between items-center flex-wrap gap-4">
-        <h1 className="text-3xl font-bold text-white">Templates de Mensagem</h1>
+        <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Templates de Mensagem</h1>
         <div className="flex items-center gap-4">
              <div className="relative">
                 <SEARCH_ICON className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
@@ -181,7 +181,7 @@ const Templates: React.FC = () => {
                     placeholder="Buscar templates..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="bg-slate-800 border border-slate-700 rounded-lg py-2 pl-10 pr-4 text-white placeholder-slate-400 focus:ring-2 focus:ring-sky-500 focus:outline-none"
+                    className="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg py-2 pl-10 pr-4 text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-slate-400 dark:focus:ring-sky-500 focus:outline-none"
                 />
             </div>
             <div className="flex gap-2">
@@ -199,8 +199,8 @@ const Templates: React.FC = () => {
       
       {filteredTemplates.length === 0 ? (
         <Card className="text-center py-12">
-            <h2 className="text-xl font-semibold text-white">{searchTerm ? 'Nenhum template encontrado.' : 'Nenhum template encontrado.'}</h2>
-            <p className="text-slate-400 mt-2 mb-6">{searchTerm ? `Sua busca por "${searchTerm}" não retornou resultados.` : 'Sincronize com sua conta da Meta para ver seus templates ou crie um novo com IA.'}</p>
+            <h2 className="text-xl font-semibold text-slate-900 dark:text-white">{searchTerm ? 'Nenhum template encontrado.' : 'Nenhum template encontrado.'}</h2>
+            <p className="text-slate-500 dark:text-slate-400 mt-2 mb-6">{searchTerm ? `Sua busca por "${searchTerm}" não retornou resultados.` : 'Sincronize com sua conta da Meta para ver seus templates ou crie um novo com IA.'}</p>
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

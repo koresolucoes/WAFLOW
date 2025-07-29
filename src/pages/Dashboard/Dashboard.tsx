@@ -36,7 +36,7 @@ const StatCard: React.FC<{ title: string; value: string; icon: React.ReactNode; 
 export const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-slate-200/80 dark:bg-slate-700/80 backdrop-blur-sm p-3 rounded-lg border border-slate-300 dark:border-slate-600 shadow-xl">
+      <div className="bg-white/80 dark:bg-slate-700/80 backdrop-blur-sm p-3 rounded-lg border border-slate-300 dark:border-slate-600 shadow-xl">
         <p className="label font-bold text-slate-900 dark:text-white">{`${label}`}</p>
         {payload.map((pld: any) => (
           <p key={pld.dataKey} style={{ color: pld.color }} className="text-slate-700 dark:text-current">
@@ -130,7 +130,7 @@ const Dashboard: React.FC = () => {
   const cardComponents: { [key: string]: React.ReactNode } = {
     stats: (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <StatCard title="Total de Contatos" value={mainMetrics.totalContacts} icon={<CONTACTS_ICON className="w-6 h-6 text-sky-500" />} />
+            <StatCard title="Total de Contatos" value={mainMetrics.totalContacts} icon={<CONTACTS_ICON className="w-6 h-6 text-slate-600 dark:text-sky-500" />} />
             <StatCard title="Negócios em Aberto" value={mainMetrics.openDealsValue} icon={<FUNNEL_ICON className="w-6 h-6 text-green-500" />} />
             <StatCard title="Taxa de Conversão" value={mainMetrics.conversionRate} icon={<span className="text-amber-500 font-bold text-xl">%</span>} footer="Negócios Ganhos vs. Perdidos" />
             <StatCard title="Automações Ativas" value={mainMetrics.activeAutomations} icon={<AUTOMATION_ICON className="w-6 h-6 text-pink-500" />} />

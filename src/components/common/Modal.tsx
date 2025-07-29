@@ -19,16 +19,16 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-lg transform rounded-xl bg-slate-800 text-left shadow-2xl transition-all"
+        className="relative w-full max-w-lg transform rounded-xl bg-white dark:bg-slate-800 text-left shadow-2xl transition-all"
         onClick={(e) => e.stopPropagation()} // Impede que o clique dentro do modal o feche
       >
-        <div className="flex items-center justify-between p-4 border-b border-slate-700">
-            <h3 className="text-lg font-semibold leading-6 text-white" id="modal-title">
+        <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700">
+            <h3 className="text-lg font-semibold leading-6 text-slate-900 dark:text-white" id="modal-title">
                 {title}
             </h3>
             <button
                 type="button"
-                className="p-1 rounded-full text-slate-400 hover:bg-slate-700 hover:text-white"
+                className="p-1 rounded-full text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-800 dark:hover:text-white"
                 onClick={onClose}
             >
                 <svg className="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
