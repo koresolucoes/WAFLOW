@@ -385,7 +385,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   importContacts: async (newContacts) => {
     const teamId = get().activeTeam?.id;
     if (!teamId) throw new Error("Nenhuma equipe ativa selecionada.");
-    const existingPhones = new Set(get().contacts.map(c => c.phone));
+    const existingPhones: Set<string> = new Set(get().contacts.map(c => c.phone));
     const { imported, skippedCount } = await contactService.importContactsToDb(teamId, newContacts, existingPhones);
     set(state => ({
       contacts: [...imported, ...state.contacts],

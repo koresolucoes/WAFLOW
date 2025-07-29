@@ -90,13 +90,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const qstashMessages = recipients.map((recipient: any, index: number) => {
             const messagePayload: any = {
                 destination: `${appUrl}/api/send-single-message`,
-                body: { // O corpo agora é um objeto, não uma string JSON
+                // Corpo é explicitamente stringified e o Content-Type é definido
+                // para garantir que o worker de destino o analise corretamente.
+                body: JSON.stringify({
                     teamId,
                     campaignId,
                     templateId,
                     variables,
                     recipient,
                     userId: user.id
+                }),
+                headers: {
+                    'Content-Type': 'application/json',
                 },
             };
             
@@ -111,9 +116,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return messagePayload;
         });
 
-        // 6. Publicar as mensagens em lote para o QStash usando publishJSON
+        // 6. Publicar as mensagens em lote para o QStash usando `publish`
         if (qstashMessages.length > 0) {
-            await qstashClient.publishJSON(qstashMessages);
+            // Usando .publish() em vez de .publishJSON() para contornar um possível
+            // problema de detecção de array no SDK no ambiente serverless.
+            await qstashClient.publish(qstashMessages);
         }
         
         return res.status(202).json({ message: 'Campanha aceita e enfileirada para envio.' });
