@@ -1,6 +1,6 @@
 import React from 'react';
 import { Page } from '../../types';
-import { ZAPFLOW_AI_LOGO, DASHBOARD_ICON, CAMPAIGN_ICON, TEMPLATE_ICON, CONTACTS_ICON, PROFILE_ICON, SETTINGS_ICON, AUTOMATION_ICON, FUNNEL_ICON, INBOX_ICON, WEBHOOK_INSPECTOR_ICON } from '../icons';
+import { ZAPFLOW_AI_LOGO, DASHBOARD_ICON, CAMPAIGN_ICON, TEMPLATE_ICON, CONTACTS_ICON, PROFILE_ICON, SETTINGS_ICON, AUTOMATION_ICON, FUNNEL_ICON, INBOX_ICON, WEBHOOK_INSPECTOR_ICON, MARKETING_ANALYTICS_ICON } from '../icons';
 import { useAuthStore } from '../../stores/authStore';
 
 interface NavItemProps {
@@ -38,6 +38,7 @@ const Sidebar: React.FC = () => {
     { icon: <CONTACTS_ICON className="w-5 h-5" />, label: 'Contatos', page: 'contacts' as Page },
     { icon: <FUNNEL_ICON className="w-5 h-5" />, label: 'Funil', page: 'funnel' as Page },
     { icon: <CAMPAIGN_ICON className="w-5 h-5" />, label: 'Campanhas', page: 'campaigns' as Page },
+    { icon: <MARKETING_ANALYTICS_ICON className="w-5 h-5" />, label: 'Painel de Marketing', page: 'marketing-dashboard' as Page },
     { icon: <TEMPLATE_ICON className="w-5 h-5" />, label: 'Templates', page: 'templates' as Page },
     { icon: <AUTOMATION_ICON className="w-5 h-5" />, label: 'Automações', page: 'automations' as Page },
     { icon: <PROFILE_ICON className="w-5 h-5" />, label: 'Perfil da Empresa', page: 'profile' as Page },

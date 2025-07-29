@@ -20,6 +20,7 @@ const Automations = lazy(() => import('./pages/Automations/Automations'));
 const AutomationEditor = lazy(() => import('./pages/AutomationEditor/AutomationEditor'));
 const Inbox = lazy(() => import('./pages/Inbox/Inbox'));
 const WebhookInspector = lazy(() => import('./pages/WebhookInspector/WebhookInspector'));
+const MarketingDashboard = lazy(() => import('./pages/MarketingDashboard/MarketingDashboard'));
 
 const PageSuspenseFallback = () => (
     <div className="flex items-center justify-center w-full h-full p-10">
@@ -63,6 +64,8 @@ const App: React.FC = () => {
         return <Inbox />;
       case 'campaigns':
         return <Campaigns />;
+      case 'marketing-dashboard':
+        return <MarketingDashboard />;
       case 'campaign-details':
         return <CampaignDetails />;
       case 'templates':

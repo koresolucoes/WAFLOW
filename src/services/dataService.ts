@@ -197,3 +197,31 @@ export const fetchDashboardData = async (teamId: string): Promise<DashboardData>
         activityFeed,
     };
 };
+
+export const fetchMetaAnalytics = async (params: { start: number, end: number, granularity: 'DAILY' | 'MONTHLY', type: 'conversation_analytics' | 'template_analytics', template_ids?: string[] }) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error("Não autenticado");
+
+    const query = new URLSearchParams({
+        start: String(params.start),
+        end: String(params.end),
+        granularity: params.granularity,
+        type: params.type,
+    });
+    
+    if (params.type === 'template_analytics' && params.template_ids && params.template_ids.length > 0) {
+        query.append('template_ids', params.template_ids.join(','));
+    }
+
+    const response = await fetch(`/api/meta-analytics?${query.toString()}`, {
+        headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+        }
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Falha ao buscar dados de análise.');
+    }
+    return response.json();
+};

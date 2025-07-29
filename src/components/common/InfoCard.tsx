@@ -4,7 +4,7 @@ import { INFO_ICON } from '../icons';
 interface InfoCardProps {
   children: React.ReactNode;
   className?: string;
-  variant?: 'info' | 'warning' | 'success';
+  variant?: 'info' | 'warning' | 'success' | 'error';
 }
 
 const InfoCard: React.FC<InfoCardProps> = ({ children, className = '', variant = 'info' }) => {
@@ -12,6 +12,7 @@ const InfoCard: React.FC<InfoCardProps> = ({ children, className = '', variant =
     info: 'border-sky-500 bg-sky-500/10 text-sky-300',
     warning: 'border-amber-500 bg-amber-500/10 text-amber-300',
     success: 'border-green-500 bg-green-500/10 text-green-300',
+    error: 'border-red-500 bg-red-500/10 text-red-300',
   };
 
   return (
