@@ -1,5 +1,5 @@
 import { supabaseAdmin } from '../supabaseAdmin.js';
-import { Automation, Contact, Json, AutomationNode, Profile } from '../types.js';
+import { Automation, Contact, Json, Profile } from '../types.js';
 import { TablesInsert } from '../database.types.js';
 import { actionHandlers } from './handlers/index.js';
 import { ActionResult } from './types.js';

@@ -1,6 +1,6 @@
 import { supabaseAdmin } from '../supabaseAdmin.js';
 import { Contact, Profile, Json } from '../types.js';
-import { TablesInsert, TablesUpdate } from '../database.types.js';
+import { TablesInsert } from '../database.types.js';
 import { getValueFromPath } from '../automation/helpers.js';
 
 const normalizePhoneNumber = (phone: string): string => {

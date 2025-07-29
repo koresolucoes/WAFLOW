@@ -23,7 +23,7 @@ interface TemplateDataPoint {
     read: number;
 }
 interface AnalyticsData {
-    conversation_analytics?: { data?: { data_points?: ConversationDataPoint[] } };
+    conversation_analytics?: { data?: { data_points?: ConversationDataPoint[] }[] };
     template_analytics?: { data?: TemplateDataPoint[] };
 }
 
@@ -130,7 +130,11 @@ const MarketingDashboard: FC = () => {
             return acc;
         }, {} as Record<string, { cost: number; conversations: number }>);
         
-        const categoryChartData = Object.entries(costByCategory).map(([name, data]) => ({ name, ...data }));
+        const categoryChartData = Object.entries(costByCategory).map(([name, data]) => ({
+            name,
+            cost: data.cost,
+            conversations: data.conversations,
+        }));
         
         // Process Template Data
         const templatePerformance = templatePoints.map(t => ({

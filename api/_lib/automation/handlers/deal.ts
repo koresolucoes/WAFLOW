@@ -40,7 +40,7 @@ export const createDeal: ActionHandler = async ({ profile, contact, node, trigge
     return { details: `Negócio "${dealName}" criado com sucesso.` };
 };
 
-export const updateDealStage: ActionHandler = async ({ profile, contact, node, teamId }) => {
+export const updateDealStage: ActionHandler = async ({ profile, contact, node }) => {
     if (!contact) {
         throw new Error('Ação "Atualizar Etapa do Negócio" requer um contato.');
     }
