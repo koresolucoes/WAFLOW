@@ -8,29 +8,40 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xyflow/react@12.0.0-next.12/dist/style.css" />
     <style>
+      :root {
+        --flow-controls-bg: #f1f5f9; /* slate-100 */
+        --flow-controls-hover-bg: #e2e8f0; /* slate-200 */
+        --flow-controls-border: #cbd5e1; /* slate-300 */
+        --flow-controls-text: #1e293b; /* slate-800 */
+        --flow-controls-shadow: rgba(0, 0, 0, 0.1);
+      }
+      .dark {
+        --flow-controls-bg: #334155; /* slate-700 */
+        --flow-controls-hover-bg: #475569; /* slate-600 */
+        --flow-controls-border: #475569; /* slate-600 */
+        --flow-controls-text: #cbd5e1; /* slate-300 */
+        --flow-controls-shadow: rgba(0, 0, 0, 0.3);
+      }
       /* For Recharts custom tooltip */
       .recharts-tooltip-wrapper {
         outline: none !important;
-      }
-      .react-flow__panel {
-        display: none;
       }
       .xyflow-react .xyflow__panel {
         display: none;
       }
       
-      /* Custom styles for React Flow Controls to match the dark theme */
+      /* Custom styles for React Flow Controls to match the theme */
       .react-flow__controls {
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        box-shadow: 0 2px 8px var(--flow-controls-shadow);
       }
       .react-flow__controls-button {
-        background-color: #334155; /* bg-slate-700 */
+        background-color: var(--flow-controls-bg);
         border: none;
-        border-bottom: 1px solid #475569; /* border-slate-600 */
-        fill: #cbd5e1; /* text-slate-300 */
+        border-bottom: 1px solid var(--flow-controls-border);
+        fill: var(--flow-controls-text);
       }
       .react-flow__controls-button:hover {
-        background-color: #475569; /* bg-slate-600 */
+        background-color: var(--flow-controls-hover-bg);
       }
       .react-flow__controls-button:disabled {
         fill-opacity: 0.5;
@@ -75,7 +86,7 @@
 </script>
 <link rel="stylesheet" href="/index.css">
 </head>
-  <body class="bg-slate-900 text-slate-300">
+  <body class="bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-300">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
   </body>

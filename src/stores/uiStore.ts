@@ -21,6 +21,9 @@ interface UiState extends ConfirmationState {
   removeToast: (id: string) => void;
   showConfirmation: (title: string, message: string, onConfirm: () => void) => void;
   hideConfirmation: () => void;
+  theme: 'light' | 'dark';
+  setTheme: (theme: 'light' | 'dark') => void;
+  toggleTheme: () => void;
 }
 
 const initialConfirmationState: ConfirmationState = {
@@ -63,5 +66,21 @@ export const useUiStore = create<UiState>((set, get) => ({
   },
   hideConfirmation: () => {
     set({ ...initialConfirmationState });
+  },
+
+  // Theme Management
+  theme: 'dark', // Default, will be overridden on mount
+  setTheme: (theme) => {
+    localStorage.setItem('theme', theme);
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+    set({ theme });
+  },
+  toggleTheme: () => {
+    const currentTheme = get().theme;
+    get().setTheme(currentTheme === 'dark' ? 'light' : 'dark');
   },
 }));

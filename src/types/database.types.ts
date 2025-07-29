@@ -658,32 +658,15 @@ export interface Database {
   }
 }
 
-type PublicSchema = Database[Extract<keyof Database, "public">]
-
 export type Tables<
-  TableName extends keyof PublicSchema["Tables"]
-> = PublicSchema["Tables"][TableName] extends {
-  Row: infer R
-}
-  ? R
-  : never
-
+  TableName extends keyof PublicTables
+> = PublicTables[TableName]["Row"]
 export type TablesInsert<
-  TableName extends keyof PublicSchema["Tables"]
-> = PublicSchema["Tables"][TableName] extends {
-  Insert: infer I
-}
-  ? I
-  : never
-
+  TableName extends keyof PublicTables
+> = PublicTables[TableName]["Insert"]
 export type TablesUpdate<
-  TableName extends keyof PublicSchema["Tables"]
-> = PublicSchema["Tables"][TableName] extends {
-  Update: infer U
-}
-  ? U
-  : never
-
+  TableName extends keyof PublicTables
+> = PublicTables[TableName]["Update"]
 export type Enums<
-  EnumName extends keyof PublicSchema["Enums"]
-> = PublicSchema["Enums"][EnumName]
+  EnumName extends keyof PublicEnums
+> = PublicEnums[EnumName]

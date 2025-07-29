@@ -4,6 +4,7 @@ import { ZAPFLOW_AI_LOGO, GOOGLE_ICON } from '../../components/icons';
 import Button from '../../components/common/Button';
 import Card from '../../components/common/Card';
 import HCaptcha from '@hcaptcha/react-hcaptcha';
+import { useUiStore } from '../../stores/uiStore';
 
 type AuthView = 'login' | 'signup' | 'reset_password';
 
@@ -16,6 +17,7 @@ const Auth: React.FC = () => {
   const [message, setMessage] = useState<string | null>(null);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const captcha = useRef<HCaptcha>(null);
+  const theme = useUiStore(state => state.theme);
   
   const sitekey = (import.meta as any).env.VITE_HCAPTCHA_SITEKEY;
 
@@ -91,32 +93,32 @@ const Auth: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4">
+    <div className="min-h-screen bg-slate-100 dark:bg-slate-900 flex flex-col items-center justify-center p-4">
       <div className="flex items-center space-x-3 mb-8">
         {ZAPFLOW_AI_LOGO}
-        <span className="text-3xl font-bold text-white">ZapFlow AI</span>
+        <span className="text-3xl font-bold text-slate-900 dark:text-white">ZapFlow AI</span>
       </div>
       
       <Card className="w-full max-w-sm">
-        <h2 className="text-2xl font-bold text-center text-white mb-2">
+        <h2 className="text-2xl font-bold text-center text-slate-900 dark:text-white mb-2">
           {titles[view]}
         </h2>
-        <p className="text-center text-slate-400 mb-6">
+        <p className="text-center text-slate-500 dark:text-slate-400 mb-6">
             {descriptions[view]}
         </p>
 
         {view !== 'reset_password' && (
              <>
-                <Button variant="secondary" className="w-full mb-4 border border-slate-600 hover:bg-slate-700" onClick={() => handleOAuthLogin('google')} disabled={loading}>
+                <Button variant="secondary" className="w-full mb-4 border border-slate-300 dark:border-slate-600" onClick={() => handleOAuthLogin('google')} disabled={loading}>
                     <GOOGLE_ICON className="w-5 h-5 mr-3"/>
                     Continuar com Google
                 </Button>
                 <div className="relative my-4">
                     <div className="absolute inset-0 flex items-center">
-                        <span className="w-full border-t border-slate-600" />
+                        <span className="w-full border-t border-slate-300 dark:border-slate-600" />
                     </div>
                     <div className="relative flex justify-center text-xs uppercase">
-                        <span className="bg-slate-800 px-2 text-slate-400">Ou continue com</span>
+                        <span className="bg-white dark:bg-slate-800 px-2 text-slate-500 dark:text-slate-400">Ou continue com</span>
                     </div>
                 </div>
              </>
@@ -125,25 +127,25 @@ const Auth: React.FC = () => {
 
         <form onSubmit={handlePasswordAuth} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1" htmlFor="email">E-mail</label>
-            <input id="email" className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1" htmlFor="email">E-mail</label>
+            <input id="email" className="w-full bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md p-2 text-slate-900 dark:text-white" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
           </div>
           {view !== 'reset_password' && (
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1" htmlFor="password">Senha</label>
-                <input id="password" className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1" htmlFor="password">Senha</label>
+                <input id="password" className="w-full bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md p-2 text-slate-900 dark:text-white" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
               </div>
           )}
           
           {view === 'login' && (
             <div className="text-right">
-                <button type="button" onClick={() => switchView('reset_password')} className="text-xs text-sky-400 hover:underline">Esqueceu a senha?</button>
+                <button type="button" onClick={() => switchView('reset_password')} className="text-xs text-sky-500 dark:text-sky-400 hover:underline">Esqueceu a senha?</button>
             </div>
           )}
 
           <div className="my-2 flex justify-center">
              {sitekey ? (
-                  <HCaptcha ref={captcha} sitekey={sitekey} theme="dark" onVerify={(token) => { setCaptchaToken(token); setError(null); }} onExpire={() => setCaptchaToken(null)} onError={(err) => setError(`Erro no CAPTCHA: ${err}`)} />
+                  <HCaptcha ref={captcha} sitekey={sitekey} theme={theme} onVerify={(token) => { setCaptchaToken(token); setError(null); }} onExpire={() => setCaptchaToken(null)} onError={(err) => setError(`Erro no CAPTCHA: ${err}`)} />
             ) : (
               <div className="text-center text-red-400 text-sm p-3 bg-red-500/10 rounded-md border border-red-500/30">
                 O CAPTCHA não pôde ser carregado. A autenticação está desativada.
@@ -159,12 +161,12 @@ const Auth: React.FC = () => {
         </form>
 
         <div className="mt-6 text-center">
-          <button onClick={() => switchView(view === 'login' ? 'signup' : 'login')} className="text-sm text-sky-400 hover:underline">
+          <button onClick={() => switchView(view === 'login' ? 'signup' : 'login')} className="text-sm text-sky-500 dark:text-sky-400 hover:underline">
             {view === 'login' ? 'Não tem uma conta? Cadastre-se' : view === 'signup' ? 'Já tem uma conta? Faça login' : 'Lembrou a senha? Voltar para o Login'}
           </button>
         </div>
       </Card>
-      <p className="text-xs text-slate-500 mt-8">© 2024 ZapFlow AI. Todos os direitos reservados.</p>
+      <p className="text-xs text-slate-500 dark:text-slate-500 mt-8">© 2024 ZapFlow AI. Todos os direitos reservados.</p>
     </div>
   );
 };

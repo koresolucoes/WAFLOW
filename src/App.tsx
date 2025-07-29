@@ -1,5 +1,6 @@
 import React, { Suspense, lazy, useEffect } from 'react';
 import { useAuthStore } from './stores/authStore';
+import { useUiStore } from './stores/uiStore';
 import MainLayout from './components/layout/MainLayout';
 import { ToastContainer } from './components/common/Toast';
 import ConfirmationModal from './components/common/ConfirmationModal';
@@ -31,7 +32,7 @@ const PageSuspenseFallback = () => (
 );
 
 const FullPageSuspenseFallback = () => (
-    <div className="flex items-center justify-center h-screen bg-slate-900">
+    <div className="flex items-center justify-center h-screen bg-slate-100 dark:bg-slate-900">
         <PageSuspenseFallback />
     </div>
 );
@@ -46,6 +47,17 @@ const App: React.FC = () => {
     dataLoadedForTeam, 
     clearAllData 
   } = useAuthStore();
+  const { setTheme } = useUiStore();
+
+  useEffect(() => {
+    const storedTheme = localStorage.getItem('theme');
+    const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (storedTheme === 'dark' || (!storedTheme && systemPrefersDark)) {
+        setTheme('dark');
+    } else {
+        setTheme('light');
+    }
+  }, [setTheme]);
 
   useEffect(() => {
     if (activeTeam && activeTeam.id !== dataLoadedForTeam) {
@@ -94,8 +106,8 @@ const App: React.FC = () => {
 
   if (loading) {
       return (
-        <div className="flex items-center justify-center h-screen bg-slate-900">
-            <div className="text-white text-xl">Carregando...</div>
+        <div className="flex items-center justify-center h-screen bg-slate-100 dark:bg-slate-900">
+            <div className="text-slate-800 dark:text-white text-xl">Carregando...</div>
         </div>
       )
   }

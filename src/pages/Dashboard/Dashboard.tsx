@@ -21,25 +21,25 @@ const StatCard: React.FC<{ title: string; value: string; icon: React.ReactNode; 
         <div>
             <div className="flex items-start justify-between">
                 <div>
-                    <h3 className="text-sm font-medium text-slate-400">{title}</h3>
-                    <p className="text-2xl font-bold text-white mt-1">{value}</p>
+                    <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400">{title}</h3>
+                    <p className="text-2xl font-bold text-slate-900 dark:text-white mt-1">{value}</p>
                 </div>
-                <div className="p-3 bg-slate-700 rounded-lg">
+                <div className="p-3 bg-slate-100 dark:bg-slate-700 rounded-lg">
                     {icon}
                 </div>
             </div>
         </div>
-        {footer && <p className="text-xs text-slate-500 mt-2">{footer}</p>}
+        {footer && <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">{footer}</p>}
     </Card>
 );
 
 export const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-slate-700 p-3 rounded-lg border border-slate-600 shadow-xl">
-        <p className="label font-bold text-white">{`${label}`}</p>
+      <div className="bg-slate-200/80 dark:bg-slate-700/80 backdrop-blur-sm p-3 rounded-lg border border-slate-300 dark:border-slate-600 shadow-xl">
+        <p className="label font-bold text-slate-900 dark:text-white">{`${label}`}</p>
         {payload.map((pld: any) => (
-          <p key={pld.dataKey} style={{ color: pld.color }}>
+          <p key={pld.dataKey} style={{ color: pld.color }} className="text-slate-700 dark:text-current">
             {`${pld.name}: ${pld.value.toLocaleString('pt-BR')}`}
           </p>
         ))}
@@ -130,10 +130,10 @@ const Dashboard: React.FC = () => {
   const cardComponents: { [key: string]: React.ReactNode } = {
     stats: (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <StatCard title="Total de Contatos" value={mainMetrics.totalContacts} icon={<CONTACTS_ICON className="w-6 h-6 text-sky-400" />} />
-            <StatCard title="Negócios em Aberto" value={mainMetrics.openDealsValue} icon={<FUNNEL_ICON className="w-6 h-6 text-green-400" />} />
-            <StatCard title="Taxa de Conversão" value={mainMetrics.conversionRate} icon={<span className="text-amber-400 font-bold text-xl">%</span>} footer="Negócios Ganhos vs. Perdidos" />
-            <StatCard title="Automações Ativas" value={mainMetrics.activeAutomations} icon={<AUTOMATION_ICON className="w-6 h-6 text-pink-400" />} />
+            <StatCard title="Total de Contatos" value={mainMetrics.totalContacts} icon={<CONTACTS_ICON className="w-6 h-6 text-sky-500" />} />
+            <StatCard title="Negócios em Aberto" value={mainMetrics.openDealsValue} icon={<FUNNEL_ICON className="w-6 h-6 text-green-500" />} />
+            <StatCard title="Taxa de Conversão" value={mainMetrics.conversionRate} icon={<span className="text-amber-500 font-bold text-xl">%</span>} footer="Negócios Ganhos vs. Perdidos" />
+            <StatCard title="Automações Ativas" value={mainMetrics.activeAutomations} icon={<AUTOMATION_ICON className="w-6 h-6 text-pink-500" />} />
         </div>
     ),
     sales: <SalesMetrics />,
@@ -179,7 +179,7 @@ const Dashboard: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      <h1 className="text-3xl font-bold text-white">Dashboard Geral</h1>
+      <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Dashboard Geral</h1>
       
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={cardOrder} strategy={rectSortingStrategy}>
