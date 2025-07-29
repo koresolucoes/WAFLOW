@@ -65,7 +65,7 @@ export const fetchStatsForAutomation = async (automationId: string): Promise<Rec
         console.error("Error fetching automation stats:", error); 
         return {}; 
     }
-    const statsData = (data as unknown as AutomationNodeStats[]) || [];
+    const statsData = (data as any as AutomationNodeStats[]) || [];
     return statsData.reduce((acc, stat) => {
         acc[stat.node_id] = stat;
         return acc;
@@ -101,5 +101,5 @@ export const fetchLogsForNode = async (automationId: string, nodeId: string): Pr
         console.error("Error fetching node logs:", error); 
         return []; 
     }
-    return (data as unknown as AutomationNodeLog[]) || [];
+    return (data as any as AutomationNodeLog[]) || [];
 };

@@ -32,13 +32,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (prefixError) console.error('[Trigger API] Error fetching profile by prefix', prefixError);
 
     if (profileByPrefix) {
-        profileData = profileByPrefix as Profile;
+        profileData = profileByPrefix as any as Profile;
     } else {
         // As a fallback, check if the prefix was actually a user ID.
         const { data: profileById, error: idError } = await supabaseAdmin.from('profiles').select(PROFILE_COLUMNS).eq('id', webhookPrefix).maybeSingle();
         if (idError) console.error('[Trigger API] Error fetching profile by ID', idError);
         if (profileById) {
-            profileData = profileById as Profile;
+            profileData = profileById as any as Profile;
         }
     }
     
@@ -59,7 +59,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
          return res.status(500).json({ error: 'Failed to retrieve automations.' });
     }
     
-    const automations = (automationsData as Automation[]) || [];
+    const automations = (automationsData as any as Automation[]) || [];
     const rawAutomation = automations.find(a => (a.nodes || []).some(n => n.id === nodeId));
 
     if (!rawAutomation) {

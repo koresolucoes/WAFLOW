@@ -39,6 +39,7 @@ const TodaysTasksCard: React.FC = () => {
                             <div className="flex justify-between items-center mt-2 text-xs">
                                 <a
                                     href="#"
+                                    onMouseDown={(e) => e.stopPropagation()}
                                     onClick={(e) => {
                                         e.preventDefault();
                                         if (task.contacts?.id) {
@@ -71,7 +72,7 @@ const TodaysTasksCard: React.FC = () => {
                     <p>Nenhuma tarefa pendente para hoje.</p>
                 </div>
             )}
-            <Button variant="secondary" size="sm" className="mt-4 w-full flex-shrink-0" onClick={() => setCurrentPage('contacts')}>
+            <Button variant="secondary" size="sm" className="mt-4 w-full flex-shrink-0" onClick={() => setCurrentPage('contacts')} onMouseDown={(e) => e.stopPropagation()}>
                 Ver todos os contatos
             </Button>
         </Card>

@@ -33,7 +33,7 @@ const dispatchAutomations = async (userId: string, triggers: TriggerInfo[], cont
         return;
     }
     
-    const automationsMap = new Map((automations as unknown as Automation[]).map(a => [a.id, a]));
+    const automationsMap = new Map((automations as any as Automation[]).map(a => [a.id, a]));
 
     const executionPromises = triggers.map(trigger => {
         const rawAutomation = automationsMap.get(trigger.automation_id);

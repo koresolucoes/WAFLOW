@@ -15,7 +15,7 @@ export const fetchActivitiesForContact = async (teamId: string, contactId: strin
 export const addActivity = async (activityData: ContactActivityInsert): Promise<ContactActivity> => {
     const { data, error } = await supabase
         .from('contact_activities')
-        .insert(activityData)
+        .insert(activityData as any)
         .select()
         .single();
     if (error) throw error;
@@ -26,7 +26,7 @@ export const addActivity = async (activityData: ContactActivityInsert): Promise<
 export const updateActivity = async (activityId: string, teamId: string, updates: ContactActivityUpdate): Promise<ContactActivity> => {
     const { data, error } = await supabase
         .from('contact_activities')
-        .update(updates)
+        .update(updates as any)
         .eq('id', activityId)
         .eq('team_id', teamId)
         .select()
@@ -63,5 +63,5 @@ export const fetchTodaysTasks = async (teamId: string): Promise<TaskWithContact[
         throw error;
     }
     
-    return (data as TaskWithContact[]) || [];
+    return (data as any as TaskWithContact[]) || [];
 };

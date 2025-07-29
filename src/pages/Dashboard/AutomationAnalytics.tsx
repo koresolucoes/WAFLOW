@@ -58,6 +58,7 @@ const AutomationAnalytics: React.FC<AutomationAnalyticsProps> = ({ data, isLoadi
                             <li
                                 key={item.automation_id}
                                 className="flex justify-between items-center p-2 bg-slate-800 rounded-md text-sm cursor-pointer hover:bg-slate-700/50"
+                                onMouseDown={(e) => e.stopPropagation()}
                                 onClick={() => setCurrentPage('automation-editor', { automationId: item.automation_id })}
                             >
                                 <span className="font-medium text-slate-200 truncate pr-2">{item.automations?.name}</span>

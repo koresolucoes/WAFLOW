@@ -701,7 +701,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         const membersMap = new Map(allTeamMembers.map(m => [m.user_id, m.email]));
         const conversationsWithCorrectAssignee = data.map((convo): Conversation => ({
             ...convo,
-            assignee_email: convo.assignee_id ? (membersMap.get(convo.assignee_id) || null) : null
+            assignee_email: convo.assignee_id ? (membersMap.get(convo.assignee_id as string) || null) : null
         }));
         set({ conversations: conversationsWithCorrectAssignee });
     } catch (error) {

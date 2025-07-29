@@ -57,8 +57,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
             if (usersError) throw usersError;
             
-            const relevantUsers = usersData.users.filter((u: User) => userIds.includes(u.id));
-            const usersById = new Map(relevantUsers.map((u: User) => [u.id, u]));
+            const relevantUsers = (usersData.users as any[]).filter((u: User) => userIds.includes(u.id));
+            const usersById = new Map((relevantUsers as User[]).map((u: User) => [u.id, u]));
             
             const result = members.map(member => ({
                 team_id: member.team_id as string,

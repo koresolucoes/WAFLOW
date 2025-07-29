@@ -52,7 +52,7 @@ export const fetchContactDetailsFromDb = async (teamId: string, contactId: strin
     if (dealsError) throw dealsError;
     
     return {
-        ...(contactData as unknown as Contact),
+        ...(contactData as any as Contact),
         deals: (dealsData as unknown as Deal[]) || []
     };
 };

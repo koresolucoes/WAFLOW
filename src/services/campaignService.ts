@@ -24,7 +24,7 @@ export const fetchCampaignDetailsFromDb = async (teamId: string, campaignId: str
         
     if (messagesError) throw messagesError;
 
-    const typedMessagesData = (messagesData as unknown as MessageWithContact[]) || [];
+    const typedMessagesData = (messagesData as any as MessageWithContact[]) || [];
     
     const metrics = {
         sent: typedMessagesData.filter(d => d.status !== 'failed' && d.status !== 'pending').length,

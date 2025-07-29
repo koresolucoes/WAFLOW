@@ -79,7 +79,7 @@ export const updateDealStage: ActionHandler = async ({ profile, contact, node })
     
     const { data: updatedDeal, error: updateError } = await supabaseAdmin
         .from('deals')
-        .update(updatePayload)
+        .update(updatePayload as any)
         .eq('id', latestDeal.id)
         .select('*')
         .single();

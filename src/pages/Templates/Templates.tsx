@@ -94,8 +94,8 @@ const Templates: React.FC = () => {
 
         const dbTemplatesMap = new Map((dbTemplatesData as any[]).map(t => [t.meta_id, t]));
 
-        const templatesToInsert: TablesInsert<'message_templates'>[] = [];
-        const updatePromises: Promise<any>[] = [];
+        const templatesToInsert: any[] = [];
+        const updatePromises: any[] = [];
 
         // 3. Comparar e preparar inserções/atualizações
         for (const metaTemplate of metaTemplates) {

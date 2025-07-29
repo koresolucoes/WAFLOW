@@ -56,7 +56,7 @@ export const findOrCreateContactByPhone = async (team_id: string, phone: string,
         if (!newContact) {
             throw new Error("Failed to create new contact and retrieve it.");
         }
-        return { contact: newContact as unknown as Contact, isNew: true };
+        return { contact: newContact as any as Contact, isNew: true };
     } else if (error) {
          console.error("Error finding contact:", error);
         throw error;
@@ -64,7 +64,7 @@ export const findOrCreateContactByPhone = async (team_id: string, phone: string,
     
     if(!contactData) throw new Error("Contact data is null after query.");
 
-    return { contact: contactData as unknown as Contact, isNew: false };
+    return { contact: contactData as any as Contact, isNew: false };
 };
 
 export const processWebhookPayloadForContact = async (
@@ -150,7 +150,7 @@ export const processWebhookPayloadForContact = async (
         if (needsUpdate) {
             const { data: updatedContact, error: updateContactError } = await supabaseAdmin
                 .from('contacts')
-                .update(updatePayload)
+                .update(updatePayload as any)
                 .eq('id', contact.id)
                 .select('company, created_at, custom_fields, email, id, name, phone, sentiment, tags, team_id')
                 .single();

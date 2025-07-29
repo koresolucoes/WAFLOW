@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabaseClient';
 import { TeamMemberWithEmail } from '../types';
+import type { User } from '@supabase/supabase-js';
 
 export const getTeamMembersForTeams = async (teamIds: string[]): Promise<TeamMemberWithEmail[]> => {
     if (teamIds.length === 0) {
