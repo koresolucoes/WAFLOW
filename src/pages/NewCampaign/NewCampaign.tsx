@@ -155,7 +155,7 @@ const NewCampaign: React.FC = () => {
     setIsConfirmModalOpen(true);
   }
   
-  const handleQueueCampaign = async () => {
+  const handleEnqueueCampaignWithQStash = async () => {
     if (!template || !activeTeam) {
         setError("Template ou equipe ativa não encontrados.");
         return;
@@ -181,6 +181,7 @@ const NewCampaign: React.FC = () => {
                 recipients,
                 speed: sendingSpeed,
                 teamId: activeTeam.id,
+                scheduleDate: isScheduled ? scheduleDate : null,
             }),
         });
 
@@ -203,58 +204,13 @@ const NewCampaign: React.FC = () => {
     setIsLoading(true);
     setError(null);
     
-    if (sendingSpeed !== 'instant') {
-        await handleQueueCampaign();
-    } else if (isScheduled) {
-        await handleScheduleCampaign();
+    if (isScheduled || sendingSpeed !== 'instant') {
+        await handleEnqueueCampaignWithQStash();
     } else {
         await handleSendCampaignNow();
     }
 
     setIsLoading(false);
-  };
-
-  const handleScheduleCampaign = async () => {
-    if (!template) return;
-    try {
-        const messagesToInsert: Omit<MessageInsert, 'campaign_id' | 'team_id'>[] = recipients.map(contact => {
-             const bodyComponentText = template.components.find(c => c.type === 'BODY')?.text || '';
-             let resolvedContent = bodyComponentText;
-             const placeholdersInBody = bodyComponentText.match(/\{\{\d+\}\}/g) || [];
-             for (const placeholder of placeholdersInBody) {
-                  let resolvedValue = '';
-                  if(placeholder === '{{1}}') {
-                      resolvedValue = contact.name;
-                  } else {
-                      resolvedValue = resolveVariables(templateVariables[placeholder] || '', { contact });
-                  }
-                  resolvedContent = resolvedContent.replace(placeholder, resolvedValue);
-             }
-             return {
-                contact_id: contact.id,
-                status: 'pending',
-                type: 'outbound',
-                source: 'campaign',
-                content: resolvedContent,
-             };
-        });
-
-        await addCampaign(
-            {
-              name: campaignName,
-              template_id: template.id,
-              status: 'Scheduled',
-              sent_at: new Date(scheduleDate).toISOString(),
-            },
-            messagesToInsert
-        );
-        
-        setSendResults([]);
-        setIsResultsModalOpen(true);
-
-    } catch(err: any) {
-        setError(err.message);
-    }
   };
 
   const handleSendCampaignNow = async () => {
@@ -412,6 +368,30 @@ const NewCampaign: React.FC = () => {
   const successfulSends = sendResults.filter(r => r.success).length;
   const failedSends = sendResults.filter(r => !r.success);
 
+  const getModalActionText = () => {
+    if (isScheduled) return 'agendar';
+    if (sendingSpeed !== 'instant') return 'enfileirar';
+    return 'enviar';
+  };
+  
+  const getModalButtonText = () => {
+    if (isScheduled) return 'Agendar Agora';
+    if (sendingSpeed !== 'instant') return 'Enfileirar Agora';
+    return 'Enviar Agora';
+  };
+
+  const getResultTitle = () => {
+    if (isScheduled) return "Campanha Agendada!";
+    if (sendingSpeed !== 'instant') return "Campanha Enfileirada!";
+    return "Resultados do Envio da Campanha";
+  };
+  
+  const getResultMessage = () => {
+    if (isScheduled) return "agendada com sucesso";
+    if (sendingSpeed !== 'instant') return "enfileirada com sucesso para envio gradual";
+    return "processada";
+  };
+
   return (
     <>
       <div className="space-y-8 max-w-4xl mx-auto">
@@ -565,7 +545,7 @@ const NewCampaign: React.FC = () => {
           title="Confirmar Campanha"
         >
             <div className="text-gray-600 dark:text-slate-300 space-y-4">
-                <p>Você está prestes a {sendingSpeed !== 'instant' ? 'enfileirar' : isScheduled ? 'agendar' : 'enviar'} a campanha <strong className="text-gray-900 dark:text-white">{campaignName}</strong>.</p>
+                <p>Você está prestes a {getModalActionText()} a campanha <strong className="text-gray-900 dark:text-white">{campaignName}</strong>.</p>
                 <div className="p-4 bg-gray-100 dark:bg-slate-700/50 rounded-lg space-y-2">
                      <p><strong>Template:</strong> <span className="font-mono text-blue-600 dark:text-sky-300">{template?.template_name}</span></p>
                      <p><strong>Total de destinatários:</strong> <span className="font-bold text-gray-900 dark:text-white">{recipients.length.toLocaleString('pt-BR')}</span></p>
@@ -577,7 +557,7 @@ const NewCampaign: React.FC = () => {
             <div className="mt-6 flex justify-end gap-3">
                 <Button variant="secondary" onClick={() => setIsConfirmModalOpen(false)}>Cancelar</Button>
                 <Button variant="primary" onClick={handleLaunch} isLoading={isLoading}>
-                    Sim, {sendingSpeed !== 'instant' ? 'Enfileirar Agora' : isScheduled ? 'Agendar Agora' : 'Enviar Agora'}
+                    Sim, {getModalButtonText()}
                 </Button>
             </div>
         </Modal>
@@ -585,28 +565,32 @@ const NewCampaign: React.FC = () => {
         <Modal
             isOpen={isResultsModalOpen}
             onClose={() => setCurrentPage('campaigns')}
-            title={sendingSpeed !== 'instant' ? "Campanha Enfileirada!" : isScheduled ? "Campanha Agendada!" : "Resultados do Envio da Campanha"}
+            title={getResultTitle()}
         >
             <div className="text-gray-600 dark:text-slate-300 space-y-4">
-                <p>A campanha <strong className="text-gray-900 dark:text-white">{campaignName}</strong> foi {sendingSpeed !== 'instant' ? 'enfileirada com sucesso para envio gradual' : isScheduled ? 'agendada com sucesso' : 'processada'}.</p>
-                {sendingSpeed === 'instant' && !isScheduled && (
-                  <div className="p-4 bg-gray-100 dark:bg-slate-700/50 rounded-lg space-y-2 text-center">
-                    <p className="text-green-600 dark:text-green-400"><strong className="text-2xl">{successfulSends}</strong> envios bem-sucedidos.</p>
-                    <p className="text-red-600 dark:text-red-400"><strong className="text-2xl">{failedSends.length}</strong> envios falharam.</p>
-                  </div>
-                )}
-                {failedSends.length > 0 && (
-                    <div>
-                        <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Detalhes das Falhas:</h4>
-                        <div className="max-h-60 overflow-y-auto p-3 bg-gray-50 dark:bg-slate-900/50 rounded-lg space-y-3">
-                            {failedSends.map((result, index) => (
-                                <div key={index} className="text-sm border-b border-gray-200 dark:border-slate-700 pb-2">
-                                    <p className="font-bold text-gray-800 dark:text-slate-200">{result.contact.name} ({result.contact.phone})</p>
-                                    <p className="text-red-500 dark:text-red-400 font-mono text-xs mt-1">{result.error}</p>
-                                </div>
-                            ))}
-                        </div>
+                <p>A campanha <strong className="text-gray-900 dark:text-white">{campaignName}</strong> foi {getResultMessage()}.</p>
+                
+                {/* Only show immediate results for instant, non-scheduled sends */}
+                {!isScheduled && sendingSpeed === 'instant' && (
+                  <>
+                    <div className="p-4 bg-gray-100 dark:bg-slate-700/50 rounded-lg space-y-2 text-center">
+                      <p className="text-green-600 dark:text-green-400"><strong className="text-2xl">{successfulSends}</strong> envios bem-sucedidos.</p>
+                      <p className="text-red-600 dark:text-red-400"><strong className="text-2xl">{failedSends.length}</strong> envios falharam.</p>
                     </div>
+                    {failedSends.length > 0 && (
+                        <div>
+                            <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Detalhes das Falhas:</h4>
+                            <div className="max-h-60 overflow-y-auto p-3 bg-gray-50 dark:bg-slate-900/50 rounded-lg space-y-3">
+                                {failedSends.map((result, index) => (
+                                    <div key={index} className="text-sm border-b border-gray-200 dark:border-slate-700 pb-2">
+                                        <p className="font-bold text-gray-800 dark:text-slate-200">{result.contact.name} ({result.contact.phone})</p>
+                                        <p className="text-red-500 dark:text-red-400 font-mono text-xs mt-1">{result.error}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                  </>
                 )}
             </div>
             <div className="mt-6 flex justify-end">

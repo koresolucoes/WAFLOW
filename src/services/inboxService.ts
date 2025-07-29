@@ -40,7 +40,7 @@ export const fetchConversationsFromDb = async (teamId: string): Promise<Conversa
     // Create a map for quick lookups of the fresh assignment data.
     const assignmentMap = new Map<string, string | null>();
     if (assignmentData) {
-        for (const assignment of (assignmentData as any[])) {
+        for (const assignment of assignmentData) {
             assignmentMap.set(assignment.contact_id, assignment.assignee_id);
         }
     }
@@ -48,7 +48,7 @@ export const fetchConversationsFromDb = async (teamId: string): Promise<Conversa
     if (rpcData && Array.isArray(rpcData)) {
         return (rpcData as any[]).map(item => {
             const contactId = item.contact_details?.id;
-            const freshAssigneeId = contactId !== undefined ? (assignmentMap.get(contactId) ?? null) : null;
+            const freshAssigneeId = contactId !== undefined ? (assignmentMap.get(String(contactId)) ?? null) : null;
 
             return {
                 contact: item.contact_details as Contact,

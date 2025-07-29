@@ -8,17 +8,23 @@ import { useUiStore } from '../../stores/uiStore';
 
 const CampaignCard: React.FC<{ campaign: CampaignWithMetrics; onViewDetails: () => void; onDelete: () => void; }> = ({ campaign, onViewDetails, onDelete }) => {
     const readRate = campaign.metrics.sent > 0 ? ((campaign.metrics.read / campaign.metrics.sent) * 100).toFixed(1) + '%' : '0.0%';
+    const isScheduledForFuture = campaign.sent_at && new Date(campaign.sent_at) > new Date();
 
-    const statusStyle = {
+    const statusText = campaign.status === 'Scheduled' && !isScheduledForFuture ? 'Enviando' : campaign.status;
+
+    const statusStyle: Record<string, string> = {
         Sent: "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400",
         Draft: "bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-400",
         Failed: "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400",
-        Scheduled: "bg-blue-100 text-blue-700 dark:bg-sky-500/20 dark:text-sky-400"
+        Scheduled: "bg-blue-100 text-blue-700 dark:bg-sky-500/20 dark:text-sky-400",
+        Enviando: "bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-400"
     };
     
     const displayDate = campaign.sent_at 
         ? campaign.status === 'Scheduled'
-            ? `Agendada para ${new Date(campaign.sent_at).toLocaleString('pt-BR', { day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit' })}`
+            ? isScheduledForFuture
+                ? `Agendada para ${new Date(campaign.sent_at).toLocaleString('pt-BR', { day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit' })}`
+                : `Iniciada em ${new Date(campaign.sent_at).toLocaleString('pt-BR', { day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit' })}`
             : `Enviada em ${new Date(campaign.sent_at).toLocaleDateString('pt-BR', { year: 'numeric', month: 'long', day: 'numeric' })}`
         : 'Não enviada';
 
@@ -37,8 +43,8 @@ const CampaignCard: React.FC<{ campaign: CampaignWithMetrics; onViewDetails: () 
             <div>
                 <div className="flex justify-between items-start gap-2">
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white break-all">{campaign.name}</h3>
-                    <span className={`px-2 py-1 text-xs font-semibold rounded-full flex-shrink-0 ${statusStyle[campaign.status]}`}>
-                        {campaign.status}
+                    <span className={`px-2 py-1 text-xs font-semibold rounded-full flex-shrink-0 ${statusStyle[statusText]}`}>
+                        {statusText}
                     </span>
                 </div>
                 <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">{displayDate}</p>

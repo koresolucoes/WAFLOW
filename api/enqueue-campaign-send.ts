@@ -31,7 +31,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         // 2. Obter e validar o corpo da requisição
-        const { teamId, templateId, variables, recipients, speed, campaignName } = req.body;
+        const { teamId, templateId, variables, recipients, speed, campaignName, scheduleDate } = req.body;
         if (!teamId || !templateId || !recipients || !speed || !campaignName) {
             return res.status(400).json({ error: 'Faltando campos obrigatórios no corpo da requisição.' });
         }
@@ -47,13 +47,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
         
         // 4. Salvar o registro da campanha e das mensagens pendentes no DB
-        const status = speed === 'instant' ? 'Sent' : 'Scheduled';
         const campaignPayload: TablesInsert<'campaigns'> = {
             name: campaignName,
             team_id: teamId,
             template_id: templateId,
-            status,
-            sent_at: status === 'Sent' ? new Date().toISOString() : null,
+            status: 'Scheduled',
+            sent_at: scheduleDate ? new Date(scheduleDate).toISOString() : new Date().toISOString(),
             recipient_count: recipients.length,
         };
         
@@ -80,26 +79,40 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         
         // 5. Determinar o atraso e construir as mensagens para o QStash
         const delayMap = { instant: 0, slow: 60, 'very_slow': 300 };
-        const delay = delayMap[speed as keyof typeof delayMap] || 0;
+        const staggerDelay = delayMap[speed as keyof typeof delayMap] || 0;
         
         const vercelUrl = process.env.VERCEL_URL;
         if (!vercelUrl) {
           return res.status(500).json({ message: 'A variável de ambiente VERCEL_URL não está configurada.' });
         }
     
-        const qstashMessages = recipients.map((recipient: any, index: number) => ({
-            destination: `https://${vercelUrl}/api/send-single-message`,
-            body: JSON.stringify({
-                teamId,
-                campaignId,
-                templateId,
-                variables,
-                recipient,
-                userId: user.id
-            }),
-            delay: delay > 0 ? (index * delay) : undefined,
-            headers: { "Content-Type": "application/json" },
+        const scheduleTimestamp = scheduleDate ? Math.floor(new Date(scheduleDate).getTime() / 1000) : undefined;
+
+        const qstashMessages = recipients.map((recipient: any, index: number) => {
+            const messagePayload: any = {
+                destination: `https://${vercelUrl}/api/send-single-message`,
+                body: JSON.stringify({
+                    teamId,
+                    campaignId,
+                    templateId,
+                    variables,
+                    recipient,
+                    userId: user.id
+                }),
+                headers: { "Content-Type": "application/json" },
+            };
+            
+            if (scheduleTimestamp) {
+                // Se agendado, usa notBefore para cada mensagem, com o atraso de escalonamento
+                messagePayload.notBefore = scheduleTimestamp + (index * staggerDelay);
+            } else if (staggerDelay > 0) {
+                // Se não agendado mas escalonado, usa delay
+                messagePayload.delay = index * staggerDelay;
+            }
+
+            return messagePayload;
         }));
+
 
         // 6. Publicar as mensagens em lote para o QStash
         if (qstashMessages.length > 0) {
