@@ -7,6 +7,7 @@ import Modal from '../../components/common/Modal';
 import { MessageInsert, Contact, MessageTemplate } from '../../types';
 import TemplatePreview from '../../components/common/TemplatePreview';
 import { useAuthStore, useMetaConfig } from '../../stores/authStore';
+import { supabase } from '../../lib/supabaseClient';
 
 interface SendResult {
     success: boolean;
@@ -36,7 +37,7 @@ const resolveVariables = (text: string, context: { contact: Contact | null }): s
 
 
 const NewCampaign: React.FC = () => {
-  const { templates, contacts, addCampaign, pageParams, setCurrentPage, activeTeam, user } = useAuthStore();
+  const { templates, contacts, addCampaign, pageParams, setCurrentPage, activeTeam } = useAuthStore();
   const metaConfig = useMetaConfig();
   
   const [campaignName, setCampaignName] = useState('');
@@ -155,11 +156,24 @@ const NewCampaign: React.FC = () => {
   }
   
   const handleQueueCampaign = async () => {
-    if (!template || !activeTeam || !user) return;
+    if (!template || !activeTeam) {
+        setError("Template ou equipe ativa não encontrados.");
+        return;
+    };
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      setError("Sessão inválida. Por favor, faça login novamente.");
+      return;
+    }
+
     try {
         const response = await fetch('/api/enqueue-campaign-send', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`,
+            },
             body: JSON.stringify({
                 campaignName,
                 templateId: template.id,
@@ -167,7 +181,6 @@ const NewCampaign: React.FC = () => {
                 recipients,
                 speed: sendingSpeed,
                 teamId: activeTeam.id,
-                userId: user.id
             }),
         });
 
@@ -176,7 +189,6 @@ const NewCampaign: React.FC = () => {
             throw new Error(errorData.message || 'Falha ao enfileirar a campanha.');
         }
         
-        // O backend agora cria a campanha. Apenas mostramos a confirmação.
         setSendResults([]);
         setIsResultsModalOpen(true);
 
@@ -191,7 +203,7 @@ const NewCampaign: React.FC = () => {
     setIsLoading(true);
     setError(null);
     
-    if (sendingSpeed !== 'instant' && !isScheduled) {
+    if (sendingSpeed !== 'instant') {
         await handleQueueCampaign();
     } else if (isScheduled) {
         await handleScheduleCampaign();
@@ -428,18 +440,12 @@ const NewCampaign: React.FC = () => {
                         value={sendingSpeed}
                         onChange={(e) => setSendingSpeed(e.target.value as any)}
                         className="w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-md p-2 text-gray-900 dark:text-white"
-                        disabled={isScheduled}
                     >
                         <option value="instant">Imediato (Máxima velocidade)</option>
                         <option value="slow">Lento (aprox. 1 por minuto)</option>
                         <option value="very_slow">Muito Lento (aprox. 1 por 5 minutos)</option>
                     </select>
-                    <p className="text-xs text-gray-500 dark:text-slate-400 mt-2">
-                        {isScheduled 
-                            ? "A velocidade de envio não se aplica a campanhas agendadas, que são enviadas imediatamente na hora marcada."
-                            : "Escolher uma velocidade mais lenta pode ajudar a evitar bloqueios do WhatsApp em grandes campanhas."
-                        }
-                    </p>
+                    <p className="text-xs text-gray-500 dark:text-slate-400 mt-2">Escolher uma velocidade mais lenta pode ajudar a evitar bloqueios do WhatsApp em grandes campanhas. Requer um serviço de fila configurado no backend.</p>
                 </div>
             </div>
 
@@ -559,19 +565,19 @@ const NewCampaign: React.FC = () => {
           title="Confirmar Campanha"
         >
             <div className="text-gray-600 dark:text-slate-300 space-y-4">
-                <p>Você está prestes a {sendingSpeed !== 'instant' && !isScheduled ? 'enfileirar' : isScheduled ? 'agendar' : 'enviar'} a campanha <strong className="text-gray-900 dark:text-white">{campaignName}</strong>.</p>
+                <p>Você está prestes a {sendingSpeed !== 'instant' ? 'enfileirar' : isScheduled ? 'agendar' : 'enviar'} a campanha <strong className="text-gray-900 dark:text-white">{campaignName}</strong>.</p>
                 <div className="p-4 bg-gray-100 dark:bg-slate-700/50 rounded-lg space-y-2">
                      <p><strong>Template:</strong> <span className="font-mono text-blue-600 dark:text-sky-300">{template?.template_name}</span></p>
                      <p><strong>Total de destinatários:</strong> <span className="font-bold text-gray-900 dark:text-white">{recipients.length.toLocaleString('pt-BR')}</span></p>
                      {isScheduled && <p><strong>Agendada para:</strong> <span className="font-bold text-gray-900 dark:text-white">{new Date(scheduleDate).toLocaleString('pt-BR')}</span></p>}
-                     {sendingSpeed !== 'instant' && !isScheduled && <p><strong>Velocidade:</strong> <span className="font-bold text-gray-900 dark:text-white">{sendingSpeed === 'slow' ? 'Lenta' : 'Muito Lenta'}</span></p>}
+                     {sendingSpeed !== 'instant' && <p><strong>Velocidade:</strong> <span className="font-bold text-gray-900 dark:text-white">{sendingSpeed === 'slow' ? 'Lenta' : 'Muito Lenta'}</span></p>}
                 </div>
                 <p className="text-amber-600 dark:text-amber-400 text-sm">Esta ação não pode ser desfeita. Tem certeza de que deseja continuar?</p>
             </div>
             <div className="mt-6 flex justify-end gap-3">
                 <Button variant="secondary" onClick={() => setIsConfirmModalOpen(false)}>Cancelar</Button>
                 <Button variant="primary" onClick={handleLaunch} isLoading={isLoading}>
-                    Sim, {sendingSpeed !== 'instant' && !isScheduled ? 'Enfileirar Agora' : isScheduled ? 'Agendar Agora' : 'Enviar Agora'}
+                    Sim, {sendingSpeed !== 'instant' ? 'Enfileirar Agora' : isScheduled ? 'Agendar Agora' : 'Enviar Agora'}
                 </Button>
             </div>
         </Modal>
@@ -579,10 +585,10 @@ const NewCampaign: React.FC = () => {
         <Modal
             isOpen={isResultsModalOpen}
             onClose={() => setCurrentPage('campaigns')}
-            title={sendingSpeed !== 'instant' && !isScheduled ? "Campanha Enfileirada!" : isScheduled ? "Campanha Agendada!" : "Resultados do Envio da Campanha"}
+            title={sendingSpeed !== 'instant' ? "Campanha Enfileirada!" : isScheduled ? "Campanha Agendada!" : "Resultados do Envio da Campanha"}
         >
             <div className="text-gray-600 dark:text-slate-300 space-y-4">
-                <p>A campanha <strong className="text-gray-900 dark:text-white">{campaignName}</strong> foi {sendingSpeed !== 'instant' && !isScheduled ? 'enfileirada com sucesso para envio gradual' : isScheduled ? 'agendada com sucesso' : 'processada'}.</p>
+                <p>A campanha <strong className="text-gray-900 dark:text-white">{campaignName}</strong> foi {sendingSpeed !== 'instant' ? 'enfileirada com sucesso para envio gradual' : isScheduled ? 'agendada com sucesso' : 'processada'}.</p>
                 {sendingSpeed === 'instant' && !isScheduled && (
                   <div className="p-4 bg-gray-100 dark:bg-slate-700/50 rounded-lg space-y-2 text-center">
                     <p className="text-green-600 dark:text-green-400"><strong className="text-2xl">{successfulSends}</strong> envios bem-sucedidos.</p>

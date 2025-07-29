@@ -1,112 +1,115 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { Client } from '@upstash/qstash';
 import { supabaseAdmin } from './_lib/supabaseAdmin.js';
 import { TablesInsert } from './_lib/database.types.js';
 
-// Helper function to calculate delay based on speed setting
-const getDelayInSeconds = (speed: 'instant' | 'slow' | 'very_slow', index: number): number => {
-    switch (speed) {
-        case 'slow':
-            return index * 60; // 1 message per minute
-        case 'very_slow':
-            return index * 300; // 1 message per 5 minutes
-        case 'instant':
-        default:
-            return 0;
-    }
-};
+// Verifique se as variáveis de ambiente do QStash estão definidas.
+if (!process.env.QSTASH_TOKEN) {
+    throw new Error("A variável de ambiente QSTASH_TOKEN é obrigatória.");
+}
+
+const qstashClient = new Client({
+    token: process.env.QSTASH_TOKEN,
+});
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'POST') {
-        return res.status(405).json({ message: 'Only POST requests are allowed' });
-    }
-
-    const { QSTASH_TOKEN, VERCEL_URL } = process.env;
-    if (!QSTASH_TOKEN || !VERCEL_URL) {
-        console.error('[ENQUEUE] Missing QSTASH_TOKEN or VERCEL_URL environment variables.');
-        return res.status(500).json({ message: 'Server configuration error for queuing service.' });
+        res.setHeader('Allow', 'POST');
+        return res.status(405).json({ message: 'Apenas requisições POST são permitidas' });
     }
 
     try {
-        const { campaignName, templateId, variables, recipients, speed, teamId, userId } = req.body;
-
-        if (!campaignName || !templateId || !recipients || !speed || !teamId || !userId) {
-            return res.status(400).json({ message: 'Missing required fields in request body.' });
+        // 1. Autenticar o usuário a partir do token de acesso
+        const authHeader = req.headers.authorization;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return res.status(401).json({ error: 'O cabeçalho de autorização está ausente ou malformado.' });
+        }
+        const token = authHeader.split(' ')[1];
+        const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
+        if (userError || !user) {
+            return res.status(401).json({ error: 'Não autorizado' });
         }
 
-        // 1. Create the campaign record in the database
+        // 2. Obter e validar o corpo da requisição
+        const { teamId, templateId, variables, recipients, speed, campaignName } = req.body;
+        if (!teamId || !templateId || !recipients || !speed || !campaignName) {
+            return res.status(400).json({ error: 'Faltando campos obrigatórios no corpo da requisição.' });
+        }
+
+        // 3. Verificar se o usuário é membro da equipe
+        const { count, error: memberError } = await supabaseAdmin
+            .from('team_members')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', user.id)
+            .eq('team_id', teamId);
+        if (memberError || count === 0) {
+            return res.status(403).json({ error: 'Acesso negado a esta equipe.' });
+        }
+        
+        // 4. Salvar o registro da campanha e das mensagens pendentes no DB
+        const status = speed === 'instant' ? 'Sent' : 'Scheduled';
         const campaignPayload: TablesInsert<'campaigns'> = {
             name: campaignName,
-            template_id: templateId,
-            status: 'Scheduled', // Using 'Scheduled' to represent a queued/in-progress campaign
             team_id: teamId,
+            template_id: templateId,
+            status,
+            sent_at: status === 'Sent' ? new Date().toISOString() : null,
             recipient_count: recipients.length,
-            sent_at: new Date().toISOString(), // Marks the time the queuing started
         };
-
-        const { data: newCampaignData, error: campaignError } = await supabaseAdmin
-            .from('campaigns')
-            .insert(campaignPayload as any)
-            .select('id')
-            .single();
-
-        if (campaignError) {
-            console.error('[ENQUEUE] Error creating campaign record:', campaignError);
-            throw campaignError;
-        }
-
-        const campaignId = newCampaignData.id;
-
-        // 2. Prepare batch of messages for QStash
-        const qstashUrl = `https://qstash.upstash.io/v2/batch`;
-        const workerUrl = `https://${VERCEL_URL}/api/send-single-message`;
         
-        const messages = recipients.map((recipient: any, index: number) => {
-            const delay = getDelayInSeconds(speed, index);
-            const headers: { [key: string]: string } = {
-                'Content-Type': 'application/json',
-            };
-            if (delay > 0) {
-                headers['Upstash-Delay'] = `${delay}s`;
-            }
+        const { data: newCampaignData, error: campaignError } = await supabaseAdmin.from('campaigns').insert(campaignPayload as any).select('id').single();
+        if (campaignError) throw campaignError;
+        const campaignId = (newCampaignData as any).id;
 
-            return {
-                destination: workerUrl,
-                headers,
-                body: JSON.stringify({
-                    recipient,
-                    templateId,
-                    variables,
-                    campaignId,
-                    userId,
-                }),
-            };
-        });
+        const messagesToInsert = recipients.map((r: any) => ({
+            campaign_id: campaignId,
+            team_id: teamId,
+            contact_id: r.id,
+            status: 'pending',
+            type: 'outbound',
+            source: 'campaign',
+            content: 'Enfileirado via QStash...',
+        }));
 
-        // 3. Send the batch to QStash
-        const qstashResponse = await fetch(qstashUrl, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${QSTASH_TOKEN}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(messages),
-        });
-
-        if (!qstashResponse.ok) {
-            const errorBody = await qstashResponse.text();
-            console.error('[ENQUEUE] Failed to send batch to QStash:', errorBody);
-            // Attempt to roll back the campaign creation if queuing fails
+        const { error: messagesError } = await supabaseAdmin.from('messages').insert(messagesToInsert as any);
+        if (messagesError) {
+            // Reverte a criação da campanha se a inserção das mensagens falhar
             await supabaseAdmin.from('campaigns').delete().eq('id', campaignId);
-            throw new Error(`QStash failed with status ${qstashResponse.status}: ${errorBody}`);
+            throw messagesError;
         }
+        
+        // 5. Determinar o atraso e construir as mensagens para o QStash
+        const delayMap = { instant: 0, slow: 60, 'very_slow': 300 };
+        const delay = delayMap[speed as keyof typeof delayMap] || 0;
+        
+        const vercelUrl = process.env.VERCEL_URL;
+        if (!vercelUrl) {
+          return res.status(500).json({ message: 'A variável de ambiente VERCEL_URL não está configurada.' });
+        }
+    
+        const qstashMessages = recipients.map((recipient: any, index: number) => ({
+            destination: `https://${vercelUrl}/api/send-single-message`,
+            body: JSON.stringify({
+                teamId,
+                campaignId,
+                templateId,
+                variables,
+                recipient,
+                userId: user.id
+            }),
+            delay: delay > 0 ? (index * delay) : undefined,
+            headers: { "Content-Type": "application/json" },
+        }));
 
-        const qstashResult = await qstashResponse.json();
-        console.log(`[ENQUEUE] Successfully queued ${qstashResult.length} messages for campaign ${campaignId}.`);
-
-        return res.status(200).json({ message: 'Campaign successfully enqueued for sending.', campaignId });
+        // 6. Publicar as mensagens em lote para o QStash
+        if (qstashMessages.length > 0) {
+            await qstashClient.batch(qstashMessages);
+        }
+        
+        return res.status(202).json({ message: 'Campanha aceita e enfileirada para envio.' });
 
     } catch (error: any) {
-        console.error("Error in enqueue-campaign-send function:", error);
-        return res.status(500).json({ message: "Failed to enqueue campaign.", error: error.message });
+        console.error("Erro na função enqueue-campaign-send:", error);
+        return res.status(500).json({ message: "Falha ao enfileirar a campanha.", error: error.message });
     }
 }
