@@ -147,7 +147,47 @@ interface AuthState {
   fetchTodaysTasks: () => Promise<void>;
 }
 
-export const useAuthStore = create<AuthState>((set, get) => ({
+export const useAuthStore = create<AuthState>((set, get) => {
+    
+  const _setupSubscriptionsForTeam = (teamId: string) => {
+    const user = get().user;
+    if (!user) return;
+    
+    get().clearSubscriptions();
+
+    // Messages subscription
+    const messagesChannel = supabase.channel(`team-messages-${teamId}`)
+        .on('postgres_changes',
+            { event: 'INSERT', schema: 'public', table: 'messages', filter: `team_id=eq.${teamId}` },
+            async (payload) => {
+                const newMessage = payload.new as Message;
+                await get().fetchConversations();
+                if (get().activeContactId === newMessage.contact_id) {
+                    const unifiedMessage = inboxService.mapPayloadToUnifiedMessage(newMessage);
+                    set(state => ({
+                        messages: [...state.messages, unifiedMessage]
+                    }));
+                }
+            }
+        ).subscribe();
+
+    // Team Members subscription
+    const teamMembersChannel = supabase.channel(`team-members-changes-${teamId}`)
+        .on('postgres_changes',
+            { event: '*', schema: 'public', table: 'team_members', filter: `team_id=eq.${teamId}` },
+            async () => {
+                const teamIds = get().userTeams.map(t => t.id);
+                if (teamIds.length > 0) {
+                    const updatedMembers = await teamService.getTeamMembersForTeams(teamIds);
+                    set({ allTeamMembers: updatedMembers });
+                }
+            }
+        ).subscribe();
+
+    set({ messagesSubscription: messagesChannel, teamSubscription: teamMembersChannel });
+  };
+
+  return {
   // Auth
   session: null,
   user: null,
@@ -176,79 +216,84 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (get().isInitialized) return () => {};
 
     const handleSession = async (session: Session | null) => {
-      get().clearSubscriptions();
-      const user = session?.user ?? null;
-      set({ session, user, profile: null, activeTeam: null, userTeams: [], allTeamMembers: [] });
+        const isRefresh = !!get().session && !!session && get().session?.user.id === session.user.id;
 
-      if (user) {
-        set({ loading: true, teamLoading: true });
-        
-        const { data, error } = await supabase.rpc('get_user_teams_and_profile');
+        const user = session?.user ?? null;
+        set({ session, user });
 
-        if (error) {
-            console.error("Erro crítico ao buscar perfil e equipes via RPC.", error);
-            set({ loading: false, teamLoading: false });
-            return;
-        }
-
-        const { profile: profileData, teams: teamsData } = data as unknown as { profile: Profile | null, teams: Team[] | null };
-        let teams = (teamsData || []).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-        
-        let allTeamMembers: TeamMemberWithEmail[] = [];
-
-        if (teams.length === 0) {
-            console.warn(`O usuário ${user.id} não possui equipes. Acionando a criação da equipe padrão via API.`);
-            try {
-                const setupResponse = await fetch('/api/setup-new-user', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId: user.id, email: user.email })
-                });
-
-                if (!setupResponse.ok) throw new Error(await setupResponse.text());
-
-                const { data: refetchData, error: refetchError } = await supabase.rpc('get_user_teams_and_profile');
-                if (refetchError) throw refetchError;
-
-                const { teams: newTeamsData } = refetchData as unknown as { teams: Team[] | null };
-                teams = (newTeamsData || []).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-
-            } catch (creationError) {
-                console.error("Falha na lógica de fallback para criar equipe padrão:", creationError);
+        if (user) {
+            if (!isRefresh) {
+                set({ loading: true, teamLoading: true });
+            } else {
+                set({ teamLoading: true });
             }
-        }
+            
+            const { data, error } = await supabase.rpc('get_user_teams_and_profile');
 
-        if (teams.length > 0) {
-            const teamIds = teams.map(t => t.id);
-            try {
-                allTeamMembers = await teamService.getTeamMembersForTeams(teamIds);
-            } catch(err) {
-                console.error("Não foi possível buscar os membros da equipe.", err);
+            if (error) {
+                console.error("Erro crítico ao buscar perfil e equipes via RPC.", error);
+                set({ loading: false, teamLoading: false });
+                return;
             }
 
-            const channel = supabase.channel(`team-members-changes-${user.id}`)
-                .on('postgres_changes',
-                    { event: '*', schema: 'public', table: 'team_members', filter: `team_id=in.(${teamIds.join(',')})` },
-                    async () => {
-                        const updatedMembers = await teamService.getTeamMembersForTeams(teamIds);
-                        set({ allTeamMembers: updatedMembers });
-                    }
-                ).subscribe();
-            set({ teamSubscription: channel });
-        }
-        
-        set({ 
-            profile: profileData,
-            userTeams: teams,
-            allTeamMembers,
-            activeTeam: teams[0] || null,
-            teamLoading: false,
-            loading: false
-        });
+            const { profile: profileData, teams: teamsData } = data as unknown as { profile: Profile | null, teams: Team[] | null };
+            let teams = (teamsData || []).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+            
+            let allTeamMembers: TeamMemberWithEmail[] = [];
 
-      } else {
-        set({ profile: null, loading: false, teamLoading: false });
-      }
+            if (teams.length === 0) {
+                console.warn(`O usuário ${user.id} não possui equipes. Acionando a criação da equipe padrão via API.`);
+                try {
+                    const setupResponse = await fetch('/api/setup-new-user', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ userId: user.id, email: user.email })
+                    });
+
+                    if (!setupResponse.ok) throw new Error(await setupResponse.text());
+
+                    const { data: refetchData, error: refetchError } = await supabase.rpc('get_user_teams_and_profile');
+                    if (refetchError) throw refetchError;
+
+                    const { teams: newTeamsData } = refetchData as unknown as { teams: Team[] | null };
+                    teams = (newTeamsData || []).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
+                } catch (creationError) {
+                    console.error("Falha na lógica de fallback para criar equipe padrão:", creationError);
+                }
+            }
+
+            if (teams.length > 0) {
+                const teamIds = teams.map(t => t.id);
+                try {
+                    allTeamMembers = await teamService.getTeamMembersForTeams(teamIds);
+                } catch(err) {
+                    console.error("Não foi possível buscar os membros da equipe.", err);
+                }
+            }
+            
+            const currentActiveTeam = get().activeTeam;
+            const newActiveTeamIsValid = teams.some(t => t.id === currentActiveTeam?.id);
+            const activeTeam = isRefresh && newActiveTeamIsValid ? currentActiveTeam : teams[0] || null;
+            
+            set({ 
+                profile: profileData,
+                userTeams: teams,
+                allTeamMembers,
+                activeTeam,
+                teamLoading: false,
+                loading: isRefresh ? get().loading : false
+            });
+
+            if (activeTeam) {
+                _setupSubscriptionsForTeam(activeTeam.id);
+            }
+
+        } else {
+            get().clearAllData();
+            set({ session: null, user: null, profile: null, activeTeam: null, userTeams: [], allTeamMembers: [], loading: false, teamLoading: false, dataLoadedForTeam: null });
+            get().clearSubscriptions();
+        }
     };
 
     supabase.auth.getSession().then(({ data: { session } }) => handleSession(session));
@@ -256,7 +301,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT') {
         handleSession(null);
-      } else if (session && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
+      } else if (session && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED')) {
         handleSession(session);
       }
     });
@@ -283,7 +328,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   setActiveTeam: (team) => {
-    set({ activeTeam: team, dataLoadedForTeam: null }); // Reset data loaded flag on team change
+    if (get().activeTeam?.id === team.id) return;
+    set({ activeTeam: team, dataLoadedForTeam: null, activeContactId: null, messages: [] });
+    _setupSubscriptionsForTeam(team.id);
   },
 
   // Navigation
@@ -312,7 +359,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         responses: data.responses,
         dataLoadedForTeam: teamId,
       });
-      get().fetchTodaysTasks(); // Fetch tasks after initial data load
+      get().fetchTodaysTasks();
+      get().fetchConversations();
     } catch (error) {
       console.error("Failed to fetch initial data for team:", teamId, error);
       useUiStore.getState().addToast(`Falha ao carregar dados da equipe: ${(error as Error).message}`, 'error');
@@ -746,7 +794,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const tasks = await activityService.fetchTodaysTasks(teamId);
     set({ todaysTasks: tasks });
   },
-}));
+}});
 
 export const useMetaConfig = create<MetaConfig>(() => ({
   accessToken: '',
