@@ -90,7 +90,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const qstashMessages = recipients.map((recipient: any, index: number) => {
             const messagePayload: any = {
-                destination: `https://${vercelUrl}/api/send-single-message`,
+                url: `https://${vercelUrl}/api/send-single-message`,
                 body: JSON.stringify({
                     teamId,
                     campaignId,
