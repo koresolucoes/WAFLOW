@@ -254,4 +254,516 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     supabase.auth.getSession().then(({ data: { session } }) => handleSession(session));
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-        if ((event === 'SIGNED_IN' || event === 'TOKEN_REF
+      if (event === 'SIGNED_OUT') {
+        handleSession(null);
+      } else if (session && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
+        handleSession(session);
+      }
+    });
+
+    set({ isInitialized: true });
+    
+    return () => {
+      subscription?.unsubscribe();
+      get().clearSubscriptions();
+    };
+  },
+  
+  updateProfile: async (profileData) => {
+    if (!get().user) throw new Error("Usuário não autenticado.");
+    const { addToast } = useUiStore.getState();
+    try {
+      const updatedProfile = await updateProfileInDb(get().user!.id, profileData);
+      set({ profile: updatedProfile });
+      addToast('Perfil salvo com sucesso!', 'success');
+    } catch (error: any) {
+      addToast(`Erro ao salvar perfil: ${error.message}`, 'error');
+      throw error;
+    }
+  },
+
+  setActiveTeam: (team) => {
+    set({ activeTeam: team, dataLoadedForTeam: null }); // Reset data loaded flag on team change
+  },
+
+  // Navigation
+  currentPage: 'dashboard',
+  pageParams: {},
+  setCurrentPage: (page, params = {}) => {
+    set({ currentPage: page, pageParams: params });
+  },
+
+  // Data Loading
+  dataLoadedForTeam: null,
+  fetchInitialData: async (teamId) => {
+    try {
+      const data = await fetchAllInitialData(teamId);
+      set({
+        templates: data.templates,
+        contacts: data.contacts,
+        allTags: [...new Set(data.contacts.flatMap(c => c.tags || []))].sort(),
+        campaigns: data.campaigns,
+        automations: data.automations,
+        pipelines: data.pipelines,
+        stages: data.stages,
+        deals: data.deals,
+        activePipelineId: data.pipelines[0]?.id || null,
+        definitions: data.definitions,
+        responses: data.responses,
+        dataLoadedForTeam: teamId,
+      });
+      get().fetchTodaysTasks(); // Fetch tasks after initial data load
+    } catch (error) {
+      console.error("Failed to fetch initial data for team:", teamId, error);
+      useUiStore.getState().addToast(`Falha ao carregar dados da equipe: ${(error as Error).message}`, 'error');
+    }
+  },
+  
+  clearAllData: () => {
+    set({
+      templates: [],
+      contacts: [],
+      allTags: [],
+      campaigns: [],
+      automations: [],
+      pipelines: [],
+      stages: [],
+      deals: [],
+      activePipelineId: null,
+      definitions: [],
+      responses: [],
+      conversations: [],
+      messages: [],
+      todaysTasks: [],
+    });
+  },
+
+  // Templates
+  templates: [],
+  setTemplates: (updater) => set(state => ({ templates: typeof updater === 'function' ? updater(state.templates) : updater })),
+  createTemplate: async (templateData) => {
+    const metaConfig = useMetaConfig.getState();
+    const teamId = get().activeTeam?.id;
+    if (!teamId) throw new Error("Nenhuma equipe ativa selecionada.");
+    const newTemplate = await createTemplateOnMetaAndDb(metaConfig, templateData, teamId);
+    set(state => ({ templates: [newTemplate, ...state.templates] }));
+  },
+  
+  // Contacts
+  contacts: [],
+  allTags: [],
+  contactDetails: null,
+  setContacts: (updater) => set(state => ({ contacts: typeof updater === 'function' ? updater(state.contacts) : updater })),
+  setContactDetails: (updater) => set(state => ({ contactDetails: typeof updater === 'function' ? updater(state.contactDetails) : updater })),
+  addContact: async (contact) => {
+    const teamId = get().activeTeam?.id;
+    if (!teamId) throw new Error("Nenhuma equipe ativa selecionada.");
+    const newContact = await contactService.addContactToDb(teamId, contact);
+    set(state => ({
+      contacts: [newContact, ...state.contacts],
+      allTags: [...new Set([...state.allTags, ...(newContact.tags || [])])].sort()
+    }));
+  },
+  updateContact: async (contact) => {
+    const teamId = get().activeTeam?.id;
+    if (!teamId) throw new Error("Nenhuma equipe ativa selecionada.");
+    const updatedContact = await contactService.updateContactInDb(teamId, contact);
+    set(state => ({
+      contacts: state.contacts.map(c => c.id === updatedContact.id ? updatedContact : c),
+      allTags: [...new Set(state.contacts.flatMap(c => c.tags || []))].sort(),
+      contactDetails: state.contactDetails?.id === updatedContact.id ? { ...state.contactDetails, ...updatedContact } : state.contactDetails
+    }));
+  },
+  deleteContact: async (contactId) => {
+    const teamId = get().activeTeam?.id;
+    if (!teamId) throw new Error("Nenhuma equipe ativa selecionada.");
+    await contactService.deleteContactFromDb(teamId, contactId);
+    set(state => ({
+      contacts: state.contacts.filter(c => c.id !== contactId),
+    }));
+  },
+  importContacts: async (newContacts) => {
+    const teamId = get().activeTeam?.id;
+    if (!teamId) throw new Error("Nenhuma equipe ativa selecionada.");
+    const existingPhones = new Set(get().contacts.map(c => c.phone));
+    const { imported, skippedCount } = await contactService.importContactsToDb(teamId, newContacts, existingPhones);
+    set(state => ({
+      contacts: [...imported, ...state.contacts],
+      allTags: [...new Set([...state.allTags, ...imported.flatMap(c => c.tags || [])])].sort()
+    }));
+    return { importedCount: imported.length, skippedCount };
+  },
+  fetchContactDetails: async (contactId) => {
+    const teamId = get().activeTeam?.id;
+    if (!teamId) throw new Error("Nenhuma equipe ativa selecionada.");
+    try {
+      const details = await contactService.fetchContactDetailsFromDb(teamId, contactId);
+      set({ contactDetails: details });
+    } catch (error) {
+      console.error("Failed to fetch contact details", error);
+    }
+  },
+  sendDirectMessages: async (message, recipients) => {
+    const metaConfig = useMetaConfig.getState();
+    const teamId = get().activeTeam?.id;
+    if (!teamId) throw new Error("Nenhuma equipe ativa selecionada.");
+    await contactService.sendDirectMessagesFromApi(metaConfig, teamId, message, recipients);
+    // Realtime should handle message updates.
+  },
+
+  // Campaigns
+  campaigns: [],
+  campaignDetails: null,
+  setCampaigns: (updater) => set(state => ({ campaigns: typeof updater === 'function' ? updater(state.campaigns) : updater })),
+  setCampaignDetails: (updater) => set(state => ({ campaignDetails: typeof updater === 'function' ? updater(state.campaignDetails) : updater })),
+  addCampaign: async (campaign, messages) => {
+    const teamId = get().activeTeam?.id;
+    if (!teamId) throw new Error("Nenhuma equipe ativa selecionada.");
+    const newCampaign = await addCampaignToDb(teamId, campaign, messages);
+    const newCampaignWithMetrics: CampaignWithMetrics = {
+        ...newCampaign,
+        metrics: {
+            sent: messages.filter(m => m.status === 'sent').length,
+            delivered: 0,
+            read: 0,
+            failed: messages.filter(m => m.status === 'failed').length,
+        }
+    };
+    set(state => ({ campaigns: [newCampaignWithMetrics, ...state.campaigns] }));
+  },
+  fetchCampaignDetails: async (campaignId) => {
+    const teamId = get().activeTeam?.id;
+    if (!teamId) throw new Error("Nenhuma equipe ativa selecionada.");
+    const details = await fetchCampaignDetailsFromDb(teamId, campaignId);
+    set({ campaignDetails: details });
+  },
+  deleteCampaign: async (campaignId) => {
+    const teamId = get().activeTeam?.id;
+    if (!teamId) throw new Error("Nenhuma equipe ativa selecionada.");
+    await deleteCampaignFromDb(teamId, campaignId);
+    set(state => ({ campaigns: state.campaigns.filter(c => c.id !== campaignId) }));
+  },
+
+  // Automations
+  automations: [],
+  setAutomations: (updater) => set(state => ({ automations: typeof updater === 'function' ? updater(state.automations) : updater })),
+  automationStats: {},
+  setAutomationStats: (updater) => set(state => ({ automationStats: typeof updater === 'function' ? updater(state.automationStats) : updater })),
+  createAndNavigateToAutomation: async () => {
+    const teamId = get().activeTeam?.id;
+    if (!teamId) throw new Error("Nenhuma equipe ativa selecionada.");
+    const newAutomation = await automationService.createAutomationInDb(teamId);
+    set(state => ({ automations: [newAutomation, ...state.automations] }));
+    get().setCurrentPage('automation-editor', { automationId: newAutomation.id });
+  },
+  updateAutomation: async (automation) => {
+    const teamId = get().activeTeam?.id;
+    if (!teamId) throw new Error("Nenhuma equipe ativa selecionada.");
+    const updatedAutomation = await automationService.updateAutomationInDb(teamId, automation);
+    set(state => ({
+      automations: state.automations.map(a => a.id === updatedAutomation.id ? updatedAutomation : a)
+    }));
+  },
+  deleteAutomation: async (automationId) => {
+    const teamId = get().activeTeam?.id;
+    if (!teamId) throw new Error("Nenhuma equipe ativa selecionada.");
+    await automationService.deleteAutomationFromDb(automationId, teamId);
+    set(state => ({ automations: state.automations.filter(a => a.id !== automationId) }));
+  },
+  fetchAutomationStats: async (automationId) => {
+    const stats = await automationService.fetchStatsForAutomation(automationId);
+    set({ automationStats: stats });
+  },
+  fetchNodeLogs: async (automationId, nodeId) => {
+    return await automationService.fetchLogsForNode(automationId, nodeId);
+  },
+
+  // Funnel
+  pipelines: [],
+  stages: [],
+  deals: [],
+  activePipelineId: null,
+  setPipelines: (updater) => set(state => ({ pipelines: typeof updater === 'function' ? updater(state.pipelines) : updater })),
+  setStages: (updater) => set(state => ({ stages: typeof updater === 'function' ? updater(state.stages) : updater })),
+  setDeals: (updater) => set(state => ({ deals: typeof updater === 'function' ? updater(state.deals) : updater })),
+  setActivePipelineId: (id) => set({ activePipelineId: id }),
+  addDeal: async (dealData) => {
+    const teamId = get().activeTeam?.id;
+    if (!teamId) throw new Error("Nenhuma equipe ativa selecionada.");
+    const newDeal = await funnelService.addDealToDb({ ...dealData, team_id: teamId });
+    set(state => ({ deals: [newDeal, ...state.deals] }));
+  },
+  updateDeal: async (dealId, updates) => {
+    const teamId = get().activeTeam?.id;
+    if (!teamId) throw new Error("Nenhuma equipe ativa selecionada.");
+    const updatedDeal = await funnelService.updateDealInDb(dealId, teamId, updates);
+    set(state => ({
+      deals: state.deals.map(d => d.id === dealId ? updatedDeal : d)
+    }));
+  },
+  deleteDeal: async (dealId) => {
+    const teamId = get().activeTeam?.id;
+    if (!teamId) throw new Error("Nenhuma equipe ativa selecionada.");
+    await funnelService.deleteDealFromDb(dealId, teamId);
+    set(state => ({ deals: state.deals.filter(d => d.id !== dealId) }));
+  },
+  createDefaultPipeline: async () => {
+    const teamId = get().activeTeam?.id;
+    if (!teamId) throw new Error("Nenhuma equipe ativa selecionada.");
+    const { pipeline, stages } = await funnelService.createDefaultPipelineInDb(teamId);
+    set(state => ({
+      pipelines: [...state.pipelines, pipeline],
+      stages: [...state.stages, ...stages],
+      activePipelineId: pipeline.id,
+    }));
+  },
+  addPipeline: async (name) => {
+    const teamId = get().activeTeam?.id;
+    if (!teamId) throw new Error("Nenhuma equipe ativa selecionada.");
+    const { pipeline, stage } = await funnelService.addPipelineToDb(teamId, name);
+    set(state => ({
+      pipelines: [...state.pipelines, pipeline],
+      stages: [...state.stages, stage]
+    }));
+  },
+  updatePipeline: async (id, name) => {
+    const teamId = get().activeTeam?.id;
+    if (!teamId) throw new Error("Nenhuma equipe ativa selecionada.");
+    const updated = await funnelService.updatePipelineInDb(id, teamId, name);
+    set(state => ({ pipelines: state.pipelines.map(p => p.id === id ? updated : p) }));
+  },
+  deletePipeline: async (id) => {
+    const teamId = get().activeTeam?.id;
+    if (!teamId) throw new Error("Nenhuma equipe ativa selecionada.");
+    await funnelService.deletePipelineFromDb(id, teamId);
+    set(state => ({
+      pipelines: state.pipelines.filter(p => p.id !== id),
+      stages: state.stages.filter(s => s.pipeline_id !== id),
+      deals: state.deals.filter(d => d.pipeline_id !== id),
+      activePipelineId: state.activePipelineId === id ? (state.pipelines[0]?.id || null) : state.activePipelineId,
+    }));
+  },
+  addStage: async (pipelineId) => {
+    const existingStages = get().stages.filter(s => s.pipeline_id === pipelineId);
+    const maxSortOrder = Math.max(-1, ...existingStages.map(s => s.sort_order));
+    const newStage = await funnelService.addStageToDb(pipelineId, maxSortOrder + 1);
+    set(state => ({ stages: [...state.stages, newStage] }));
+  },
+  updateStage: async (id, updates) => {
+    const updated = await funnelService.updateStageInDb(id, updates);
+    set(state => ({ stages: state.stages.map(s => s.id === id ? updated : s) }));
+  },
+  deleteStage: async (id) => {
+    await funnelService.deleteStageFromDb(id);
+    set(state => ({ stages: state.stages.filter(s => s.id !== id) }));
+  },
+
+  // Custom Fields
+  definitions: [],
+  setDefinitions: (updater) => set(state => ({ definitions: typeof updater === 'function' ? updater(state.definitions) : updater })),
+  addDefinition: async (definition) => {
+    const teamId = get().activeTeam?.id;
+    if (!teamId) throw new Error("Nenhuma equipe ativa selecionada.");
+    const newDef = await customFieldService.addCustomFieldDefinition(teamId, definition);
+    set(state => ({ definitions: [...state.definitions, newDef] }));
+  },
+  deleteDefinition: async (id) => {
+    const teamId = get().activeTeam?.id;
+    if (!teamId) throw new Error("Nenhuma equipe ativa selecionada.");
+    await customFieldService.deleteCustomFieldDefinition(id, teamId);
+    set(state => ({ definitions: state.definitions.filter(d => d.id !== id) }));
+  },
+  
+  // Canned Responses
+  responses: [],
+  setResponses: (updater) => set(state => ({ responses: typeof updater === 'function' ? updater(state.responses) : updater })),
+  addResponse: async (response) => {
+    const teamId = get().activeTeam?.id;
+    if (!teamId) throw new Error("Nenhuma equipe ativa selecionada.");
+    const newRes = await cannedResponseService.addCannedResponse(teamId, response);
+    set(state => ({ responses: [...state.responses, newRes].sort((a,b) => a.shortcut.localeCompare(b.shortcut)) }));
+  },
+  updateResponse: async (id, updates) => {
+    const teamId = get().activeTeam?.id;
+    if (!teamId) throw new Error("Nenhuma equipe ativa selecionada.");
+    const updatedRes = await cannedResponseService.updateCannedResponse(id, teamId, updates);
+    set(state => ({
+      responses: state.responses.map(r => r.id === id ? updatedRes : r).sort((a,b) => a.shortcut.localeCompare(b.shortcut))
+    }));
+  },
+  deleteResponse: async (id) => {
+    const teamId = get().activeTeam?.id;
+    if (!teamId) throw new Error("Nenhuma equipe ativa selecionada.");
+    await cannedResponseService.deleteCannedResponse(id, teamId);
+    set(state => ({ responses: state.responses.filter(r => r.id !== id) }));
+  },
+
+  // Inbox
+  conversations: [],
+  messages: [],
+  activeContactId: null,
+  inboxLoading: false,
+  isSending: false,
+  setMessages: (updater) => set(state => ({ messages: typeof updater === 'function' ? updater(state.messages) : updater })),
+  fetchConversations: async () => {
+    const teamId = get().activeTeam?.id;
+    if (!teamId) return;
+    set({ inboxLoading: true });
+    try {
+      const convos = await inboxService.fetchConversationsFromDb(teamId);
+      set({ conversations: convos });
+    } catch (error) {
+      console.error("Failed to fetch conversations:", error);
+    } finally {
+      set({ inboxLoading: false });
+    }
+  },
+  setActiveContactId: async (contactId) => {
+    const teamId = get().activeTeam?.id;
+    if (!teamId) return;
+    
+    // Clear old messages and set loading state
+    set({ activeContactId: contactId, messages: [], inboxLoading: true });
+
+    if (!contactId) {
+      set({ inboxLoading: false });
+      return;
+    }
+
+    try {
+        const messages = await inboxService.fetchMessagesFromDb(teamId, contactId);
+        set({ messages });
+
+        // Update unread count locally for immediate UI feedback
+        set(state => ({
+          conversations: state.conversations.map(c => 
+            c.contact.id === contactId ? { ...c, unread_count: 0 } : c
+          )
+        }));
+
+    } catch (error) {
+        console.error("Failed to fetch messages for active contact:", error);
+    } finally {
+        set({ inboxLoading: false });
+    }
+  },
+  sendMessage: async (contactId, text) => {
+    const teamId = get().activeTeam?.id;
+    const contact = get().contacts.find(c => c.id === contactId);
+    const metaConfig = useMetaConfig.getState();
+    if (!teamId || !contact) throw new Error("Contexto inválido para enviar mensagem.");
+
+    set({ isSending: true });
+    try {
+        const tempId = `temp_${Date.now()}`;
+        const pendingMessage: UnifiedMessage = {
+            id: tempId,
+            contact_id: contactId,
+            content: text,
+            created_at: new Date().toISOString(),
+            type: 'outbound',
+            status: 'pending',
+            source: 'direct',
+            message_template_id: null,
+            replied_to_message_id: null,
+        };
+        set(state => ({ messages: [...state.messages, pendingMessage] }));
+
+        const sentMessage = await inboxService.sendMessageToApi(teamId, contact, text, metaConfig);
+        const finalMessage = inboxService.mapPayloadToUnifiedMessage(sentMessage);
+
+        set(state => ({
+            messages: state.messages.map(m => m.id === tempId ? finalMessage : m)
+        }));
+
+    } catch (error) {
+        console.error("Failed to send message:", error);
+        set(state => ({
+            messages: state.messages.map(m => m.id.startsWith('temp_') ? { ...m, status: 'failed' } : m)
+        }));
+        throw error;
+    } finally {
+        set({ isSending: false });
+    }
+  },
+  assignConversation: async (contactId, assigneeId) => {
+    await inboxService.assignConversation(contactId, assigneeId);
+    set(state => ({
+      conversations: state.conversations.map(c => 
+        c.contact.id === contactId ? { ...c, assignee_id: assigneeId } : c
+      )
+    }));
+  },
+  deleteConversation: async (contactId) => {
+    await inboxService.deleteConversation(contactId);
+    set(state => ({
+      conversations: state.conversations.filter(c => c.contact.id !== contactId),
+      activeContactId: state.activeContactId === contactId ? null : state.activeContactId,
+      messages: state.activeContactId === contactId ? [] : state.messages
+    }));
+  },
+
+  // Activities
+  activitiesForContact: [],
+  todaysTasks: [],
+  activityLoading: false,
+  fetchActivitiesForContact: async (contactId) => {
+    const teamId = get().activeTeam?.id;
+    if (!teamId) return;
+    set({ activityLoading: true });
+    try {
+      const activities = await activityService.fetchActivitiesForContact(teamId, contactId);
+      set({ activitiesForContact: activities });
+    } finally {
+      set({ activityLoading: false });
+    }
+  },
+  addActivity: async (activityData) => {
+    const teamId = get().activeTeam?.id;
+    if (!teamId) return null;
+    const newActivity = await activityService.addActivity({ ...activityData, team_id: teamId });
+    get().fetchActivitiesForContact(activityData.contact_id); // Re-fetch for consistency
+    get().fetchTodaysTasks(); // Refresh dashboard tasks
+    return newActivity;
+  },
+  updateActivity: async (activityId, updates) => {
+    const teamId = get().activeTeam?.id;
+    if (!teamId) return null;
+    const updatedActivity = await activityService.updateActivity(activityId, teamId, updates);
+    get().fetchActivitiesForContact(updatedActivity.contact_id); // Re-fetch
+    get().fetchTodaysTasks(); // Refresh dashboard tasks
+    return updatedActivity;
+  },
+  deleteActivity: async (activityId) => {
+    const teamId = get().activeTeam?.id;
+    if (!teamId) return;
+    await activityService.deleteActivity(activityId, teamId);
+    // Re-fetching will be handled by the component that calls this
+  },
+  fetchTodaysTasks: async () => {
+    const teamId = get().activeTeam?.id;
+    if (!teamId) return;
+    const tasks = await activityService.fetchTodaysTasks(teamId);
+    set({ todaysTasks: tasks });
+  },
+}));
+
+export const useMetaConfig = create<MetaConfig>(() => ({
+  accessToken: '',
+  wabaId: '',
+  phoneNumberId: '',
+}));
+
+// Sincroniza as credenciais da Meta do perfil principal para o store dedicado
+useAuthStore.subscribe(
+  (state) => state.profile,
+  (profile, _previousProfile) => {
+    if (profile) {
+      useMetaConfig.setState({
+        accessToken: profile.meta_access_token || '',
+        wabaId: profile.meta_waba_id || '',
+        phoneNumberId: profile.meta_phone_number_id || '',
+      });
+    }
+  }
+);
