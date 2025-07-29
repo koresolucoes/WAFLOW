@@ -12,6 +12,7 @@ const AccountSettings: React.FC = () => {
 
     const [newEmail, setNewEmail] = useState('');
     const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
     const [isUpdatingEmail, setIsUpdatingEmail] = useState(false);
     const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
     const [emailError, setEmailError] = useState('');
@@ -35,8 +36,13 @@ const AccountSettings: React.FC = () => {
 
     const handleUpdatePassword = async (e: React.FormEvent) => {
         e.preventDefault();
-        setIsUpdatingPassword(true);
         setPasswordError('');
+        if (newPassword !== confirmPassword) {
+            setPasswordError('As senhas não correspondem.');
+            return;
+        }
+
+        setIsUpdatingPassword(true);
 
         const { error } = await supabase.auth.updateUser({ password: newPassword });
 
@@ -45,6 +51,7 @@ const AccountSettings: React.FC = () => {
         } else {
             addToast('Senha atualizada com sucesso!', 'success');
             setNewPassword('');
+            setConfirmPassword('');
         }
         setIsUpdatingPassword(false);
     };
@@ -91,6 +98,18 @@ const AccountSettings: React.FC = () => {
                             id="newPassword"
                             value={newPassword}
                             onChange={(e) => setNewPassword(e.target.value)}
+                            required
+                            minLength={6}
+                            className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white"
+                        />
+                    </div>
+                    <div>
+                        <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-300 mb-1">Confirmar Nova Senha</label>
+                        <input
+                            type="password"
+                            id="confirmPassword"
+                            value={confirmPassword}
+                            onChange={(e) => setConfirmPassword(e.target.value)}
                             required
                             minLength={6}
                             className="w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-white"
