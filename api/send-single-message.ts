@@ -25,6 +25,12 @@ const receiver = new Receiver({
 });
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+    // Adicionado para lidar com a verificação de endpoint do QStash que usa GET
+    if (req.method !== 'POST') {
+        res.setHeader('Allow', 'POST');
+        return res.status(200).send('OK');
+    }
+
     let payload;
     try {
         const rawBody = await getRawBody(req);
