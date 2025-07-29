@@ -14,6 +14,11 @@ export const updateDealInDb = async (dealId: string, teamId: string, updates: Ta
     return data as unknown as DealWithContact;
 };
 
+export const deleteDealFromDb = async (dealId: string, teamId: string): Promise<void> => {
+    const { error } = await supabase.from('deals').delete().eq('id', dealId).eq('team_id', teamId);
+    if (error) throw error;
+};
+
 export const createDefaultPipelineInDb = async (teamId: string): Promise<{ pipeline: Pipeline, stages: PipelineStage[] }> => {
     const { data: pipelineData, error: pipelineError } = await supabase.from('pipelines').insert({ team_id: teamId, name: 'Funil de Vendas Padrão' } as any).select('*').single();
     if (pipelineError || !pipelineData) throw pipelineError || new Error("Falha ao criar funil.");

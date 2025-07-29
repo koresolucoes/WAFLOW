@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { PipelineStage, DealWithContact } from '../../types';
+import { PipelineStage, DealWithContact, Deal } from '../../types';
 import DealCard from './DealCard';
 import { useAuthStore } from '../../stores/authStore';
 import { TRASH_ICON } from '../../components/icons';
@@ -12,9 +12,11 @@ interface StageColumnProps {
     onDragStart: (dealId: string) => void;
     onDrop: (stageId: string) => void;
     draggedDealId: string | null;
+    onEditDeal: (deal: DealWithContact) => void;
+    onDeleteDeal: (deal: Deal) => void;
 }
 
-const StageColumn: React.FC<StageColumnProps> = ({ stage, deals, onDragStart, onDrop, draggedDealId }) => {
+const StageColumn: React.FC<StageColumnProps> = ({ stage, deals, onDragStart, onDrop, draggedDealId, onEditDeal, onDeleteDeal }) => {
     const { updateStage, deleteStage } = useAuthStore();
     const { showConfirmation, addToast } = useUiStore();
     const [isEditing, setIsEditing] = useState(false);
@@ -115,6 +117,8 @@ const StageColumn: React.FC<StageColumnProps> = ({ stage, deals, onDragStart, on
                         deal={deal} 
                         onDragStart={onDragStart}
                         isGhost={draggedDealId === deal.id}
+                        onEdit={() => onEditDeal(deal)}
+                        onDelete={() => onDeleteDeal(deal)}
                     />
                 ))}
             </div>

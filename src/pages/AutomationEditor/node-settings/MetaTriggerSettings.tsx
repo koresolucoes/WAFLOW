@@ -113,7 +113,7 @@ const MetaTriggerSettings: React.FC<NodeSettingsProps> = ({ node, onConfigChange
                     <div>
                         <label className="block text-sm font-medium text-slate-300 mb-1">Funil</label>
                         <select value={config.pipeline_id || ''} onChange={(e) => onConfigChange({ ...config, pipeline_id: e.target.value, stage_id: '' })} className={baseInputClass}>
-                            <option value="">Qualquer Funil</option>
+                            <option value="">Selecione um Funil</option>
                             {pipelines.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                         </select>
                     </div>

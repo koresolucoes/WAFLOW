@@ -1,14 +1,18 @@
 import React, { useMemo } from 'react';
-import { DealWithContact } from '../../types';
+import { DealWithContact, Deal } from '../../types';
 import { useAuthStore } from '../../stores/authStore';
+import Button from '../../components/common/Button';
+import { EDIT_ICON, TRASH_ICON } from '../../components/icons';
 
 interface DealCardProps {
     deal: DealWithContact;
     onDragStart: (dealId: string) => void;
     isGhost?: boolean;
+    onEdit: () => void;
+    onDelete: () => void;
 }
 
-const DealCard: React.FC<DealCardProps> = ({ deal, onDragStart, isGhost }) => {
+const DealCard: React.FC<DealCardProps> = ({ deal, onDragStart, isGhost, onEdit, onDelete }) => {
     const { setCurrentPage } = useAuthStore();
 
     const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
@@ -43,10 +47,18 @@ const DealCard: React.FC<DealCardProps> = ({ deal, onDragStart, isGhost }) => {
         <div
             draggable
             onDragStart={handleDragStart}
-            className={`p-4 bg-slate-800 rounded-lg shadow-md ${borderWidth} ${statusStyles[deal.status]} cursor-grab active:cursor-grabbing transition-opacity duration-200 ${isGhost ? 'opacity-30' : 'opacity-100'}`}
+            className={`p-4 bg-slate-800 rounded-lg shadow-md ${borderWidth} ${statusStyles[deal.status]} cursor-grab active:cursor-grabbing transition-opacity duration-200 ${isGhost ? 'opacity-30' : 'opacity-100'} group relative`}
         >
+            <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); onEdit(); }} className="text-slate-400 hover:text-white" title="Editar negócio">
+                    <EDIT_ICON className="w-4 h-4" />
+                </Button>
+                <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); onDelete(); }} className="text-slate-400 hover:text-red-400" title="Excluir negócio">
+                    <TRASH_ICON className="w-4 h-4" />
+                </Button>
+            </div>
             <div className="flex justify-between items-start">
-                <h3 className="font-bold text-white break-words">{deal.name}</h3>
+                <h3 className="font-bold text-white break-words pr-12">{deal.name}</h3>
                 {isStagnant && (
                      <div className="flex-shrink-0 ml-2" title={`Negócio parado nesta etapa há ${stagnantDays} dias`}>
                         <span role="img" aria-label="Alerta de estagnação">⏰</span>

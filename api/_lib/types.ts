@@ -81,3 +81,8 @@ export interface ActionContext {
     automationId: string;
     teamId: string;
 }
+
+export interface TriggerInfo {
+  automation_id: string;
+  node_id: string;
+}

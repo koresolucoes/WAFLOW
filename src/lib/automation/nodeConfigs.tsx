@@ -101,8 +101,13 @@ export const nodeConfigs: Record<string, NodeConfig> = {
         nodeType: 'trigger',
         data: { nodeType: 'trigger', type: 'deal_stage_changed', label: 'Etapa do Negócio Alterada', config: { pipeline_id: '', stage_id: '' } },
         SettingsComponent: MetaTriggerSettings,
-        description: data => (data.config as any)?.stage_id ? 'Quando um negócio entra em uma etapa específica.' : 'Configurar etapa do funil.',
-        isConfigured: data => !!(data.config as any)?.stage_id,
+        description: data => {
+            const config = data.config as any || {};
+            if (config.stage_id) return 'Quando um negócio entra em uma etapa específica.';
+            if (config.pipeline_id) return 'Quando um negócio muda de etapa em um funil específico.';
+            return 'Configurar funil e/ou etapa.';
+        },
+        isConfigured: data => !!(data.config as any)?.pipeline_id,
     },
     // Actions
     'send_template': {

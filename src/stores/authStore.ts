@@ -101,6 +101,7 @@ interface AuthState {
   setActivePipelineId: (id: string | null) => void;
   addDeal: (dealData: Omit<DealInsert, 'team_id'>) => Promise<void>;
   updateDeal: (dealId: string, updates: TablesUpdate<'deals'>) => Promise<void>;
+  deleteDeal: (dealId: string) => Promise<void>;
   createDefaultPipeline: () => Promise<void>;
   addPipeline: (name: string) => Promise<void>;
   updatePipeline: (id: string, name: string) => Promise<void>;
@@ -551,6 +552,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set(state => ({ deals: state.deals.map(d => d.id === dealId ? { ...d, ...updatedDeal } : d) }));
 
     if (updates.stage_id && oldDeal && oldDeal.stage_id !== updates.stage_id) {
+        const newStageId = updates.stage_id;
         fetch('/api/run-trigger', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -558,10 +560,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                 eventType: 'deal_stage_changed', 
                 userId: user.id, 
                 contactId: updatedDeal.contact_id, 
-                data: { deal: updatedDeal, new_stage_id: updates.stage_id }
+                data: { deal: updatedDeal, new_stage_id: newStageId }
             })
         }).catch(err => console.error("Failed to call deal_stage_changed trigger API", err));
     }
+  },
+  deleteDeal: async (dealId) => {
+    const { user, activeTeam } = get();
+    if (!user || !activeTeam) throw new Error("User not authenticated.");
+    await funnelService.deleteDealFromDb(dealId, activeTeam.id);
+    set(state => ({ deals: state.deals.filter(d => d.id !== dealId) }));
   },
   createDefaultPipeline: async () => {
     const { user, activeTeam } = get();
@@ -584,7 +592,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const updatedPipeline = await funnelService.updatePipelineInDb(id, activeTeam.id, name);
     set(state => ({ pipelines: state.pipelines.map(p => p.id === id ? updatedPipeline : p) }));
   },
-  deletePipeline: async (id) => {
+  deletePipeline: async (id: string) => {
     const { user, activeTeam, pipelines } = get();
     if (!user || !activeTeam) throw new Error("User not authenticated.");
     const remainingPipelines = pipelines.filter(p => p.id !== id);

@@ -1,12 +1,7 @@
 import { supabaseAdmin } from '../supabaseAdmin.js';
 import { executeAutomation } from './engine.js';
-import { Automation, Contact, Json, Profile, Deal } from '../types.js';
+import { Automation, Contact, Json, Profile, Deal, AutomationNode, TriggerInfo } from '../types.js';
 import { sanitizeAutomation } from './utils.js';
-
-type TriggerInfo = {
-    automation_id: string;
-    node_id: string;
-};
 
 const dispatchAutomations = async (userId: string, triggers: TriggerInfo[], contact: Contact | null, triggerPayload: Json | null) => {
     if (triggers.length === 0) return;
@@ -202,12 +197,77 @@ const handleDealCreatedEvent = async (userId: string, contact: Contact, deal: De
 const handleDealStageChangedEvent = async (userId: string, contact: Contact, deal: Deal, new_stage_id: string) => {
     console.log(`[HANDLER] Processing deal_stage_changed event for deal ${deal.id} to stage ${new_stage_id}`);
     const { data: teamData, error: teamError } = await supabaseAdmin.from('teams').select('id').eq('owner_id', userId).single();
-    if (teamError || !teamData) return;
-    const { data: triggers, error } = await supabaseAdmin.from('automation_triggers').select('automation_id, node_id').eq('team_id', teamData.id).eq('trigger_type', 'deal_stage_changed').eq('trigger_key', new_stage_id);
-    if (error) { console.error(`[HANDLER] Error in DealStageChangedEvent:`, error); return; }
-    if (triggers && triggers.length > 0) {
+    if (teamError || !teamData) {
+        console.error(`[HANDLER] Could not find team for user ${userId}. Aborting.`);
+        return;
+    }
+    const teamId = teamData.id;
+
+    const { data: stageData, error: stageError } = await supabaseAdmin
+        .from('pipeline_stages')
+        .select('pipeline_id')
+        .eq('id', new_stage_id)
+        .single();
+    if (stageError || !stageData) {
+        console.error(`[HANDLER] Could not find pipeline for stage ${new_stage_id}. Aborting.`);
+        return;
+    }
+    const pipelineIdOfNewStage = stageData.pipeline_id;
+
+    const { data: allTriggers, error } = await supabaseAdmin
+        .from('automation_triggers')
+        .select('automation_id, node_id, trigger_key')
+        .eq('team_id', teamId)
+        .eq('trigger_type', 'deal_stage_changed');
+
+    if (error) {
+        console.error(`[HANDLER] Error fetching deal_stage_changed triggers:`, error);
+        return;
+    }
+    if (!allTriggers || allTriggers.length === 0) {
+        console.log('[HANDLER] No deal_stage_changed triggers found for this team.');
+        return;
+    }
+
+    const matchingTriggers: TriggerInfo[] = [];
+    const specificStageTriggers = allTriggers.filter(t => t.trigger_key === new_stage_id);
+    specificStageTriggers.forEach(t => matchingTriggers.push({ automation_id: t.automation_id, node_id: t.node_id }));
+
+    const anyStageTriggers = allTriggers.filter(t => t.trigger_key === null);
+    const automationIdsToFetch = [...new Set(anyStageTriggers.map(t => t.automation_id))];
+
+    if (automationIdsToFetch.length > 0) {
+        const { data: automationsData, error: automationsError } = await supabaseAdmin
+            .from('automations')
+            .select('id, nodes')
+            .in('id', automationIdsToFetch);
+
+        if (automationsError) {
+            console.error('[HANDLER] Error fetching automations for "any stage" triggers:', automationsError);
+        } else if (automationsData) {
+            const automationsMap = new Map((automationsData as any[]).map(a => [a.id, a.nodes]));
+            for (const trigger of anyStageTriggers) {
+                const nodes = automationsMap.get(trigger.automation_id);
+                if (nodes) {
+                    const node = (nodes as AutomationNode[]).find(n => n.id === trigger.node_id);
+                    if (node && node.data.type === 'deal_stage_changed') {
+                        const config = node.data.config as any;
+                        if (!config.pipeline_id || config.pipeline_id === pipelineIdOfNewStage) {
+                            matchingTriggers.push({ automation_id: trigger.automation_id, node_id: trigger.node_id });
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (matchingTriggers.length > 0) {
+        const uniqueTriggers = Array.from(new Map(matchingTriggers.map(item => [`${item.automation_id}-${item.node_id}`, item])).values());
+        console.log(`[HANDLER] Found ${uniqueTriggers.length} matching triggers for stage change.`);
         const triggerData = { type: 'deal_stage_changed', payload: { deal, new_stage_id } };
-        await dispatchAutomations(userId, triggers as unknown as TriggerInfo[], contact, triggerData);
+        await dispatchAutomations(userId, uniqueTriggers, contact, triggerData);
+    } else {
+        console.log(`[HANDLER] No matching triggers found for stage change to ${new_stage_id}.`);
     }
 };
 

@@ -6,7 +6,7 @@ import Modal from './Modal';
 interface DealFormModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSave: (deal: Omit<DealInsert, 'team_id' | 'contact_id' >) => void;
+    onSave: (dealData: { id?: string; name: string; value: number; stage_id: string; pipeline_id: string; }) => Promise<void>;
     pipeline: Pipeline;
     stages: PipelineStage[];
     contactName: string;
@@ -18,14 +18,11 @@ const DealFormModal: React.FC<DealFormModalProps> = ({ isOpen, onClose, onSave, 
     const [value, setValue] = useState(0);
     const [stageId, setStageId] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const isEditing = !!deal;
 
-    // Robustly determine the initial stage ID
     const initialStageId = useMemo(() => {
-        if (deal?.stage_id) {
-            return deal.stage_id;
-        }
+        if (deal?.stage_id) return deal.stage_id;
         if (stages.length > 0) {
-            // Find the stage with the minimum sort_order as the default
             return stages.reduce((prev, current) => 
                 (prev.sort_order < current.sort_order) ? prev : current
             ).id;
@@ -33,7 +30,6 @@ const DealFormModal: React.FC<DealFormModalProps> = ({ isOpen, onClose, onSave, 
         return '';
     }, [deal, stages]);
 
-    // Effect to reset form state when the modal is opened
     useEffect(() => {
         if (isOpen) {
             setName(deal?.name || `Negócio - ${contactName}`);
@@ -50,12 +46,15 @@ const DealFormModal: React.FC<DealFormModalProps> = ({ isOpen, onClose, onSave, 
         }
         setIsLoading(true);
 
-        const dealData: Omit<DealInsert, 'team_id' | 'contact_id' > = {
+        const dealData: { id?: string; name: string; value: number; stage_id: string; pipeline_id: string; } = {
             name,
             value,
             stage_id: stageId,
             pipeline_id: pipeline.id,
         };
+        if(isEditing) {
+            dealData.id = deal.id;
+        }
 
         try {
             await onSave(dealData);
@@ -65,7 +64,7 @@ const DealFormModal: React.FC<DealFormModalProps> = ({ isOpen, onClose, onSave, 
     };
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title={deal ? 'Editar Negócio' : 'Criar Novo Negócio'}>
+        <Modal isOpen={isOpen} onClose={onClose} title={isEditing ? 'Editar Negócio' : 'Criar Novo Negócio'}>
             <form onSubmit={handleSubmit} className="space-y-4">
                  <div>
                     <label htmlFor="name" className="block text-sm font-medium text-slate-300 mb-1">Nome do Negócio</label>
@@ -91,7 +90,7 @@ const DealFormModal: React.FC<DealFormModalProps> = ({ isOpen, onClose, onSave, 
                     />
                 </div>
                  <div>
-                    <label htmlFor="stageId" className="block text-sm font-medium text-slate-300 mb-1">Etapa Inicial</label>
+                    <label htmlFor="stageId" className="block text-sm font-medium text-slate-300 mb-1">Etapa</label>
                     <select
                         id="stageId"
                         value={stageId}

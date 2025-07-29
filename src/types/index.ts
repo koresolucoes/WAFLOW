@@ -70,10 +70,10 @@ export type Automation = Omit<Database['public']['Tables']['automations']['Row']
 };
 
 export type Pipeline = Database['public']['Tables']['pipelines']['Row'];
-export type PipelineStage = Omit<Database['public']['Tables']['pipeline_stages']['Row'], 'type'> & {
+export type PipelineStage = Database['public']['Tables']['pipeline_stages']['Row'] & {
     type: StageType;
 };
-export type Deal = Omit<Database['public']['Tables']['deals']['Row'], 'status'> & {
+export type Deal = Database['public']['Tables']['deals']['Row'] & {
     status: DealStatus;
 };
 export type WebhookLog = Database['public']['Tables']['webhook_logs']['Row'];

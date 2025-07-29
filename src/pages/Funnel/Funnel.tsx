@@ -5,6 +5,9 @@ import Button from '../../components/common/Button';
 import PipelineManagerModal from './PipelineManagerModal';
 import DealClosingModal from './DealClosingModal';
 import { useAuthStore } from '../../stores/authStore';
+import { useUiStore } from '../../stores/uiStore';
+import { Deal, DealWithContact } from '../../types';
+import DealFormModal from '../../components/common/DealFormModal';
 
 const FunnelMetric: React.FC<{ label: string, value: string | number }> = ({ label, value }) => (
     <div className="text-center px-4">
@@ -15,14 +18,17 @@ const FunnelMetric: React.FC<{ label: string, value: string | number }> = ({ lab
 
 const Funnel: React.FC = () => {
     const { 
-        pipelines, stages, deals, updateDeal, createDefaultPipeline, 
+        pipelines, stages, deals, updateDeal, deleteDeal, createDefaultPipeline, 
         activePipelineId, setActivePipelineId, addStage,
     } = useAuthStore();
+    const { showConfirmation, addToast } = useUiStore();
 
     const [draggedDealId, setDraggedDealId] = useState<string | null>(null);
     const [isCreating, setIsCreating] = useState(false);
     const [isManagerOpen, setIsManagerOpen] = useState(false);
     const [closingInfo, setClosingInfo] = useState<{ dealId: string; newStageId: string; status: 'Ganho' | 'Perdido' } | null>(null);
+    const [isDealModalOpen, setIsDealModalOpen] = useState(false);
+    const [editingDeal, setEditingDeal] = useState<DealWithContact | null>(null);
 
     const activePipeline = useMemo(() => {
         return pipelines.find(p => p.id === activePipelineId);
@@ -115,6 +121,35 @@ const Funnel: React.FC = () => {
         }
     };
 
+    const handleOpenDealModal = (deal: DealWithContact) => {
+        setEditingDeal(deal);
+        setIsDealModalOpen(true);
+    };
+
+    const handleSaveDeal = async (dealData: { id?: string; name: string; value: number; stage_id: string; pipeline_id: string; }) => {
+        if (dealData.id) {
+            await updateDeal(dealData.id, { name: dealData.name, value: dealData.value, stage_id: dealData.stage_id });
+            addToast('Negócio atualizado com sucesso!', 'success');
+        }
+        setIsDealModalOpen(false);
+        setEditingDeal(null);
+    };
+
+    const handleDeleteDeal = (deal: Deal) => {
+        showConfirmation(
+            'Excluir Negócio',
+            `Tem certeza de que deseja excluir o negócio "${deal.name}"?`,
+            async () => {
+                try {
+                    await deleteDeal(deal.id);
+                    addToast('Negócio excluído com sucesso.', 'success');
+                } catch (err: any) {
+                    addToast(`Erro ao excluir negócio: ${err.message}`, 'error');
+                }
+            }
+        );
+    };
+
     if (pipelines.length === 0 && !isCreating) {
         return (
              <div className="flex flex-col items-center justify-center h-full text-center text-slate-400">
@@ -164,6 +199,8 @@ const Funnel: React.FC = () => {
                                 onDragStart={handleDragStart}
                                 onDrop={handleDrop}
                                 draggedDealId={draggedDealId}
+                                onEditDeal={handleOpenDealModal}
+                                onDeleteDeal={handleDeleteDeal}
                             />
                         ))}
                         <div className="w-80 flex-shrink-0 h-full flex items-center justify-center">
@@ -182,6 +219,17 @@ const Funnel: React.FC = () => {
                 onSave={handleSaveClosingReason}
                 status={closingInfo?.status || 'Ganho'}
             />
+            {activePipeline && (
+                <DealFormModal
+                    isOpen={isDealModalOpen}
+                    onClose={() => { setIsDealModalOpen(false); setEditingDeal(null); }}
+                    onSave={handleSaveDeal}
+                    pipeline={activePipeline}
+                    stages={activeStages}
+                    contactName={editingDeal?.contacts?.name || ''}
+                    deal={editingDeal || undefined}
+                />
+            )}
         </>
     );
 };
