@@ -14,7 +14,8 @@ export const config = {
   },
 };
 
-// Verifique se as chaves de assinatura estão definidas
+// Verifique se as chaves de assinatura estão definidas no início.
+// Uma falha aqui causará um erro de inicialização da função, que é o comportamento desejado.
 if (!process.env.QSTASH_CURRENT_SIGNING_KEY || !process.env.QSTASH_NEXT_SIGNING_KEY) {
     throw new Error("As variáveis de ambiente QSTASH_CURRENT_SIGNING_KEY e QSTASH_NEXT_SIGNING_KEY são obrigatórias.");
 }
@@ -25,35 +26,43 @@ const receiver = new Receiver({
 });
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-    // Adicionado para lidar com a verificação de endpoint do QStash que usa GET
     if (req.method !== 'POST') {
         res.setHeader('Allow', 'POST');
-        return res.status(200).send('OK');
+        return res.status(200).send('OK'); // Responde a verificações GET
     }
 
-    let payload;
+    let untrustedPayload: any;
+
     try {
         const rawBody = await getRawBody(req);
-        payload = await receiver.verify({
+        const rawBodyString = rawBody.toString();
+
+        // Tenta analisar o corpo primeiro para ter dados disponíveis no bloco catch
+        try {
+            untrustedPayload = JSON.parse(rawBodyString);
+        } catch (e) {
+            console.error("Falha ao analisar o corpo do QStash como JSON:", rawBodyString);
+            return res.status(400).json({ success: false, error: "Corpo JSON inválido" });
+        }
+
+        // Agora, verifica a assinatura. Se falhar, o bloco catch principal será acionado.
+        const payload = await receiver.verify({
             signature: req.headers['upstash-signature'] as string,
-            body: rawBody.toString(),
+            body: rawBodyString,
         });
 
         const { teamId, campaignId, templateId, variables, recipient, userId } = payload;
         
-        // 1. Obter perfil para a configuração da Meta
         const { data: profile, error: profileError } = await supabaseAdmin.from('profiles').select('*').eq('id', userId).single();
         if (profileError || !profile) {
             throw new Error(`Perfil não encontrado para o usuário ${userId}`);
         }
         
-        // 2. Obter o template
         const { data: templateData, error: templateError } = await supabaseAdmin.from('message_templates').select('*').eq('id', templateId).single();
         const template = templateData as unknown as MessageTemplate;
         if (templateError || !template) throw new Error(`Template com ID ${templateId} não encontrado.`);
         if (!template.meta_id) throw new Error(`Template '${template.template_name}' não está sincronizado com a Meta.`);
         
-        // 3. Preparar e enviar a mensagem via API da Meta
         const metaConfig = getMetaConfig(profile);
         const metaTemplateDetails = await getMetaTemplateById(metaConfig, template.meta_id);
 
@@ -73,6 +82,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 finalComponents.push({ type: 'header', parameters: placeholders.map(p => ({ type: 'text', text: resolvePlaceholder(p) })) });
             }
         }
+
         const bodyComponent = templateComponents.find(c => c.type === 'BODY');
         if (bodyComponent?.text) {
             const placeholders = bodyComponent.text.match(/\{\{\d+\}\}/g) || [];
@@ -81,9 +91,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
         }
         
+        const buttonsComponent = templateComponents.find(c => c.type === 'BUTTONS');
+        if (buttonsComponent?.buttons) {
+            buttonsComponent.buttons.forEach((button, index) => {
+                if (button.type === 'URL' && button.url) {
+                    const placeholders = button.url.match(/\{\{\d+\}\}/g) || [];
+                    if (placeholders.length > 0) {
+                        const parameters = placeholders.map(p => ({ type: 'text', text: resolvePlaceholder(p) }));
+                        finalComponents.push({
+                            type: 'button',
+                            sub_type: 'url',
+                            index: String(index),
+                            parameters: parameters,
+                        });
+                    }
+                }
+            });
+        }
+        
         const response = await sendTemplatedMessage(metaConfig, recipient.phone, metaTemplateDetails.name, metaTemplateDetails.language, finalComponents.length > 0 ? finalComponents : undefined);
 
-        // 4. Atualizar o status da mensagem no BD para 'sent'
         let resolvedContent = bodyComponent?.text || `[Template: ${template.template_name}]`;
         const placeholdersInBody = resolvedContent.match(/\{\{\d+\}\}/g) || [];
         for (const placeholder of placeholdersInBody) {
@@ -106,9 +133,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     } catch (error: any) {
         console.error("Erro no worker send-single-message:", error.message);
         
-        // Tenta atualizar a mensagem para 'failed'
-        if (payload) {
-            const { campaignId, recipient } = payload;
+        if (untrustedPayload) {
+            const { campaignId, recipient } = untrustedPayload;
             if (campaignId && recipient?.id) {
                 await supabaseAdmin
                     .from('messages')
@@ -118,7 +144,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
         }
         
-        // Responde com erro para que o QStash possa tentar novamente, se configurado
         res.status(500).json({ success: false, error: error.message });
     }
 }
