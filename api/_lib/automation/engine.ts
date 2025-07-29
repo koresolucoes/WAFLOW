@@ -54,7 +54,7 @@ export const createDefaultLoggingHooks = (automationId: string, contactId: strin
             console.error(`[Execution Logging] Failed to create node log for node ${node.id} in run ${runId}`, logError);
         }
 
-        const { error: rpcError } = await supabaseAdmin.rpc('increment_automation_node_stats', {
+        const { error: rpcError } = await supabaseAdmin.rpc('increment_node_stat', {
             p_automation_id: automationId,
             p_node_id: node.id,
             p_team_id: teamId,
