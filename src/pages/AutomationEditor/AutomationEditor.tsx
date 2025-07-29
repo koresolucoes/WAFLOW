@@ -90,12 +90,12 @@ const nodeStyles = {
     body: "p-4 space-y-2",
     header: "flex items-center gap-3",
     iconContainer: "flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-lg",
-    trigger: "border-sky-500",
+    trigger: "border-slate-500 dark:border-sky-500",
     action: "border-pink-500",
     logic: "border-purple-500",
-    triggerIconBg: "bg-sky-500/10 dark:bg-sky-500/20",
-    actionIconBg: "bg-pink-500/10 dark:bg-pink-500/20",
-    logicIconBg: "bg-purple-500/10 dark:bg-purple-500/20",
+    triggerIconBg: "bg-slate-100 dark:bg-sky-500/20",
+    actionIconBg: "bg-pink-100 dark:bg-pink-500/20",
+    logicIconBg: "bg-purple-100 dark:bg-purple-500/20",
     label: "text-base font-semibold text-slate-800 dark:text-slate-100",
     description: "text-xs text-slate-500 dark:text-slate-400 min-h-[16px]",
 };
@@ -163,10 +163,10 @@ const CustomNode: FC<NodeProps<AutomationNode>> = memo(({ data, id, isConnectabl
             ) : type === 'split_path' ? (
                  <>
                     <Handle type="source" position={Position.Bottom} id="a" style={{ left: '30%' }} isConnectable={isConnectable} className="!bg-sky-500">
-                        <div className="absolute -bottom-5 text-xs text-sky-500 dark:text-sky-400">A</div>
+                        <div className="absolute -bottom-5 text-xs text-slate-600 dark:text-sky-400">A</div>
                     </Handle>
                     <Handle type="source" position={Position.Bottom} id="b" style={{ left: '70%' }} isConnectable={isConnectable} className="!bg-pink-500">
-                        <div className="absolute -bottom-5 text-xs text-pink-500 dark:text-pink-400">B</div>
+                        <div className="absolute -bottom-5 text-xs text-slate-600 dark:text-pink-400">B</div>
                     </Handle>
                 </>
             ) : (

@@ -140,28 +140,28 @@ export type PublicTables = {
   automations: {
     Row: {
       created_at: string
-      edges: Json | null
+      edges: any | null
       id: string
       name: string
-      nodes: Json | null
+      nodes: any | null
       status: PublicEnums["automation_status"]
       team_id: string
     }
     Insert: {
       created_at?: string
-      edges?: Json | null
+      edges?: any | null
       id?: string
       name: string
-      nodes?: Json | null
+      nodes?: any | null
       status?: PublicEnums["automation_status"]
       team_id: string
     }
     Update: {
       created_at?: string
-      edges?: Json | null
+      edges?: any | null
       id?: string
       name?: string
-      nodes?: Json | null
+      nodes?: any | null
       status?: PublicEnums["automation_status"]
       team_id?: string
     }
@@ -257,7 +257,7 @@ export type PublicTables = {
     Row: {
       company: string | null
       created_at: string
-      custom_fields: Json | null
+      custom_fields: any | null
       email: string | null
       id: string
       name: string
@@ -269,7 +269,7 @@ export type PublicTables = {
     Insert: {
       company?: string | null
       created_at?: string
-      custom_fields?: Json | null
+      custom_fields?: any | null
       email?: string | null
       id?: string
       name: string
@@ -281,7 +281,7 @@ export type PublicTables = {
     Update: {
       company?: string | null
       created_at?: string
-      custom_fields?: Json | null
+      custom_fields?: any | null
       email?: string | null
       id?: string
       name?: string
@@ -396,7 +396,7 @@ export type PublicTables = {
   message_templates: {
     Row: {
       category: PublicEnums["template_category"]
-      components: Json
+      components: any
       created_at: string
       id: string
       meta_id: string | null
@@ -406,7 +406,7 @@ export type PublicTables = {
     }
     Insert: {
       category: PublicEnums["template_category"]
-      components: Json
+      components: any
       created_at?: string
       id?: string
       meta_id?: string | null
@@ -416,7 +416,7 @@ export type PublicTables = {
     }
     Update: {
       category?: PublicEnums["template_category"]
-      components?: Json
+      components?: any
       created_at?: string
       id?: string
       meta_id?: string | null
@@ -537,7 +537,7 @@ export type PublicTables = {
       company_name: string | null
       company_products: string | null
       company_tone: string | null
-      dashboard_layout: Json | null
+      dashboard_layout: any | null
       id: string
       meta_access_token: string | null
       meta_phone_number_id: string | null
@@ -552,7 +552,7 @@ export type PublicTables = {
       company_name?: string | null
       company_products?: string | null
       company_tone?: string | null
-      dashboard_layout?: Json | null
+      dashboard_layout?: any | null
       id: string
       meta_access_token?: string | null
       meta_phone_number_id?: string | null
@@ -567,7 +567,7 @@ export type PublicTables = {
       company_name?: string | null
       company_products?: string | null
       company_tone?: string | null
-      dashboard_layout?: Json | null
+      dashboard_layout?: any | null
       id?: string
       meta_access_token?: string | null
       meta_phone_number_id?: string | null
@@ -620,7 +620,7 @@ export type PublicTables = {
       team_id: string
       created_at: string
       source: string
-      payload: Json | null
+      payload: any | null
       path: string | null
     }
     Insert: {
@@ -628,7 +628,7 @@ export type PublicTables = {
       team_id: string
       created_at?: string
       source: string
-      payload?: Json | null
+      payload?: any | null
       path?: string | null
     }
     Update: {
@@ -636,7 +636,7 @@ export type PublicTables = {
       team_id?: string
       created_at?: string
       source?: string
-      payload?: Json | null
+      payload?: any | null
       path?: string | null
     }
   }
