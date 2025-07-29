@@ -197,24 +197,3 @@ export const fetchDashboardData = async (teamId: string): Promise<DashboardData>
         activityFeed,
     };
 };
-
-export const fetchMetaAnalytics = async (params: any): Promise<any> => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) throw new Error("Not authenticated");
-
-    const response = await fetch('/api/meta-analytics', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify(params),
-    });
-
-    if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to fetch Meta analytics data');
-    }
-    
-    return response.json();
-};
