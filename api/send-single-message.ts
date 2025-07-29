@@ -1,8 +1,8 @@
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { Receiver } from '@upstash/qstash/vercel';
 import { supabaseAdmin } from './_lib/supabaseAdmin.js';
 import { sendTemplatedMessage } from './_lib/meta/messages.js';
-import { getMetaTemplateById } from './_lib/meta/templates.js';
 import { getMetaConfig, resolveVariables } from './_lib/automation/helpers.js';
 import { getRawBody } from './_lib/webhook/parser.js';
 import { MessageTemplate } from './_lib/types.js';
@@ -51,20 +51,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             body: rawBodyString,
         });
 
-        const { teamId, campaignId, templateId, variables, recipient, userId } = payload;
+        const { teamId, campaignId, templateId, variables, recipient, userId, metaTemplateName, metaTemplateLanguage } = payload;
         
         const { data: profile, error: profileError } = await supabaseAdmin.from('profiles').select('*').eq('id', userId).single();
         if (profileError || !profile) {
             throw new Error(`Perfil não encontrado para o usuário ${userId}`);
         }
         
+        // Busca o template do DB apenas para construir a mensagem de log final
         const { data: templateData, error: templateError } = await supabaseAdmin.from('message_templates').select('*').eq('id', templateId).single();
         const template = templateData as unknown as MessageTemplate;
         if (templateError || !template) throw new Error(`Template com ID ${templateId} não encontrado.`);
-        if (!template.meta_id) throw new Error(`Template '${template.template_name}' não está sincronizado com a Meta.`);
         
         const metaConfig = getMetaConfig(profile);
-        const metaTemplateDetails = await getMetaTemplateById(metaConfig, template.meta_id);
 
         const context = { contact: recipient, trigger: null };
         const resolvePlaceholder = (placeholder: string) => {
@@ -109,7 +108,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             });
         }
         
-        const response = await sendTemplatedMessage(metaConfig, recipient.phone, metaTemplateDetails.name, metaTemplateDetails.language, finalComponents.length > 0 ? finalComponents : undefined);
+        const response = await sendTemplatedMessage(metaConfig, recipient.phone, metaTemplateName, metaTemplateLanguage, finalComponents.length > 0 ? finalComponents : undefined);
 
         let resolvedContent = bodyComponent?.text || `[Template: ${template.template_name}]`;
         const placeholdersInBody = resolvedContent.match(/\{\{\d+\}\}/g) || [];

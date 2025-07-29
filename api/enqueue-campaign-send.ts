@@ -1,7 +1,12 @@
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { Client } from '@upstash/qstash';
 import { supabaseAdmin } from './_lib/supabaseAdmin.js';
 import { TablesInsert } from './_lib/database.types.js';
+import { getMetaTemplateById } from './_lib/meta/templates.js';
+import { getMetaConfig } from './_lib/automation/helpers.js';
+import { MessageTemplate } from './_lib/types.js';
+
 
 // Verifique se as variáveis de ambiente estão definidas.
 if (!process.env.QSTASH_TOKEN) {
@@ -49,7 +54,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(403).json({ error: 'Acesso negado a esta equipe.' });
         }
 
-        // 4. Salvar campanha e mensagens no DB
+        // 4. Buscar detalhes do template e do perfil UMA VEZ
+        const { data: profile, error: profileError } = await supabaseAdmin.from('profiles').select('*').eq('id', user.id).single();
+        if (profileError || !profile) throw new Error(`Perfil não encontrado para o usuário ${user.id}`);
+
+        const { data: templateData, error: templateError } = await supabaseAdmin.from('message_templates').select('*').eq('id', templateId).single();
+        const template = templateData as unknown as MessageTemplate;
+        if (templateError || !template) throw new Error(`Template com ID ${templateId} não encontrado.`);
+        if (!template.meta_id) throw new Error(`Template '${template.template_name}' não está sincronizado com a Meta.`);
+        
+        const metaConfig = getMetaConfig(profile);
+        const metaTemplateDetails = await getMetaTemplateById(metaConfig, template.meta_id);
+
+        // 5. Salvar campanha e mensagens no DB
         const campaignPayload: TablesInsert<'campaigns'> = {
             name: campaignName,
             team_id: teamId,
@@ -79,7 +96,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             throw messagesError;
         }
 
-        // 5. Construir as mensagens para o QStash
+        // 6. Construir as mensagens para o QStash
         const delayMap = { instant: 0, slow: 60, 'very_slow': 300 };
         const staggerDelay = delayMap[speed as keyof typeof delayMap] || 0;
         const appUrl = process.env.APP_URL;
@@ -87,16 +104,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const qstashMessages = recipients.map((recipient: any, index: number) => {
             const messagePayload: any = {
-                // ✅ **CORREÇÃO**: Usar 'url' para métodos de batch
                 url: `${appUrl}/api/send-single-message`,
-                // ✅ **CORREÇÃO**: 'body' como objeto, 'batchJSON' fará a conversão
                 body: {
                     teamId,
                     campaignId,
                     templateId,
                     variables,
                     recipient,
-                    userId: user.id
+                    userId: user.id,
+                    metaTemplateName: metaTemplateDetails.name,
+                    metaTemplateLanguage: metaTemplateDetails.language,
                 },
             };
 
@@ -109,7 +126,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return messagePayload;
         });
 
-        // 6. ✅ **CORREÇÃO**: Publicar as mensagens usando qstashClient.batchJSON
+        // 7. Publicar as mensagens usando qstashClient.batchJSON
         if (qstashMessages.length > 0) {
             await qstashClient.batchJSON(qstashMessages);
         }
