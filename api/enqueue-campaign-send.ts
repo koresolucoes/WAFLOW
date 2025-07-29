@@ -3,9 +3,12 @@ import { Client } from '@upstash/qstash';
 import { supabaseAdmin } from './_lib/supabaseAdmin.js';
 import { TablesInsert } from './_lib/database.types.js';
 
-// Verifique se as variáveis de ambiente do QStash estão definidas.
+// Verifique se as variáveis de ambiente do QStash e da App URL estão definidas.
 if (!process.env.QSTASH_TOKEN) {
     throw new Error("A variável de ambiente QSTASH_TOKEN é obrigatória.");
+}
+if (!process.env.APP_URL) {
+    throw new Error("A variável de ambiente APP_URL é obrigatória.");
 }
 
 const qstashClient = new Client({
@@ -81,25 +84,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const delayMap = { instant: 0, slow: 60, 'very_slow': 300 };
         const staggerDelay = delayMap[speed as keyof typeof delayMap] || 0;
         
-        const vercelUrl = process.env.VERCEL_URL;
-        if (!vercelUrl) {
-          return res.status(500).json({ message: 'A variável de ambiente VERCEL_URL não está configurada.' });
-        }
-    
+        const appUrl = process.env.APP_URL;
         const scheduleTimestamp = scheduleDate ? Math.floor(new Date(scheduleDate).getTime() / 1000) : undefined;
 
         const qstashMessages = recipients.map((recipient: any, index: number) => {
             const messagePayload: any = {
-                url: `https://${vercelUrl}/api/send-single-message`,
-                body: JSON.stringify({
+                destination: `${appUrl}/api/send-single-message`,
+                body: { // O corpo agora é um objeto, não uma string JSON
                     teamId,
                     campaignId,
                     templateId,
                     variables,
                     recipient,
                     userId: user.id
-                }),
-                headers: { "Content-Type": "application/json" },
+                },
             };
             
             if (scheduleTimestamp) {
@@ -111,12 +109,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
 
             return messagePayload;
-        }));
+        });
 
-
-        // 6. Publicar as mensagens em lote para o QStash
+        // 6. Publicar as mensagens em lote para o QStash usando publishJSON
         if (qstashMessages.length > 0) {
-            await qstashClient.batch(qstashMessages);
+            await qstashClient.publishJSON(qstashMessages);
         }
         
         return res.status(202).json({ message: 'Campanha aceita e enfileirada para envio.' });
