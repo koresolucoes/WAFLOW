@@ -17,6 +17,8 @@ const handler = async (req: VercelRequest, res: VercelResponse) => {
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method Not Allowed' });
     }
+    
+    const messageIdFromBody = req.body?.messageId;
 
     try {
         const { messageId, userId, variables } = req.body;
@@ -27,7 +29,7 @@ const handler = async (req: VercelRequest, res: VercelResponse) => {
 
         const { data: message, error: msgError } = await supabaseAdmin
             .from('messages')
-            .select('*, contacts(*), campaigns(*), message_templates(*)')
+            .select('*, contacts(*), campaigns!inner(*, message_templates!inner(*))')
             .eq('id', messageId)
             .single();
 
@@ -45,7 +47,11 @@ const handler = async (req: VercelRequest, res: VercelResponse) => {
 
         const metaConfig = getMetaConfig(profile as any);
         const contact = message.contacts as any;
-        const template = message.message_templates as any as MessageTemplate;
+        const campaignWithTemplate = message.campaigns as any;
+        if (!campaignWithTemplate) {
+             throw new Error(`Campaign data not found for message ${messageId}`);
+        }
+        const template = campaignWithTemplate.message_templates as any as MessageTemplate;
 
         if (!contact || !template || !template.meta_id) {
             throw new Error(`Contact or template invalid for message ${messageId}`);
@@ -84,29 +90,38 @@ const handler = async (req: VercelRequest, res: VercelResponse) => {
 
         const response = await sendTemplatedMessage(metaConfig, contact.phone, metaTemplateDetails.name, metaTemplateDetails.language, finalComponents.length > 0 ? finalComponents : undefined);
         
-        await supabaseAdmin.from('messages').update({
+        const { error: updateError } = await supabaseAdmin.from('messages').update({
             status: 'sent',
             meta_message_id: response.messages[0].id,
             sent_at: new Date().toISOString(),
             content: resolvedContent,
         }).eq('id', messageId);
 
-        // Check if this was the last message to update campaign status
-        const campaign = message.campaigns as any;
-        if (campaign) {
-            const { count } = await supabaseAdmin.from('messages').select('*', { count: 'exact', head: true }).eq('campaign_id', campaign.id).eq('status', 'pending');
-            if (count === 0) {
-                 await supabaseAdmin.from('campaigns').update({ status: 'Sent' }).eq('id', campaign.id);
+        if (updateError) {
+            console.error(`[Process Campaign] Failed to update message status for ${messageId}:`, updateError);
+        }
+
+        if (campaignWithTemplate) {
+            const { count, error: countError } = await supabaseAdmin
+                .from('messages')
+                .select('*', { count: 'exact', head: true })
+                .eq('campaign_id', campaignWithTemplate.id)
+                .eq('status', 'pending');
+            
+            if (countError) {
+                console.error(`[Process Campaign] Error checking remaining messages for campaign ${campaignWithTemplate.id}:`, countError);
+            } else if (count === 0) {
+                 console.log(`[Process Campaign] Last message for campaign ${campaignWithTemplate.id} processed. Updating campaign status to 'Sent'.`);
+                 await supabaseAdmin.from('campaigns').update({ status: 'Sent' }).eq('id', campaignWithTemplate.id);
             }
         }
 
         res.status(200).json({ success: true });
 
     } catch (err: any) {
-        console.error(`Error processing message ${req.body?.messageId}:`, err);
-        // Update message to failed
-        if(req.body?.messageId) {
-            await supabaseAdmin.from('messages').update({ status: 'failed', error_message: err.message }).eq('id', req.body.messageId);
+        console.error(`Error processing message ${messageIdFromBody}:`, err);
+        if(messageIdFromBody) {
+            await supabaseAdmin.from('messages').update({ status: 'failed', error_message: err.message }).eq('id', messageIdFromBody);
         }
         res.status(500).json({ error: 'Failed to process campaign message.', details: err.message });
     }
@@ -130,7 +145,6 @@ const verifiedHandler = async (req: VercelRequest, res: VercelResponse) => {
       return res.status(401).send("Invalid signature");
   }
   
-  // Attach parsed body for the main handler
   if (rawBody.length > 0) {
     req.body = JSON.parse(rawBody.toString('utf-8'));
   }

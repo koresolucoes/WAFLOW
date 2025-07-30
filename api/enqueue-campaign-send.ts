@@ -54,7 +54,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             team_id: teamId,
             campaign_id: campaign.id,
             contact_id: contact.id,
-            message_template_id: templateId,
             content: 'Message enqueued for sending.', // Placeholder, will be updated by processor
             status: 'pending',
             type: 'outbound',
