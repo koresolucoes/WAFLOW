@@ -1,81 +1,100 @@
-
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { Client } from 'https://esm.sh/@upstash/qstash@^2.8.1';
+import { Client } from "@upstash/qstash";
 import { supabaseAdmin } from './_lib/supabaseAdmin.js';
 import { TablesInsert } from './_lib/database.types.js';
-import { getMetaTemplateById } from './_lib/meta/templates.js';
-import { getMetaConfig } from './_lib/automation/helpers.js';
-import { MessageTemplate } from './_lib/types.js';
 
-
-// Verifique se as variáveis de ambiente estão definidas.
-if (!process.env.QSTASH_TOKEN) {
-    throw new Error("A variável de ambiente QSTASH_TOKEN é obrigatória.");
-}
-if (!process.env.APP_URL) {
-    throw new Error("A variável de ambiente APP_URL é obrigatória.");
-}
-
-const qstashClient = new Client({
-    token: process.env.QSTASH_TOKEN,
-});
+const qstash = new Client({ token: process.env.QSTASH_TOKEN! });
+const vercelUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'POST') {
-        res.setHeader('Allow', 'POST');
-        return res.status(405).json({ message: 'Apenas requisições POST são permitidas' });
+        return res.status(405).json({ error: 'Method Not Allowed' });
     }
 
     try {
-        // 1. Autenticar o usuário
         const authHeader = req.headers.authorization;
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
-            return res.status(401).json({ error: 'O cabeçalho de autorização está ausente ou malformado.' });
+            return res.status(401).json({ error: 'Authorization header is missing or malformed.' });
         }
         const token = authHeader.split(' ')[1];
         const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
+
         if (userError || !user) {
-            return res.status(401).json({ error: 'Não autorizado' });
+            return res.status(401).json({ error: 'Unauthorized' });
         }
 
-        // 2. Validar o corpo da requisição
-        const { teamId, templateId, variables, recipients, speed, campaignName, scheduleDate } = req.body;
-        if (!teamId || !templateId || !recipients || !Array.isArray(recipients) || !speed || !campaignName) {
-            return res.status(400).json({ error: 'Faltando campos obrigatórios no corpo da requisição.' });
+        const {
+            campaignName,
+            templateId,
+            variables,
+            recipients,
+            speed,
+            teamId,
+            scheduleDate
+        } = req.body;
+
+        if (!campaignName || !templateId || !recipients || !speed || !teamId) {
+            return res.status(400).json({ error: 'Missing required campaign parameters.' });
         }
 
-        // 3. Verificar se o usuário é membro da equipe
-        const { count, error: memberError } = await supabaseAdmin
-            .from('team_members')
-            .select('*', { count: 'exact', head: true })
-            .eq('user_id', user.id)
-            .eq('team_id', teamId);
-        if (memberError || count === 0) {
-            return res.status(403).json({ error: 'Acesso negado a esta equipe.' });
-        }
-
-        // 4. Buscar detalhes do template e do perfil UMA VEZ
-        const { data: profile, error: profileError } = await supabaseAdmin.from('profiles').select('*').eq('id', user.id).single();
-        if (profileError || !profile) throw new Error(`Perfil não encontrado para o usuário ${user.id}`);
-
-        const { data: templateData, error: templateError } = await supabaseAdmin.from('message_templates').select('*').eq('id', templateId).single();
-        const template = templateData as unknown as MessageTemplate;
-        if (templateError || !template) throw new Error(`Template com ID ${templateId} não encontrado.`);
-        if (!template.meta_id) throw new Error(`Template '${template.template_name}' não está sincronizado com a Meta.`);
-        
-        const metaConfig = getMetaConfig(profile);
-        const metaTemplateDetails = await getMetaTemplateById(metaConfig, template.meta_id);
-
-        // 5. Salvar campanha e mensagens no DB
+        // 1. Create campaign record
         const campaignPayload: TablesInsert<'campaigns'> = {
             name: campaignName,
-            team_id: teamId,
             template_id: templateId,
             status: 'Scheduled',
-            sent_at: scheduleDate ? new Date(scheduleDate).toISOString() : new Date().toISOString(),
-            recipient_count: recipients.length,
+            sent_at: scheduleDate || new Date().toISOString(),
+            team_id: teamId,
+            recipient_count: recipients.length
         };
-
-        const { data: newCampaignData, error: campaignError } = await supabaseAdmin.from('campaigns').insert(campaignPayload as any).select('id').single();
+        const { data: campaign, error: campaignError } = await supabaseAdmin.from('campaigns').insert(campaignPayload as any).select().single();
         if (campaignError) throw campaignError;
         
+        // 2. Create message records
+        const messagesToInsert: TablesInsert<'messages'>[] = recipients.map((contact: any) => ({
+            team_id: teamId,
+            campaign_id: campaign.id,
+            contact_id: contact.id,
+            message_template_id: templateId,
+            content: 'Message enqueued for sending.', // Placeholder, will be updated by processor
+            status: 'pending',
+            type: 'outbound',
+            source: 'campaign',
+        }));
+
+        const { data: messages, error: messagesError } = await supabaseAdmin.from('messages').insert(messagesToInsert as any).select('id');
+        if (messagesError) throw messagesError;
+
+        // 3. Enqueue messages with QStash
+        const delaySeconds = speed === 'slow' ? 60 : speed === 'very_slow' ? 300 : 0;
+        
+        const publishPromises = messages.map((message, index) => {
+            const payload = {
+                messageId: message.id,
+                userId: user.id,
+                variables: variables
+            };
+            const options: any = {};
+
+            if(scheduleDate) {
+                const scheduleTimestamp = new Date(scheduleDate).getTime();
+                options.notBefore = Math.floor(scheduleTimestamp / 1000) + (index * delaySeconds);
+            } else if (delaySeconds > 0) {
+                options.delay = index * delaySeconds;
+            }
+            
+            return qstash.publishJSON({
+                url: `${vercelUrl}/api/process-campaign-message`,
+                body: payload,
+                ...options,
+            });
+        });
+
+        await Promise.all(publishPromises);
+        
+        res.status(202).json({ message: 'Campaign successfully enqueued.' });
+
+    } catch (err: any) {
+        console.error('Error in enqueue-campaign-send:', err);
+        res.status(500).json({ error: 'Failed to enqueue campaign.', details: err.message });
+    }
+}
