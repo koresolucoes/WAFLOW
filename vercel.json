@@ -1,4 +1,9 @@
 {
+  "routes": [
+    { "src": "/api/webhook/.*" },
+    { "src": "/api/trigger/.*" },
+    { "src": "/api/process-campaign-message" }
+  ],
   "rewrites": [
     {
       "source": "/((?!api/).*)",
