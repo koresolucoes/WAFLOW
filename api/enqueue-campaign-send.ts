@@ -4,7 +4,7 @@ import { supabaseAdmin } from './_lib/supabaseAdmin.js';
 import { TablesInsert } from './_lib/database.types.js';
 
 const qstash = new Client({ token: process.env.QSTASH_TOKEN! });
-const vercelUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000';
+const callbackBaseUrl = process.env.APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'POST') {
@@ -82,7 +82,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
             
             return qstash.publishJSON({
-                url: `${vercelUrl}/api/process-campaign-message`,
+                url: `${callbackBaseUrl}/api/process-campaign-message`,
                 body: payload,
                 ...options,
             });

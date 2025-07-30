@@ -135,10 +135,13 @@ const verifiedHandler = async (req: VercelRequest, res: VercelResponse) => {
       return res.status(401).send("Signature missing");
   }
 
+  const callbackBaseUrl = process.env.APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined);
+  const verificationUrl = callbackBaseUrl ? `${callbackBaseUrl}${req.url}` : undefined;
+
   const isValid = await verify({
     signature,
     body: rawBody.toString('utf-8'),
-    url: process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}${req.url}` : undefined,
+    url: verificationUrl,
   });
 
   if (!isValid) {
