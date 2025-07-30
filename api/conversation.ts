@@ -43,32 +43,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 return res.status(403).json({ error: 'Access denied to this team.' });
             }
             
-            const { data: existingConversation, error: selectError } = await supabaseAdmin
+            const { error: upsertError } = await supabaseAdmin
                 .from('conversations')
-                .select('id')
-                .eq('team_id', teamId)
-                .eq('contact_id', contactId)
-                .maybeSingle();
+                .upsert({
+                    team_id: teamId,
+                    contact_id: contactId,
+                    assignee_id: assigneeId,
+                    status: 'open',
+                    updated_at: new Date().toISOString(),
+                } as any, {
+                    onConflict: 'team_id, contact_id'
+                });
 
-            if (selectError) throw selectError;
-
-            if (existingConversation) {
-                const { error: updateError } = await supabaseAdmin
-                    .from('conversations')
-                    .update({ assignee_id: assigneeId, updated_at: new Date().toISOString() } as any)
-                    .eq('id', existingConversation.id);
-                if (updateError) throw updateError;
-            } else {
-                const { error: insertError } = await supabaseAdmin
-                    .from('conversations')
-                    .insert({
-                        team_id: teamId,
-                        contact_id: contactId,
-                        assignee_id: assigneeId,
-                        status: 'open',
-                    } as any);
-                if (insertError) throw insertError;
-            }
+            if (upsertError) throw upsertError;
 
             return res.status(200).json({ success: true });
 

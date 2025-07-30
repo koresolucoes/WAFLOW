@@ -404,23 +404,64 @@ export const useAuthStore = create<AuthState>((set, get) => {
   setContacts: (updater) => set(state => ({ contacts: typeof updater === 'function' ? updater(state.contacts) : updater })),
   setContactDetails: (updater) => set(state => ({ contactDetails: typeof updater === 'function' ? updater(state.contactDetails) : updater })),
   addContact: async (contact) => {
-    const teamId = get().activeTeam?.id;
-    if (!teamId) throw new Error("Nenhuma equipe ativa selecionada.");
+    const { activeTeam, user } = get();
+    const teamId = activeTeam?.id;
+    if (!teamId || !user) throw new Error("Nenhuma equipe ativa ou usuário selecionado.");
+    
     const newContact = await contactService.addContactToDb(teamId, contact);
+    
     set(state => ({
       contacts: [newContact, ...state.contacts],
       allTags: [...new Set([...state.allTags, ...(newContact.tags || [])])].sort()
     }));
+
+    // Fire and forget automation trigger
+    fetch('/api/run-trigger', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            eventType: 'contact_created',
+            userId: user.id,
+            contactId: newContact.id,
+        })
+    }).catch(e => console.error("Failed to run 'contact_created' trigger:", e));
   },
   updateContact: async (contact) => {
-    const teamId = get().activeTeam?.id;
-    if (!teamId) throw new Error("Nenhuma equipe ativa selecionada.");
+    const { activeTeam, user, contacts } = get();
+    const teamId = activeTeam?.id;
+    if (!teamId || !user) throw new Error("Nenhuma equipe ativa ou usuário selecionado.");
+
+    const originalContact = contacts.find(c => c.id === contact.id);
+    const originalTags = new Set(originalContact?.tags || []);
+    
     const updatedContact = await contactService.updateContactInDb(teamId, contact);
-    set(state => ({
-      contacts: state.contacts.map(c => c.id === updatedContact.id ? updatedContact : c),
-      allTags: [...new Set(state.contacts.flatMap(c => c.tags || []))].sort(),
-      contactDetails: state.contactDetails?.id === updatedContact.id ? { ...state.contactDetails, ...updatedContact } : state.contactDetails
-    }));
+
+    const newTags = new Set(updatedContact.tags || []);
+    const addedTags = [...newTags].filter(tag => !originalTags.has(tag));
+
+    set(state => {
+        const newContacts = state.contacts.map(c => c.id === updatedContact.id ? updatedContact : c);
+        const newAllTags = [...new Set(newContacts.flatMap(c => c.tags || []))].sort();
+        return {
+            contacts: newContacts,
+            allTags: newAllTags,
+            contactDetails: state.contactDetails?.id === updatedContact.id ? { ...state.contactDetails, ...updatedContact } : state.contactDetails
+        };
+    });
+
+    // Fire automation trigger for added tags
+    if (addedTags.length > 0) {
+        fetch('/api/run-trigger', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                eventType: 'tags_added',
+                userId: user.id,
+                contactId: updatedContact.id,
+                data: { addedTags }
+            })
+        }).catch(e => console.error("Failed to run 'tags_added' trigger:", e));
+    }
   },
   deleteContact: async (contactId) => {
     const teamId = get().activeTeam?.id;
@@ -536,18 +577,52 @@ export const useAuthStore = create<AuthState>((set, get) => {
   setDeals: (updater) => set(state => ({ deals: typeof updater === 'function' ? updater(state.deals) : updater })),
   setActivePipelineId: (id) => set({ activePipelineId: id }),
   addDeal: async (dealData) => {
-    const teamId = get().activeTeam?.id;
-    if (!teamId) throw new Error("Nenhuma equipe ativa selecionada.");
+    const { activeTeam, user } = get();
+    const teamId = activeTeam?.id;
+    if (!teamId || !user) throw new Error("Nenhuma equipe ativa ou usuário selecionado.");
+    
     const newDeal = await funnelService.addDealToDb({ ...dealData, team_id: teamId });
+    
     set(state => ({ deals: [newDeal, ...state.deals] }));
+
+    // Fire and forget automation trigger
+    fetch('/api/run-trigger', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            eventType: 'deal_created',
+            userId: user.id,
+            contactId: newDeal.contact_id,
+            data: { deal: newDeal }
+        })
+    }).catch(e => console.error("Failed to run 'deal_created' trigger:", e));
   },
   updateDeal: async (dealId, updates) => {
-    const teamId = get().activeTeam?.id;
-    if (!teamId) throw new Error("Nenhuma equipe ativa selecionada.");
+    const { activeTeam, user, deals } = get();
+    const teamId = activeTeam?.id;
+    if (!teamId || !user) throw new Error("Nenhuma equipe ativa ou usuário selecionado.");
+
+    const originalDeal = deals.find(d => d.id === dealId);
+    
     const updatedDeal = await funnelService.updateDealInDb(dealId, teamId, updates);
+
     set(state => ({
       deals: state.deals.map(d => d.id === dealId ? updatedDeal : d)
     }));
+    
+    // Fire automation trigger if stage changed
+    if (updates.stage_id && originalDeal && originalDeal.stage_id !== updates.stage_id) {
+        fetch('/api/run-trigger', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                eventType: 'deal_stage_changed',
+                userId: user.id,
+                contactId: updatedDeal.contact_id,
+                data: { deal: updatedDeal, new_stage_id: updates.stage_id }
+            })
+        }).catch(e => console.error("Failed to run 'deal_stage_changed' trigger:", e));
+    }
   },
   deleteDeal: async (dealId) => {
     const teamId = get().activeTeam?.id;
@@ -659,7 +734,14 @@ export const useAuthStore = create<AuthState>((set, get) => {
     set({ inboxLoading: true });
     try {
       const convos = await inboxService.fetchConversationsFromDb(teamId);
-      set({ conversations: convos });
+      const membersMap = new Map(get().allTeamMembers.map(m => [m.user_id, m.email]));
+      
+      const convosWithEmail = convos.map(c => ({
+          ...c,
+          assignee_email: c.assignee_id ? membersMap.get(c.assignee_id) || null : null
+      }));
+
+      set({ conversations: convosWithEmail });
     } catch (error) {
       console.error("Failed to fetch conversations:", error);
     } finally {
@@ -736,11 +818,15 @@ export const useAuthStore = create<AuthState>((set, get) => {
   },
   assignConversation: async (contactId, assigneeId) => {
     await inboxService.assignConversation(contactId, assigneeId);
-    set(state => ({
-      conversations: state.conversations.map(c => 
-        c.contact.id === contactId ? { ...c, assignee_id: assigneeId } : c
-      )
-    }));
+    set(state => {
+        const membersMap = new Map(state.allTeamMembers.map(m => [m.user_id, m.email]));
+        const assigneeEmail = assigneeId ? membersMap.get(assigneeId) || null : null;
+        return {
+            conversations: state.conversations.map(c => 
+                c.contact.id === contactId ? { ...c, assignee_id: assigneeId, assignee_email: assigneeEmail } : c
+            )
+        };
+    });
   },
   deleteConversation: async (contactId) => {
     await inboxService.deleteConversation(contactId);
