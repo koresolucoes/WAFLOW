@@ -185,7 +185,10 @@ export const handleTagAddedEvent = async (userId: string, contact: Contact, adde
 const handleDealCreatedEvent = async (userId: string, contact: Contact, deal: Deal) => {
     console.log(`[HANDLER] Processing deal_created event for deal ${deal.id}`);
     const { data: teamData, error: teamError } = await supabaseAdmin.from('teams').select('id').eq('owner_id', userId).single();
-    if (teamError || !teamData) return;
+    if (teamError || !teamData) {
+        console.error(`[HANDLER] Could not find team for user ${userId} in DealCreatedEvent. Aborting.`);
+        return;
+    }
     const { data: triggers, error } = await supabaseAdmin.from('automation_triggers').select('automation_id, node_id').eq('team_id', teamData.id).eq('trigger_type', 'deal_created');
     if (error) { console.error(`[HANDLER] Error in DealCreatedEvent:`, error); return; }
     if (triggers && triggers.length > 0) {
