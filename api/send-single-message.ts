@@ -1,6 +1,6 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { Receiver } from '@upstash/qstash/vercel';
+import { Receiver } from 'https://esm.sh/@upstash/qstash@^2.8.1/vercel';
 import { supabaseAdmin } from './_lib/supabaseAdmin.js';
 import { sendTemplatedMessage } from './_lib/meta/messages.js';
 import { getMetaConfig, resolveVariables } from './_lib/automation/helpers.js';

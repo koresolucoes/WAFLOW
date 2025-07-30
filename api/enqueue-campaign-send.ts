@@ -1,6 +1,6 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { Client } from '@upstash/qstash';
+import { Client } from 'https://esm.sh/@upstash/qstash@^2.8.1';
 import { supabaseAdmin } from './_lib/supabaseAdmin.js';
 import { TablesInsert } from './_lib/database.types.js';
 import { getMetaTemplateById } from './_lib/meta/templates.js';
@@ -78,63 +78,4 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const { data: newCampaignData, error: campaignError } = await supabaseAdmin.from('campaigns').insert(campaignPayload as any).select('id').single();
         if (campaignError) throw campaignError;
-        const campaignId = (newCampaignData as any).id;
-
-        const messagesToInsert = recipients.map((r: any) => ({
-            campaign_id: campaignId,
-            team_id: teamId,
-            contact_id: r.id,
-            status: 'pending',
-            type: 'outbound',
-            source: 'campaign',
-            content: 'Enfileirado via QStash...',
-        }));
-
-        const { error: messagesError } = await supabaseAdmin.from('messages').insert(messagesToInsert as any);
-        if (messagesError) {
-            await supabaseAdmin.from('campaigns').delete().eq('id', campaignId);
-            throw messagesError;
-        }
-
-        // 6. Construir as mensagens para o QStash
-        const delayMap = { instant: 0, slow: 60, 'very_slow': 300 };
-        const staggerDelay = delayMap[speed as keyof typeof delayMap] || 0;
-        const appUrl = process.env.APP_URL;
-        const scheduleTimestamp = scheduleDate ? Math.floor(new Date(scheduleDate).getTime() / 1000) : undefined;
-
-        const qstashMessages = recipients.map((recipient: any, index: number) => {
-            const messagePayload: any = {
-                url: `${appUrl}/api/send-single-message`,
-                body: {
-                    teamId,
-                    campaignId,
-                    templateId,
-                    variables,
-                    recipient,
-                    userId: user.id,
-                    metaTemplateName: metaTemplateDetails.name,
-                    metaTemplateLanguage: metaTemplateDetails.language,
-                },
-            };
-
-            if (scheduleTimestamp) {
-                messagePayload.notBefore = scheduleTimestamp + (index * staggerDelay);
-            } else if (staggerDelay > 0) {
-                messagePayload.delay = index * staggerDelay;
-            }
-
-            return messagePayload;
-        });
-
-        // 7. Publicar as mensagens usando qstashClient.batchJSON
-        if (qstashMessages.length > 0) {
-            await qstashClient.batchJSON(qstashMessages);
-        }
-
-        return res.status(202).json({ message: 'Campanha aceita e enfileirada para envio.' });
-
-    } catch (error: any) {
-        console.error("Erro na função enqueue-campaign-send:", error);
-        return res.status(500).json({ message: "Falha ao enfileirar a campanha.", error: error.message });
-    }
-}
+        
